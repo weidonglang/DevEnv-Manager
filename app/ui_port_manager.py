@@ -6,14 +6,14 @@ from tkinter import messagebox, ttk
 
 import customtkinter as ctk
 
-from port.port_models import PortRecord
-from port.port_scanner import filter_records, scan_ports
+from port.port_models import PortRecord, analyze_record
+from port.port_scanner import filter_records, scan_ports, summarize_records
 from port.process_control import kill_process
 
 
 class PortManagerPage(ctk.CTkFrame):
-    COLUMNS = ("protocol", "local", "port", "remote", "status", "pid", "name")
-    HEADINGS = ("协议", "本地地址", "端口", "远程地址", "状态", "PID", "进程名")
+    COLUMNS = ("protocol", "local", "port", "remote", "status", "pid", "name", "service")
+    HEADINGS = ("协议", "本地地址", "端口", "远程地址", "状态", "PID", "进程名", "常见用途")
 
     def __init__(self, master, services) -> None:
         super().__init__(master, fg_color="transparent")
@@ -49,7 +49,11 @@ class PortManagerPage(ctk.CTkFrame):
         actions.grid(row=2, column=0, padx=8, pady=4, sticky="ew")
         actions.grid_columnconfigure(0, weight=1)
         self.search_var = ctk.StringVar()
-        search = ctk.CTkEntry(actions, textvariable=self.search_var, placeholder_text="端口 / PID / 进程名 / 协议 / 状态")
+        search = ctk.CTkEntry(
+            actions,
+            textvariable=self.search_var,
+            placeholder_text='智能搜索，例如 port:8000-9000 name:java -pid:4 status:listen',
+        )
         search.grid(row=0, column=0, padx=8, pady=8, sticky="ew")
         search.bind("<KeyRelease>", lambda _event: self.apply_filter())
         ctk.CTkButton(actions, text="扫描 / 刷新  F5", width=120, command=self.scan).grid(row=0, column=1, padx=4)
@@ -63,9 +67,16 @@ class PortManagerPage(ctk.CTkFrame):
         self.listen_var = ctk.BooleanVar(value=False)
         self.hide_var = ctk.BooleanVar(value=True)
         self.auto_var = ctk.BooleanVar(value=False)
+        self.conflict_var = ctk.BooleanVar(value=False)
         ctk.CTkCheckBox(filters, text="只看监听端口", variable=self.listen_var, command=self.apply_filter).pack(side="left", padx=6)
         ctk.CTkCheckBox(filters, text="隐藏 PID 0/4", variable=self.hide_var, command=self.apply_filter).pack(side="left", padx=6)
         ctk.CTkCheckBox(filters, text="10 秒自动刷新", variable=self.auto_var, command=self._toggle_auto).pack(side="left", padx=6)
+        ctk.CTkCheckBox(filters, text="只看疑似冲突", variable=self.conflict_var, command=self.apply_filter).pack(side="left", padx=6)
+        ctk.CTkLabel(
+            filters,
+            text="支持 port/pid/name/proto/status/local/remote/user/path/service 字段和 -排除",
+            text_color=("gray40", "gray65"),
+        ).pack(side="right", padx=6)
         shortcuts = ctk.CTkFrame(self, fg_color="transparent")
         shortcuts.grid(row=4, column=0, padx=8, pady=3, sticky="ew")
         for text, value in (
@@ -83,7 +94,7 @@ class PortManagerPage(ctk.CTkFrame):
         table_frame.grid_columnconfigure(0, weight=1)
         table_frame.grid_rowconfigure(0, weight=1)
         self.tree = ttk.Treeview(table_frame, columns=self.COLUMNS, show="headings", selectmode="extended")
-        widths = (65, 160, 70, 180, 95, 80, 160)
+        widths = (60, 145, 65, 165, 85, 70, 135, 135)
         for column, heading, width in zip(self.COLUMNS, self.HEADINGS, widths):
             self.tree.heading(column, text=heading, command=lambda c=column: self.sort_by(c))
             self.tree.column(column, width=width, minwidth=55, anchor="center")
@@ -130,11 +141,24 @@ class PortManagerPage(ctk.CTkFrame):
         self.records = records
         self.services.port_count = len(records)
         self.apply_filter()
-        self.status.configure(text=f"扫描完成，共发现 {len(records)} 条记录。安全提示：PID 0/4 和关键系统进程禁止结束。")
+        summary = summarize_records(records)
+        self.status.configure(
+            text=(
+                f"扫描完成：{summary['records']} 条连接，{summary['ports']} 个协议/端口，"
+                f"{summary['listeners']} 条监听，{summary['processes']} 个进程，"
+                f"{summary['conflicts']} 个疑似冲突。"
+            )
+        )
         self.services.log.write(f"端口扫描完成，共发现 {len(records)} 条记录")
 
     def apply_filter(self) -> None:
-        self.filtered = filter_records(self.records, self.search_var.get(), self.listen_var.get(), self.hide_var.get())
+        self.filtered = filter_records(
+            self.records,
+            self.search_var.get(),
+            self.listen_var.get(),
+            self.hide_var.get(),
+            self.conflict_var.get(),
+        )
         selected_keys = {
             (self.tree.set(item, "pid"), self.tree.set(item, "port")) for item in self.tree.selection()
         }
@@ -167,7 +191,10 @@ class PortManagerPage(ctk.CTkFrame):
 
     def _show_details(self, _event=None) -> None:
         selected = self.selected_records()
-        text = selected[0].details() if selected else "未选择进程。"
+        text = (
+            selected[0].details() + "\n\n" + analyze_record(selected[0], self.records)
+            if selected else "未选择进程。"
+        )
         self.details.configure(state="normal")
         self.details.delete("1.0", "end")
         self.details.insert("1.0", text)
