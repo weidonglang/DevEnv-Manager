@@ -135,3 +135,20 @@ def switch_junction(link: Path, target: Path, root: Path) -> None:
     )
     if result.returncode != 0:
         raise RuntimeError(result.stderr.strip() or result.stdout.strip() or "创建版本指针失败")
+
+
+def remove_junction(link: Path) -> None:
+    if not link.exists():
+        return
+    if not is_junction(link):
+        raise RuntimeError(f"拒绝删除非链接目录：{link}")
+    result = subprocess.run(
+        ["cmd", "/c", "rmdir", str(link)],
+        capture_output=True,
+        text=True,
+        encoding="gbk",
+        errors="replace",
+        creationflags=subprocess.CREATE_NO_WINDOW,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr.strip() or result.stdout.strip() or "删除版本指针失败")

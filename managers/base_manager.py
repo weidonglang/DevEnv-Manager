@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
+import shutil
 from typing import Callable
 
 from core.config_store import ConfigService
-from core.env_var import switch_junction
+from core.env_var import remove_junction, switch_junction
 from core.event_log import EventLog
 from core.process_runner import run_command
 
@@ -65,3 +66,23 @@ class BaseRuntimeManager:
         if not result.success:
             raise RuntimeError(result.output or f"{executable.name} 验证失败")
         return result.output
+
+    def uninstall(self, version: str) -> Path:
+        data = self.config.installed()
+        record = next((item for item in data[self.collection] if item.get("version") == version), None)
+        if not record:
+            raise RuntimeError(f"未找到 DevEnv 管理的 {self.kind} {version}")
+        target = Path(record["path"]).resolve()
+        expected_parent = getattr(self.config.paths, self.collection).resolve()
+        if target.parent != expected_parent:
+            raise RuntimeError(f"拒绝删除非标准受管目录：{target}")
+        link = self.config.paths.current / self.kind
+        if data["current"].get(self.kind) == version:
+            remove_junction(link)
+            data["current"][self.kind] = None
+        if target.exists():
+            shutil.rmtree(target)
+        data[self.collection] = [item for item in data[self.collection] if item.get("version") != version]
+        self.config.update_installed(data)
+        self.event_log.write(f"已卸载 {self.kind} {version}：{target}")
+        return target

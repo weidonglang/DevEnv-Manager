@@ -17,7 +17,7 @@ class PythonManager(BaseRuntimeManager):
     kind = "python"
     collection = "pythons"
     executable = "python"
-    supported_versions = ("3.10", "3.11")
+    supported_versions = ("3.9", "3.10", "3.11", "3.12", "3.13", "3.14")
 
     def find_existing_install(self, version: str) -> Path | None:
         candidates: list[Path] = []

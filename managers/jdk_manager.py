@@ -12,7 +12,7 @@ class JdkManager(BaseRuntimeManager):
     kind = "jdk"
     collection = "jdks"
     executable = "java"
-    supported_versions = ("17", "21")
+    supported_versions = ("8", "11", "17", "21", "25")
 
     def resolve_release(self, version: str) -> dict[str, str]:
         if version not in self.supported_versions:

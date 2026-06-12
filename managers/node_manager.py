@@ -15,7 +15,7 @@ class NodeManager(BaseRuntimeManager):
     kind = "node"
     collection = "nodes"
     executable = "node"
-    supported_versions = ("20", "22")
+    supported_versions = ("16", "18", "20", "22", "24")
 
     def resolve_release(self, version: str) -> dict[str, str]:
         if version not in self.supported_versions:
