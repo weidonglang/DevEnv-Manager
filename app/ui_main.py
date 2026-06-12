@@ -107,7 +107,7 @@ class HomePage(ScrollablePage):
     def diagnose(self) -> None:
         def work(update):
             update(20, "正在检查环境变量")
-            result = run_diagnostics(self.services.config.paths)
+            result = run_diagnostics(self.services.config)
             update(90, "正在生成报告")
             return result
         self.services.submit_task("环境诊断", work, self._show_report)
