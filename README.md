@@ -1,32 +1,51 @@
 # DevEnv Manager
 
-DevEnv Manager 是面向 Windows 的多版本开发环境管理与端口占用控制工具。它可以从官方源自动下载、安装和切换 JDK、Python、Node.js，并提供环境诊断、端口进程管理、PATH 修复、系统运行时卸载入口和安装后健康检查。
+面向 Windows 的一站式开发环境管理器。
 
-当前仓库包含两个版本：
+适合：
 
-- `tauri/`：最新 Tauri + Rust 重构版，安装包体积更小，启动更轻，后续主要维护这个版本。
+- Java / Spring Boot 学习者
+- Python 初学者和多版本用户
+- 前端开发者
+- 经常被 PATH、JAVA_HOME、pip、npm、端口占用折磨的人
+- 想把 JDK、Python、Node.js、Maven、Gradle 安装到固定目录并快速切换的人
+
+一句话：Windows 开发环境坏了？用 DevEnv Manager 一键诊断、一键修复、一键跑项目。
+
+## 当前版本
+
+仓库包含两个实现：
+
+- `tauri/`：最新 Tauri 2 + Rust + TypeScript 重构版，后续主线维护。
 - 根目录 Python/CustomTkinter 版本：旧版实现，保留用于对照和迁移。
 
-## Tauri/Rust 重构版
+## Tauri/Rust 重构版能力
 
-重构版位于 `tauri/`，使用 Tauri 2、Rust 和 TypeScript 实现。
+- JDK、Python、Node.js、Maven、Gradle 的下载、安装、切换、卸载和 `current` 指针管理。
+- 安装根目录智能规范化：选择 `D:\` 时自动使用 `D:\DevEnvManager`，避免把文件散在盘符根目录。
+- 安装和切换后自动健康检查，验证命令和环境变量是否真的生效。
+- 下载安装过程展示进度：查询、下载、解压、静默安装、验证。
+- 用户级环境变量管理：`DEVENV_HOME`、`JAVA_HOME`、PATH 备份、恢复、清理。
+- 环境医生：一键诊断、评分、问题列表、修复建议、导出 Markdown 报告。
+- Python 冲突分析：检测默认 `python`、`pip`、`py -0p`、注册表、Microsoft Store 执行别名风险。
+- 配置模板：保存当前 JDK/Python/Node/Maven/Gradle 组合和用户环境变量，可快速恢复。
+- 项目启动向导：识别 Node/Python/Maven/Gradle/Rust/Tauri/.NET/Go 项目，给出运行时建议和常用操作。
+- 端口管理：扫描 TCP/UDP、固定列宽排序、常用端口筛选、智能搜索、安全结束普通进程。
+- 网络诊断、下载缓存管理、命令面板、自身卸载入口。
+- 后台执行耗时任务，隐藏 Windows 命令窗口，减少闪屏和界面卡顿。
 
-### 新版能力
+## 使用流程
 
-- 更小的 Windows 安装包：NSIS 安装包约 1-2 MB，独立 exe 约 4 MB。
-- 安装根目录智能规范化：选择 `D:\` 时会自动使用 `D:\DevEnvManager`，避免污染盘符根目录。
-- JDK、Python、Node.js、Maven、Gradle 的下载、安装、切换、卸载和 current 指针管理。
-- 安装或切换运行时后自动执行健康检查，验证命令和环境变量是否真的生效。
-- 下载安装过程显示持续进度，能看到查询、下载、解压、验证等阶段。
-- 发现系统已有 Java/Python/Node.js/Maven/Gradle，并尝试通过 Windows 卸载注册表启动正式卸载器。
-- 环境健康检查：检查 `DEVENV_HOME`、`JAVA_HOME`、PATH、受管 JDK/Python/Node/Maven/Gradle。
-- 配置模板：保存当前 JDK/Python/Node/Maven/Gradle 组合和用户环境变量，之后可一键恢复。
-- PATH 检查会区分真实失效、重复项和“托管路径待安装”，支持清理真实失效 PATH。
-- 端口管理支持固定列宽排序、常用端口筛选和智能搜索，例如 `8080`、`java web`、`mysql`、`redis`。
-- 后台执行安装、切换、扫描和诊断任务，避免界面卡死和命令窗口闪烁。
-- 工具箱支持启动 DevEnv Manager 自身卸载程序。
+1. 打开 Tauri 新版。
+2. 在“总览”确认安装根目录，默认优先使用 `D:\DevEnvManager`。
+3. 在“运行时”安装或切换 JDK / Python / Node.js / Maven / Gradle。
+4. 在“环境”点击“配置”，写入用户级 `DEVENV_HOME`、`JAVA_HOME` 和受管 PATH。
+5. 在“环境医生”点击“一键诊断”，查看评分、问题和建议。
+6. 在“运行时”的 Python 环境分析里检查 pip 是否和当前 Python 匹配。
+7. 在“项目启动向导”输入项目目录，分析项目并运行安装依赖、测试或开发服务。
+8. 在“端口”搜索 `8080`、`spring`、`mysql`、`vite` 等关键词快速定位冲突。
 
-### 新版开发运行
+## 开发运行
 
 ```powershell
 cd tauri
@@ -34,30 +53,100 @@ npm install
 npm run tauri:dev
 ```
 
-### 新版打包
+## 打包发布
 
 ```powershell
 cd tauri
 npm run tauri:build
 ```
 
-输出位于：
+输出位置：
 
 - `tauri\src-tauri\target\release\bundle\nsis\DevEnv Manager_0.1.0_x64-setup.exe`
 - `tauri\src-tauri\target\release\bundle\msi\DevEnv Manager_0.1.0_x64_en-US.msi`
 - `tauri\src-tauri\target\release\dailytools-tauri.exe`
 
-## 功能
+## 测试
 
-- JDK 17/21：通过 Eclipse Adoptium API 获取 Temurin Windows x64 ZIP。
-- Python 3.10/3.11：自动选择仍提供 Windows x64 安装器的最新补丁版本。
-- Node.js 20/22：通过 Node.js 官方版本索引获取 Windows x64 ZIP。
-- 多版本并存，通过 `current` junction 切换当前版本。
-- 仅配置当前用户的 `DEVENV_HOME`、`JAVA_HOME` 和 `PATH`。
-- PATH 修改前备份，重复配置不会重复追加。
-- 环境诊断、任务状态、运行时状态和最近事件日志。
-- TCP/UDP 端口扫描、搜索、快捷筛选、排序、详情和复制。
-- 安全结束普通进程，拦截 PID 0、PID 4 和关键系统进程。
+```powershell
+cd tauri\src-tauri
+cargo test
+
+cd ..\
+npm run build
+```
+
+## 安全说明
+
+- 只修改当前用户级环境变量，不修改系统级环境变量。
+- 下载域名走白名单：Adoptium、GitHub、Node.js、Python、Apache、Gradle 等官方源。
+- ZIP 解压阻止路径穿越。
+- 删除和卸载受管运行时前会校验路径必须位于 DevEnv Manager 根目录内。
+- 外部运行时只通过 Windows 正式卸载注册表入口启动卸载器，不直接删除用户外部目录。
+- 结束进程会拦截 PID 0、PID 4、System、lsass.exe、csrss.exe、wininit.exe、winlogon.exe、services.exe 等关键进程。
+- 导出诊断报告会脱敏用户目录和常见敏感键值，不导出私钥、token、密码。
+- 不包含账号系统、云同步、遥测、广告或联网统计。
+
+## 常见问题
+
+**为什么修改环境变量后当前终端没有变化？**  
+已经启动的 CMD、PowerShell、IDE 不会自动继承新环境变量，请重新打开终端或 IDE。
+
+**为什么选择 D 盘后安装到了 `D:\DevEnvManager`？**  
+这是有意设计，避免把 `current`、`envs`、`downloads` 等目录直接散在 D 盘根目录。
+
+**为什么 Python 安装后没有全局 `py` 命令？**  
+受管 Python 默认不安装全局 Python Launcher，避免和你已有的系统 Python 抢占。建议使用受管 PATH 中的 `python`，或在 Python 分析里检查现有 `py -0p`。
+
+**为什么卸载外部运行时提示找不到卸载入口？**  
+它可能是绿色版、IDE 内置运行时、Scoop/压缩包安装，或没有注册到 Windows 卸载表。此时工具不会直接删除外部目录，只会给出手动建议。
+
+**为什么 Maven / Gradle 要求 JAVA_HOME？**  
+Maven 和 Gradle 需要有效 JDK。新版会在受管命令执行时注入 `JAVA_HOME=%DEVENV_HOME%\current\jdk`，安装或切换后也会重新验证。
+
+## 手动测试清单
+
+- 全新 Windows 环境首次打开。
+- 修改安装根目录，特别是选择 `D:\`。
+- 安装 JDK 17/21，并切换验证。
+- 安装 Python 3.12/3.14，并验证 `python -m pip --version`。
+- 安装 Node.js 22，并验证 `npm --version`。
+- 安装 Maven / Gradle，并验证 JAVA_HOME 处理。
+- 配置用户环境变量后重新打开终端测试。
+- 故意制造重复或失效 PATH，再清理。
+- 运行环境医生并导出报告。
+- 检测多个 Python 和 Microsoft Store Python 别名。
+- 扫描 8080、5173、3306、5432、6379 端口。
+- 结束普通 node/java 进程，确认系统关键进程被拦截。
+- 分析 Node/Python/Java/Tauri/Rust 项目。
+- 生成 VS Code 配置。
+- 清理下载缓存。
+- 启动自身卸载入口。
+- 打包 Tauri 安装包。
+
+## 路线图
+
+已实现的核心 P0：
+
+- 环境医生
+- Python 多版本冲突分析
+- 项目启动向导
+- 诊断报告导出
+- 配置模板保存和恢复
+- 安装进度和切换后验证
+
+后续规划：
+
+- Git / GitHub SSH Key、LFS、全局用户名邮箱诊断和修复。
+- Node.js 生态增强：pnpm、yarn、corepack、npm registry、global prefix。
+- Python 生态增强：uv、poetry、virtualenv、pip 镜像源。
+- Go、Rust、.NET SDK 更完整的检测、安装引导和项目动作。
+- 镜像源与网络加速中心。
+- Docker / WSL 检测。
+- 数据库和本地服务端口解释器。
+- 配置模板导入、导出和团队模板。
+- 更新检查和 GitHub Releases 入口。
+- 可选 CLI：`devenv doctor`、`devenv use jdk 21`、`devenv project check .`。
 
 ## 旧版 Python 开发运行
 
@@ -70,52 +159,10 @@ python -m pip install -r requirements.txt
 python main.py
 ```
 
-## 旧版 Python 打包
-
-双击 `build_exe.bat`，或执行：
+旧版打包：
 
 ```powershell
 .\build_exe.bat
 ```
 
-输出位于 `dist\DevEnvManager.exe`。目标电脑不需要预装 Python、JDK 或 Node.js。
-
-## 使用说明
-
-1. 在“设置”中选择安装根目录，默认优先使用 `D:\DevEnvManager`。
-2. 在“环境管理”中安装所需版本，安装成功后会自动激活。
-3. 在首页点击“一键修复 PATH”，然后重新打开终端或 IDE。
-4. 使用“一键诊断”验证命令和环境变量。
-5. 在“端口管理器”中扫描、搜索和处理端口占用。
-
-## 安全说明
-
-- 下载只允许 Adoptium、GitHub、Node.js 和 Python 官方域名。
-- JDK 与 Node.js 下载会执行官方 SHA-256 校验。
-- ZIP 解压会阻止路径穿越。
-- 安装路径必须位于用户选择的根目录内。
-- 软件不修改系统级环境变量。
-- PID 0、PID 4 和关键 Windows 进程禁止结束。
-
-## 常见问题
-
-**为什么修改环境变量后当前终端没有变化？**  
-已启动的 CMD、PowerShell 和 IDE 不会自动刷新进程环境，请重新打开。
-
-**为什么 PID 4 不能结束？**  
-PID 4 是 Windows System 进程，直接结束会危害系统稳定性。
-
-**为什么 80/443 被 System 占用？**  
-常见原因包括 IIS、HTTP.sys、Hyper-V、Docker、WSL 或其他系统服务。
-
-**为什么 Python 安装后没有 `py` 命令？**  
-本工具刻意不安装全局 Python Launcher，避免与已有 Python 冲突。请使用 `python`。
-
-**为什么不默认安装到 C 盘？**  
-运行时和下载文件体积较大，默认优先放在 D 盘，并允许用户自定义位置。
-
-## 测试
-
-```powershell
-python -m pytest -q
-```
+输出位于 `dist\DevEnvManager.exe`。

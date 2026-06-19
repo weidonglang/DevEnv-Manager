@@ -442,6 +442,8 @@ th {
 }
 
 .sort-head {
+  display: inline-flex;
+  align-items: center;
   justify-content: flex-start;
   width: 100%;
   min-height: 24px;
@@ -614,6 +616,93 @@ select {
 
 .profile-list {
   margin-top: 14px;
+}
+
+.doctor-panel {
+  gap: 16px;
+}
+
+.doctor-score {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+  padding: 14px;
+  border: 1px solid #d8e8df;
+  border-radius: 8px;
+  background: #f4fbf7;
+}
+
+.doctor-score strong {
+  font-size: 40px;
+  line-height: 1;
+  color: #17633f;
+}
+
+.doctor-score span {
+  color: #52616b;
+  overflow-wrap: anywhere;
+}
+
+.suggestion-list,
+.doctor-checks,
+.python-analysis {
+  display: grid;
+  gap: 10px;
+}
+
+.suggestion,
+.doctor-check {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #e3e9ed;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.suggestion div,
+.doctor-check div {
+  display: grid;
+  gap: 3px;
+}
+
+.suggestion span,
+.doctor-check span,
+.doctor-check small {
+  color: #62717c;
+  overflow-wrap: anywhere;
+}
+
+.doctor-check.warning {
+  border-color: #efc9a3;
+  background: #fff9ec;
+}
+
+.doctor-check.notice {
+  border-color: #cfdbea;
+  background: #f6f9fc;
+}
+
+.runtime.warn {
+  border-color: #efc9a3;
+  background: #fff9ec;
+}
+
+.compact-grid {
+  margin-top: 12px;
+}
+
+.compact-grid h3 {
+  margin: 0 0 10px;
+  font-size: 14px;
+}
+
+.project-action-item {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
 }
 
 .health-item.ok {
