@@ -3,7 +3,9 @@ import { listen } from "@tauri-apps/api/event";
 import {
   Activity,
   Boxes,
+  Clipboard,
   Download,
+  FileText,
   FolderSearch,
   Gauge,
   Hammer,
@@ -149,6 +151,73 @@ type ConfigProfile = {
   path: string;
 };
 
+type DoctorReport = {
+  score: number;
+  summary: string;
+  generatedAt: string;
+  checks: Array<{
+    id: string;
+    title: string;
+    category: string;
+    status: string;
+    severity: string;
+    detail: string;
+    fixAction?: string;
+  }>;
+  suggestions: Array<{
+    id: string;
+    title: string;
+    description: string;
+    action?: string;
+  }>;
+};
+
+type PythonAnalysis = {
+  currentPython?: PythonToolState;
+  currentPip?: PythonToolState;
+  launcherOutput: string;
+  discoveredPythons: PythonEntry[];
+  discoveredPips: PythonEntry[];
+  risks: string[];
+  recommendations: string[];
+  pipRepairCommand: string;
+  aliasSettingsCommand: string;
+};
+
+type PythonToolState = {
+  path: string;
+  version: string;
+  status: string;
+  detail: string;
+};
+
+type PythonEntry = {
+  path: string;
+  source: string;
+  version: string;
+  current: boolean;
+};
+
+type ProjectAnalysis = {
+  root: string;
+  projectTypes: string[];
+  detectedFiles: string[];
+  packageManager?: string;
+  recommendedRuntime: Array<{
+    name: string;
+    requirement: string;
+    status: string;
+  }>;
+  actions: Array<{
+    id: string;
+    title: string;
+    command: string;
+    description: string;
+    safeToRun: boolean;
+  }>;
+  warnings: string[];
+};
+
 const app = document.querySelector<HTMLDivElement>("#app");
 
 if (!app) {
@@ -167,6 +236,7 @@ app.innerHTML = `
       </div>
       <nav class="nav">
         <button class="nav-item active" data-view="overview">${icon(Gauge)}<span>总览</span></button>
+        <button class="nav-item" data-view="doctor">${icon(Shield)}<span>环境医生</span></button>
         <button class="nav-item" data-view="ports">${icon(Network)}<span>端口</span></button>
         <button class="nav-item" data-view="runtimes">${icon(Terminal)}<span>运行时</span></button>
         <button class="nav-item" data-view="environment">${icon(Route)}<span>环境</span></button>
@@ -220,7 +290,8 @@ app.innerHTML = `
               <li><span class="dot done"></span> 端口扫描 MVP</li>
               <li><span class="dot done"></span> JDK 下载、安装和切换</li>
               <li><span class="dot done"></span> PATH 修复与恢复</li>
-              <li><span class="dot todo"></span> Python / Node / Maven / Gradle 安装链路</li>
+              <li><span class="dot done"></span> Python / Node / Maven / Gradle 安装和验证</li>
+              <li><span class="dot done"></span> 环境医生、Python 冲突分析、项目启动向导</li>
             </ul>
           </section>
         </div>
@@ -231,6 +302,24 @@ app.innerHTML = `
             <button id="save-root"><span>保存</span></button>
           </div>
           <div id="root-detail" class="small-note"></div>
+        </section>
+      </section>
+
+      <section id="view-doctor" class="view">
+        <section class="panel doctor-panel">
+          <div class="panel-head">
+            <div class="panel-title">${icon(Shield)}<h2>环境医生</h2></div>
+            <div class="toolbar compact">
+              <button id="run-doctor" class="primary">${icon(Activity)}<span>一键诊断</span></button>
+              <button id="export-doctor">${icon(FileText)}<span>导出报告</span></button>
+            </div>
+          </div>
+          <div id="doctor-score" class="doctor-score">
+            <strong>--</strong>
+            <span>还没有诊断结果</span>
+          </div>
+          <div id="doctor-suggestions" class="suggestion-list"></div>
+          <div id="doctor-checks" class="doctor-checks"></div>
         </section>
       </section>
 
@@ -333,6 +422,13 @@ app.innerHTML = `
           <div id="managed-pythons" class="runtime-list"></div>
         </section>
         <section class="panel runtime-manager">
+          <div class="panel-head">
+            <div class="panel-title">${icon(Activity)}<h2>Python 环境分析</h2></div>
+            <button id="analyze-python">${icon(Search)}<span>分析</span></button>
+          </div>
+          <div id="python-analysis" class="python-analysis"></div>
+        </section>
+        <section class="panel runtime-manager">
           <div class="panel-title">${icon(Download)}<h2>构建工具</h2></div>
           <div class="toolbar">
             <button id="install-maven">${icon(Download)}<span>安装 Maven 最新版</span></button>
@@ -410,15 +506,16 @@ app.innerHTML = `
 
       <section id="view-project" class="view">
         <section class="panel">
-          <div class="panel-title">${icon(FolderSearch)}<h2>项目健康</h2></div>
+          <div class="panel-title">${icon(FolderSearch)}<h2>项目启动向导</h2></div>
           <div class="form-row">
             <input id="project-path" value="E:\\\\pycode\\\\dailytools" />
-            <button id="check-project">${icon(Play)}<span>检查</span></button>
+            <button id="check-project">${icon(Play)}<span>分析</span></button>
           </div>
           <div class="toolbar project-actions">
             <button id="generate-vscode">${icon(Hammer)}<span>生成 VS Code 配置</span></button>
           </div>
           <div id="project-health" class="project-health"></div>
+          <pre id="project-output" class="command-output"></pre>
         </section>
       </section>
     </section>
@@ -435,6 +532,9 @@ const state = {
   cache: [] as CacheEntry[],
   health: [] as EnvHealthCheck[],
   profiles: [] as ConfigProfile[],
+  doctor: null as DoctorReport | null,
+  python: null as PythonAnalysis | null,
+  project: null as ProjectAnalysis | null,
 };
 
 const portState = {
@@ -754,6 +854,126 @@ function renderProfiles() {
     : `<div class="empty">还没有保存配置模板</div>`;
 }
 
+function renderDoctor() {
+  const score = document.querySelector<HTMLElement>("#doctor-score");
+  const checks = document.querySelector<HTMLElement>("#doctor-checks");
+  const suggestions = document.querySelector<HTMLElement>("#doctor-suggestions");
+  if (!score || !checks || !suggestions) return;
+  const report = state.doctor;
+  if (!report) {
+    score.innerHTML = `<strong>--</strong><span>点击“一键诊断”生成环境评分</span>`;
+    checks.innerHTML = `<div class="empty">还没有诊断结果</div>`;
+    suggestions.innerHTML = "";
+    return;
+  }
+  const warningCount = report.checks.filter((item) => item.severity !== "info" || item.status !== "正常").length;
+  score.innerHTML = `<strong>${report.score}</strong><span>${escapeHtml(report.summary)} · ${warningCount} 项需要关注</span>`;
+  suggestions.innerHTML = report.suggestions
+    .map(
+      (item) => `
+        <article class="suggestion">
+          <div><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.description)}</span></div>
+          ${item.action ? `<button data-action="doctor-fix" data-fix="${escapeHtml(item.action)}">${doctorActionLabel(item.action)}</button>` : ""}
+        </article>
+      `,
+    )
+    .join("");
+  checks.innerHTML = report.checks
+    .map(
+      (item) => `
+        <article class="doctor-check ${escapeHtml(item.severity)}">
+          <div>
+            <strong>${escapeHtml(item.title)}</strong>
+            <span>${escapeHtml(item.category)} · ${escapeHtml(item.status)}</span>
+          </div>
+          <small>${escapeHtml(item.detail || "无详情")}</small>
+          ${item.fixAction ? `<button data-action="doctor-fix" data-fix="${escapeHtml(item.fixAction)}">${doctorActionLabel(item.fixAction)}</button>` : ""}
+        </article>
+      `,
+    )
+    .join("");
+}
+
+function doctorActionLabel(action: string) {
+  const labels: Record<string, string> = {
+    cleanup_path: "清理 PATH",
+    configure_env: "配置环境",
+    discover_runtimes: "刷新运行时",
+    python_analysis: "查看 Python",
+    export_report: "导出报告",
+    network: "网络诊断",
+    ports: "查看端口",
+    cache: "查看缓存",
+    copy_fix_command: "复制建议",
+  };
+  return labels[action] || "处理";
+}
+
+function renderPythonAnalysis() {
+  const element = document.querySelector<HTMLElement>("#python-analysis");
+  if (!element) return;
+  const analysis = state.python;
+  if (!analysis) {
+    element.innerHTML = `<div class="empty">点击“分析”查看 python、pip、py launcher 和 Microsoft Store 别名风险</div>`;
+    return;
+  }
+  const currentPython = analysis.currentPython
+    ? `<article class="runtime">
+        <div><strong>默认 python</strong><span>${escapeHtml(analysis.currentPython.status)}</span></div>
+        <small>${escapeHtml(analysis.currentPython.version)} · ${escapeHtml(analysis.currentPython.path)}</small>
+      </article>`
+    : `<article class="runtime warn"><div><strong>默认 python</strong><span>未发现</span></div><small>PATH 上没有可用 python</small></article>`;
+  const currentPip = analysis.currentPip
+    ? `<article class="runtime ${analysis.currentPip.status === "正常" ? "" : "warn"}">
+        <div><strong>默认 pip</strong><span>${escapeHtml(analysis.currentPip.status)}</span></div>
+        <small>${escapeHtml(analysis.currentPip.version)} · ${escapeHtml(analysis.currentPip.path)}</small>
+      </article>`
+    : `<article class="runtime warn"><div><strong>默认 pip</strong><span>未发现</span></div><small>建议使用 python -m ensurepip --upgrade</small></article>`;
+
+  element.innerHTML = `
+    <div class="runtime-list">${currentPython}${currentPip}</div>
+    <div class="chip-row">${analysis.risks.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}</div>
+    <div class="toolbar compact">
+      <button data-action="copy-text" data-copy="${escapeHtml(analysis.pipRepairCommand)}">${icon(Clipboard)}<span>复制 pip 修复命令</span></button>
+      <button data-action="copy-text" data-copy="${escapeHtml(analysis.aliasSettingsCommand)}">${icon(Clipboard)}<span>复制别名设置命令</span></button>
+    </div>
+    <div class="grid two compact-grid">
+      <section>
+        <h3>发现的 Python</h3>
+        <div class="runtime-list">
+          ${analysis.discoveredPythons
+            .map(
+              (item) => `
+                <article class="runtime">
+                  <div><strong>${escapeHtml(item.version)}</strong><span>${escapeHtml(item.source)}${item.current ? " · 默认" : ""}</span></div>
+                  <small>${escapeHtml(item.path)}</small>
+                </article>
+              `,
+            )
+            .join("") || `<div class="empty">没有发现 Python</div>`}
+        </div>
+      </section>
+      <section>
+        <h3>发现的 pip / py launcher</h3>
+        <div class="runtime-list">
+          ${analysis.discoveredPips
+            .map(
+              (item) => `
+                <article class="runtime">
+                  <div><strong>${escapeHtml(item.version)}</strong><span>${escapeHtml(item.source)}${item.current ? " · 默认" : ""}</span></div>
+                  <small>${escapeHtml(item.path)}</small>
+                </article>
+              `,
+            )
+            .join("") || `<div class="empty">没有发现 pip</div>`}
+        </div>
+        <pre class="command-output">${escapeHtml(analysis.launcherOutput)}</pre>
+      </section>
+    </div>
+    <ul>${analysis.recommendations.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+  `;
+}
+
 function filteredPorts(records: PortRecord[]) {
   const terms = expandPortQuery(portState.query);
   return records.filter((record) => {
@@ -833,6 +1053,53 @@ function renderProjectHealth(health: ProjectHealth) {
   `;
 }
 
+function renderProjectAnalysis(analysis: ProjectAnalysis) {
+  const element = document.querySelector<HTMLElement>("#project-health");
+  if (!element) return;
+  state.project = analysis;
+  element.innerHTML = `
+    <div class="project-summary">
+      <strong>${escapeHtml(analysis.root)}</strong>
+      <span>${analysis.projectTypes.length ? analysis.projectTypes.join(" / ") : "未识别项目类型"}</span>
+    </div>
+    <div class="chip-row">${analysis.detectedFiles.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}</div>
+    <div class="grid two compact-grid">
+      <section>
+        <h3>推荐环境</h3>
+        <div class="runtime-list">
+          ${analysis.recommendedRuntime
+            .map(
+              (item) => `
+                <article class="runtime">
+                  <div><strong>${escapeHtml(item.name)}</strong><span>${escapeHtml(item.status)}</span></div>
+                  <small>${escapeHtml(item.requirement)}</small>
+                </article>
+              `,
+            )
+            .join("") || `<div class="empty">没有特殊运行时要求</div>`}
+        </div>
+      </section>
+      <section>
+        <h3>建议操作</h3>
+        <div class="runtime-list">
+          ${analysis.actions
+            .map(
+              (item) => `
+                <article class="runtime project-action-item">
+                  <div><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.command)}</span></div>
+                  <small>${escapeHtml(item.description)}</small>
+                  <button data-action="project-run" data-project-action="${escapeHtml(item.id)}">${item.id === "copy_commands" ? icon(Clipboard) : icon(Play)}<span>${item.id === "copy_commands" ? "复制" : "运行"}</span></button>
+                </article>
+              `,
+            )
+            .join("")}
+        </div>
+      </section>
+    </div>
+    ${analysis.warnings.length ? `<ul>${analysis.warnings.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>` : ""}
+  `;
+}
+
 async function refreshBase() {
   const [snapshot, config, envSnapshot, profiles] = await Promise.all([
     invoke<AppSnapshot>("app_snapshot"),
@@ -849,6 +1116,8 @@ async function refreshBase() {
   renderEnv();
   renderHealth();
   renderProfiles();
+  renderDoctor();
+  renderPythonAnalysis();
   renderRuntimes();
   renderPorts();
 }
@@ -919,6 +1188,74 @@ async function runRuntimeOperation(
     }
   } catch (error) {
     showToast(error instanceof Error ? error.message : String(error), true);
+  }
+}
+
+async function copyText(text: string) {
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast("已复制到剪贴板");
+  } catch {
+    showToast(text);
+  }
+}
+
+async function runDoctorAction(action: string) {
+  if (action === "cleanup_path") {
+    await runOperation(() => invoke<OperationResult>("cleanup_path_entries"), "正在清理 PATH");
+    return;
+  }
+  if (action === "configure_env") {
+    await runOperation(() => invoke<OperationResult>("configure_user_environment"), "正在配置用户环境变量");
+    return;
+  }
+  if (action === "discover_runtimes") {
+    state.runtimes = await invoke<RuntimeInfo[]>("discover_runtimes");
+    renderRuntimes();
+    activateView("runtimes");
+    showToast("运行时刷新完成");
+    return;
+  }
+  if (action === "python_analysis") {
+    activateView("runtimes");
+    state.python = await invoke<PythonAnalysis>("analyze_python_environment");
+    renderPythonAnalysis();
+    showToast("Python 环境分析完成");
+    return;
+  }
+  if (action === "export_report") {
+    if (!state.doctor) {
+      state.doctor = await invoke<DoctorReport>("run_doctor");
+      renderDoctor();
+    }
+    const report = state.doctor!;
+    await runOperation(() => invoke<OperationResult>("export_doctor_report", { report }), "正在导出诊断报告");
+    return;
+  }
+  if (action === "network") {
+    activateView("toolbox");
+    state.network = await invoke<NetworkDiagnostics>("network_diagnostics");
+    renderNetwork();
+    showToast("网络诊断完成");
+    return;
+  }
+  if (action === "ports") {
+    activateView("ports");
+    state.ports = await invoke<PortRecord[]>("scan_ports");
+    renderPorts();
+    showToast("端口扫描完成");
+    return;
+  }
+  if (action === "cache") {
+    activateView("toolbox");
+    state.cache = await invoke<CacheEntry[]>("cache_entries", { calculateHash: false });
+    renderCache();
+    showToast("缓存列表已刷新");
+    return;
+  }
+  if (action === "copy_fix_command") {
+    await copyText("devenv doctor");
+    return;
   }
 }
 
@@ -1023,6 +1360,31 @@ document.querySelectorAll<HTMLButtonElement>(".nav-item").forEach((button) => {
 });
 
 document.querySelector("#refresh-all")?.addEventListener("click", () => void refreshAll(true));
+document.querySelector("#run-doctor")?.addEventListener("click", async () => {
+  showToast("环境医生正在诊断");
+  try {
+    state.doctor = await invoke<DoctorReport>("run_doctor");
+    renderDoctor();
+    showToast("环境诊断完成");
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), true);
+  }
+});
+document.querySelector("#export-doctor")?.addEventListener("click", async () => {
+  try {
+    if (!state.doctor) {
+      state.doctor = await invoke<DoctorReport>("run_doctor");
+      renderDoctor();
+    }
+    const report = state.doctor!;
+    await runOperation(
+      () => invoke<OperationResult>("export_doctor_report", { report }),
+      "正在导出诊断报告",
+    );
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), true);
+  }
+});
 document.querySelector("#save-root")?.addEventListener("click", () => {
   const input = document.querySelector<HTMLInputElement>("#root-dir");
   if (!input) return;
@@ -1068,6 +1430,16 @@ document.querySelector("#install-maven")?.addEventListener("click", () => {
 });
 document.querySelector("#install-gradle")?.addEventListener("click", () => {
   void runRuntimeOperation(() => invoke<OperationResult>("install_gradle_latest"), "正在安装 Gradle 最新版", "Gradle");
+});
+document.querySelector("#analyze-python")?.addEventListener("click", async () => {
+  showToast("正在分析 Python 环境");
+  try {
+    state.python = await invoke<PythonAnalysis>("analyze_python_environment");
+    renderPythonAnalysis();
+    showToast("Python 环境分析完成");
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), true);
+  }
 });
 document.querySelector("#configure-env")?.addEventListener("click", () => {
   void runOperation(() => invoke<OperationResult>("configure_user_environment"), "正在配置用户环境变量");
@@ -1139,8 +1511,14 @@ document.querySelector("#run-command")?.addEventListener("click", async () => {
 document.querySelector("#check-project")?.addEventListener("click", async () => {
   const input = document.querySelector<HTMLInputElement>("#project-path");
   if (!input) return;
-  const health = await invoke<ProjectHealth>("project_health", { path: input.value });
-  renderProjectHealth(health);
+  showToast("正在分析项目");
+  try {
+    const analysis = await invoke<ProjectAnalysis>("analyze_project", { path: input.value });
+    renderProjectAnalysis(analysis);
+    showToast("项目分析完成");
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), true);
+  }
 });
 document.querySelector("#generate-vscode")?.addEventListener("click", () => {
   const input = document.querySelector<HTMLInputElement>("#project-path");
@@ -1181,6 +1559,38 @@ document.addEventListener("click", (event) => {
   const button = (event.target as HTMLElement).closest<HTMLButtonElement>("button[data-action]");
   if (!button) return;
   const action = button.dataset.action;
+  if (action === "doctor-fix") {
+    const fix = button.dataset.fix || "";
+    void runDoctorAction(fix).catch((error) => showToast(error instanceof Error ? error.message : String(error), true));
+  }
+  if (action === "copy-text") {
+    void copyText(button.dataset.copy || "");
+  }
+  if (action === "project-run") {
+    const input = document.querySelector<HTMLInputElement>("#project-path");
+    const output = document.querySelector<HTMLElement>("#project-output");
+    const projectAction = button.dataset.projectAction || "";
+    const command = state.project?.actions.find((item) => item.id === projectAction)?.command || "";
+    if (!input) return;
+    if (projectAction === "copy_commands") {
+      void invoke<CommandRunResult>("run_project_action", { path: input.value, action: projectAction })
+        .then((result) => copyText(result.output))
+        .catch((error) => showToast(error instanceof Error ? error.message : String(error), true));
+      return;
+    }
+    const longRunning = projectAction === "npm_dev" || projectAction === "npm_tauri_dev";
+    const ok = longRunning || window.confirm(`将运行：${command}\n\n工作目录：${input.value}\n\n确定继续吗？`);
+    if (!ok) return;
+    showToast(longRunning ? "正在后台启动开发服务" : "正在运行项目命令");
+    void invoke<CommandRunResult>("run_project_action", { path: input.value, action: projectAction })
+      .then((result) => {
+        if (output) {
+          output.textContent = `退出码 ${result.returnCode} · ${result.elapsedMs} ms\n${result.output}`;
+        }
+        showToast(result.success ? "项目操作完成" : "项目操作失败", !result.success);
+      })
+      .catch((error) => showToast(error instanceof Error ? error.message : String(error), true));
+  }
   if (action === "switch-jdk") {
     const version = button.dataset.version || "";
     const path = button.dataset.path || null;

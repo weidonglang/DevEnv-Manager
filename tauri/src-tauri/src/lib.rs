@@ -8,7 +8,7 @@ use std::fs;
 use std::io::{self, Read, Write};
 use std::net::{IpAddr, Ipv4Addr};
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::time::Instant;
 use tauri::Emitter;
 use tempfile::Builder as TempBuilder;
@@ -235,6 +235,99 @@ struct EnvHealthCheck {
     name: String,
     status: String,
     detail: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct DoctorReport {
+    score: u8,
+    summary: String,
+    checks: Vec<DoctorCheck>,
+    suggestions: Vec<DoctorSuggestion>,
+    generated_at: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct DoctorCheck {
+    id: String,
+    title: String,
+    category: String,
+    status: String,
+    severity: String,
+    detail: String,
+    fix_action: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct DoctorSuggestion {
+    id: String,
+    title: String,
+    description: String,
+    action: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PythonToolState {
+    path: String,
+    version: String,
+    status: String,
+    detail: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PythonEntry {
+    path: String,
+    source: String,
+    version: String,
+    current: bool,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PythonAnalysis {
+    current_python: Option<PythonToolState>,
+    current_pip: Option<PythonToolState>,
+    launcher_output: String,
+    discovered_pythons: Vec<PythonEntry>,
+    discovered_pips: Vec<PythonEntry>,
+    risks: Vec<String>,
+    recommendations: Vec<String>,
+    pip_repair_command: String,
+    alias_settings_command: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ProjectRuntimeRecommendation {
+    name: String,
+    requirement: String,
+    status: String,
+}
+
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct ProjectAction {
+    id: String,
+    title: String,
+    command: String,
+    description: String,
+    safe_to_run: bool,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ProjectAnalysis {
+    root: String,
+    project_types: Vec<String>,
+    detected_files: Vec<String>,
+    package_manager: Option<String>,
+    recommended_runtime: Vec<ProjectRuntimeRecommendation>,
+    actions: Vec<ProjectAction>,
+    warnings: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -965,53 +1058,18 @@ fn scan_ports_blocking() -> Result<Vec<PortRecord>, String> {
 
 #[tauri::command]
 fn project_health(path: String) -> Result<ProjectHealth, String> {
-    let root = PathBuf::from(path.trim());
-    if !root.exists() {
-        return Err("项目目录不存在".to_string());
-    }
-    if !root.is_dir() {
-        return Err("请选择目录而不是文件".to_string());
-    }
-
-    let mut project_types = Vec::new();
-    let mut signals = Vec::new();
-    let mut suggestions = Vec::new();
-
-    let checks = [
-        ("package.json", "Node.js", "运行 npm install 安装依赖"),
-        ("pyproject.toml", "Python", "创建虚拟环境并安装项目依赖"),
-        ("requirements.txt", "Python", "运行 pip install -r requirements.txt"),
-        ("pom.xml", "Maven", "运行 mvn test 验证项目"),
-        ("build.gradle", "Gradle", "运行 gradle test 验证项目"),
-        ("Cargo.toml", "Rust", "运行 cargo test 验证项目"),
-        ("src-tauri/tauri.conf.json", "Tauri", "运行 npm run tauri:dev 启动桌面应用"),
-    ];
-
-    for (file, kind, suggestion) in checks {
-        if root.join(file).exists() {
-            if !project_types.iter().any(|item| item == kind) {
-                project_types.push(kind.to_string());
-            }
-            signals.push(file.to_string());
-            suggestions.push(suggestion.to_string());
-        }
-    }
-
-    if root.join(".venv").exists() {
-        signals.push(".venv".to_string());
-    }
-    if root.join("node_modules").exists() {
-        signals.push("node_modules".to_string());
-    }
-
-    project_types.sort();
-    suggestions.sort();
-    suggestions.dedup();
+    let analysis = analyze_project_blocking(&PathBuf::from(path.trim()))?;
+    let suggestions = analysis
+        .actions
+        .iter()
+        .map(|item| format!("{}：{}", item.title, item.command))
+        .chain(analysis.warnings.iter().cloned())
+        .collect::<Vec<_>>();
 
     Ok(ProjectHealth {
-        root: display_path(root),
-        project_types,
-        signals,
+        root: analysis.root,
+        project_types: analysis.project_types,
+        signals: analysis.detected_files,
         suggestions,
     })
 }
@@ -1236,6 +1294,567 @@ fn environment_health_blocking() -> Result<Vec<EnvHealthCheck>, String> {
 }
 
 #[tauri::command]
+async fn run_doctor() -> Result<DoctorReport, String> {
+    run_blocking(run_doctor_blocking).await?
+}
+
+fn run_doctor_blocking() -> Result<DoctorReport, String> {
+    let paths = load_paths()?;
+    let env = env_snapshot();
+    let health = environment_health_blocking().unwrap_or_default();
+    let runtimes = discover_runtimes_blocking();
+    let ports = scan_ports_blocking().unwrap_or_default();
+    let network = network_diagnostics_blocking();
+    let python = analyze_python_environment_blocking();
+    let mut score = 100_i32;
+    let mut checks = Vec::new();
+    let mut suggestions = Vec::new();
+
+    push_doctor_check(
+        &mut checks,
+        &mut score,
+        DoctorCheck {
+            id: "devenv-home".to_string(),
+            title: "DEVENV_HOME".to_string(),
+            category: "环境变量".to_string(),
+            status: if env.devenv_home.as_deref().map(path_key) == Some(path_key(&display_path(&paths.root))) {
+                "正常".to_string()
+            } else {
+                "需修复".to_string()
+            },
+            severity: if env.devenv_home.as_deref().map(path_key) == Some(path_key(&display_path(&paths.root))) {
+                "info".to_string()
+            } else {
+                "warning".to_string()
+            },
+            detail: env
+                .devenv_home
+                .clone()
+                .unwrap_or_else(|| "未设置 DEVENV_HOME".to_string()),
+            fix_action: Some("configure_env".to_string()),
+        },
+    );
+
+    let duplicate_count = env
+        .path_warnings
+        .iter()
+        .filter(|item| item.starts_with("重复 PATH"))
+        .count();
+    let invalid_count = env
+        .path_warnings
+        .iter()
+        .filter(|item| item.starts_with("失效 PATH"))
+        .count();
+    push_doctor_check(
+        &mut checks,
+        &mut score,
+        DoctorCheck {
+            id: "path-quality".to_string(),
+            title: "PATH 重复和失效项".to_string(),
+            category: "环境变量".to_string(),
+            status: if duplicate_count == 0 && invalid_count == 0 {
+                "正常".to_string()
+            } else {
+                "需清理".to_string()
+            },
+            severity: if invalid_count > 5 { "warning" } else if duplicate_count > 0 || invalid_count > 0 { "notice" } else { "info" }
+                .to_string(),
+            detail: format!(
+                "PATH 共 {} 项；重复 {} 项；失效 {} 项",
+                env.path_entries.len(),
+                duplicate_count,
+                invalid_count
+            ),
+            fix_action: Some("cleanup_path".to_string()),
+        },
+    );
+
+    let managed_missing = MANAGED_PATHS
+        .iter()
+        .filter(|managed| {
+            !env.path_entries
+                .iter()
+                .any(|entry| path_key(entry) == path_key(managed))
+        })
+        .count();
+    push_doctor_check(
+        &mut checks,
+        &mut score,
+        DoctorCheck {
+            id: "managed-paths".to_string(),
+            title: "受管 PATH".to_string(),
+            category: "环境变量".to_string(),
+            status: if managed_missing == 0 { "正常" } else { "缺失" }.to_string(),
+            severity: if managed_missing == 0 { "info" } else { "warning" }.to_string(),
+            detail: if managed_missing == 0 {
+                "PATH 已包含 DevEnv Manager 受管目录".to_string()
+            } else {
+                format!("缺少 {managed_missing} 个受管 PATH 项，安装后可能不能立刻在终端使用")
+            },
+            fix_action: Some("configure_env".to_string()),
+        },
+    );
+
+    for check in &health {
+        let severe = matches!(check.status.as_str(), "异常" | "未安装" | "未设置" | "需清理" | "需配置");
+        push_doctor_check(
+            &mut checks,
+            &mut score,
+            DoctorCheck {
+                id: format!("runtime-{}", check.name.to_ascii_lowercase().replace([' ', '.'], "-")),
+                title: check.name.clone(),
+                category: "运行时".to_string(),
+                status: check.status.clone(),
+                severity: if severe { "warning" } else { "info" }.to_string(),
+                detail: check.detail.clone(),
+                fix_action: Some("discover_runtimes".to_string()),
+            },
+        );
+    }
+
+    let git = command_probe("Git", "git", &["--version"]);
+    push_doctor_check(&mut checks, &mut score, git);
+    for (name, exe, args) in [
+        ("npm", "npm", vec!["--version"]),
+        ("pnpm", "pnpm", vec!["--version"]),
+        ("yarn", "yarn", vec!["--version"]),
+        ("corepack", "corepack", vec!["--version"]),
+        ("uv", "uv", vec!["--version"]),
+        ("poetry", "poetry", vec!["--version"]),
+        ("Go", "go", vec!["version"]),
+        ("Rust", "rustc", vec!["--version"]),
+        (".NET", "dotnet", vec!["--version"]),
+    ] {
+        push_doctor_check(&mut checks, &mut score, optional_command_probe(name, exe, &args));
+    }
+
+    let python_conflict_count = python.discovered_pythons.len();
+    let python_store_risk = python
+        .discovered_pythons
+        .iter()
+        .any(|item| item.source == "Microsoft Store");
+    let pip_problem = python
+        .current_pip
+        .as_ref()
+        .map(|item| item.status != "正常")
+        .unwrap_or(true);
+    push_doctor_check(
+        &mut checks,
+        &mut score,
+        DoctorCheck {
+            id: "python-conflicts".to_string(),
+            title: "Python 多版本和 pip 匹配".to_string(),
+            category: "Python".to_string(),
+            status: if python_conflict_count <= 1 && !python_store_risk && !pip_problem {
+                "正常".to_string()
+            } else {
+                "需关注".to_string()
+            },
+            severity: if python_store_risk || pip_problem { "warning" } else if python_conflict_count > 1 { "notice" } else { "info" }
+                .to_string(),
+            detail: format!(
+                "发现 {} 个 Python、{} 个 pip；{}",
+                python.discovered_pythons.len(),
+                python.discovered_pips.len(),
+                python.risks.join("；")
+            ),
+            fix_action: Some("python_analysis".to_string()),
+        },
+    );
+
+    let java_count = runtimes.iter().filter(|item| item.kind == "Java").count();
+    push_doctor_check(
+        &mut checks,
+        &mut score,
+        DoctorCheck {
+            id: "java-conflicts".to_string(),
+            title: "JDK 多版本".to_string(),
+            category: "Java".to_string(),
+            status: if java_count <= 1 { "正常" } else { "多版本" }.to_string(),
+            severity: if java_count <= 1 { "info" } else { "notice" }.to_string(),
+            detail: format!("发现 {java_count} 个 JDK/Java 入口"),
+            fix_action: Some("discover_runtimes".to_string()),
+        },
+    );
+
+    let watched_ports = [80_u16, 443, 3000, 3306, 5432, 5173, 6379, 8000, 8080, 8081, 8888];
+    for port in watched_ports {
+        if let Some(record) = ports.iter().find(|item| item.local_port == port) {
+            push_doctor_check(
+                &mut checks,
+                &mut score,
+                DoctorCheck {
+                    id: format!("port-{port}"),
+                    title: format!("端口 {port} 占用"),
+                    category: "端口".to_string(),
+                    status: "占用".to_string(),
+                    severity: if matches!(port, 80 | 443 | 3306 | 5432 | 6379 | 8080) {
+                        "notice"
+                    } else {
+                        "info"
+                    }
+                    .to_string(),
+                    detail: format!("{} / PID {} / {}", record.process_name, record.pid, record.risk),
+                    fix_action: Some("ports".to_string()),
+                },
+            );
+        }
+    }
+
+    for item in &network.checks {
+        push_doctor_check(
+            &mut checks,
+            &mut score,
+            DoctorCheck {
+                id: format!("network-{}", slug(&item.name)),
+                title: item.name.clone(),
+                category: "网络".to_string(),
+                status: if item.success { "正常" } else { "不可访问" }.to_string(),
+                severity: if item.success { "info" } else { "notice" }.to_string(),
+                detail: format!("{} · {} ms · {}", item.status, item.elapsed_ms, item.url),
+                fix_action: Some("network".to_string()),
+            },
+        );
+    }
+
+    let cache_size = dir_size(&paths.downloads()).unwrap_or(0);
+    push_doctor_check(
+        &mut checks,
+        &mut score,
+        DoctorCheck {
+            id: "download-cache".to_string(),
+            title: "下载缓存".to_string(),
+            category: "缓存".to_string(),
+            status: if cache_size > 2 * 1024 * 1024 * 1024 { "过大" } else { "正常" }.to_string(),
+            severity: if cache_size > 2 * 1024 * 1024 * 1024 { "notice" } else { "info" }.to_string(),
+            detail: format!("当前缓存大小 {}", format_size(cache_size)),
+            fix_action: Some("cache".to_string()),
+        },
+    );
+
+    if duplicate_count > 0 || invalid_count > 0 {
+        suggestions.push(DoctorSuggestion {
+            id: "cleanup-path".to_string(),
+            title: "清理失效和重复 PATH".to_string(),
+            description: "只清理真实不存在的路径和重复项，保留 DevEnv Manager 待安装的受管目录。".to_string(),
+            action: Some("cleanup_path".to_string()),
+        });
+    }
+    if managed_missing > 0 {
+        suggestions.push(DoctorSuggestion {
+            id: "configure-env".to_string(),
+            title: "配置受管环境变量".to_string(),
+            description: "写入用户级 DEVENV_HOME、JAVA_HOME 和受管 PATH，安装后的工具可直接在新终端使用。".to_string(),
+            action: Some("configure_env".to_string()),
+        });
+    }
+    if python_store_risk || pip_problem || python_conflict_count > 1 {
+        suggestions.push(DoctorSuggestion {
+            id: "python-analysis".to_string(),
+            title: "查看 Python 冲突分析".to_string(),
+            description: "确认默认 python、pip、py launcher 和 Microsoft Store 执行别名是否互相抢占。".to_string(),
+            action: Some("python_analysis".to_string()),
+        });
+    }
+    suggestions.push(DoctorSuggestion {
+        id: "export-report".to_string(),
+        title: "导出诊断报告".to_string(),
+        description: "生成可分享的 Markdown 报告，自动脱敏用户目录和敏感字段。".to_string(),
+        action: Some("export_report".to_string()),
+    });
+
+    let final_score = score.clamp(0, 100) as u8;
+    let problem_count = checks
+        .iter()
+        .filter(|item| item.severity != "info" || !matches!(item.status.as_str(), "正常" | "可选缺失"))
+        .count();
+    Ok(DoctorReport {
+        score: final_score,
+        summary: format!("环境评分 {final_score}/100，发现 {problem_count} 个需要关注的项目。"),
+        checks,
+        suggestions,
+        generated_at: current_timestamp(),
+    })
+}
+
+#[tauri::command]
+async fn export_doctor_report(report: DoctorReport) -> Result<OperationResult, String> {
+    run_blocking(move || export_doctor_report_blocking(report)).await?
+}
+
+fn export_doctor_report_blocking(report: DoctorReport) -> Result<OperationResult, String> {
+    let paths = load_paths()?;
+    fs::create_dir_all(paths.logs()).map_err(|err| format!("创建报告目录失败：{err}"))?;
+    let filename = format!("doctor-report-{}.md", filename_timestamp());
+    let target = paths.logs().join(filename);
+    let text = redact_report_text(&doctor_report_markdown(&report));
+    fs::write(&target, text).map_err(|err| format!("写入诊断报告失败：{err}"))?;
+    Ok(OperationResult {
+        success: true,
+        message: format!("已导出诊断报告：{}", display_path(target)),
+    })
+}
+
+#[tauri::command]
+async fn analyze_python_environment() -> Result<PythonAnalysis, String> {
+    run_blocking(|| Ok(analyze_python_environment_blocking())).await?
+}
+
+fn analyze_python_environment_blocking() -> PythonAnalysis {
+    let current_python = detect_runtime("Python", "python", &["--version"]).map(|runtime| {
+        let status = if runtime.executable.to_ascii_lowercase().contains("\\windowsapps\\") {
+            "风险".to_string()
+        } else {
+            "正常".to_string()
+        };
+        PythonToolState {
+            path: runtime.executable,
+            version: runtime.version,
+            status,
+            detail: runtime.source,
+        }
+    });
+
+    let python_m_pip = current_python
+        .as_ref()
+        .and_then(|python| run_command_output(PathBuf::from(&python.path), &["-m", "pip", "--version"], 30).ok());
+    let pip_runtime = detect_runtime("pip", "pip", &["--version"]);
+    let current_pip = pip_runtime.map(|runtime| {
+        let pip_output = runtime.version.clone();
+        let matches_python = python_m_pip
+            .as_deref()
+            .map(|expected| same_python_package_location(expected, &pip_output))
+            .unwrap_or(false);
+        PythonToolState {
+            path: runtime.executable,
+            version: pip_output.clone(),
+            status: if matches_python { "正常" } else { "不匹配" }.to_string(),
+            detail: if matches_python {
+                "pip 与当前 python -m pip 指向一致".to_string()
+            } else {
+                python_m_pip
+                    .as_ref()
+                    .map(|expected| format!("python -m pip: {expected}"))
+                    .unwrap_or_else(|| "当前 Python 无法运行 -m pip".to_string())
+            },
+        }
+    });
+
+    let current_python_key = current_python.as_ref().map(|item| path_key(&item.path));
+    let discovered_pythons = python_candidates()
+        .into_iter()
+        .filter_map(|path| {
+            detect_runtime_at("Python", &path, &["--version"], None).map(|runtime| PythonEntry {
+                current: current_python_key.as_deref() == Some(path_key(&runtime.executable).as_str()),
+                source: runtime.source,
+                path: runtime.executable,
+                version: runtime.version,
+            })
+        })
+        .collect::<Vec<_>>();
+    let current_pip_key = current_pip.as_ref().map(|item| path_key(&item.path));
+    let discovered_pips = find_all_on_path("pip")
+        .into_iter()
+        .filter_map(|path| {
+            detect_runtime_at("pip", &path, &["--version"], None).map(|runtime| PythonEntry {
+                current: current_pip_key.as_deref() == Some(path_key(&runtime.executable).as_str()),
+                source: runtime.source,
+                path: runtime.executable,
+                version: runtime.version,
+            })
+        })
+        .collect::<Vec<_>>();
+    let launcher_output = hidden_command("py")
+        .arg("-0p")
+        .output()
+        .map(|output| command_text(&output.stdout, &output.stderr))
+        .unwrap_or_else(|_| "未发现 Python Launcher 或 py -0p 执行失败".to_string());
+
+    let mut risks = Vec::new();
+    if discovered_pythons.len() > 1 {
+        risks.push(format!("PATH/注册表中发现 {} 个 Python，pip 容易安装到错误版本", discovered_pythons.len()));
+    }
+    if discovered_pythons.iter().any(|item| item.source == "Microsoft Store") {
+        risks.push("Microsoft Store Python 执行别名可能抢占 python 命令".to_string());
+    }
+    if current_pip.as_ref().map(|item| item.status.as_str()) != Some("正常") {
+        risks.push("pip 与当前 python -m pip 不一致或当前 Python 缺少 pip".to_string());
+    }
+    if risks.is_empty() {
+        risks.push("未发现明显 Python 冲突".to_string());
+    }
+
+    let mut recommendations = Vec::new();
+    recommendations.push("优先使用 DevEnv Manager 受管 Python 或官网安装版 Python。".to_string());
+    recommendations.push("安装包时尽量使用 python -m pip，而不是直接运行 pip。".to_string());
+    if discovered_pythons.iter().any(|item| item.source == "Microsoft Store") {
+        recommendations.push("如默认 python 指向 WindowsApps，请在 Windows“应用执行别名”中关闭 Python 别名。".to_string());
+    }
+
+    PythonAnalysis {
+        current_python,
+        current_pip,
+        launcher_output,
+        discovered_pythons,
+        discovered_pips,
+        risks,
+        recommendations,
+        pip_repair_command: "python -m ensurepip --upgrade; python -m pip install --upgrade pip".to_string(),
+        alias_settings_command: "start ms-settings:appsfeatures-app".to_string(),
+    }
+}
+
+#[tauri::command]
+fn analyze_project(path: String) -> Result<ProjectAnalysis, String> {
+    analyze_project_blocking(&PathBuf::from(path.trim()))
+}
+
+fn analyze_project_blocking(root: &Path) -> Result<ProjectAnalysis, String> {
+    if !root.exists() {
+        return Err("项目目录不存在".to_string());
+    }
+    if !root.is_dir() {
+        return Err("请选择目录而不是文件".to_string());
+    }
+    let signals = project_signals(root);
+    let mut project_types = Vec::new();
+    let mut recommendations = Vec::new();
+    let mut actions = Vec::new();
+    let mut warnings = Vec::new();
+    let has = |name: &str| signals.iter().any(|item| item == name);
+
+    if has("package.json") {
+        push_unique(&mut project_types, "Node.js");
+        recommendations.push(runtime_recommendation("Node.js", "建议 Node.js 20/22 LTS", "node"));
+        let manager = detect_package_manager(&signals);
+        actions.push(project_action("npm_install", "安装依赖", &format!("{manager} install"), "安装前端或 Node 项目依赖", true));
+        actions.push(project_action("npm_dev", "启动开发服务", &format!("{manager} run dev"), "启动 Vite/Next/Node 开发服务，后台运行", true));
+        actions.push(project_action("npm_test", "运行测试", &format!("{manager} test"), "运行 package.json 中的测试脚本", true));
+    }
+    if has("pyproject.toml") || has("requirements.txt") || has("poetry.lock") || has("uv.lock") || has(".venv") {
+        push_unique(&mut project_types, "Python");
+        recommendations.push(runtime_recommendation("Python", "建议 Python 3.12/3.14，并使用 .venv", "python"));
+        actions.push(project_action("python_pytest", "运行 pytest", "python -m pytest -q", "使用当前 Python 运行测试", true));
+        if !has(".venv") {
+            warnings.push("未发现 .venv，建议用当前 Python 创建项目虚拟环境".to_string());
+        }
+    }
+    if has("pom.xml") {
+        push_unique(&mut project_types, "Maven");
+        recommendations.push(runtime_recommendation("JDK", "Maven 项目通常需要 JDK 8/11/17/21", "java"));
+        recommendations.push(runtime_recommendation("Maven", "需要 mvn 可用", "mvn"));
+        actions.push(project_action("mvn_test", "Maven 测试", "mvn test", "运行 Maven 测试", true));
+    }
+    if has("build.gradle") || has("build.gradle.kts") || has("gradlew") {
+        push_unique(&mut project_types, "Gradle");
+        recommendations.push(runtime_recommendation("JDK", "Gradle 项目通常需要 JDK 17/21", "java"));
+        recommendations.push(runtime_recommendation("Gradle", "优先使用项目 gradlew；否则使用受管 Gradle", "gradle"));
+        actions.push(project_action("gradle_test", "Gradle 测试", gradle_command(root, "test").as_str(), "运行 Gradle 测试", true));
+    }
+    if has("Cargo.toml") {
+        push_unique(&mut project_types, "Rust");
+        recommendations.push(runtime_recommendation("Rust", "建议 rustup stable + MSVC Build Tools", "rustc"));
+        actions.push(project_action("cargo_test", "Cargo 测试", "cargo test", "运行 Rust 测试", true));
+    }
+    if has("src-tauri/tauri.conf.json") {
+        push_unique(&mut project_types, "Tauri");
+        recommendations.push(runtime_recommendation("Tauri", "需要 Node.js、Rust、MSVC Build Tools", "cargo"));
+        if has("package.json") {
+            actions.push(project_action("npm_tauri_dev", "启动 Tauri 开发", "npm run tauri:dev", "启动 Tauri 桌面开发服务，后台运行", true));
+        }
+    }
+    if signals.iter().any(|item| item.ends_with(".csproj") || item.ends_with(".sln")) {
+        push_unique(&mut project_types, ".NET");
+        recommendations.push(runtime_recommendation(".NET SDK", "需要 dotnet SDK", "dotnet"));
+        actions.push(project_action("dotnet_test", ".NET 测试", "dotnet test", "运行 .NET 测试", true));
+    }
+    if has("go.mod") {
+        push_unique(&mut project_types, "Go");
+        recommendations.push(runtime_recommendation("Go", "需要 go 命令可用", "go"));
+        actions.push(project_action("go_test", "Go 测试", "go test ./...", "运行 Go 测试", true));
+    }
+    actions.push(project_action("vscode", "生成 VS Code 配置", "generate-vscode-config", "写入 .vscode/settings.json 和 tasks.json", true));
+    actions.push(project_action("copy_commands", "复制推荐命令", "copy", "复制该项目的推荐命令清单", true));
+    if project_types.is_empty() {
+        warnings.push("还没有识别到常见项目文件，可检查是否选中了项目根目录。".to_string());
+    }
+    project_types.sort();
+    project_types.dedup();
+    Ok(ProjectAnalysis {
+        root: display_path(root),
+        project_types,
+        detected_files: signals.clone(),
+        package_manager: if has("package.json") {
+            Some(detect_package_manager(&signals))
+        } else {
+            None
+        },
+        recommended_runtime: recommendations,
+        actions,
+        warnings,
+    })
+}
+
+#[tauri::command]
+async fn run_project_action(path: String, action: String) -> Result<CommandRunResult, String> {
+    run_blocking(move || run_project_action_blocking(path, action)).await?
+}
+
+fn run_project_action_blocking(path: String, action: String) -> Result<CommandRunResult, String> {
+    let root = PathBuf::from(path.trim());
+    let analysis = analyze_project_blocking(&root)?;
+    let selected = analysis
+        .actions
+        .iter()
+        .find(|item| item.id == action)
+        .cloned()
+        .ok_or_else(|| "这个项目不支持所选操作".to_string())?;
+    if action == "vscode" {
+        let result = generate_vscode_config(display_path(&root))?;
+        return Ok(CommandRunResult {
+            success: result.success,
+            return_code: 0,
+            output: result.message,
+            elapsed_ms: 0,
+        });
+    }
+    if action == "copy_commands" {
+        return Ok(CommandRunResult {
+            success: true,
+            return_code: 0,
+            output: analysis
+                .actions
+                .iter()
+                .filter(|item| item.command != "copy" && item.command != "generate-vscode-config")
+                .map(|item| format!("{}: {}", item.title, item.command))
+                .collect::<Vec<_>>()
+                .join("\n"),
+            elapsed_ms: 0,
+        });
+    }
+    if matches!(action.as_str(), "npm_dev" | "npm_tauri_dev") {
+        let parts = parse_command_line(&selected.command)?;
+        let executable = parts.first().ok_or_else(|| "命令为空".to_string())?;
+        let started = Instant::now();
+        hidden_command(executable)
+            .args(parts.iter().skip(1))
+            .current_dir(root)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .map_err(|err| format!("启动开发服务失败：{err}"))?;
+        return Ok(CommandRunResult {
+            success: true,
+            return_code: 0,
+            output: format!("已后台启动：{}", selected.command),
+            elapsed_ms: started.elapsed().as_millis(),
+        });
+    }
+    run_tool_command_blocking(selected.command, Some(display_path(root)))
+}
+
+#[tauri::command]
 async fn list_config_profiles() -> Result<Vec<ConfigProfile>, String> {
     run_blocking(list_config_profiles_blocking).await?
 }
@@ -1449,7 +2068,12 @@ pub fn run() {
             uninstall_runtime,
             kill_process,
             scan_ports,
+            run_doctor,
+            export_doctor_report,
+            analyze_python_environment,
             project_health,
+            analyze_project,
+            run_project_action,
             network_diagnostics,
             cache_entries,
             clear_download_cache,
@@ -3191,6 +3815,276 @@ fn launch_uninstall_string(uninstall_string: &str) -> Result<(), String> {
     Ok(())
 }
 
+fn push_doctor_check(checks: &mut Vec<DoctorCheck>, score: &mut i32, check: DoctorCheck) {
+    let penalty = match (check.severity.as_str(), check.status.as_str()) {
+        ("warning", "异常" | "未安装" | "未设置" | "缺失" | "需修复") => 12,
+        ("warning", _) => 8,
+        ("notice", "占用") => 5,
+        ("notice", "不可访问") => 3,
+        ("notice", _) => 2,
+        _ => 0,
+    };
+    *score -= penalty;
+    checks.push(check);
+}
+
+fn command_probe(name: &str, executable: &str, args: &[&str]) -> DoctorCheck {
+    match detect_runtime(name, executable, args) {
+        Some(info) => DoctorCheck {
+            id: format!("tool-{}", slug(name)),
+            title: name.to_string(),
+            category: "工具".to_string(),
+            status: "正常".to_string(),
+            severity: "info".to_string(),
+            detail: format!("{} · {}", info.version, info.executable),
+            fix_action: Some("discover_runtimes".to_string()),
+        },
+        None => DoctorCheck {
+            id: format!("tool-{}", slug(name)),
+            title: name.to_string(),
+            category: "工具".to_string(),
+            status: "未安装".to_string(),
+            severity: "warning".to_string(),
+            detail: format!("没有找到 {executable}，相关项目可能无法构建或诊断"),
+            fix_action: Some("copy_fix_command".to_string()),
+        },
+    }
+}
+
+fn optional_command_probe(name: &str, executable: &str, args: &[&str]) -> DoctorCheck {
+    match detect_runtime(name, executable, args) {
+        Some(info) => DoctorCheck {
+            id: format!("tool-{}", slug(name)),
+            title: name.to_string(),
+            category: "扩展工具".to_string(),
+            status: "正常".to_string(),
+            severity: "info".to_string(),
+            detail: format!("{} · {}", info.version, info.executable),
+            fix_action: Some("discover_runtimes".to_string()),
+        },
+        None => DoctorCheck {
+            id: format!("tool-{}", slug(name)),
+            title: name.to_string(),
+            category: "扩展工具".to_string(),
+            status: "可选缺失".to_string(),
+            severity: "info".to_string(),
+            detail: format!("没有找到 {executable}；只有对应项目或生态功能需要它"),
+            fix_action: Some("copy_fix_command".to_string()),
+        },
+    }
+}
+
+fn doctor_report_markdown(report: &DoctorReport) -> String {
+    let mut text = String::new();
+    text.push_str("# DevEnv Manager 诊断报告\n\n");
+    text.push_str(&format!("生成时间：{}\n\n", report.generated_at));
+    text.push_str(&format!("环境评分：{} / 100\n\n", report.score));
+    text.push_str(&format!("{}\n\n", report.summary));
+    text.push_str("## 问题列表\n\n");
+    for check in &report.checks {
+        text.push_str(&format!(
+            "- [{}] {} / {} / {}：{}\n",
+            check.category, check.title, check.status, check.severity, check.detail
+        ));
+    }
+    text.push_str("\n## 建议\n\n");
+    for suggestion in &report.suggestions {
+        text.push_str(&format!("- {}：{}\n", suggestion.title, suggestion.description));
+    }
+    text
+}
+
+fn redact_report_text(text: &str) -> String {
+    let mut result = text.to_string();
+    for key in ["USERPROFILE", "HOME"] {
+        if let Ok(value) = env::var(key) {
+            if !value.trim().is_empty() {
+                result = result.replace(&value, "%USER_HOME%");
+            }
+        }
+    }
+    result
+        .lines()
+        .map(|line| {
+            line.split(' ')
+                .map(|part| {
+                    let lower = part.to_ascii_lowercase();
+                    for marker in ["token=", "password=", "secret=", "access_key="] {
+                        if lower.starts_with(marker) {
+                            return format!("{marker}<redacted>");
+                        }
+                    }
+                    part.to_string()
+                })
+                .collect::<Vec<_>>()
+                .join(" ")
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn filename_timestamp() -> String {
+    format!("{:?}", std::time::SystemTime::now())
+        .chars()
+        .map(|ch| if ch.is_ascii_alphanumeric() { ch } else { '-' })
+        .collect()
+}
+
+fn slug(value: &str) -> String {
+    value
+        .chars()
+        .map(|ch| if ch.is_ascii_alphanumeric() { ch.to_ascii_lowercase() } else { '-' })
+        .collect::<String>()
+        .trim_matches('-')
+        .to_string()
+}
+
+fn dir_size(path: &Path) -> io::Result<u64> {
+    let mut total = 0_u64;
+    if !path.exists() {
+        return Ok(0);
+    }
+    for item in fs::read_dir(path)? {
+        let item = item?;
+        let meta = item.metadata()?;
+        if meta.is_dir() {
+            total += dir_size(&item.path())?;
+        } else {
+            total += meta.len();
+        }
+    }
+    Ok(total)
+}
+
+fn same_python_package_location(left: &str, right: &str) -> bool {
+    let normalize = |value: &str| {
+        value
+            .split(" from ")
+            .nth(1)
+            .and_then(|tail| tail.split(" (python").next())
+            .map(path_key)
+            .unwrap_or_else(|| path_key(value))
+    };
+    normalize(left) == normalize(right)
+}
+
+fn python_candidates() -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+    let mut seen = BTreeSet::new();
+    for exe in ["python", "python3", "py"] {
+        for path in find_all_on_path(exe) {
+            if path
+                .file_name()
+                .and_then(OsStr::to_str)
+                .map(|name| name.eq_ignore_ascii_case("py.exe"))
+                .unwrap_or(false)
+            {
+                continue;
+            }
+            if seen.insert(path_key(&display_path(&path))) {
+                candidates.push(path);
+            }
+        }
+    }
+    for runtime in discover_runtimes_blocking() {
+        if runtime.kind == "Python" && seen.insert(path_key(&runtime.executable)) {
+            candidates.push(PathBuf::from(runtime.executable));
+        }
+    }
+    candidates
+}
+
+fn project_signals(root: &Path) -> Vec<String> {
+    let mut signals = Vec::new();
+    for file in [
+        "package.json",
+        "pnpm-lock.yaml",
+        "yarn.lock",
+        "package-lock.json",
+        "vite.config.js",
+        "vite.config.ts",
+        "next.config.js",
+        "next.config.mjs",
+        "requirements.txt",
+        "pyproject.toml",
+        "poetry.lock",
+        "uv.lock",
+        ".venv",
+        "pom.xml",
+        "build.gradle",
+        "build.gradle.kts",
+        "gradlew",
+        "Cargo.toml",
+        "src-tauri/tauri.conf.json",
+        "go.mod",
+        "go.sum",
+        "global.json",
+    ] {
+        if root.join(file).exists() {
+            signals.push(file.to_string());
+        }
+    }
+    if let Ok(items) = fs::read_dir(root) {
+        for item in items.flatten() {
+            let path = item.path();
+            if let Some(name) = path.file_name().and_then(OsStr::to_str) {
+                if name.ends_with(".csproj") || name.ends_with(".sln") {
+                    signals.push(name.to_string());
+                }
+            }
+        }
+    }
+    signals.sort();
+    signals.dedup();
+    signals
+}
+
+fn detect_package_manager(signals: &[String]) -> String {
+    if signals.iter().any(|item| item == "pnpm-lock.yaml") {
+        "pnpm".to_string()
+    } else if signals.iter().any(|item| item == "yarn.lock") {
+        "yarn".to_string()
+    } else {
+        "npm".to_string()
+    }
+}
+
+fn runtime_recommendation(name: &str, requirement: &str, executable: &str) -> ProjectRuntimeRecommendation {
+    ProjectRuntimeRecommendation {
+        name: name.to_string(),
+        requirement: requirement.to_string(),
+        status: if find_on_path(executable).is_some() {
+            "已发现".to_string()
+        } else {
+            "未发现".to_string()
+        },
+    }
+}
+
+fn project_action(id: &str, title: &str, command: &str, description: &str, safe_to_run: bool) -> ProjectAction {
+    ProjectAction {
+        id: id.to_string(),
+        title: title.to_string(),
+        command: command.to_string(),
+        description: description.to_string(),
+        safe_to_run,
+    }
+}
+
+fn gradle_command(root: &Path, task: &str) -> String {
+    if root.join("gradlew.bat").exists() || root.join("gradlew").exists() {
+        format!(".\\gradlew {task}")
+    } else {
+        format!("gradle {task}")
+    }
+}
+
+fn push_unique(items: &mut Vec<String>, value: &str) {
+    if !items.iter().any(|item| item == value) {
+        items.push(value.to_string());
+    }
+}
+
 async fn run_blocking<F, R>(task: F) -> Result<R, String>
 where
     F: FnOnce() -> R + Send + 'static,
@@ -3258,5 +4152,45 @@ mod tests {
             vec![r"C:\Program Files\App\uninstall.exe", "/S"]
         );
         assert!(parse_command_line(r#"node "unterminated"#).is_err());
+    }
+
+    #[test]
+    fn project_signals_detect_mixed_tauri_project() {
+        let temp = tempfile::tempdir().unwrap();
+        fs::write(temp.path().join("package.json"), "{}").unwrap();
+        fs::write(temp.path().join("Cargo.toml"), "[package]\nname='demo'\n").unwrap();
+        fs::create_dir_all(temp.path().join("src-tauri")).unwrap();
+        fs::write(temp.path().join("src-tauri").join("tauri.conf.json"), "{}").unwrap();
+        let analysis = analyze_project_blocking(temp.path()).unwrap();
+        assert!(analysis.project_types.contains(&"Node.js".to_string()));
+        assert!(analysis.project_types.contains(&"Rust".to_string()));
+        assert!(analysis.project_types.contains(&"Tauri".to_string()));
+        assert!(analysis.actions.iter().any(|item| item.id == "npm_tauri_dev"));
+    }
+
+    #[test]
+    fn python_pip_location_compare_uses_site_package_path() {
+        let left = r"pip 25.0 from C:\Python312\Lib\site-packages\pip (python 3.12)";
+        let right = r"pip 25.0 from C:\Python312\Lib\site-packages\pip (python 3.12)";
+        let other = r"pip 24.0 from C:\Python311\Lib\site-packages\pip (python 3.11)";
+        assert!(same_python_package_location(left, right));
+        assert!(!same_python_package_location(left, other));
+    }
+
+    #[test]
+    fn report_redaction_masks_home_and_sensitive_pairs() {
+        let text = format!(
+            "path={} token=abc123 password=hunter2",
+            env::var("USERPROFILE").unwrap_or_else(|_| "C:\\Users\\demo".to_string())
+        );
+        let redacted = redact_report_text(&text);
+        assert!(!redacted.contains("abc123"));
+        assert!(!redacted.contains("hunter2"));
+    }
+
+    #[test]
+    fn download_url_allowlist_rejects_unknown_hosts() {
+        assert!(validate_download_url("https://nodejs.org/dist/index.json").is_ok());
+        assert!(validate_download_url("https://example.com/file.zip").is_err());
     }
 }
