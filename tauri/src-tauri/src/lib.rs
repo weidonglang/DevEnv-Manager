@@ -15,6 +15,8 @@ use tempfile::Builder as TempBuilder;
 use zip::ZipArchive;
 
 #[cfg(windows)]
+use std::os::windows::process::CommandExt;
+#[cfg(windows)]
 use winreg::{enums::*, RegKey};
 
 const APP_NAME: &str = "DevEnvManager";
@@ -88,6 +90,18 @@ struct CurrentVersions {
     node: Option<String>,
     maven: Option<String>,
     gradle: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct ConfigProfile {
+    id: String,
+    name: String,
+    created_at: String,
+    current: CurrentVersions,
+    devenv_home: Option<String>,
+    java_home: Option<String>,
+    path: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -215,6 +229,22 @@ struct CommandRunResult {
     elapsed_ms: u128,
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct EnvHealthCheck {
+    name: String,
+    status: String,
+    detail: String,
+}
+
+#[derive(Debug, Clone)]
+struct UninstallEntry {
+    display_name: String,
+    install_location: String,
+    display_icon: String,
+    uninstall_string: String,
+}
+
 #[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 struct TaskProgress {
@@ -260,13 +290,7 @@ fn load_config() -> Result<ConfigView, String> {
 
 #[tauri::command]
 fn set_root_dir(root: String) -> Result<ConfigView, String> {
-    let root = PathBuf::from(root.trim());
-    if root.as_os_str().is_empty() {
-        return Err("根目录不能为空".to_string());
-    }
-    let root = root
-        .canonicalize()
-        .unwrap_or_else(|_| root.expand_home().unwrap_or(root));
+    let root = normalize_root_dir(&root)?;
     let mut settings = load_settings()?;
     settings.root_dir = display_path(&root);
     save_json(&settings_file(), &settings)?;
@@ -301,7 +325,11 @@ fn env_snapshot() -> EnvSnapshot {
 }
 
 #[tauri::command]
-fn configure_user_environment() -> Result<OperationResult, String> {
+async fn configure_user_environment() -> Result<OperationResult, String> {
+    run_blocking(configure_user_environment_blocking).await?
+}
+
+fn configure_user_environment_blocking() -> Result<OperationResult, String> {
     let paths = load_paths()?;
     paths.ensure().map_err(|err| err.to_string())?;
     let environment = user_environment()?;
@@ -329,7 +357,60 @@ fn configure_user_environment() -> Result<OperationResult, String> {
 }
 
 #[tauri::command]
-fn restore_user_environment() -> Result<OperationResult, String> {
+async fn cleanup_path_entries() -> Result<OperationResult, String> {
+    run_blocking(cleanup_path_entries_blocking).await?
+}
+
+fn cleanup_path_entries_blocking() -> Result<OperationResult, String> {
+    let paths = load_paths()?;
+    let environment = user_environment()?;
+    let old_path = environment
+        .get("Path")
+        .or_else(|| environment.get("PATH"))
+        .cloned()
+        .unwrap_or_default();
+    let mut seen = BTreeSet::new();
+    let mut retained = Vec::new();
+    let mut removed = 0_usize;
+
+    for entry in old_path.split(';') {
+        let entry = entry.trim();
+        if entry.is_empty() {
+            continue;
+        }
+        let key = path_key(entry);
+        if !seen.insert(key) {
+            removed += 1;
+            continue;
+        }
+        let expanded = expand_environment_path(entry, &paths);
+        if !Path::new(&expanded).exists() && !is_managed_pending_path(&expanded, &paths) {
+            removed += 1;
+            continue;
+        }
+        retained.push(entry.to_string());
+    }
+
+    let new_path = retained.join(";");
+    let java_home = environment.get("JAVA_HOME").map(String::as_str);
+    set_user_environment_values(&paths, java_home, &new_path)?;
+    broadcast_environment_change();
+    Ok(OperationResult {
+        success: true,
+        message: if removed == 0 {
+            "PATH 没有需要清理的真实失效或重复项".to_string()
+        } else {
+            format!("已清理 {removed} 个真实失效或重复 PATH，托管待安装路径已保留")
+        },
+    })
+}
+
+#[tauri::command]
+async fn restore_user_environment() -> Result<OperationResult, String> {
+    run_blocking(restore_user_environment_blocking).await?
+}
+
+fn restore_user_environment_blocking() -> Result<OperationResult, String> {
     let paths = load_paths()?;
     let backup: Value = read_json(&paths.env_backup_file())?;
     let path = backup.get("Path").and_then(Value::as_str).unwrap_or("");
@@ -344,8 +425,15 @@ fn restore_user_environment() -> Result<OperationResult, String> {
 }
 
 #[tauri::command]
-fn discover_runtimes() -> Vec<RuntimeInfo> {
+async fn discover_runtimes() -> Vec<RuntimeInfo> {
+    run_blocking(discover_runtimes_blocking)
+        .await
+        .unwrap_or_default()
+}
+
+fn discover_runtimes_blocking() -> Vec<RuntimeInfo> {
     let mut runtimes = Vec::new();
+
     for (kind, exe, args) in [
         ("Java", "java", vec!["-version"]),
         ("Python", "python", vec!["--version"]),
@@ -355,15 +443,47 @@ fn discover_runtimes() -> Vec<RuntimeInfo> {
         ("Maven", "mvn", vec!["--version"]),
         ("Gradle", "gradle", vec!["--version"]),
     ] {
-        if let Some(info) = detect_runtime(kind, exe, &args) {
-            runtimes.push(info);
+        for candidate in find_all_on_path(exe) {
+            if let Some(info) = detect_runtime_at(kind, &candidate, &args, None) {
+                push_runtime(&mut runtimes, info);
+            }
+        }
+        if !runtimes.iter().any(|item| item.kind == kind) {
+            if let Some(info) = detect_runtime(kind, exe, &args) {
+                push_runtime(&mut runtimes, info);
+            }
         }
     }
+
+    if let Ok(paths) = load_paths() {
+        add_managed_runtime_discoveries(&mut runtimes, &paths);
+        if let Ok(environment) = user_environment() {
+            if let Some(java_home) = environment.get("JAVA_HOME") {
+                let executable = PathBuf::from(expand_environment_path(java_home, &paths)).join("bin/java.exe");
+                if let Some(info) = detect_runtime_at("Java", &executable, &["-version"], Some("JAVA_HOME".to_string())) {
+                    push_runtime(&mut runtimes, info);
+                }
+            }
+        }
+    }
+    add_python_launcher_discoveries(&mut runtimes);
+    add_python_registry_discoveries(&mut runtimes);
+
+    runtimes.sort_by(|a, b| {
+        a.kind
+            .cmp(&b.kind)
+            .then(version_key(&a.version).cmp(&version_key(&b.version)).reverse())
+            .then(a.executable.cmp(&b.executable))
+    });
     runtimes
 }
 
 #[tauri::command]
-fn install_jdk(app: tauri::AppHandle, version: String) -> Result<OperationResult, String> {
+async fn install_jdk(app: tauri::AppHandle, version: String) -> Result<OperationResult, String> {
+    run_blocking(move || install_jdk_blocking(app, version)).await?
+}
+
+fn install_jdk_blocking(app: tauri::AppHandle, version: String) -> Result<OperationResult, String> {
     let version = version.trim();
     let task = format!("JDK {version}");
     emit_task_progress(&app, &task, 2, "正在准备安装");
@@ -381,7 +501,7 @@ fn install_jdk(app: tauri::AppHandle, version: String) -> Result<OperationResult
         return Err(format!("JDK {version} 已安装：{}", display_path(&target)));
     }
     emit_task_progress(&app, &task, 18, "正在下载 JDK");
-    download_file(&release.url, &archive, release.sha256.as_deref())?;
+    download_file_with_progress(&release.url, &archive, release.sha256.as_deref(), Some((&app, &task, 18, 68)))?;
     emit_task_progress(&app, &task, 70, "正在解压 JDK");
     install_zip_payload(&archive, &target, &["bin/java.exe", "bin/javac.exe"])?;
     emit_task_progress(&app, &task, 88, "正在验证 JDK");
@@ -398,7 +518,7 @@ fn install_jdk(app: tauri::AppHandle, version: String) -> Result<OperationResult
             "detail": output.lines().next().unwrap_or(""),
         }),
     )?;
-    switch_runtime("jdk".to_string(), version.to_string())?;
+    switch_runtime_blocking("jdk".to_string(), version.to_string(), None)?;
     refresh_user_java_home(&paths)?;
     emit_task_progress(&app, &task, 100, "安装完成");
     Ok(OperationResult {
@@ -408,7 +528,11 @@ fn install_jdk(app: tauri::AppHandle, version: String) -> Result<OperationResult
 }
 
 #[tauri::command]
-fn install_node(app: tauri::AppHandle, version: String) -> Result<OperationResult, String> {
+async fn install_node(app: tauri::AppHandle, version: String) -> Result<OperationResult, String> {
+    run_blocking(move || install_node_blocking(app, version)).await?
+}
+
+fn install_node_blocking(app: tauri::AppHandle, version: String) -> Result<OperationResult, String> {
     let version = version.trim();
     let task = format!("Node.js {version}");
     emit_task_progress(&app, &task, 2, "正在准备安装");
@@ -427,7 +551,7 @@ fn install_node(app: tauri::AppHandle, version: String) -> Result<OperationResul
         return Err(format!("Node.js {version} 已安装：{}", display_path(&target)));
     }
     emit_task_progress(&app, &task, 18, "正在下载 Node.js");
-    download_file(&release.url, &archive, checksum.as_deref())?;
+    download_file_with_progress(&release.url, &archive, checksum.as_deref(), Some((&app, &task, 18, 68)))?;
     emit_task_progress(&app, &task, 70, "正在解压 Node.js");
     install_zip_payload(&archive, &target, &["node.exe", "npm.cmd", "npx.cmd"])?;
     emit_task_progress(&app, &task, 88, "正在验证 Node.js");
@@ -444,7 +568,7 @@ fn install_node(app: tauri::AppHandle, version: String) -> Result<OperationResul
             "tag": release.tag,
         }),
     )?;
-    switch_runtime("node".to_string(), version.to_string())?;
+    switch_runtime_blocking("node".to_string(), version.to_string(), None)?;
     emit_task_progress(&app, &task, 100, "安装完成");
     Ok(OperationResult {
         success: true,
@@ -453,7 +577,11 @@ fn install_node(app: tauri::AppHandle, version: String) -> Result<OperationResul
 }
 
 #[tauri::command]
-fn install_python(app: tauri::AppHandle, version: String) -> Result<OperationResult, String> {
+async fn install_python(app: tauri::AppHandle, version: String) -> Result<OperationResult, String> {
+    run_blocking(move || install_python_blocking(app, version)).await?
+}
+
+fn install_python_blocking(app: tauri::AppHandle, version: String) -> Result<OperationResult, String> {
     let version = version.trim();
     let task = format!("Python {version}");
     emit_task_progress(&app, &task, 2, "正在准备安装");
@@ -471,9 +599,9 @@ fn install_python(app: tauri::AppHandle, version: String) -> Result<OperationRes
         return Err(format!("Python {version} 已安装：{}", display_path(&target)));
     }
     emit_task_progress(&app, &task, 20, "正在下载 Python 安装器");
-    download_file(&release.url, &installer, None)?;
+    download_file_with_progress(&release.url, &installer, None, Some((&app, &task, 20, 60)))?;
     emit_task_progress(&app, &task, 62, "正在静默安装 Python");
-    let output = Command::new(&installer)
+    let output = hidden_command(&installer)
         .args([
             "/quiet",
             "InstallAllUsers=0",
@@ -494,7 +622,17 @@ fn install_python(app: tauri::AppHandle, version: String) -> Result<OperationRes
             command_text(&output.stdout, &output.stderr)
         ));
     }
-    let python_exe = target.join("python.exe");
+    let python_exe = locate_python_exe(&target).ok_or_else(|| {
+        format!(
+            "Python 安装器执行完成，但没有在目标目录找到 python.exe：{}\n{}",
+            display_path(&target),
+            command_text(&output.stdout, &output.stderr)
+        )
+    })?;
+    let python_home = python_exe
+        .parent()
+        .ok_or_else(|| "无法识别 Python 安装目录".to_string())?
+        .to_path_buf();
     emit_task_progress(&app, &task, 88, "正在验证 Python 和 pip");
     let verify = run_command_output(python_exe.clone(), &["--version"], 30)?;
     run_command_output(python_exe.clone(), &["-m", "pip", "--version"], 30)?;
@@ -502,7 +640,7 @@ fn install_python(app: tauri::AppHandle, version: String) -> Result<OperationRes
         &paths,
         runtime_meta("python")?,
         version,
-        &target,
+        &python_home,
         &python_exe,
         json!({
             "detail": verify.lines().next().unwrap_or(&release.tag),
@@ -510,7 +648,7 @@ fn install_python(app: tauri::AppHandle, version: String) -> Result<OperationRes
             "installer": display_path(&installer),
         }),
     )?;
-    switch_runtime("python".to_string(), version.to_string())?;
+    switch_runtime_blocking("python".to_string(), version.to_string(), None)?;
     emit_task_progress(&app, &task, 100, "安装完成");
     Ok(OperationResult {
         success: true,
@@ -519,7 +657,11 @@ fn install_python(app: tauri::AppHandle, version: String) -> Result<OperationRes
 }
 
 #[tauri::command]
-fn install_maven_latest(app: tauri::AppHandle) -> Result<OperationResult, String> {
+async fn install_maven_latest(app: tauri::AppHandle) -> Result<OperationResult, String> {
+    run_blocking(move || install_maven_latest_blocking(app)).await?
+}
+
+fn install_maven_latest_blocking(app: tauri::AppHandle) -> Result<OperationResult, String> {
     let task = "Maven".to_string();
     emit_task_progress(&app, &task, 3, "正在查询 Maven 版本");
     let paths = load_paths()?;
@@ -532,11 +674,11 @@ fn install_maven_latest(app: tauri::AppHandle) -> Result<OperationResult, String
         return Err(format!("Maven {} 已安装：{}", release.tag, display_path(&target)));
     }
     emit_task_progress(&app, &task, 18, "正在下载 Maven");
-    download_file(&release.url, &archive, None)?;
+    download_file_with_progress(&release.url, &archive, None, Some((&app, &task, 18, 70)))?;
     emit_task_progress(&app, &task, 72, "正在解压 Maven");
     install_zip_payload(&archive, &target, &["bin/mvn.cmd"])?;
     emit_task_progress(&app, &task, 88, "正在验证 Maven");
-    let output = run_command_output(target.join("bin/mvn.cmd"), &["-v"], 60)?;
+    let output = run_managed_command_output(&paths, target.join("bin/mvn.cmd"), &["-v"], 60)?;
     record_install(
         &paths,
         runtime_meta("maven")?,
@@ -545,7 +687,7 @@ fn install_maven_latest(app: tauri::AppHandle) -> Result<OperationResult, String
         &target.join("bin/mvn.cmd"),
         json!({ "detail": output.lines().next().unwrap_or("") }),
     )?;
-    switch_runtime("maven".to_string(), release.tag.clone())?;
+    switch_runtime_blocking("maven".to_string(), release.tag.clone(), None)?;
     emit_task_progress(&app, &task, 100, "安装完成");
     Ok(OperationResult {
         success: true,
@@ -554,7 +696,11 @@ fn install_maven_latest(app: tauri::AppHandle) -> Result<OperationResult, String
 }
 
 #[tauri::command]
-fn install_gradle_latest(app: tauri::AppHandle) -> Result<OperationResult, String> {
+async fn install_gradle_latest(app: tauri::AppHandle) -> Result<OperationResult, String> {
+    run_blocking(move || install_gradle_latest_blocking(app)).await?
+}
+
+fn install_gradle_latest_blocking(app: tauri::AppHandle) -> Result<OperationResult, String> {
     let task = "Gradle".to_string();
     emit_task_progress(&app, &task, 3, "正在查询 Gradle 版本");
     let paths = load_paths()?;
@@ -567,11 +713,11 @@ fn install_gradle_latest(app: tauri::AppHandle) -> Result<OperationResult, Strin
         return Err(format!("Gradle {} 已安装：{}", release.tag, display_path(&target)));
     }
     emit_task_progress(&app, &task, 18, "正在下载 Gradle");
-    download_file(&release.url, &archive, release.sha256.as_deref())?;
+    download_file_with_progress(&release.url, &archive, release.sha256.as_deref(), Some((&app, &task, 18, 70)))?;
     emit_task_progress(&app, &task, 72, "正在解压 Gradle");
     install_zip_payload(&archive, &target, &["bin/gradle.bat"])?;
     emit_task_progress(&app, &task, 88, "正在验证 Gradle");
-    let output = run_command_output(target.join("bin/gradle.bat"), &["-v"], 120)?;
+    let output = run_managed_command_output(&paths, target.join("bin/gradle.bat"), &["-v"], 120)?;
     record_install(
         &paths,
         runtime_meta("gradle")?,
@@ -580,7 +726,7 @@ fn install_gradle_latest(app: tauri::AppHandle) -> Result<OperationResult, Strin
         &target.join("bin/gradle.bat"),
         json!({ "detail": output.lines().next().unwrap_or("") }),
     )?;
-    switch_runtime("gradle".to_string(), release.tag.clone())?;
+    switch_runtime_blocking("gradle".to_string(), release.tag.clone(), None)?;
     emit_task_progress(&app, &task, 100, "安装完成");
     Ok(OperationResult {
         success: true,
@@ -589,48 +735,88 @@ fn install_gradle_latest(app: tauri::AppHandle) -> Result<OperationResult, Strin
 }
 
 #[tauri::command]
-fn switch_runtime(kind: String, version: String) -> Result<OperationResult, String> {
+async fn switch_runtime(kind: String, version: String, path: Option<String>) -> Result<OperationResult, String> {
+    run_blocking(move || switch_runtime_blocking(kind, version, path)).await?
+}
+
+fn switch_runtime_blocking(kind: String, version: String, path: Option<String>) -> Result<OperationResult, String> {
     let paths = load_paths()?;
     let meta = runtime_meta(&kind)?;
     let mut installed = load_installed(&paths)?;
+    let requested_path = path.as_deref().map(path_key);
     let record = collection(&installed, meta.collection)
         .iter()
-        .find(|item| item.get("version").and_then(Value::as_str) == Some(version.as_str()))
+        .find(|item| {
+            if let Some(requested) = requested_path.as_deref() {
+                item.get("path")
+                    .and_then(Value::as_str)
+                    .map(path_key)
+                    .as_deref()
+                    == Some(requested)
+            } else {
+                item.get("version").and_then(Value::as_str) == Some(version.as_str())
+            }
+        })
         .cloned()
         .ok_or_else(|| format!("尚未安装 {} {}", meta.kind, version))?;
+    let selected_version = record
+        .get("version")
+        .and_then(Value::as_str)
+        .unwrap_or(version.as_str())
+        .to_string();
     let target = PathBuf::from(record.get("path").and_then(Value::as_str).unwrap_or(""));
     if !target.exists() {
         return Err(format!("版本目录不存在：{}", display_path(&target)));
     }
     switch_junction(&paths.current().join(meta.link_name), &target, &paths.root)?;
-    set_current(&mut installed, meta.kind, Some(version.clone()));
+    set_current(&mut installed, meta.kind, Some(selected_version.clone()));
     save_json(&paths.installed_file(), &installed)?;
     if meta.kind == "jdk" {
         refresh_user_java_home(&paths)?;
     }
     Ok(OperationResult {
         success: true,
-        message: format!("已切换当前 {} 到 {}", meta.kind, version),
+        message: format!("已切换当前 {} 到 {}", meta.kind, selected_version),
     })
 }
 
 #[tauri::command]
-fn uninstall_runtime(kind: String, version: String) -> Result<OperationResult, String> {
+async fn uninstall_runtime(kind: String, version: String, path: Option<String>) -> Result<OperationResult, String> {
+    run_blocking(move || uninstall_runtime_blocking(kind, version, path)).await?
+}
+
+fn uninstall_runtime_blocking(kind: String, version: String, path: Option<String>) -> Result<OperationResult, String> {
     let paths = load_paths()?;
     let meta = runtime_meta(&kind)?;
     let mut installed = load_installed(&paths)?;
+    let requested_path = path.as_deref().map(path_key);
     let records = collection_mut(&mut installed, meta.collection);
     let index = records
         .iter()
-        .position(|item| item.get("version").and_then(Value::as_str) == Some(version.as_str()))
+        .position(|item| {
+            if let Some(requested) = requested_path.as_deref() {
+                item.get("path")
+                    .and_then(Value::as_str)
+                    .map(path_key)
+                    .as_deref()
+                    == Some(requested)
+            } else {
+                item.get("version").and_then(Value::as_str) == Some(version.as_str())
+            }
+        })
         .ok_or_else(|| format!("未找到 DevEnv 管理的 {} {}", meta.kind, version))?;
     let record = records[index].clone();
+    let selected_version = record
+        .get("version")
+        .and_then(Value::as_str)
+        .unwrap_or(version.as_str())
+        .to_string();
     let target = PathBuf::from(record.get("path").and_then(Value::as_str).unwrap_or(""));
     let expected_parent = runtime_parent(&paths, meta.collection)?;
     if target.parent() != Some(expected_parent.as_path()) {
         return Err(format!("拒绝删除非标准受管目录：{}", display_path(&target)));
     }
-    if current_version(&installed, meta.kind).as_deref() == Some(version.as_str()) {
+    if current_version(&installed, meta.kind).as_deref() == Some(selected_version.as_str()) {
         remove_junction(&paths.current().join(meta.link_name))?;
         set_current(&mut installed, meta.kind, None);
     }
@@ -644,7 +830,7 @@ fn uninstall_runtime(kind: String, version: String) -> Result<OperationResult, S
     }
     Ok(OperationResult {
         success: true,
-        message: format!("已卸载 {} {}", meta.kind, version),
+        message: format!("已卸载 {} {}", meta.kind, selected_version),
     })
 }
 
@@ -682,7 +868,7 @@ fn kill_process(pid: u32, force: bool, allow_caution: bool) -> KillResult {
     if force {
         args.push("/F".to_string());
     }
-    let output = Command::new("taskkill").args(&args).output();
+    let output = hidden_command("taskkill").args(&args).output();
     match output {
         Ok(done) if done.status.success() => KillResult {
             success: true,
@@ -717,8 +903,12 @@ fn kill_process(pid: u32, force: bool, allow_caution: bool) -> KillResult {
 }
 
 #[tauri::command]
-fn scan_ports() -> Result<Vec<PortRecord>, String> {
-    let output = Command::new("netstat")
+async fn scan_ports() -> Result<Vec<PortRecord>, String> {
+    run_blocking(scan_ports_blocking).await?
+}
+
+fn scan_ports_blocking() -> Result<Vec<PortRecord>, String> {
+    let output = hidden_command("netstat")
         .args(["-ano"])
         .output()
         .map_err(|err| format!("无法执行 netstat: {err}"))?;
@@ -827,7 +1017,16 @@ fn project_health(path: String) -> Result<ProjectHealth, String> {
 }
 
 #[tauri::command]
-fn network_diagnostics() -> NetworkDiagnostics {
+async fn network_diagnostics() -> NetworkDiagnostics {
+    run_blocking(network_diagnostics_blocking)
+        .await
+        .unwrap_or_else(|_| NetworkDiagnostics {
+            checks: Vec::new(),
+            proxy: Vec::new(),
+        })
+}
+
+fn network_diagnostics_blocking() -> NetworkDiagnostics {
     let endpoints = [
         ("GitHub", "https://github.com"),
         ("Python 官网", "https://www.python.org"),
@@ -936,11 +1135,15 @@ fn clear_download_cache() -> Result<OperationResult, String> {
 }
 
 #[tauri::command]
-fn run_tool_command(command: String, cwd: Option<String>) -> Result<CommandRunResult, String> {
+async fn run_tool_command(command: String, cwd: Option<String>) -> Result<CommandRunResult, String> {
+    run_blocking(move || run_tool_command_blocking(command, cwd)).await?
+}
+
+fn run_tool_command_blocking(command: String, cwd: Option<String>) -> Result<CommandRunResult, String> {
     let parts = parse_command_line(&command)?;
     let executable = parts.first().ok_or_else(|| "命令不能为空".to_string())?;
     let started = Instant::now();
-    let mut cmd = Command::new(executable);
+    let mut cmd = hidden_command(executable);
     cmd.args(parts.iter().skip(1));
     if let Some(cwd) = cwd.filter(|item| !item.trim().is_empty()) {
         cmd.current_dir(cwd);
@@ -951,6 +1154,237 @@ fn run_tool_command(command: String, cwd: Option<String>) -> Result<CommandRunRe
         return_code: output.status.code().unwrap_or(-1),
         output: command_text(&output.stdout, &output.stderr),
         elapsed_ms: started.elapsed().as_millis(),
+    })
+}
+
+#[tauri::command]
+async fn environment_health() -> Result<Vec<EnvHealthCheck>, String> {
+    run_blocking(environment_health_blocking).await?
+}
+
+fn environment_health_blocking() -> Result<Vec<EnvHealthCheck>, String> {
+    let paths = load_paths()?;
+    let env = env_snapshot();
+    let mut checks = Vec::new();
+
+    checks.push(EnvHealthCheck {
+        name: "DEVENV_HOME".to_string(),
+        status: if env.devenv_home.as_deref().map(path_key) == Some(path_key(&display_path(&paths.root))) {
+            "正常".to_string()
+        } else {
+            "需配置".to_string()
+        },
+        detail: env
+            .devenv_home
+            .clone()
+            .unwrap_or_else(|| "未设置，点击“配置”写入受管根目录".to_string()),
+    });
+
+    checks.push(EnvHealthCheck {
+        name: "PATH".to_string(),
+        status: if env.path_warnings.iter().any(|item| item.starts_with("失效 PATH") || item.starts_with("重复 PATH")) {
+            "需清理".to_string()
+        } else {
+            "正常".to_string()
+        },
+        detail: if env.path_warnings.is_empty() {
+            format!("{} 个条目，没有真实失效或重复项", env.path_entries.len())
+        } else {
+            env.path_warnings.join("；")
+        },
+    });
+
+    if let Some(java_home) = env.java_home.as_deref() {
+        checks.push(EnvHealthCheck {
+            name: "JAVA_HOME".to_string(),
+            status: if is_valid_java_home(java_home, &paths) {
+                "正常".to_string()
+            } else {
+                "异常".to_string()
+            },
+            detail: java_home.to_string(),
+        });
+    } else {
+        checks.push(EnvHealthCheck {
+            name: "JAVA_HOME".to_string(),
+            status: "未设置".to_string(),
+            detail: "未发现 JAVA_HOME；安装或切换 JDK 后会自动配置".to_string(),
+        });
+    }
+
+    for (name, executable, args) in [
+        ("JDK", paths.current().join("jdk/bin/java.exe"), vec!["-version"]),
+        ("Python", paths.current().join("python/python.exe"), vec!["--version"]),
+        ("Node.js", paths.current().join("node/node.exe"), vec!["-v"]),
+    ] {
+        checks.push(check_executable_health(name, &executable, &args));
+    }
+    checks.push(check_managed_executable_health(
+        &paths,
+        "Maven",
+        &paths.current().join("maven/bin/mvn.cmd"),
+        &["-v"],
+    ));
+    checks.push(check_managed_executable_health(
+        &paths,
+        "Gradle",
+        &paths.current().join("gradle/bin/gradle.bat"),
+        &["-v"],
+    ));
+
+    Ok(checks)
+}
+
+#[tauri::command]
+async fn list_config_profiles() -> Result<Vec<ConfigProfile>, String> {
+    run_blocking(list_config_profiles_blocking).await?
+}
+
+fn list_config_profiles_blocking() -> Result<Vec<ConfigProfile>, String> {
+    let paths = load_paths()?;
+    let mut profiles = load_profiles(&paths)?;
+    profiles.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+    Ok(profiles)
+}
+
+#[tauri::command]
+async fn save_config_profile(name: String) -> Result<OperationResult, String> {
+    run_blocking(move || save_config_profile_blocking(name)).await?
+}
+
+fn save_config_profile_blocking(name: String) -> Result<OperationResult, String> {
+    let name = name.trim();
+    if name.is_empty() {
+        return Err("模板名称不能为空".to_string());
+    }
+    let paths = load_paths()?;
+    let installed = load_installed(&paths)?;
+    let environment = user_environment()?;
+    let path = environment
+        .get("Path")
+        .or_else(|| environment.get("PATH"))
+        .cloned()
+        .unwrap_or_default();
+    let id = format!("profile-{}", current_timestamp().replace([' ', ':', '.', '{', '}', ','], "-"));
+    let profile = ConfigProfile {
+        id: id.clone(),
+        name: name.to_string(),
+        created_at: current_timestamp(),
+        current: installed.current,
+        devenv_home: environment.get("DEVENV_HOME").cloned(),
+        java_home: environment.get("JAVA_HOME").cloned(),
+        path,
+    };
+    let mut profiles = load_profiles(&paths)?;
+    profiles.retain(|item| item.name != name);
+    profiles.push(profile);
+    save_json(&paths.profiles_file(), &profiles)?;
+    Ok(OperationResult {
+        success: true,
+        message: format!("已保存配置模板：{name}"),
+    })
+}
+
+#[tauri::command]
+async fn apply_config_profile(id: String) -> Result<OperationResult, String> {
+    run_blocking(move || apply_config_profile_blocking(id)).await?
+}
+
+fn apply_config_profile_blocking(id: String) -> Result<OperationResult, String> {
+    let paths = load_paths()?;
+    let profiles = load_profiles(&paths)?;
+    let profile = profiles
+        .into_iter()
+        .find(|item| item.id == id)
+        .ok_or_else(|| "没有找到配置模板".to_string())?;
+    let switches = [
+        ("jdk", profile.current.jdk.clone()),
+        ("python", profile.current.python.clone()),
+        ("node", profile.current.node.clone()),
+        ("maven", profile.current.maven.clone()),
+        ("gradle", profile.current.gradle.clone()),
+    ];
+    let mut applied = Vec::new();
+    for (kind, version) in switches {
+        if let Some(version) = version {
+            switch_runtime_blocking(kind.to_string(), version.clone(), None)?;
+            applied.push(format!("{kind} {version}"));
+        }
+    }
+    restore_environment_values(
+        profile.devenv_home.as_deref(),
+        profile.java_home.as_deref(),
+        &profile.path,
+    )?;
+    broadcast_environment_change();
+    Ok(OperationResult {
+        success: true,
+        message: if applied.is_empty() {
+            format!("已恢复环境变量模板：{}", profile.name)
+        } else {
+            format!("已应用模板 {}：{}", profile.name, applied.join("，"))
+        },
+    })
+}
+
+#[tauri::command]
+async fn delete_config_profile(id: String) -> Result<OperationResult, String> {
+    run_blocking(move || delete_config_profile_blocking(id)).await?
+}
+
+fn delete_config_profile_blocking(id: String) -> Result<OperationResult, String> {
+    let paths = load_paths()?;
+    let mut profiles = load_profiles(&paths)?;
+    let before = profiles.len();
+    profiles.retain(|item| item.id != id);
+    if profiles.len() == before {
+        return Err("没有找到配置模板".to_string());
+    }
+    save_json(&paths.profiles_file(), &profiles)?;
+    Ok(OperationResult {
+        success: true,
+        message: "已删除配置模板".to_string(),
+    })
+}
+
+#[tauri::command]
+async fn uninstall_external_runtime(executable: String, kind: String) -> Result<OperationResult, String> {
+    run_blocking(move || uninstall_external_runtime_blocking(executable, kind)).await?
+}
+
+fn uninstall_external_runtime_blocking(executable: String, kind: String) -> Result<OperationResult, String> {
+    let executable_path = PathBuf::from(executable.trim());
+    if !executable_path.exists() {
+        return Err("运行时路径不存在，无法定位卸载器".to_string());
+    }
+    let entry = find_uninstall_entry_for_path(&executable_path, &kind)
+        .ok_or_else(|| {
+            format!(
+                "没有在 Windows 卸载注册表中找到匹配的卸载入口。{} 可能是绿色版、IDE 内置运行时，或没有单独卸载器；可以先用“配置”切换到 DevEnv 管理的版本，再手动删除原软件目录。",
+                display_path(&executable_path)
+            )
+        })?;
+    launch_uninstall_string(&entry.uninstall_string)?;
+    Ok(OperationResult {
+        success: true,
+        message: format!("已启动 {} 的系统卸载程序", entry.display_name),
+    })
+}
+
+#[tauri::command]
+async fn self_uninstall(app: tauri::AppHandle) -> Result<OperationResult, String> {
+    let result = run_blocking(self_uninstall_blocking).await??;
+    app.exit(0);
+    Ok(result)
+}
+
+fn self_uninstall_blocking() -> Result<OperationResult, String> {
+    let entry = find_self_uninstall_entry()
+        .ok_or_else(|| "没有找到 DevEnv Manager 的卸载入口，请从 Windows 设置中卸载".to_string())?;
+    launch_uninstall_string(&entry.uninstall_string)?;
+    Ok(OperationResult {
+        success: true,
+        message: "已启动 DevEnv Manager 卸载程序".to_string(),
     })
 }
 
@@ -1003,6 +1437,7 @@ pub fn run() {
             set_root_dir,
             env_snapshot,
             configure_user_environment,
+            cleanup_path_entries,
             restore_user_environment,
             discover_runtimes,
             install_jdk,
@@ -1019,6 +1454,13 @@ pub fn run() {
             cache_entries,
             clear_download_cache,
             run_tool_command,
+            environment_health,
+            list_config_profiles,
+            save_config_profile,
+            apply_config_profile,
+            delete_config_profile,
+            uninstall_external_runtime,
+            self_uninstall,
             generate_vscode_config
         ])
         .run(tauri::generate_context!())
@@ -1048,6 +1490,12 @@ impl AppPaths {
     fn gradles(&self) -> PathBuf {
         self.envs().join("gradles")
     }
+    fn tools(&self) -> PathBuf {
+        self.root.join("tools")
+    }
+    fn npm_global(&self) -> PathBuf {
+        self.tools().join("npm-global")
+    }
     fn current(&self) -> PathBuf {
         self.root.join("current")
     }
@@ -1066,6 +1514,9 @@ impl AppPaths {
     fn env_backup_file(&self) -> PathBuf {
         self.config().join("env_backup.json")
     }
+    fn profiles_file(&self) -> PathBuf {
+        self.config().join("profiles.json")
+    }
 
     fn ensure(&self) -> io::Result<()> {
         for path in [
@@ -1075,6 +1526,8 @@ impl AppPaths {
             self.nodes(),
             self.mavens(),
             self.gradles(),
+            self.tools(),
+            self.npm_global(),
             self.current(),
             self.downloads(),
             self.config(),
@@ -1142,6 +1595,27 @@ fn default_root_dir() -> PathBuf {
     }
 }
 
+fn normalize_root_dir(input: &str) -> Result<PathBuf, String> {
+    let raw = input.trim().trim_matches('"');
+    if raw.is_empty() {
+        return Err("根目录不能为空".to_string());
+    }
+    let expanded = PathBuf::from(raw)
+        .expand_home()
+        .unwrap_or_else(|| PathBuf::from(raw));
+    let resolved = expanded.canonicalize().unwrap_or(expanded);
+    if is_drive_root(&resolved) {
+        Ok(resolved.join(APP_NAME))
+    } else {
+        Ok(resolved)
+    }
+}
+
+fn is_drive_root(path: &Path) -> bool {
+    let trimmed = display_path(path).trim_end_matches(['\\', '/']).to_string();
+    cfg!(windows) && trimmed.len() == 2 && trimmed.as_bytes().get(1) == Some(&b':')
+}
+
 fn app_config_dir() -> PathBuf {
     dirs::data_local_dir()
         .or_else(dirs::home_dir)
@@ -1176,6 +1650,10 @@ fn default_installed() -> InstalledData {
     }
 }
 
+fn default_profiles() -> Vec<ConfigProfile> {
+    Vec::new()
+}
+
 fn load_settings() -> Result<Settings, String> {
     load_json_with_default(&settings_file(), default_settings())
 }
@@ -1190,6 +1668,10 @@ fn ensure_installed(paths: &AppPaths) -> Result<InstalledData, String> {
 
 fn load_installed(paths: &AppPaths) -> Result<InstalledData, String> {
     load_json_with_default(&paths.installed_file(), default_installed())
+}
+
+fn load_profiles(paths: &AppPaths) -> Result<Vec<ConfigProfile>, String> {
+    load_json_with_default(&paths.profiles_file(), default_profiles())
 }
 
 fn load_json_with_default<T>(path: &Path, default: T) -> Result<T, String>
@@ -1257,19 +1739,12 @@ fn user_environment() -> Result<std::collections::HashMap<String, String>, Strin
 }
 
 fn merge_path(existing: &str) -> String {
-    fn key(value: &str) -> String {
-        value
-            .trim()
-            .trim_matches('"')
-            .trim_end_matches(['\\', '/'])
-            .to_ascii_lowercase()
-    }
-    let managed_keys: BTreeSet<String> = MANAGED_PATHS.iter().map(|item| key(item)).collect();
+    let managed_keys: BTreeSet<String> = MANAGED_PATHS.iter().map(|item| path_key(item)).collect();
     let mut retained = Vec::new();
     let mut seen = BTreeSet::new();
     for item in existing.split(';') {
         let item = item.trim();
-        let item_key = key(item);
+        let item_key = path_key(item);
         if item.is_empty() || managed_keys.contains(&item_key) || seen.contains(&item_key) {
             continue;
         }
@@ -1282,6 +1757,14 @@ fn merge_path(existing: &str) -> String {
         .chain(retained)
         .collect::<Vec<String>>()
         .join(";")
+}
+
+fn path_key(value: &str) -> String {
+    value
+        .trim()
+        .trim_matches('"')
+        .trim_end_matches(['\\', '/'])
+        .to_ascii_lowercase()
 }
 
 fn set_user_environment_values(
@@ -1360,7 +1843,7 @@ fn restore_environment_values(
 fn broadcast_environment_change() {
     #[cfg(windows)]
     {
-        let _ = Command::new("powershell")
+        let _ = hidden_command("powershell")
             .args([
                 "-NoProfile",
                 "-Command",
@@ -1435,20 +1918,25 @@ fn inspect_path_entries(entries: &[String], paths: &AppPaths) -> Vec<String> {
     let mut seen = BTreeSet::new();
     let mut warnings = Vec::new();
     for entry in entries {
-        let normalized = entry
-            .trim()
-            .trim_matches('"')
-            .trim_end_matches(['\\', '/'])
-            .to_ascii_lowercase();
+        let normalized = path_key(entry);
         if !seen.insert(normalized) {
             warnings.push(format!("重复 PATH: {entry}"));
         }
         let expanded = expand_environment_path(entry, paths);
-        if !entry.contains('%') && !Path::new(&expanded).exists() {
-            warnings.push(format!("失效 PATH: {entry}"));
+        if !Path::new(&expanded).exists() {
+            if is_managed_pending_path(&expanded, paths) {
+                warnings.push(format!("托管 PATH 待安装: {entry}"));
+            } else if !entry.contains('%') {
+                warnings.push(format!("失效 PATH: {entry}"));
+            }
         }
     }
     warnings
+}
+
+fn is_managed_pending_path(expanded: &str, paths: &AppPaths) -> bool {
+    let path = PathBuf::from(expanded);
+    path.starts_with(paths.current()) || path.starts_with(paths.tools())
 }
 
 #[derive(Debug)]
@@ -1684,13 +2172,21 @@ fn validate_download_url(url: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn download_file(url: &str, target_path: &Path, expected_sha256: Option<&str>) -> Result<(), String> {
+fn download_file_with_progress(
+    url: &str,
+    target_path: &Path,
+    expected_sha256: Option<&str>,
+    progress: Option<(&tauri::AppHandle, &str, u8, u8)>,
+) -> Result<(), String> {
     validate_download_url(url)?;
     if target_path.exists() && target_path.metadata().map(|item| item.len()).unwrap_or(0) > 0 {
         if expected_sha256
             .map(|expected| file_sha256(target_path).ok().as_deref() == Some(&expected.to_ascii_lowercase()))
             .unwrap_or(true)
         {
+            if let Some((app, task, _, end)) = progress {
+                emit_task_progress(app, task, end, "使用已有下载缓存");
+            }
             return Ok(());
         }
     }
@@ -1712,10 +2208,12 @@ fn download_file(url: &str, target_path: &Path, expected_sha256: Option<&str>) -
         .error_for_status()
         .map_err(|err| format!("下载失败：{err}"))?;
     validate_download_url(response.url().as_str())?;
+    let total = response.content_length();
     let mut file = fs::File::create(&temp_path).map_err(|err| format!("写入下载缓存失败：{err}"))?;
     let mut hasher = Sha256::new();
     let mut buffer = [0_u8; 1024 * 128];
     let mut downloaded = 0_u64;
+    let mut last_percent = 0_u8;
     loop {
         let read = response
             .read(&mut buffer)
@@ -1727,6 +2225,21 @@ fn download_file(url: &str, target_path: &Path, expected_sha256: Option<&str>) -
             .map_err(|err| format!("写入下载缓存失败：{err}"))?;
         hasher.update(&buffer[..read]);
         downloaded += read as u64;
+        if let (Some(total), Some((app, task, start, end))) = (total, progress) {
+            if total > 0 {
+                let span = end.saturating_sub(start) as u64;
+                let percent = start.saturating_add(((downloaded.saturating_mul(span)) / total) as u8).min(end);
+                if percent >= last_percent.saturating_add(3) || percent >= end {
+                    last_percent = percent;
+                    emit_task_progress(
+                        app,
+                        task,
+                        percent,
+                        &format!("正在下载 {}", format_size(downloaded)),
+                    );
+                }
+            }
+        }
     }
     if downloaded == 0 {
         return Err("服务器返回了空文件".to_string());
@@ -1782,6 +2295,38 @@ fn install_zip_payload(archive: &Path, target: &Path, required_files: &[&str]) -
         .find(|candidate| required_files.iter().all(|name| candidate.join(name).exists()))
         .ok_or_else(|| "无法识别压缩包中的运行时根目录".to_string())?;
     fs::rename(&payload, target).map_err(|err| format!("移动运行时目录失败：{err}"))
+}
+
+fn locate_python_exe(target: &Path) -> Option<PathBuf> {
+    let direct = target.join("python.exe");
+    if direct.is_file() {
+        return Some(direct);
+    }
+    find_file_limited(target, "python.exe", 4)
+}
+
+fn find_file_limited(root: &Path, file_name: &str, depth: usize) -> Option<PathBuf> {
+    if depth == 0 || !root.is_dir() {
+        return None;
+    }
+    for item in fs::read_dir(root).ok()?.flatten() {
+        let path = item.path();
+        if path.is_file()
+            && path
+                .file_name()
+                .and_then(OsStr::to_str)
+                .map(|name| name.eq_ignore_ascii_case(file_name))
+                .unwrap_or(false)
+        {
+            return Some(path);
+        }
+        if path.is_dir() {
+            if let Some(found) = find_file_limited(&path, file_name, depth - 1) {
+                return Some(found);
+            }
+        }
+    }
+    None
 }
 
 fn safe_extract_zip(archive: &Path, destination: &Path) -> Result<(), String> {
@@ -1948,7 +2493,7 @@ fn switch_junction(link: &Path, target: &Path, root: &Path) -> Result<(), String
         }
         remove_junction(link)?;
     }
-    let output = Command::new("cmd")
+    let output = hidden_command("cmd")
         .args(["/c", "mklink", "/J"])
         .arg(link)
         .arg(target)
@@ -1967,7 +2512,7 @@ fn remove_junction(link: &Path) -> Result<(), String> {
     if !is_junction(link) {
         return Err(format!("拒绝删除非链接目录：{}", display_path(link)));
     }
-    let output = Command::new("cmd")
+    let output = hidden_command("cmd")
         .args(["/c", "rmdir"])
         .arg(link)
         .output()
@@ -1979,7 +2524,7 @@ fn remove_junction(link: &Path) -> Result<(), String> {
 }
 
 fn is_junction(path: &Path) -> bool {
-    Command::new("cmd")
+    hidden_command("cmd")
         .args(["/c", "fsutil", "reparsepoint", "query"])
         .arg(path)
         .output()
@@ -1988,39 +2533,199 @@ fn is_junction(path: &Path) -> bool {
 }
 
 fn detect_runtime(kind: &str, executable: &str, args: &[&str]) -> Option<RuntimeInfo> {
-    let output = Command::new(executable).args(args).output().ok()?;
+    let path = find_on_path(executable).unwrap_or_else(|| executable.to_string());
+    detect_runtime_at(kind, Path::new(&path), args, None)
+}
+
+fn detect_runtime_at(kind: &str, executable: &Path, args: &[&str], source: Option<String>) -> Option<RuntimeInfo> {
+    if executable.components().count() > 1 && !executable.is_file() {
+        return None;
+    }
+    let output = hidden_command(executable).args(args).output().ok()?;
     let mut text = String::from_utf8_lossy(&output.stdout).trim().to_string();
     if text.is_empty() {
         text = String::from_utf8_lossy(&output.stderr).trim().to_string();
     }
     let version = text.lines().next().unwrap_or("unknown").to_string();
-    let path = find_on_path(executable).unwrap_or_else(|| executable.to_string());
+    let path = display_path(executable);
 
     Some(RuntimeInfo {
         kind: kind.to_string(),
         version,
         executable: path.clone(),
-        source: classify_source(&path),
+        source: source.unwrap_or_else(|| classify_source(&path)),
     })
 }
 
 fn find_on_path(executable: &str) -> Option<String> {
-    let path_value = env::var_os("PATH")?;
+    find_all_on_path(executable).into_iter().next().map(display_path)
+}
+
+fn find_all_on_path(executable: &str) -> Vec<PathBuf> {
+    let Some(path_value) = env::var_os("PATH") else {
+        return Vec::new();
+    };
     let extensions = if cfg!(windows) {
         vec![".exe", ".cmd", ".bat", ""]
     } else {
         vec![""]
     };
 
+    let mut result = Vec::new();
+    let mut seen = BTreeSet::new();
     for dir in env::split_paths(&path_value) {
         for ext in &extensions {
             let candidate = dir.join(format!("{executable}{ext}"));
-            if candidate.is_file() {
-                return Some(display_path(candidate));
+            if candidate.is_file() && seen.insert(path_key(&display_path(&candidate))) {
+                result.push(candidate);
             }
         }
     }
-    None
+    result
+}
+
+fn push_runtime(runtimes: &mut Vec<RuntimeInfo>, info: RuntimeInfo) {
+    let key = format!("{}|{}", info.kind.to_ascii_lowercase(), path_key(&info.executable));
+    if !runtimes
+        .iter()
+        .any(|item| format!("{}|{}", item.kind.to_ascii_lowercase(), path_key(&item.executable)) == key)
+    {
+        runtimes.push(info);
+    }
+}
+
+fn add_managed_runtime_discoveries(runtimes: &mut Vec<RuntimeInfo>, paths: &AppPaths) {
+    let Ok(installed) = load_installed(paths) else {
+        return;
+    };
+    for (label, meta) in [
+        ("Java", runtime_meta("jdk")),
+        ("Python", runtime_meta("python")),
+        ("Node.js", runtime_meta("node")),
+        ("Maven", runtime_meta("maven")),
+        ("Gradle", runtime_meta("gradle")),
+    ] {
+        let Ok(meta) = meta else {
+            continue;
+        };
+        for item in collection(&installed, meta.collection) {
+            let Some(executable) = item.get(meta.exe_key).and_then(Value::as_str) else {
+                continue;
+            };
+            let version = item
+                .get("detail")
+                .and_then(Value::as_str)
+                .or_else(|| item.get("version").and_then(Value::as_str))
+                .unwrap_or("unknown")
+                .to_string();
+            let path = PathBuf::from(executable);
+            if path.is_file() {
+                push_runtime(
+                    runtimes,
+                    RuntimeInfo {
+                        kind: label.to_string(),
+                        version,
+                        executable: display_path(path),
+                        source: "DevEnv managed".to_string(),
+                    },
+                );
+            }
+        }
+    }
+}
+
+fn add_python_launcher_discoveries(runtimes: &mut Vec<RuntimeInfo>) {
+    let Ok(output) = hidden_command("py").arg("-0p").output() else {
+        return;
+    };
+    let text = command_text(&output.stdout, &output.stderr);
+    for line in text.lines() {
+        let Some(path) = extract_windows_path(line) else {
+            continue;
+        };
+        if let Some(info) = detect_runtime_at("Python", Path::new(&path), &["--version"], Some("py launcher".to_string())) {
+            push_runtime(runtimes, info);
+        }
+    }
+}
+
+#[cfg(windows)]
+fn add_python_registry_discoveries(runtimes: &mut Vec<RuntimeInfo>) {
+    for root in [RegKey::predef(HKEY_CURRENT_USER), RegKey::predef(HKEY_LOCAL_MACHINE)] {
+        let Ok(core) = root.open_subkey(r"Software\Python\PythonCore") else {
+            continue;
+        };
+        for version in core.enum_keys().flatten() {
+            let Ok(install) = core.open_subkey(format!(r"{version}\InstallPath")) else {
+                continue;
+            };
+            let executable = install
+                .get_value::<String, _>("ExecutablePath")
+                .ok()
+                .map(PathBuf::from)
+                .or_else(|| install.get_value::<String, _>("").ok().map(|path| PathBuf::from(path).join("python.exe")));
+            if let Some(executable) = executable {
+                if let Some(info) = detect_runtime_at("Python", &executable, &["--version"], Some("Python registry".to_string())) {
+                    push_runtime(runtimes, info);
+                }
+            }
+        }
+    }
+    add_java_registry_discoveries(runtimes);
+    add_java_common_dir_discoveries(runtimes);
+}
+
+#[cfg(not(windows))]
+fn add_python_registry_discoveries(_runtimes: &mut Vec<RuntimeInfo>) {}
+
+#[cfg(windows)]
+fn add_java_registry_discoveries(runtimes: &mut Vec<RuntimeInfo>) {
+    for root in [RegKey::predef(HKEY_CURRENT_USER), RegKey::predef(HKEY_LOCAL_MACHINE)] {
+        let Ok(java_soft) = root.open_subkey(r"Software\JavaSoft\JDK") else {
+            continue;
+        };
+        for version in java_soft.enum_keys().flatten() {
+            let Ok(key) = java_soft.open_subkey(version) else {
+                continue;
+            };
+            let Ok(java_home) = key.get_value::<String, _>("JavaHome") else {
+                continue;
+            };
+            let executable = PathBuf::from(java_home).join("bin/java.exe");
+            if let Some(info) = detect_runtime_at("Java", &executable, &["-version"], Some("Java registry".to_string())) {
+                push_runtime(runtimes, info);
+            }
+        }
+    }
+}
+
+#[cfg(windows)]
+fn add_java_common_dir_discoveries(runtimes: &mut Vec<RuntimeInfo>) {
+    for base in [
+        r"C:\Program Files\Java",
+        r"C:\Program Files\Eclipse Adoptium",
+        r"D:\Java",
+        r"D:\Program Files\Java",
+        r"D:\Program Files\Eclipse Adoptium",
+    ] {
+        let base = Path::new(base);
+        let Ok(items) = fs::read_dir(base) else {
+            continue;
+        };
+        for item in items.flatten() {
+            let executable = item.path().join("bin/java.exe");
+            if let Some(info) = detect_runtime_at("Java", &executable, &["-version"], Some("common install dir".to_string())) {
+                push_runtime(runtimes, info);
+            }
+        }
+    }
+}
+
+fn extract_windows_path(line: &str) -> Option<String> {
+    let start = line
+        .find(":\\")
+        .and_then(|index| line[..index].char_indices().last().map(|(pos, _)| pos))?;
+    Some(line[start..].trim().trim_matches('"').to_string())
 }
 
 fn parse_socket(value: &str) -> Option<(String, u16)> {
@@ -2156,16 +2861,17 @@ fn parse_command_line(command: &str) -> Result<Vec<String>, String> {
     let mut parts = Vec::new();
     let mut current = String::new();
     let mut quote: Option<char> = None;
-    let mut escape = false;
+    let mut chars = command.chars().peekable();
 
-    for ch in command.chars() {
-        if escape {
-            current.push(ch);
-            escape = false;
-            continue;
-        }
+    while let Some(ch) = chars.next() {
         if ch == '\\' {
-            escape = true;
+            if matches!(chars.peek(), Some('"') | Some('\'') | Some('\\')) {
+                if let Some(next) = chars.next() {
+                    current.push(next);
+                }
+            } else {
+                current.push(ch);
+            }
             continue;
         }
         if let Some(active) = quote {
@@ -2187,9 +2893,6 @@ fn parse_command_line(command: &str) -> Result<Vec<String>, String> {
         }
     }
 
-    if escape {
-        current.push('\\');
-    }
     if quote.is_some() {
         return Err("命令包含未闭合的引号".to_string());
     }
@@ -2200,7 +2903,7 @@ fn parse_command_line(command: &str) -> Result<Vec<String>, String> {
 }
 
 fn run_command_output(executable: PathBuf, args: &[&str], timeout_seconds: u64) -> Result<String, String> {
-    let output = Command::new(executable)
+    let output = hidden_command(executable)
         .args(args)
         .output()
         .map_err(|err| format!("执行命令失败：{err}"))?;
@@ -2211,6 +2914,52 @@ fn run_command_output(executable: PathBuf, args: &[&str], timeout_seconds: u64) 
     Ok(command_text(&output.stdout, &output.stderr))
 }
 
+fn run_managed_command_output(
+    paths: &AppPaths,
+    executable: PathBuf,
+    args: &[&str],
+    timeout_seconds: u64,
+) -> Result<String, String> {
+    let mut command = hidden_command(executable);
+    command.args(args);
+    apply_managed_environment(paths, &mut command);
+    let output = command.output().map_err(|err| format!("执行命令失败：{err}"))?;
+    let _ = timeout_seconds;
+    if !output.status.success() {
+        return Err(command_text(&output.stdout, &output.stderr));
+    }
+    Ok(command_text(&output.stdout, &output.stderr))
+}
+
+fn apply_managed_environment(paths: &AppPaths, command: &mut Command) {
+    command.env("DEVENV_HOME", display_path(&paths.root));
+    let java_home = paths.current().join("jdk");
+    if java_home.join("bin/java.exe").is_file() {
+        command.env("JAVA_HOME", display_path(&java_home));
+    }
+
+    let current_path = env::var("PATH").unwrap_or_default();
+    let mut entries = Vec::new();
+    for item in [
+        paths.current().join("jdk/bin"),
+        paths.current().join("python"),
+        paths.current().join("python/Scripts"),
+        paths.current().join("node"),
+        paths.current().join("maven/bin"),
+        paths.current().join("gradle/bin"),
+        paths.npm_global(),
+    ] {
+        entries.push(display_path(item));
+    }
+    entries.extend(
+        current_path
+            .split(';')
+            .map(|item| expand_environment_path(item, paths))
+            .filter(|item| !item.trim().is_empty()),
+    );
+    command.env("PATH", entries.join(";"));
+}
+
 fn command_text(stdout: &[u8], stderr: &[u8]) -> String {
     let stdout = String::from_utf8_lossy(stdout).trim().to_string();
     let stderr = String::from_utf8_lossy(stderr).trim().to_string();
@@ -2219,6 +2968,237 @@ fn command_text(stdout: &[u8], stderr: &[u8]) -> String {
         .filter(|item| !item.is_empty())
         .collect::<Vec<String>>()
         .join("\n")
+}
+
+fn hidden_command(program: impl AsRef<OsStr>) -> Command {
+    let mut command = Command::new(program);
+    hide_command_window(&mut command);
+    command
+}
+
+fn hide_command_window(command: &mut Command) {
+    #[cfg(windows)]
+    {
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+}
+
+fn check_executable_health(name: &str, executable: &Path, args: &[&str]) -> EnvHealthCheck {
+    if !executable.is_file() {
+        return EnvHealthCheck {
+            name: name.to_string(),
+            status: "未安装".to_string(),
+            detail: format!("未发现 {}", display_path(executable)),
+        };
+    }
+    match run_command_output(executable.to_path_buf(), args, 30) {
+        Ok(output) => EnvHealthCheck {
+            name: name.to_string(),
+            status: "正常".to_string(),
+            detail: output.lines().next().unwrap_or("验证通过").to_string(),
+        },
+        Err(err) => EnvHealthCheck {
+            name: name.to_string(),
+            status: "异常".to_string(),
+            detail: err,
+        },
+    }
+}
+
+fn check_managed_executable_health(
+    paths: &AppPaths,
+    name: &str,
+    executable: &Path,
+    args: &[&str],
+) -> EnvHealthCheck {
+    if !executable.is_file() {
+        return EnvHealthCheck {
+            name: name.to_string(),
+            status: "未安装".to_string(),
+            detail: format!("未发现 {}", display_path(executable)),
+        };
+    }
+    match run_managed_command_output(paths, executable.to_path_buf(), args, 30) {
+        Ok(output) => EnvHealthCheck {
+            name: name.to_string(),
+            status: "正常".to_string(),
+            detail: output.lines().next().unwrap_or("验证通过").to_string(),
+        },
+        Err(err) => EnvHealthCheck {
+            name: name.to_string(),
+            status: "异常".to_string(),
+            detail: err,
+        },
+    }
+}
+
+#[cfg(windows)]
+fn uninstall_entries() -> Vec<UninstallEntry> {
+    let mut entries = Vec::new();
+    for root in [RegKey::predef(HKEY_CURRENT_USER), RegKey::predef(HKEY_LOCAL_MACHINE)] {
+        for subkey in [
+            r"Software\Microsoft\Windows\CurrentVersion\Uninstall",
+            r"Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall",
+        ] {
+            let Ok(uninstall) = root.open_subkey(subkey) else {
+                continue;
+            };
+            for name in uninstall.enum_keys().flatten() {
+                let Ok(app) = uninstall.open_subkey(name) else {
+                    continue;
+                };
+                let display_name = app.get_value::<String, _>("DisplayName").unwrap_or_default();
+                let uninstall_string = app.get_value::<String, _>("UninstallString").unwrap_or_default();
+                if display_name.trim().is_empty() || uninstall_string.trim().is_empty() {
+                    continue;
+                }
+                entries.push(UninstallEntry {
+                    display_name,
+                    install_location: app.get_value::<String, _>("InstallLocation").unwrap_or_default(),
+                    display_icon: app.get_value::<String, _>("DisplayIcon").unwrap_or_default(),
+                    uninstall_string,
+                });
+            }
+        }
+    }
+    entries
+}
+
+#[cfg(not(windows))]
+fn uninstall_entries() -> Vec<UninstallEntry> {
+    Vec::new()
+}
+
+fn find_uninstall_entry_for_path(executable: &Path, kind: &str) -> Option<UninstallEntry> {
+    let executable_key = path_key(&display_path(executable));
+    let executable_roots = executable_candidate_roots(executable);
+    let kind_words = uninstall_kind_words(kind);
+    uninstall_entries()
+        .into_iter()
+        .filter(|entry| {
+            let name = entry.display_name.to_ascii_lowercase();
+            kind_words.is_empty() || kind_words.iter().any(|word| name.contains(word))
+        })
+        .map(|entry| {
+            let mut score = 0;
+            let name = entry.display_name.to_ascii_lowercase();
+            for word in &kind_words {
+                if name.contains(word) {
+                    score += 2;
+                }
+            }
+            for candidate in [&entry.install_location, &entry.display_icon, &entry.uninstall_string] {
+                if candidate.trim().is_empty() {
+                    continue;
+                }
+                for candidate_part in path_like_parts(candidate) {
+                    let candidate_key = path_key(&candidate_part);
+                    if candidate_key.is_empty() {
+                        continue;
+                    }
+                    if candidate_key == executable_key {
+                        score += 30;
+                    } else if executable_key.starts_with(&candidate_key)
+                        || candidate_key.starts_with(&executable_key)
+                    {
+                        score += 18;
+                    } else if executable_roots
+                        .iter()
+                        .any(|root| candidate_key.starts_with(root) || root.starts_with(&candidate_key))
+                    {
+                        score += 12;
+                    }
+                }
+            }
+            (score, entry)
+        })
+        .filter(|(score, _)| *score >= 10)
+        .max_by(|a, b| a.0.cmp(&b.0))
+        .map(|(_, entry)| entry)
+}
+
+fn executable_candidate_roots(executable: &Path) -> Vec<String> {
+    let mut roots = Vec::new();
+    let mut current = executable.parent();
+    for _ in 0..5 {
+        let Some(path) = current else {
+            break;
+        };
+        roots.push(path_key(&display_path(path)));
+        current = path.parent();
+    }
+    roots
+}
+
+fn path_like_parts(value: &str) -> Vec<String> {
+    let cleaned = value.trim().trim_matches('"');
+    let mut parts = vec![cleaned.split(',').next().unwrap_or(cleaned).trim().trim_matches('"').to_string()];
+    for token in parse_command_line(cleaned).unwrap_or_default() {
+        if token.contains(":\\") || token.contains("\\\\") {
+            parts.push(token.split(',').next().unwrap_or(&token).trim_matches('"').to_string());
+        }
+    }
+    parts
+        .into_iter()
+        .filter(|item| !item.trim().is_empty())
+        .collect()
+}
+
+fn find_self_uninstall_entry() -> Option<UninstallEntry> {
+    let current = env::current_exe().ok().map(|path| path_key(&display_path(path)));
+    uninstall_entries()
+        .into_iter()
+        .find(|entry| {
+            let name = entry.display_name.to_ascii_lowercase();
+            if name == "devenv manager" || name.contains("devenv manager") {
+                return true;
+            }
+            if let Some(current) = current.as_deref() {
+                let install_key = path_key(&entry.install_location);
+                return !install_key.is_empty() && current.starts_with(&install_key);
+            }
+            false
+        })
+}
+
+fn uninstall_kind_words(kind: &str) -> Vec<&'static str> {
+    match kind.to_ascii_lowercase().as_str() {
+        "java" | "jdk" => vec!["java", "jdk", "temurin", "adoptium", "oracle"],
+        "python" | "python launcher" => vec!["python"],
+        "node.js" | "node" | "npm" => vec!["node", "node.js"],
+        "maven" => vec!["maven"],
+        "gradle" => vec!["gradle"],
+        _ => vec![],
+    }
+}
+
+fn launch_uninstall_string(uninstall_string: &str) -> Result<(), String> {
+    let mut parts = parse_command_line(uninstall_string)?;
+    let executable = parts.first().cloned().ok_or_else(|| "卸载命令为空".to_string())?;
+    if executable.to_ascii_lowercase().contains("msiexec") {
+        for part in parts.iter_mut().skip(1) {
+            if part.eq_ignore_ascii_case("/i") || part.eq_ignore_ascii_case("/I") {
+                *part = "/X".to_string();
+                break;
+            }
+        }
+    }
+    hidden_command(&executable)
+        .args(parts.iter().skip(1))
+        .spawn()
+        .map_err(|err| format!("启动卸载程序失败：{err}"))?;
+    Ok(())
+}
+
+async fn run_blocking<F, R>(task: F) -> Result<R, String>
+where
+    F: FnOnce() -> R + Send + 'static,
+    R: Send + 'static,
+{
+    tauri::async_runtime::spawn_blocking(task)
+        .await
+        .map_err(|err| format!("后台任务失败：{err}"))
 }
 
 fn current_timestamp() -> String {
@@ -2272,6 +3252,10 @@ mod tests {
         assert_eq!(
             parse_command_line(r#"python -m pytest "tests/test path.py""#).unwrap(),
             vec!["python", "-m", "pytest", "tests/test path.py"]
+        );
+        assert_eq!(
+            parse_command_line(r#""C:\Program Files\App\uninstall.exe" /S"#).unwrap(),
+            vec![r"C:\Program Files\App\uninstall.exe", "/S"]
         );
         assert!(parse_command_line(r#"node "unterminated"#).is_err());
     }
