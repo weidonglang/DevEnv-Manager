@@ -139,6 +139,16 @@ type EnvHealthCheck = {
   detail: string;
 };
 
+type ConfigProfile = {
+  id: string;
+  name: string;
+  createdAt: string;
+  current: Record<string, string | null>;
+  devenvHome?: string;
+  javaHome?: string;
+  path: string;
+};
+
 const app = document.querySelector<HTMLDivElement>("#app");
 
 if (!app) {
@@ -173,6 +183,10 @@ app.innerHTML = `
         <button id="refresh-all" class="primary">${icon(RefreshCw)}<span>刷新</span></button>
       </header>
       <div id="toast" class="toast" hidden></div>
+      <div id="task-progress" class="task-progress" hidden>
+        <div><strong id="task-progress-title">任务</strong><span id="task-progress-message">等待中</span></div>
+        <div class="progress-track"><span id="task-progress-bar"></span></div>
+      </div>
 
       <section id="view-overview" class="view active">
         <div class="metrics">
@@ -342,6 +356,14 @@ app.innerHTML = `
             <div id="env-health" class="runtime-list health-list"></div>
           </section>
           <section class="panel">
+            <div class="panel-title">${icon(Shield)}<h2>配置模板</h2></div>
+            <div class="form-row">
+              <input id="profile-name" placeholder="例如 Java 8 + Python 3.12" />
+              <button id="save-profile">${icon(Download)}<span>保存</span></button>
+            </div>
+            <div id="profile-list" class="runtime-list profile-list"></div>
+          </section>
+          <section class="panel">
             <div class="panel-title">${icon(Shield)}<h2>PATH 检查</h2></div>
             <div id="path-warnings" class="warning-list"></div>
           </section>
@@ -412,6 +434,7 @@ const state = {
   network: null as NetworkDiagnostics | null,
   cache: [] as CacheEntry[],
   health: [] as EnvHealthCheck[],
+  profiles: [] as ConfigProfile[],
 };
 
 const portState = {
@@ -706,6 +729,31 @@ function renderHealth() {
     : `<div class="empty">还没有环境健康检查结果</div>`;
 }
 
+function renderProfiles() {
+  const element = document.querySelector<HTMLElement>("#profile-list");
+  if (!element) return;
+  element.innerHTML = state.profiles.length
+    ? state.profiles
+        .map((profile) => {
+          const current = Object.entries(profile.current)
+            .filter(([, value]) => value)
+            .map(([key, value]) => `${key} ${value}`)
+            .join(" · ");
+          return `
+            <article class="runtime profile-item">
+              <div><strong>${escapeHtml(profile.name)}</strong><span>${escapeHtml(profile.createdAt)}</span></div>
+              <small>${escapeHtml(current || "仅保存环境变量")}</small>
+              <div class="row-actions">
+                <button data-action="apply-profile" data-id="${escapeHtml(profile.id)}">${icon(RefreshCw)}<span>应用</span></button>
+                <button data-action="delete-profile" data-id="${escapeHtml(profile.id)}">${icon(Trash2)}<span>删除</span></button>
+              </div>
+            </article>
+          `;
+        })
+        .join("")
+    : `<div class="empty">还没有保存配置模板</div>`;
+}
+
 function filteredPorts(records: PortRecord[]) {
   const terms = expandPortQuery(portState.query);
   return records.filter((record) => {
@@ -786,18 +834,21 @@ function renderProjectHealth(health: ProjectHealth) {
 }
 
 async function refreshBase() {
-  const [snapshot, config, envSnapshot] = await Promise.all([
+  const [snapshot, config, envSnapshot, profiles] = await Promise.all([
     invoke<AppSnapshot>("app_snapshot"),
     invoke<ConfigView>("load_config"),
     invoke<EnvSnapshot>("env_snapshot"),
+    invoke<ConfigProfile[]>("list_config_profiles"),
   ]);
 
   state.snapshot = snapshot;
   state.config = config;
   state.env = envSnapshot;
+  state.profiles = profiles;
   renderSnapshot();
   renderEnv();
   renderHealth();
+  renderProfiles();
   renderRuntimes();
   renderPorts();
 }
@@ -881,6 +932,21 @@ function showToast(message: string, isError = false) {
 
 function renderProgress(progress: TaskProgress) {
   showToast(`${progress.task}: ${progress.percent}% · ${progress.message}`);
+  const box = document.querySelector<HTMLElement>("#task-progress");
+  const title = document.querySelector<HTMLElement>("#task-progress-title");
+  const message = document.querySelector<HTMLElement>("#task-progress-message");
+  const bar = document.querySelector<HTMLElement>("#task-progress-bar");
+  if (!box || !title || !message || !bar) return;
+  box.hidden = false;
+  title.textContent = `${progress.task} · ${progress.percent}%`;
+  message.textContent = progress.message;
+  bar.style.width = `${Math.max(0, Math.min(100, progress.percent))}%`;
+  if (progress.percent >= 100) {
+    window.setTimeout(() => {
+      box.hidden = true;
+      bar.style.width = "0%";
+    }, 2500);
+  }
 }
 
 function renderNetwork() {
@@ -1021,6 +1087,14 @@ document.querySelector("#cleanup-path")?.addEventListener("click", () => {
 });
 document.querySelector("#restore-env")?.addEventListener("click", () => {
   void runOperation(() => invoke<OperationResult>("restore_user_environment"), "正在恢复用户环境变量");
+});
+document.querySelector("#save-profile")?.addEventListener("click", () => {
+  const input = document.querySelector<HTMLInputElement>("#profile-name");
+  const name = input?.value.trim() || "";
+  void runOperation(
+    () => invoke<OperationResult>("save_config_profile", { name }),
+    "正在保存配置模板",
+  );
 });
 document.querySelector("#run-network")?.addEventListener("click", async () => {
   showToast("正在执行网络诊断");
@@ -1185,6 +1259,21 @@ document.addEventListener("click", (event) => {
     void runOperation(
       () => invoke<OperationResult>("uninstall_external_runtime", { kind, executable }),
       `正在启动 ${kind} 的系统卸载程序`,
+    );
+  }
+  if (action === "apply-profile") {
+    const id = button.dataset.id || "";
+    void runRuntimeOperation(
+      () => invoke<OperationResult>("apply_config_profile", { id }),
+      "正在应用配置模板",
+      "PATH",
+    );
+  }
+  if (action === "delete-profile") {
+    const id = button.dataset.id || "";
+    void runOperation(
+      () => invoke<OperationResult>("delete_config_profile", { id }),
+      "正在删除配置模板",
     );
   }
   if (action === "kill-port") {

@@ -92,6 +92,18 @@ struct CurrentVersions {
     gradle: Option<String>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct ConfigProfile {
+    id: String,
+    name: String,
+    created_at: String,
+    current: CurrentVersions,
+    devenv_home: Option<String>,
+    java_home: Option<String>,
+    path: String,
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct PathSummary {
@@ -489,7 +501,7 @@ fn install_jdk_blocking(app: tauri::AppHandle, version: String) -> Result<Operat
         return Err(format!("JDK {version} 已安装：{}", display_path(&target)));
     }
     emit_task_progress(&app, &task, 18, "正在下载 JDK");
-    download_file(&release.url, &archive, release.sha256.as_deref())?;
+    download_file_with_progress(&release.url, &archive, release.sha256.as_deref(), Some((&app, &task, 18, 68)))?;
     emit_task_progress(&app, &task, 70, "正在解压 JDK");
     install_zip_payload(&archive, &target, &["bin/java.exe", "bin/javac.exe"])?;
     emit_task_progress(&app, &task, 88, "正在验证 JDK");
@@ -539,7 +551,7 @@ fn install_node_blocking(app: tauri::AppHandle, version: String) -> Result<Opera
         return Err(format!("Node.js {version} 已安装：{}", display_path(&target)));
     }
     emit_task_progress(&app, &task, 18, "正在下载 Node.js");
-    download_file(&release.url, &archive, checksum.as_deref())?;
+    download_file_with_progress(&release.url, &archive, checksum.as_deref(), Some((&app, &task, 18, 68)))?;
     emit_task_progress(&app, &task, 70, "正在解压 Node.js");
     install_zip_payload(&archive, &target, &["node.exe", "npm.cmd", "npx.cmd"])?;
     emit_task_progress(&app, &task, 88, "正在验证 Node.js");
@@ -587,7 +599,7 @@ fn install_python_blocking(app: tauri::AppHandle, version: String) -> Result<Ope
         return Err(format!("Python {version} 已安装：{}", display_path(&target)));
     }
     emit_task_progress(&app, &task, 20, "正在下载 Python 安装器");
-    download_file(&release.url, &installer, None)?;
+    download_file_with_progress(&release.url, &installer, None, Some((&app, &task, 20, 60)))?;
     emit_task_progress(&app, &task, 62, "正在静默安装 Python");
     let output = hidden_command(&installer)
         .args([
@@ -610,7 +622,17 @@ fn install_python_blocking(app: tauri::AppHandle, version: String) -> Result<Ope
             command_text(&output.stdout, &output.stderr)
         ));
     }
-    let python_exe = target.join("python.exe");
+    let python_exe = locate_python_exe(&target).ok_or_else(|| {
+        format!(
+            "Python 安装器执行完成，但没有在目标目录找到 python.exe：{}\n{}",
+            display_path(&target),
+            command_text(&output.stdout, &output.stderr)
+        )
+    })?;
+    let python_home = python_exe
+        .parent()
+        .ok_or_else(|| "无法识别 Python 安装目录".to_string())?
+        .to_path_buf();
     emit_task_progress(&app, &task, 88, "正在验证 Python 和 pip");
     let verify = run_command_output(python_exe.clone(), &["--version"], 30)?;
     run_command_output(python_exe.clone(), &["-m", "pip", "--version"], 30)?;
@@ -618,7 +640,7 @@ fn install_python_blocking(app: tauri::AppHandle, version: String) -> Result<Ope
         &paths,
         runtime_meta("python")?,
         version,
-        &target,
+        &python_home,
         &python_exe,
         json!({
             "detail": verify.lines().next().unwrap_or(&release.tag),
@@ -652,11 +674,11 @@ fn install_maven_latest_blocking(app: tauri::AppHandle) -> Result<OperationResul
         return Err(format!("Maven {} 已安装：{}", release.tag, display_path(&target)));
     }
     emit_task_progress(&app, &task, 18, "正在下载 Maven");
-    download_file(&release.url, &archive, None)?;
+    download_file_with_progress(&release.url, &archive, None, Some((&app, &task, 18, 70)))?;
     emit_task_progress(&app, &task, 72, "正在解压 Maven");
     install_zip_payload(&archive, &target, &["bin/mvn.cmd"])?;
     emit_task_progress(&app, &task, 88, "正在验证 Maven");
-    let output = run_command_output(target.join("bin/mvn.cmd"), &["-v"], 60)?;
+    let output = run_managed_command_output(&paths, target.join("bin/mvn.cmd"), &["-v"], 60)?;
     record_install(
         &paths,
         runtime_meta("maven")?,
@@ -691,11 +713,11 @@ fn install_gradle_latest_blocking(app: tauri::AppHandle) -> Result<OperationResu
         return Err(format!("Gradle {} 已安装：{}", release.tag, display_path(&target)));
     }
     emit_task_progress(&app, &task, 18, "正在下载 Gradle");
-    download_file(&release.url, &archive, release.sha256.as_deref())?;
+    download_file_with_progress(&release.url, &archive, release.sha256.as_deref(), Some((&app, &task, 18, 70)))?;
     emit_task_progress(&app, &task, 72, "正在解压 Gradle");
     install_zip_payload(&archive, &target, &["bin/gradle.bat"])?;
     emit_task_progress(&app, &task, 88, "正在验证 Gradle");
-    let output = run_command_output(target.join("bin/gradle.bat"), &["-v"], 120)?;
+    let output = run_managed_command_output(&paths, target.join("bin/gradle.bat"), &["-v"], 120)?;
     record_install(
         &paths,
         runtime_meta("gradle")?,
@@ -1194,13 +1216,135 @@ fn environment_health_blocking() -> Result<Vec<EnvHealthCheck>, String> {
         ("JDK", paths.current().join("jdk/bin/java.exe"), vec!["-version"]),
         ("Python", paths.current().join("python/python.exe"), vec!["--version"]),
         ("Node.js", paths.current().join("node/node.exe"), vec!["-v"]),
-        ("Maven", paths.current().join("maven/bin/mvn.cmd"), vec!["-v"]),
-        ("Gradle", paths.current().join("gradle/bin/gradle.bat"), vec!["-v"]),
     ] {
         checks.push(check_executable_health(name, &executable, &args));
     }
+    checks.push(check_managed_executable_health(
+        &paths,
+        "Maven",
+        &paths.current().join("maven/bin/mvn.cmd"),
+        &["-v"],
+    ));
+    checks.push(check_managed_executable_health(
+        &paths,
+        "Gradle",
+        &paths.current().join("gradle/bin/gradle.bat"),
+        &["-v"],
+    ));
 
     Ok(checks)
+}
+
+#[tauri::command]
+async fn list_config_profiles() -> Result<Vec<ConfigProfile>, String> {
+    run_blocking(list_config_profiles_blocking).await?
+}
+
+fn list_config_profiles_blocking() -> Result<Vec<ConfigProfile>, String> {
+    let paths = load_paths()?;
+    let mut profiles = load_profiles(&paths)?;
+    profiles.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+    Ok(profiles)
+}
+
+#[tauri::command]
+async fn save_config_profile(name: String) -> Result<OperationResult, String> {
+    run_blocking(move || save_config_profile_blocking(name)).await?
+}
+
+fn save_config_profile_blocking(name: String) -> Result<OperationResult, String> {
+    let name = name.trim();
+    if name.is_empty() {
+        return Err("模板名称不能为空".to_string());
+    }
+    let paths = load_paths()?;
+    let installed = load_installed(&paths)?;
+    let environment = user_environment()?;
+    let path = environment
+        .get("Path")
+        .or_else(|| environment.get("PATH"))
+        .cloned()
+        .unwrap_or_default();
+    let id = format!("profile-{}", current_timestamp().replace([' ', ':', '.', '{', '}', ','], "-"));
+    let profile = ConfigProfile {
+        id: id.clone(),
+        name: name.to_string(),
+        created_at: current_timestamp(),
+        current: installed.current,
+        devenv_home: environment.get("DEVENV_HOME").cloned(),
+        java_home: environment.get("JAVA_HOME").cloned(),
+        path,
+    };
+    let mut profiles = load_profiles(&paths)?;
+    profiles.retain(|item| item.name != name);
+    profiles.push(profile);
+    save_json(&paths.profiles_file(), &profiles)?;
+    Ok(OperationResult {
+        success: true,
+        message: format!("已保存配置模板：{name}"),
+    })
+}
+
+#[tauri::command]
+async fn apply_config_profile(id: String) -> Result<OperationResult, String> {
+    run_blocking(move || apply_config_profile_blocking(id)).await?
+}
+
+fn apply_config_profile_blocking(id: String) -> Result<OperationResult, String> {
+    let paths = load_paths()?;
+    let profiles = load_profiles(&paths)?;
+    let profile = profiles
+        .into_iter()
+        .find(|item| item.id == id)
+        .ok_or_else(|| "没有找到配置模板".to_string())?;
+    let switches = [
+        ("jdk", profile.current.jdk.clone()),
+        ("python", profile.current.python.clone()),
+        ("node", profile.current.node.clone()),
+        ("maven", profile.current.maven.clone()),
+        ("gradle", profile.current.gradle.clone()),
+    ];
+    let mut applied = Vec::new();
+    for (kind, version) in switches {
+        if let Some(version) = version {
+            switch_runtime_blocking(kind.to_string(), version.clone(), None)?;
+            applied.push(format!("{kind} {version}"));
+        }
+    }
+    restore_environment_values(
+        profile.devenv_home.as_deref(),
+        profile.java_home.as_deref(),
+        &profile.path,
+    )?;
+    broadcast_environment_change();
+    Ok(OperationResult {
+        success: true,
+        message: if applied.is_empty() {
+            format!("已恢复环境变量模板：{}", profile.name)
+        } else {
+            format!("已应用模板 {}：{}", profile.name, applied.join("，"))
+        },
+    })
+}
+
+#[tauri::command]
+async fn delete_config_profile(id: String) -> Result<OperationResult, String> {
+    run_blocking(move || delete_config_profile_blocking(id)).await?
+}
+
+fn delete_config_profile_blocking(id: String) -> Result<OperationResult, String> {
+    let paths = load_paths()?;
+    let mut profiles = load_profiles(&paths)?;
+    let before = profiles.len();
+    profiles.retain(|item| item.id != id);
+    if profiles.len() == before {
+        return Err("没有找到配置模板".to_string());
+    }
+    save_json(&paths.profiles_file(), &profiles)?;
+    Ok(OperationResult {
+        success: true,
+        message: "已删除配置模板".to_string(),
+    })
 }
 
 #[tauri::command]
@@ -1311,6 +1455,10 @@ pub fn run() {
             clear_download_cache,
             run_tool_command,
             environment_health,
+            list_config_profiles,
+            save_config_profile,
+            apply_config_profile,
+            delete_config_profile,
             uninstall_external_runtime,
             self_uninstall,
             generate_vscode_config
@@ -1365,6 +1513,9 @@ impl AppPaths {
     }
     fn env_backup_file(&self) -> PathBuf {
         self.config().join("env_backup.json")
+    }
+    fn profiles_file(&self) -> PathBuf {
+        self.config().join("profiles.json")
     }
 
     fn ensure(&self) -> io::Result<()> {
@@ -1499,6 +1650,10 @@ fn default_installed() -> InstalledData {
     }
 }
 
+fn default_profiles() -> Vec<ConfigProfile> {
+    Vec::new()
+}
+
 fn load_settings() -> Result<Settings, String> {
     load_json_with_default(&settings_file(), default_settings())
 }
@@ -1513,6 +1668,10 @@ fn ensure_installed(paths: &AppPaths) -> Result<InstalledData, String> {
 
 fn load_installed(paths: &AppPaths) -> Result<InstalledData, String> {
     load_json_with_default(&paths.installed_file(), default_installed())
+}
+
+fn load_profiles(paths: &AppPaths) -> Result<Vec<ConfigProfile>, String> {
+    load_json_with_default(&paths.profiles_file(), default_profiles())
 }
 
 fn load_json_with_default<T>(path: &Path, default: T) -> Result<T, String>
@@ -2013,13 +2172,21 @@ fn validate_download_url(url: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn download_file(url: &str, target_path: &Path, expected_sha256: Option<&str>) -> Result<(), String> {
+fn download_file_with_progress(
+    url: &str,
+    target_path: &Path,
+    expected_sha256: Option<&str>,
+    progress: Option<(&tauri::AppHandle, &str, u8, u8)>,
+) -> Result<(), String> {
     validate_download_url(url)?;
     if target_path.exists() && target_path.metadata().map(|item| item.len()).unwrap_or(0) > 0 {
         if expected_sha256
             .map(|expected| file_sha256(target_path).ok().as_deref() == Some(&expected.to_ascii_lowercase()))
             .unwrap_or(true)
         {
+            if let Some((app, task, _, end)) = progress {
+                emit_task_progress(app, task, end, "使用已有下载缓存");
+            }
             return Ok(());
         }
     }
@@ -2041,10 +2208,12 @@ fn download_file(url: &str, target_path: &Path, expected_sha256: Option<&str>) -
         .error_for_status()
         .map_err(|err| format!("下载失败：{err}"))?;
     validate_download_url(response.url().as_str())?;
+    let total = response.content_length();
     let mut file = fs::File::create(&temp_path).map_err(|err| format!("写入下载缓存失败：{err}"))?;
     let mut hasher = Sha256::new();
     let mut buffer = [0_u8; 1024 * 128];
     let mut downloaded = 0_u64;
+    let mut last_percent = 0_u8;
     loop {
         let read = response
             .read(&mut buffer)
@@ -2056,6 +2225,21 @@ fn download_file(url: &str, target_path: &Path, expected_sha256: Option<&str>) -
             .map_err(|err| format!("写入下载缓存失败：{err}"))?;
         hasher.update(&buffer[..read]);
         downloaded += read as u64;
+        if let (Some(total), Some((app, task, start, end))) = (total, progress) {
+            if total > 0 {
+                let span = end.saturating_sub(start) as u64;
+                let percent = start.saturating_add(((downloaded.saturating_mul(span)) / total) as u8).min(end);
+                if percent >= last_percent.saturating_add(3) || percent >= end {
+                    last_percent = percent;
+                    emit_task_progress(
+                        app,
+                        task,
+                        percent,
+                        &format!("正在下载 {}", format_size(downloaded)),
+                    );
+                }
+            }
+        }
     }
     if downloaded == 0 {
         return Err("服务器返回了空文件".to_string());
@@ -2111,6 +2295,38 @@ fn install_zip_payload(archive: &Path, target: &Path, required_files: &[&str]) -
         .find(|candidate| required_files.iter().all(|name| candidate.join(name).exists()))
         .ok_or_else(|| "无法识别压缩包中的运行时根目录".to_string())?;
     fs::rename(&payload, target).map_err(|err| format!("移动运行时目录失败：{err}"))
+}
+
+fn locate_python_exe(target: &Path) -> Option<PathBuf> {
+    let direct = target.join("python.exe");
+    if direct.is_file() {
+        return Some(direct);
+    }
+    find_file_limited(target, "python.exe", 4)
+}
+
+fn find_file_limited(root: &Path, file_name: &str, depth: usize) -> Option<PathBuf> {
+    if depth == 0 || !root.is_dir() {
+        return None;
+    }
+    for item in fs::read_dir(root).ok()?.flatten() {
+        let path = item.path();
+        if path.is_file()
+            && path
+                .file_name()
+                .and_then(OsStr::to_str)
+                .map(|name| name.eq_ignore_ascii_case(file_name))
+                .unwrap_or(false)
+        {
+            return Some(path);
+        }
+        if path.is_dir() {
+            if let Some(found) = find_file_limited(&path, file_name, depth - 1) {
+                return Some(found);
+            }
+        }
+    }
+    None
 }
 
 fn safe_extract_zip(archive: &Path, destination: &Path) -> Result<(), String> {
@@ -2698,6 +2914,52 @@ fn run_command_output(executable: PathBuf, args: &[&str], timeout_seconds: u64) 
     Ok(command_text(&output.stdout, &output.stderr))
 }
 
+fn run_managed_command_output(
+    paths: &AppPaths,
+    executable: PathBuf,
+    args: &[&str],
+    timeout_seconds: u64,
+) -> Result<String, String> {
+    let mut command = hidden_command(executable);
+    command.args(args);
+    apply_managed_environment(paths, &mut command);
+    let output = command.output().map_err(|err| format!("执行命令失败：{err}"))?;
+    let _ = timeout_seconds;
+    if !output.status.success() {
+        return Err(command_text(&output.stdout, &output.stderr));
+    }
+    Ok(command_text(&output.stdout, &output.stderr))
+}
+
+fn apply_managed_environment(paths: &AppPaths, command: &mut Command) {
+    command.env("DEVENV_HOME", display_path(&paths.root));
+    let java_home = paths.current().join("jdk");
+    if java_home.join("bin/java.exe").is_file() {
+        command.env("JAVA_HOME", display_path(&java_home));
+    }
+
+    let current_path = env::var("PATH").unwrap_or_default();
+    let mut entries = Vec::new();
+    for item in [
+        paths.current().join("jdk/bin"),
+        paths.current().join("python"),
+        paths.current().join("python/Scripts"),
+        paths.current().join("node"),
+        paths.current().join("maven/bin"),
+        paths.current().join("gradle/bin"),
+        paths.npm_global(),
+    ] {
+        entries.push(display_path(item));
+    }
+    entries.extend(
+        current_path
+            .split(';')
+            .map(|item| expand_environment_path(item, paths))
+            .filter(|item| !item.trim().is_empty()),
+    );
+    command.env("PATH", entries.join(";"));
+}
+
 fn command_text(stdout: &[u8], stderr: &[u8]) -> String {
     let stdout = String::from_utf8_lossy(stdout).trim().to_string();
     let stderr = String::from_utf8_lossy(stderr).trim().to_string();
@@ -2731,6 +2993,33 @@ fn check_executable_health(name: &str, executable: &Path, args: &[&str]) -> EnvH
         };
     }
     match run_command_output(executable.to_path_buf(), args, 30) {
+        Ok(output) => EnvHealthCheck {
+            name: name.to_string(),
+            status: "正常".to_string(),
+            detail: output.lines().next().unwrap_or("验证通过").to_string(),
+        },
+        Err(err) => EnvHealthCheck {
+            name: name.to_string(),
+            status: "异常".to_string(),
+            detail: err,
+        },
+    }
+}
+
+fn check_managed_executable_health(
+    paths: &AppPaths,
+    name: &str,
+    executable: &Path,
+    args: &[&str],
+) -> EnvHealthCheck {
+    if !executable.is_file() {
+        return EnvHealthCheck {
+            name: name.to_string(),
+            status: "未安装".to_string(),
+            detail: format!("未发现 {}", display_path(executable)),
+        };
+    }
+    match run_managed_command_output(paths, executable.to_path_buf(), args, 30) {
         Ok(output) => EnvHealthCheck {
             name: name.to_string(),
             status: "正常".to_string(),

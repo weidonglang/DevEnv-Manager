@@ -150,6 +150,54 @@ svg {
   color: #9a321f;
 }
 
+.task-progress {
+  display: grid;
+  gap: 8px;
+  margin: -8px 0 16px;
+  padding: 12px;
+  border: 1px solid #cfe3dc;
+  border-radius: 8px;
+  background: #f7fcfa;
+}
+
+.task-progress[hidden] {
+  display: none;
+}
+
+.task-progress div:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.task-progress strong,
+.task-progress span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-progress span {
+  color: #62717c;
+}
+
+.progress-track {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #dce8e3;
+}
+
+.progress-track span {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: #2aa876;
+  transition: width 180ms ease;
+}
+
 .primary {
   min-width: 104px;
   background: #2aa876;
@@ -561,6 +609,10 @@ select {
 }
 
 .health-list {
+  margin-top: 14px;
+}
+
+.profile-list {
   margin-top: 14px;
 }
 
