@@ -1,0 +1,11 @@
+{
+  "version": "0.4.0",
+  "date": "2026-06-20",
+  "notes": [
+    "修复环境医生排版并固定左侧导航",
+    "新增端口冲突解释、进程详情和历史记录",
+    "新增 Docker、WSL、数据库与本地服务诊断",
+    "新增配置模板导入导出和可分享诊断报告"
+  ],
+  "downloadUrl": "https://github.com/weidonglang/dailytools/releases/latest"
+}
