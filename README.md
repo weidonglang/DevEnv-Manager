@@ -26,9 +26,9 @@
 - 安装和切换后自动健康检查，验证命令和环境变量是否真的生效。
 - 下载安装过程展示进度：查询、下载、解压、静默安装、验证。
 - 用户级环境变量管理：`DEVENV_HOME`、`JAVA_HOME`、PATH 备份、恢复、清理。
-- 环境医生：一键诊断、评分、问题列表、修复建议、导出 Markdown 报告。
+- 环境医生：按类别对齐展示诊断项和修复建议，可导出 Markdown/JSON 或复制脱敏报告。
 - Python 冲突分析：检测默认 `python`、`pip`、`py -0p`、注册表、Microsoft Store 执行别名风险。
-- 配置模板：保存当前 JDK/Python/Node/Maven/Gradle 组合和用户环境变量，可快速恢复。
+- 配置模板：保存当前 JDK/Python/Node/Maven/Gradle 组合和用户环境变量，可导入、导出并快速恢复。
 - 项目启动向导：识别 Node/Python/Maven/Gradle/Rust/Tauri/.NET/Go 项目，给出运行时建议和常用操作。
 - Git / GitHub 工具链：检测 Git、Git Bash、Git LFS、OpenSSH、用户身份、SSH 公钥和 GitHub HTTPS/SSH 连接，可安全配置身份或生成 ed25519 Key。
 - Node.js 生态：检测 npm、npx、pnpm、Yarn、Corepack、registry、全局目录和 pnpm store，支持安装包管理器及切换官方源/npmmirror。
@@ -38,7 +38,10 @@
 - Rust / rustup 诊断：检测 rustup、rustc、Cargo、已安装工具链、默认工具链和 MSVC Build Tools，支持切换 stable 与更新。
 - .NET SDK 诊断：检测 SDK/Runtime 列表，识别项目 `global.json`，支持 restore、build 和 test 项目动作。
 - 镜像加速中心：集中查看 npm、pip、GOPROXY、Maven、Gradle 和 Cargo 配置，Maven/Gradle 写入前自动备份并可恢复。
-- 端口管理：扫描 TCP/UDP、固定列宽排序、常用端口筛选、智能搜索、安全结束普通进程。
+- 端口管理：固定列宽排序、智能搜索、进程/父进程/Windows 服务解释、7 天历史、安全结束普通进程和打开进程位置。
+- Docker / WSL 检测，以及 MySQL、PostgreSQL、Redis、MongoDB、Elasticsearch、SQL Server 本地服务检查和受保护的停止操作。
+- JDK 发行版能力模型、项目 JDK 版本建议，以及可选的启动时更新检查和 GitHub Releases 入口。
+- 存储清理已建立只读安全架构和实施计划；当前版本不扫描、不删除电脑文件。
 - 网络诊断、下载缓存管理、命令面板、自身卸载入口。
 - 后台执行耗时任务，隐藏 Windows 命令窗口，减少闪屏和界面卡顿。
 
@@ -46,10 +49,10 @@
 
 1. 打开 Tauri 新版。
 2. 在“总览”确认安装根目录，默认优先使用 `D:\DevEnvManager`。
-3. 在“运行时”安装或切换 JDK / Python / Node.js / Maven / Gradle。
+3. 在“版本管理”安装或切换 JDK / Python / Node.js / Maven / Gradle。
 4. 在“环境”点击“配置”，写入用户级 `DEVENV_HOME`、`JAVA_HOME` 和受管 PATH。
 5. 在“环境医生”点击“一键诊断”，查看评分、问题和建议。
-6. 在“运行时”的 Python 环境分析里检查 pip 是否和当前 Python 匹配。
+6. 在“版本管理”的 Python 环境分析里检查 pip 是否和当前 Python 匹配。
 7. 在“项目启动向导”输入项目目录，分析项目并运行安装依赖、测试或开发服务。
 8. 在“端口”搜索 `8080`、`spring`、`mysql`、`vite` 等关键词快速定位冲突。
 9. 在“工具链”检查 Git/GitHub、Node 和 Python 生态，需要时配置 Git 身份、包管理器或镜像源。
@@ -72,8 +75,8 @@ npm run tauri:build
 
 输出位置：
 
-- `tauri\src-tauri\target\release\bundle\nsis\DevEnv Manager_0.3.0_x64-setup.exe`
-- `tauri\src-tauri\target\release\bundle\msi\DevEnv Manager_0.3.0_x64_en-US.msi`
+- `tauri\src-tauri\target\release\bundle\nsis\DevEnv Manager_0.4.0_x64-setup.exe`
+- `tauri\src-tauri\target\release\bundle\msi\DevEnv Manager_0.4.0_x64_en-US.msi`
 - `tauri\src-tauri\target\release\dailytools-tauri.exe`
 
 ## 测试
@@ -149,7 +152,7 @@ Maven 和 Gradle 需要有效 JDK。新版会在受管命令执行时注入 `JAV
 
 ## 路线图
 
-已实现的 P0 / P1：
+已实现的 P0 / P1 / P2：
 
 - 环境医生
 - Python 多版本冲突分析
@@ -165,14 +168,18 @@ Maven 和 Gradle 需要有效 JDK。新版会在受管命令执行时注入 `JAV
 - Rust/rustup 与 MSVC Build Tools 诊断
 - .NET SDK/Runtime 与 `global.json` 诊断
 - Maven/Gradle 镜像配置备份和恢复
+- 端口进程解释、Windows 服务映射和 7 天历史
+- Docker / WSL 与数据库本地服务检查
+- 配置模板导入、导出和团队分享
+- Markdown/JSON 脱敏诊断报告和复制分享
+- 项目 JDK 建议、JDK 发行版扩展结构和更新检查
+- 存储清理只读架构（尚未启用扫描或删除）
 
 后续规划：
 
-- Docker / WSL 检测。
-- 数据库和本地服务端口解释器。
-- 配置模板导入、导出和团队模板。
-- 更新检查和 GitHub Releases 入口。
 - 可选 CLI：`devenv doctor`、`devenv use jdk 21`、`devenv project check .`。
+- 在明确预览、白名单、回收站和恢复策略完成后，实现存储占用扫描；删除能力继续后置。
+- 按许可和稳定下载源逐步增加 Zulu、Liberica、Microsoft OpenJDK 等自动安装适配器。
 
 ## 旧版 Python 开发运行
 

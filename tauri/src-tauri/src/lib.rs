@@ -1,3 +1,5 @@
+mod cleanup;
+
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -43,7 +45,7 @@ const BLOCKED_NAMES: [&str; 9] = [
     "lsass.exe",
 ];
 const CAUTION_NAMES: [&str; 1] = ["svchost.exe"];
-const ALLOWED_DOWNLOAD_HOSTS: [&str; 12] = [
+const ALLOWED_DOWNLOAD_HOSTS: [&str; 13] = [
     "api.adoptium.net",
     "github.com",
     "objects.githubusercontent.com",
@@ -56,6 +58,7 @@ const ALLOWED_DOWNLOAD_HOSTS: [&str; 12] = [
     "services.gradle.org",
     "downloads.gradle.org",
     "go.dev",
+    "raw.githubusercontent.com",
 ];
 
 #[derive(Debug, Clone)]
@@ -107,6 +110,14 @@ struct ConfigProfile {
     devenv_home: Option<String>,
     java_home: Option<String>,
     path: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ConfigProfileBundle {
+    schema_version: u32,
+    exported_at: String,
+    profiles: Vec<ConfigProfile>,
 }
 
 #[derive(Debug, Serialize)]
@@ -188,7 +199,34 @@ struct PortRecord {
     state: String,
     pid: u32,
     process_name: String,
+    process_path: String,
+    command_line: String,
+    parent_pid: u32,
+    parent_process_name: String,
+    service_names: Vec<String>,
+    common_usage: String,
+    explanation: String,
     risk: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct PortHistoryEntry {
+    port: u16,
+    protocol: String,
+    pid: u32,
+    process_name: String,
+    process_path: String,
+    observed_at: u64,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PortHistorySummary {
+    port: u16,
+    process_name: String,
+    observations: usize,
+    last_seen: u64,
 }
 
 #[derive(Debug, Serialize)]
@@ -441,6 +479,62 @@ struct PlatformReport {
     generated_at: String,
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SystemPlatformReport {
+    docker: ToolState,
+    docker_info: String,
+    docker_desktop_path: String,
+    wsl: ToolState,
+    wsl_status: String,
+    wsl_distributions: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LocalServiceStatus {
+    id: String,
+    name: String,
+    port: u16,
+    occupied: bool,
+    pid: u32,
+    process_name: String,
+    process_path: String,
+    service_names: Vec<String>,
+    safe_to_stop: bool,
+    connection_command: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct JdkDistribution {
+    id: String,
+    name: String,
+    recommended: bool,
+    supports_install: bool,
+    description: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct UpdateManifest {
+    version: String,
+    date: String,
+    notes: Vec<String>,
+    download_url: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct UpdateCheckResult {
+    current_version: String,
+    latest_version: String,
+    update_available: bool,
+    date: String,
+    notes: Vec<String>,
+    download_url: String,
+}
+
 #[derive(Debug, Clone)]
 struct UninstallEntry {
     display_name: String,
@@ -505,6 +599,14 @@ fn set_root_dir(root: String) -> Result<ConfigView, String> {
 }
 
 #[tauri::command]
+fn set_auto_check_update(enabled: bool) -> Result<ConfigView, String> {
+    let mut settings = load_settings()?;
+    settings.auto_check_update = enabled;
+    save_json(&settings_file(), &settings)?;
+    load_config()
+}
+
+#[tauri::command]
 fn env_snapshot() -> EnvSnapshot {
     let paths = load_paths().unwrap_or_else(|_| AppPaths::new(default_root_dir()));
     let user_env = user_environment().unwrap_or_default();
@@ -531,6 +633,90 @@ fn env_snapshot() -> EnvSnapshot {
 #[tauri::command]
 async fn configure_user_environment() -> Result<OperationResult, String> {
     run_blocking(configure_user_environment_blocking).await?
+}
+
+#[tauri::command]
+fn storage_cleanup_architecture() -> cleanup::CleanupArchitecture {
+    cleanup::architecture()
+}
+
+#[tauri::command]
+fn jdk_distributions() -> Vec<JdkDistribution> {
+    vec![
+        JdkDistribution {
+            id: "temurin".to_string(),
+            name: "Eclipse Temurin".to_string(),
+            recommended: true,
+            supports_install: true,
+            description: "默认推荐，支持官方 API 自动安装".to_string(),
+        },
+        JdkDistribution {
+            id: "zulu".to_string(),
+            name: "Azul Zulu".to_string(),
+            recommended: false,
+            supports_install: false,
+            description: "当前支持发现，自动安装待实现".to_string(),
+        },
+        JdkDistribution {
+            id: "liberica".to_string(),
+            name: "BellSoft Liberica".to_string(),
+            recommended: false,
+            supports_install: false,
+            description: "当前支持发现，自动安装待实现".to_string(),
+        },
+        JdkDistribution {
+            id: "microsoft".to_string(),
+            name: "Microsoft OpenJDK".to_string(),
+            recommended: false,
+            supports_install: false,
+            description: "当前支持发现，自动安装待实现".to_string(),
+        },
+        JdkDistribution {
+            id: "oracle".to_string(),
+            name: "Oracle JDK".to_string(),
+            recommended: false,
+            supports_install: false,
+            description: "仅检测或引导，不自动接受许可协议".to_string(),
+        },
+    ]
+}
+
+#[tauri::command]
+async fn check_for_updates() -> Result<UpdateCheckResult, String> {
+    run_blocking(check_for_updates_blocking).await?
+}
+
+fn check_for_updates_blocking() -> Result<UpdateCheckResult, String> {
+    let settings = load_settings()?;
+    let url = if settings.update_manifest_url.trim().is_empty() {
+        "https://raw.githubusercontent.com/weidonglang/dailytools/main/update-manifest.json".to_string()
+    } else {
+        settings.update_manifest_url
+    };
+    validate_download_url(&url)?;
+    let client = reqwest::blocking::Client::builder()
+        .user_agent("DevEnvManager/2.0")
+        .timeout(std::time::Duration::from_secs(15))
+        .build()
+        .map_err(|err| format!("创建更新检查客户端失败：{err}"))?;
+    let manifest: UpdateManifest = client
+        .get(&url)
+        .send()
+        .map_err(|err| format!("检查更新失败：{err}"))?
+        .error_for_status()
+        .map_err(|err| format!("检查更新失败：{err}"))?
+        .json()
+        .map_err(|err| format!("更新清单格式错误：{err}"))?;
+    validate_download_url(&manifest.download_url)?;
+    let current = env!("CARGO_PKG_VERSION").to_string();
+    Ok(UpdateCheckResult {
+        update_available: version_key(&manifest.version) > version_key(&current),
+        current_version: current,
+        latest_version: manifest.version,
+        date: manifest.date,
+        notes: manifest.notes,
+        download_url: manifest.download_url,
+    })
 }
 
 #[derive(Debug, Serialize, Clone, Copy)]
@@ -701,12 +887,24 @@ fn discover_runtimes_blocking() -> Vec<RuntimeInfo> {
 }
 
 #[tauri::command]
-async fn install_jdk(app: tauri::AppHandle, version: String) -> Result<OperationResult, String> {
-    run_blocking(move || install_jdk_blocking(app, version)).await?
+async fn install_jdk(
+    app: tauri::AppHandle,
+    version: String,
+    distribution: Option<String>,
+) -> Result<OperationResult, String> {
+    run_blocking(move || install_jdk_blocking(app, version, distribution)).await?
 }
 
-fn install_jdk_blocking(app: tauri::AppHandle, version: String) -> Result<OperationResult, String> {
+fn install_jdk_blocking(
+    app: tauri::AppHandle,
+    version: String,
+    distribution: Option<String>,
+) -> Result<OperationResult, String> {
     let version = version.trim();
+    let distribution = distribution.as_deref().unwrap_or("temurin");
+    if distribution != "temurin" {
+        return Err("当前只支持自动安装 Temurin；其他发行版暂时仅检测和规划".to_string());
+    }
     let task = format!("JDK {version}");
     emit_task_progress(&app, &task, 2, "正在准备安装");
     if !["8", "11", "17", "21", "25"].contains(&version) {
@@ -1189,6 +1387,7 @@ fn scan_ports_blocking() -> Result<Vec<PortRecord>, String> {
 
     let text = String::from_utf8_lossy(&output.stdout);
     let system = sysinfo::System::new_all();
+    let services = windows_service_map();
     let mut records = Vec::new();
 
     for line in text.lines() {
@@ -1214,6 +1413,10 @@ fn scan_ports_blocking() -> Result<Vec<PortRecord>, String> {
         };
         let pid = pid_text.parse::<u32>().unwrap_or(0);
         let process_name = process_name(&system, pid);
+        let (process_path, command_line, parent_pid, parent_process_name) = process_details(&system, pid);
+        let service_names = services.get(&pid).cloned().unwrap_or_default();
+        let common_usage = port_common_usage(local_port, &process_name);
+        let explanation = port_explanation(local_port, &process_name, &common_usage);
         let risk = classify_port(local_port, pid, &process_name);
 
         records.push(PortRecord {
@@ -1224,6 +1427,13 @@ fn scan_ports_blocking() -> Result<Vec<PortRecord>, String> {
             state,
             pid,
             process_name,
+            process_path,
+            command_line,
+            parent_pid,
+            parent_process_name,
+            service_names,
+            common_usage,
+            explanation,
             risk,
         });
     }
@@ -1234,7 +1444,63 @@ fn scan_ports_blocking() -> Result<Vec<PortRecord>, String> {
             .then(a.protocol.cmp(&b.protocol))
             .then(a.pid.cmp(&b.pid))
     });
+    let _ = update_port_history(&records);
     Ok(records)
+}
+
+#[tauri::command]
+fn port_history() -> Result<Vec<PortHistorySummary>, String> {
+    let paths = load_paths()?;
+    let entries: Vec<PortHistoryEntry> = load_json_with_default(&paths.port_history_file(), Vec::new())?;
+    let mut grouped: std::collections::HashMap<(u16, String), PortHistorySummary> = std::collections::HashMap::new();
+    for entry in entries {
+        let key = (entry.port, entry.process_name.to_ascii_lowercase());
+        let summary = grouped.entry(key).or_insert_with(|| PortHistorySummary {
+            port: entry.port,
+            process_name: entry.process_name.clone(),
+            observations: 0,
+            last_seen: 0,
+        });
+        summary.observations += 1;
+        summary.last_seen = summary.last_seen.max(entry.observed_at);
+    }
+    let mut summaries = grouped.into_values().collect::<Vec<_>>();
+    summaries.sort_by(|a, b| b.observations.cmp(&a.observations).then(b.last_seen.cmp(&a.last_seen)));
+    summaries.truncate(50);
+    Ok(summaries)
+}
+
+#[tauri::command]
+fn open_process_location(pid: u32) -> Result<OperationResult, String> {
+    if pid == 0 {
+        return Err("PID 无效".to_string());
+    }
+    let mut system = sysinfo::System::new_all();
+    system.refresh_all();
+    let process = system
+        .process(sysinfo::Pid::from_u32(pid))
+        .ok_or_else(|| format!("PID {pid} 已不存在，请重新扫描端口"))?;
+    let path = process
+        .exe()
+        .ok_or_else(|| "当前权限无法读取该进程路径".to_string())?;
+    if !path.is_file() {
+        return Err("进程文件已不存在".to_string());
+    }
+    #[cfg(windows)]
+    {
+        hidden_command("explorer.exe")
+            .arg(format!("/select,{}", display_path(path)))
+            .spawn()
+            .map_err(|err| format!("打开进程位置失败：{err}"))?;
+    }
+    #[cfg(not(windows))]
+    {
+        return Err("打开进程位置目前仅支持 Windows".to_string());
+    }
+    Ok(OperationResult {
+        success: true,
+        message: format!("已打开 {}", display_path(path)),
+    })
 }
 
 #[tauri::command]
@@ -1833,6 +2099,33 @@ fn export_doctor_report_blocking(report: DoctorReport) -> Result<OperationResult
 }
 
 #[tauri::command]
+async fn export_doctor_report_json(report: DoctorReport) -> Result<OperationResult, String> {
+    run_blocking(move || export_doctor_report_json_blocking(report)).await?
+}
+
+fn export_doctor_report_json_blocking(report: DoctorReport) -> Result<OperationResult, String> {
+    let paths = load_paths()?;
+    fs::create_dir_all(paths.logs()).map_err(|err| format!("创建报告目录失败：{err}"))?;
+    let target = paths.logs().join(format!("doctor-report-{}.json", filename_timestamp()));
+    let text = serde_json::to_string_pretty(&report).map_err(|err| format!("生成 JSON 报告失败：{err}"))?;
+    fs::write(&target, redact_report_text(&text)).map_err(|err| format!("写入 JSON 报告失败：{err}"))?;
+    Ok(OperationResult {
+        success: true,
+        message: format!("已导出 JSON 诊断报告：{}", display_path(target)),
+    })
+}
+
+#[tauri::command]
+fn doctor_report_text(report: DoctorReport, format: String) -> Result<String, String> {
+    let text = match format.as_str() {
+        "markdown" => doctor_report_markdown(&report),
+        "json" => serde_json::to_string_pretty(&report).map_err(|err| format!("生成 JSON 报告失败：{err}"))?,
+        _ => return Err("不支持的报告格式".to_string()),
+    };
+    Ok(redact_report_text(&text))
+}
+
+#[tauri::command]
 async fn analyze_python_environment() -> Result<PythonAnalysis, String> {
     run_blocking(|| Ok(analyze_python_environment_blocking())).await?
 }
@@ -2356,6 +2649,156 @@ fn platform_action_title(action: &str) -> &'static str {
 }
 
 #[tauri::command]
+async fn inspect_system_platforms() -> Result<SystemPlatformReport, String> {
+    run_blocking(inspect_system_platforms_blocking).await?
+}
+
+fn inspect_system_platforms_blocking() -> Result<SystemPlatformReport, String> {
+    let paths = load_paths()?;
+    let docker_executable = resolve_tool(&paths, "docker");
+    let docker = probe_tool("Docker", docker_executable.clone(), &["--version"]);
+    let docker_info = command_value(docker_executable, &["info", "--format", "{{.ServerVersion}}"]);
+    let docker_desktop_path = docker_desktop_path().map(display_path).unwrap_or_default();
+    let wsl_executable = resolve_tool(&paths, "wsl");
+    let wsl = probe_tool("WSL", wsl_executable.clone(), &["--version"]);
+    let wsl_status = command_value(wsl_executable.clone(), &["--status"]);
+    let wsl_distributions = command_value(wsl_executable, &["--list", "--verbose"])
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .map(str::to_string)
+        .collect();
+    Ok(SystemPlatformReport {
+        docker,
+        docker_info: if docker_info.is_empty() {
+            "Docker 服务未运行或无法连接".to_string()
+        } else {
+            format!("Docker Engine {docker_info}")
+        },
+        docker_desktop_path,
+        wsl,
+        wsl_status,
+        wsl_distributions,
+    })
+}
+
+#[tauri::command]
+async fn inspect_local_services() -> Result<Vec<LocalServiceStatus>, String> {
+    run_blocking(inspect_local_services_blocking).await?
+}
+
+fn inspect_local_services_blocking() -> Result<Vec<LocalServiceStatus>, String> {
+    let ports = scan_ports_blocking()?;
+    Ok(database_service_definitions()
+        .into_iter()
+        .map(|(id, name, port, connection_command)| {
+            let record = ports
+                .iter()
+                .find(|record| record.local_port == port && record.state.eq_ignore_ascii_case("LISTENING"));
+            LocalServiceStatus {
+                id: id.to_string(),
+                name: name.to_string(),
+                port,
+                occupied: record.is_some(),
+                pid: record.map(|item| item.pid).unwrap_or(0),
+                process_name: record.map(|item| item.process_name.clone()).unwrap_or_default(),
+                process_path: record.map(|item| item.process_path.clone()).unwrap_or_default(),
+                service_names: record.map(|item| item.service_names.clone()).unwrap_or_default(),
+                safe_to_stop: record
+                    .map(|item| {
+                        !BLOCKED_PIDS.contains(&item.pid)
+                            && !BLOCKED_NAMES.contains(&item.process_name.to_ascii_lowercase().as_str())
+                            && item.service_names.iter().any(|service| service_matches_database(port, service))
+                    })
+                    .unwrap_or(false),
+                connection_command: connection_command.to_string(),
+            }
+        })
+        .collect())
+}
+
+#[tauri::command]
+async fn stop_local_service(port: u16, service_name: String) -> Result<OperationResult, String> {
+    run_blocking(move || stop_local_service_blocking(port, service_name)).await?
+}
+
+fn stop_local_service_blocking(port: u16, service_name: String) -> Result<OperationResult, String> {
+    if !database_service_definitions().iter().any(|item| item.2 == port) {
+        return Err("只允许停止已定义的数据库开发服务".to_string());
+    }
+    if !service_matches_database(port, &service_name) {
+        return Err("服务名与数据库端口不匹配，已拒绝停止".to_string());
+    }
+    let records = scan_ports_blocking()?;
+    let verified = records.iter().any(|record| {
+        record.local_port == port
+            && record.state.eq_ignore_ascii_case("LISTENING")
+            && record.service_names.iter().any(|service| service.eq_ignore_ascii_case(&service_name))
+    });
+    if !verified {
+        return Err("重新扫描后没有确认该服务仍占用目标端口".to_string());
+    }
+    let output = hidden_command("sc.exe")
+        .args(["stop", service_name.as_str()])
+        .output()
+        .map_err(|err| format!("停止 Windows 服务失败：{err}"))?;
+    if !output.status.success() {
+        return Err(format!("停止 Windows 服务失败：{}", command_text(&output.stdout, &output.stderr)));
+    }
+    Ok(OperationResult {
+        success: true,
+        message: format!("已请求停止 Windows 服务 {service_name}"),
+    })
+}
+
+#[tauri::command]
+fn open_docker_desktop() -> Result<OperationResult, String> {
+    let executable = docker_desktop_path().ok_or_else(|| "没有找到 Docker Desktop.exe".to_string())?;
+    hidden_command(&executable)
+        .spawn()
+        .map_err(|err| format!("启动 Docker Desktop 失败：{err}"))?;
+    Ok(OperationResult {
+        success: true,
+        message: format!("已启动 {}", display_path(executable)),
+    })
+}
+
+fn database_service_definitions() -> Vec<(&'static str, &'static str, u16, &'static str)> {
+    vec![
+        ("mysql", "MySQL", 3306, "mysql -h 127.0.0.1 -P 3306 -u root -p"),
+        ("postgres", "PostgreSQL", 5432, "psql -h 127.0.0.1 -p 5432 -U postgres"),
+        ("redis", "Redis", 6379, "redis-cli -h 127.0.0.1 -p 6379"),
+        ("mongo", "MongoDB", 27017, "mongosh mongodb://127.0.0.1:27017"),
+        ("elasticsearch", "Elasticsearch", 9200, "curl http://127.0.0.1:9200"),
+        ("sqlserver", "SQL Server", 1433, "sqlcmd -S 127.0.0.1,1433 -E"),
+    ]
+}
+
+fn service_matches_database(port: u16, service: &str) -> bool {
+    let service = service.to_ascii_lowercase();
+    match port {
+        3306 => service.contains("mysql") || service.contains("maria"),
+        5432 => service.contains("postgres"),
+        6379 => service.contains("redis"),
+        27017 => service.contains("mongo"),
+        9200 => service.contains("elastic"),
+        1433 => service.contains("mssql") || service.contains("sqlserver"),
+        _ => false,
+    }
+}
+
+fn docker_desktop_path() -> Option<PathBuf> {
+    let program_files = env::var("ProgramFiles").unwrap_or_else(|_| r"C:\Program Files".to_string());
+    let local_app_data = env::var("LOCALAPPDATA").unwrap_or_default();
+    [
+        PathBuf::from(program_files).join("Docker/Docker/Docker Desktop.exe"),
+        PathBuf::from(local_app_data).join("Docker/Docker Desktop.exe"),
+    ]
+    .into_iter()
+    .find(|path| path.is_file())
+}
+
+#[tauri::command]
 fn analyze_project(path: String) -> Result<ProjectAnalysis, String> {
     analyze_project_blocking(&PathBuf::from(path.trim()))
 }
@@ -2392,13 +2835,15 @@ fn analyze_project_blocking(root: &Path) -> Result<ProjectAnalysis, String> {
     }
     if has("pom.xml") {
         push_unique(&mut project_types, "Maven");
-        recommendations.push(runtime_recommendation("JDK", "Maven 项目通常需要 JDK 8/11/17/21", "java"));
+        recommendations.push(project_jdk_recommendation(root, "Maven 项目通常需要 JDK 8/11/17/21"));
         recommendations.push(runtime_recommendation("Maven", "需要 mvn 可用", "mvn"));
         actions.push(project_action("mvn_test", "Maven 测试", "mvn test", "运行 Maven 测试", true));
     }
     if has("build.gradle") || has("build.gradle.kts") || has("gradlew") {
         push_unique(&mut project_types, "Gradle");
-        recommendations.push(runtime_recommendation("JDK", "Gradle 项目通常需要 JDK 17/21", "java"));
+        if !has("pom.xml") {
+            recommendations.push(project_jdk_recommendation(root, "Gradle 项目通常需要 JDK 17/21"));
+        }
         recommendations.push(runtime_recommendation("Gradle", "优先使用项目 gradlew；否则使用受管 Gradle", "gradle"));
         actions.push(project_action("gradle_test", "Gradle 测试", gradle_command(root, "test").as_str(), "运行 Gradle 测试", true));
     }
@@ -2591,6 +3036,24 @@ fn apply_config_profile_blocking(id: String) -> Result<OperationResult, String> 
         ("gradle", profile.current.gradle.clone()),
         ("go", profile.current.go.clone()),
     ];
+    let installed = load_installed(&paths)?;
+    let missing = switches
+        .iter()
+        .filter_map(|(kind, version)| {
+            let version = version.as_ref()?;
+            let meta = runtime_meta(kind).ok()?;
+            (!collection(&installed, meta.collection)
+                .iter()
+                .any(|item| item.get("version").and_then(Value::as_str) == Some(version.as_str())))
+                .then(|| format!("{kind} {version}"))
+        })
+        .collect::<Vec<_>>();
+    if !missing.is_empty() {
+        return Err(format!(
+            "模板所需版本尚未安装：{}。为避免只切换一部分，当前环境没有发生变化。",
+            missing.join("、")
+        ));
+    }
     let mut applied = Vec::new();
     for (kind, version) in switches {
         if let Some(version) = version {
@@ -2631,6 +3094,64 @@ fn delete_config_profile_blocking(id: String) -> Result<OperationResult, String>
     Ok(OperationResult {
         success: true,
         message: "已删除配置模板".to_string(),
+    })
+}
+
+#[tauri::command]
+fn export_config_profiles() -> Result<OperationResult, String> {
+    let paths = load_paths()?;
+    let profiles = load_profiles(&paths)?;
+    let bundle = ConfigProfileBundle {
+        schema_version: 1,
+        exported_at: current_timestamp(),
+        profiles,
+    };
+    fs::create_dir_all(paths.logs()).map_err(|err| format!("创建导出目录失败：{err}"))?;
+    let target = paths.logs().join(format!("config-profiles-{}.json", filename_timestamp()));
+    save_json(&target, &bundle)?;
+    Ok(OperationResult {
+        success: true,
+        message: format!("已导出配置模板：{}", display_path(target)),
+    })
+}
+
+#[tauri::command]
+fn import_config_profiles(path: String) -> Result<OperationResult, String> {
+    let source = PathBuf::from(path.trim().trim_matches('"'));
+    if !source.is_file() {
+        return Err("模板文件不存在，请输入有效的 JSON 文件路径".to_string());
+    }
+    let metadata = source.metadata().map_err(|err| format!("读取模板文件失败：{err}"))?;
+    if metadata.len() > 1024 * 1024 {
+        return Err("模板文件超过 1 MB，已拒绝导入".to_string());
+    }
+    let text = fs::read_to_string(&source).map_err(|err| format!("读取模板文件失败：{err}"))?;
+    let bundle: ConfigProfileBundle = serde_json::from_str(&text)
+        .map_err(|err| format!("模板 JSON 格式不正确：{err}"))?;
+    if bundle.schema_version != 1 {
+        return Err(format!("不支持的模板版本：{}", bundle.schema_version));
+    }
+    if bundle.profiles.is_empty() || bundle.profiles.len() > 100 {
+        return Err("模板数量必须在 1 到 100 之间".to_string());
+    }
+    let paths = load_paths()?;
+    let mut profiles = load_profiles(&paths)?;
+    let mut imported = 0_usize;
+    for (index, mut profile) in bundle.profiles.into_iter().enumerate() {
+        profile.name = profile.name.trim().to_string();
+        if profile.name.is_empty() || profile.name.len() > 100 || profile.name.chars().any(char::is_control) {
+            return Err(format!("第 {} 个模板名称无效", index + 1));
+        }
+        profile.id = format!("imported-{}-{index}", filename_timestamp());
+        profile.created_at = current_timestamp();
+        profiles.retain(|item| item.name != profile.name);
+        profiles.push(profile);
+        imported += 1;
+    }
+    save_json(&paths.profiles_file(), &profiles)?;
+    Ok(OperationResult {
+        success: true,
+        message: format!("已导入 {imported} 个配置模板；应用前会检查所需版本"),
     })
 }
 
@@ -2720,8 +3241,12 @@ pub fn run() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             app_snapshot,
+            storage_cleanup_architecture,
+            jdk_distributions,
+            check_for_updates,
             load_config,
             set_root_dir,
+            set_auto_check_update,
             env_snapshot,
             configure_user_environment,
             cleanup_path_entries,
@@ -2737,13 +3262,21 @@ pub fn run() {
             uninstall_runtime,
             kill_process,
             scan_ports,
+            port_history,
+            open_process_location,
             run_doctor,
             export_doctor_report,
+            export_doctor_report_json,
+            doctor_report_text,
             analyze_python_environment,
             inspect_toolchains,
             run_toolchain_action,
             inspect_platform_toolchains,
             run_platform_action,
+            inspect_system_platforms,
+            inspect_local_services,
+            stop_local_service,
+            open_docker_desktop,
             project_health,
             analyze_project,
             run_project_action,
@@ -2756,6 +3289,8 @@ pub fn run() {
             save_config_profile,
             apply_config_profile,
             delete_config_profile,
+            export_config_profiles,
+            import_config_profiles,
             uninstall_external_runtime,
             self_uninstall,
             generate_vscode_config
@@ -2816,6 +3351,9 @@ impl AppPaths {
     }
     fn profiles_file(&self) -> PathBuf {
         self.config().join("profiles.json")
+    }
+    fn port_history_file(&self) -> PathBuf {
+        self.config().join("port_history.json")
     }
 
     fn ensure(&self) -> io::Result<()> {
@@ -2936,7 +3474,7 @@ fn default_settings() -> Settings {
         download_timeout_seconds: 60,
         theme: "system".to_string(),
         last_page: "home".to_string(),
-        update_manifest_url: String::new(),
+        update_manifest_url: "https://raw.githubusercontent.com/weidonglang/dailytools/main/update-manifest.json".to_string(),
         port_process_exclusions: Vec::new(),
     }
 }
@@ -4295,6 +4833,142 @@ fn run_command_output(executable: PathBuf, args: &[&str], timeout_seconds: u64) 
     Ok(command_text(&output.stdout, &output.stderr))
 }
 
+fn process_details(system: &sysinfo::System, pid: u32) -> (String, String, u32, String) {
+    let Some(process) = system.process(sysinfo::Pid::from_u32(pid)) else {
+        return (String::new(), String::new(), 0, String::new());
+    };
+    let process_path = process.exe().map(display_path).unwrap_or_default();
+    let command_line = process
+        .cmd()
+        .iter()
+        .map(|item| item.to_string_lossy().to_string())
+        .collect::<Vec<_>>()
+        .join(" ");
+    let parent_pid = process.parent().map(|value| value.as_u32()).unwrap_or(0);
+    let parent_process_name = system
+        .process(sysinfo::Pid::from_u32(parent_pid))
+        .map(|parent| parent.name().to_string_lossy().to_string())
+        .unwrap_or_default();
+    (process_path, command_line, parent_pid, parent_process_name)
+}
+
+fn windows_service_map() -> std::collections::HashMap<u32, Vec<String>> {
+    let mut result = std::collections::HashMap::new();
+    #[cfg(windows)]
+    {
+        let Ok(output) = hidden_command("tasklist").args(["/svc", "/fo", "csv", "/nh"]).output() else {
+            return result;
+        };
+        for line in decode_command_stream(&output.stdout).lines() {
+            let columns = parse_csv_line(line);
+            let Some(pid) = columns.get(1).and_then(|value| value.parse::<u32>().ok()) else {
+                continue;
+            };
+            let services = columns
+                .get(2)
+                .map(|value| {
+                    value
+                        .split(',')
+                        .map(str::trim)
+                        .filter(|item| !item.is_empty() && !item.eq_ignore_ascii_case("N/A"))
+                        .map(str::to_string)
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default();
+            if !services.is_empty() {
+                result.insert(pid, services);
+            }
+        }
+    }
+    result
+}
+
+fn parse_csv_line(line: &str) -> Vec<String> {
+    let mut values = Vec::new();
+    let mut current = String::new();
+    let mut quoted = false;
+    let mut chars = line.chars().peekable();
+    while let Some(ch) = chars.next() {
+        match ch {
+            '"' if quoted && chars.peek() == Some(&'"') => {
+                current.push('"');
+                chars.next();
+            }
+            '"' => quoted = !quoted,
+            ',' if !quoted => values.push(std::mem::take(&mut current)),
+            _ => current.push(ch),
+        }
+    }
+    values.push(current);
+    values
+}
+
+fn port_common_usage(port: u16, process_name: &str) -> String {
+    let lower = process_name.to_ascii_lowercase();
+    let known = match port {
+        80 => "HTTP Web 服务",
+        443 => "HTTPS Web 服务",
+        1433 => "SQL Server",
+        3000 | 4173 | 5173 | 5174 => "前端开发服务",
+        3306 => "MySQL",
+        5432 => "PostgreSQL",
+        6379 => "Redis",
+        8005 | 8009 | 8443 => "Tomcat",
+        8000 => "常见 Web 开发服务",
+        8080..=8082 => "Spring Boot / Tomcat / Web 服务",
+        8761 => "Spring Cloud Eureka",
+        8888 => "Jupyter / Spring Config",
+        9200 => "Elasticsearch",
+        27017 => "MongoDB",
+        _ if lower.contains("java") => "Java 应用",
+        _ if lower.contains("node") => "Node.js 应用",
+        _ if lower.contains("python") => "Python 应用",
+        _ => "未识别的本地服务",
+    };
+    known.to_string()
+}
+
+fn port_explanation(port: u16, process_name: &str, usage: &str) -> String {
+    let lower = process_name.to_ascii_lowercase();
+    if matches!(port, 8080..=8082) && lower.contains("java") {
+        "可能是 Spring Boot、Tomcat，或 IDE 启动的 Java Web 服务。".to_string()
+    } else if matches!(port, 3000 | 4173 | 5173 | 5174) && lower.contains("node") {
+        "可能是 Vite、Next.js、React/Vue 开发服务器或其他 Node.js 服务。".to_string()
+    } else {
+        format!("该端口通常用于{usage}；结束前请确认对应项目不再需要。")
+    }
+}
+
+fn update_port_history(records: &[PortRecord]) -> Result<(), String> {
+    let paths = load_paths()?;
+    let mut history: Vec<PortHistoryEntry> = load_json_with_default(&paths.port_history_file(), Vec::new())?;
+    let now = unix_timestamp();
+    let retention_start = now.saturating_sub(7 * 24 * 60 * 60);
+    history.retain(|entry| entry.observed_at >= retention_start);
+    for record in records.iter().filter(|record| record.state.eq_ignore_ascii_case("LISTENING")) {
+        let duplicate = history.iter().rev().take(200).any(|entry| {
+            entry.port == record.local_port
+                && entry.pid == record.pid
+                && entry.process_name.eq_ignore_ascii_case(&record.process_name)
+                && now.saturating_sub(entry.observed_at) < 5 * 60
+        });
+        if !duplicate {
+            history.push(PortHistoryEntry {
+                port: record.local_port,
+                protocol: record.protocol.clone(),
+                pid: record.pid,
+                process_name: record.process_name.clone(),
+                process_path: record.process_path.clone(),
+                observed_at: now,
+            });
+        }
+    }
+    if history.len() > 2_000 {
+        history.drain(0..history.len() - 2_000);
+    }
+    save_json(&paths.port_history_file(), &history)
+}
+
 fn run_managed_command_output(
     paths: &AppPaths,
     executable: PathBuf,
@@ -4343,13 +5017,28 @@ fn apply_managed_environment(paths: &AppPaths, command: &mut Command) {
 }
 
 fn command_text(stdout: &[u8], stderr: &[u8]) -> String {
-    let stdout = String::from_utf8_lossy(stdout).trim().to_string();
-    let stderr = String::from_utf8_lossy(stderr).trim().to_string();
+    let stdout = decode_command_stream(stdout).trim().to_string();
+    let stderr = decode_command_stream(stderr).trim().to_string();
     [stdout, stderr]
         .into_iter()
         .filter(|item| !item.is_empty())
         .collect::<Vec<String>>()
         .join("\n")
+}
+
+fn decode_command_stream(bytes: &[u8]) -> String {
+    let looks_utf16 = bytes.len() >= 4
+        && bytes.len().is_multiple_of(2)
+        && bytes.iter().skip(1).step_by(2).filter(|byte| **byte == 0).count() > bytes.len() / 6;
+    if looks_utf16 {
+        let words = bytes
+            .chunks_exact(2)
+            .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
+            .collect::<Vec<_>>();
+        String::from_utf16_lossy(&words).trim_start_matches('\u{feff}').to_string()
+    } else {
+        String::from_utf8_lossy(bytes).to_string()
+    }
 }
 
 fn hidden_command(program: impl AsRef<OsStr>) -> Command {
@@ -5081,6 +5770,87 @@ fn dotnet_required_sdk(root: &Path) -> Option<String> {
     value.pointer("/sdk/version").and_then(Value::as_str).map(str::to_string)
 }
 
+fn project_jdk_recommendation(root: &Path, fallback: &str) -> ProjectRuntimeRecommendation {
+    let required = detect_project_jdk_requirement(root);
+    let current = detect_runtime("JDK", "java", &["-version"])
+        .map(|info| info.version)
+        .unwrap_or_default();
+    let current_major = normalize_java_requirement(&current);
+    match required {
+        Some(required) => ProjectRuntimeRecommendation {
+            name: "JDK".to_string(),
+            requirement: format!("项目配置建议 JDK {required}"),
+            status: if current_major.as_deref() == Some(required.as_str()) {
+                "版本匹配".to_string()
+            } else if current.is_empty() {
+                "未发现 JDK".to_string()
+            } else {
+                format!("当前版本可能不匹配：{}", current.lines().next().unwrap_or("未知"))
+            },
+        },
+        None => runtime_recommendation("JDK", fallback, "java"),
+    }
+}
+
+fn detect_project_jdk_requirement(root: &Path) -> Option<String> {
+    let java_version = root.join(".java-version");
+    if let Ok(value) = fs::read_to_string(java_version) {
+        if let Some(version) = normalize_java_requirement(&value) {
+            return Some(version);
+        }
+    }
+    if let Ok(pom) = fs::read_to_string(root.join("pom.xml")) {
+        for tag in ["maven.compiler.release", "maven.compiler.target", "maven.compiler.source", "release", "target", "source"] {
+            if let Some(value) = extract_xml_tag(&pom, tag).and_then(normalize_java_requirement) {
+                return Some(value);
+            }
+        }
+    }
+    for name in ["build.gradle", "build.gradle.kts"] {
+        if let Ok(gradle) = fs::read_to_string(root.join(name)) {
+            for line in gradle.lines().filter(|line| {
+                line.contains("sourceCompatibility")
+                    || line.contains("targetCompatibility")
+                    || line.contains("languageVersion")
+                    || line.contains("jvmToolchain")
+            }) {
+                if let Some(value) = normalize_java_requirement(line) {
+                    return Some(value);
+                }
+            }
+        }
+    }
+    None
+}
+
+fn extract_xml_tag<'a>(text: &'a str, tag: &str) -> Option<&'a str> {
+    let start_tag = format!("<{tag}>");
+    let end_tag = format!("</{tag}>");
+    let start = text.find(&start_tag)? + start_tag.len();
+    let end = text[start..].find(&end_tag)? + start;
+    Some(text[start..end].trim())
+}
+
+fn normalize_java_requirement(value: &str) -> Option<String> {
+    let numbers = value
+        .split(|ch: char| !ch.is_ascii_digit() && ch != '.')
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>();
+    for number in numbers {
+        if let Some(rest) = number.strip_prefix("1.") {
+            if matches!(rest, "8") {
+                return Some(rest.to_string());
+            }
+        }
+        if let Ok(version) = number.split('.').next()?.parse::<u32>() {
+            if (8..=30).contains(&version) {
+                return Some(version.to_string());
+            }
+        }
+    }
+    None
+}
+
 fn project_signals(root: &Path) -> Vec<String> {
     let mut signals = Vec::new();
     for file in [
@@ -5185,6 +5955,13 @@ where
 fn current_timestamp() -> String {
     // Keep dependencies lean; second precision is enough for audit records.
     format!("{:?}", std::time::SystemTime::now())
+}
+
+fn unix_timestamp() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_secs())
+        .unwrap_or(0)
 }
 
 fn display_path(path: impl AsRef<Path>) -> String {
@@ -5350,5 +6127,50 @@ mod tests {
         .unwrap();
         assert!(installed.gos.is_empty());
         assert!(installed.current.go.is_none());
+    }
+
+    #[test]
+    fn csv_parser_preserves_service_list_column() {
+        let values = parse_csv_line(r#""mysqld.exe","1234","MySQL80, Helper""#);
+        assert_eq!(values, vec!["mysqld.exe", "1234", "MySQL80, Helper"]);
+    }
+
+    #[test]
+    fn database_service_guard_requires_matching_port_and_name() {
+        assert!(service_matches_database(3306, "MySQL80"));
+        assert!(service_matches_database(5432, "postgresql-x64-17"));
+        assert!(!service_matches_database(3306, "Dhcp"));
+        assert!(!service_matches_database(445, "MySQL80"));
+    }
+
+    #[test]
+    fn project_jdk_requirement_reads_java_version_and_gradle() {
+        let temp = tempfile::tempdir().unwrap();
+        fs::write(temp.path().join(".java-version"), "17\n").unwrap();
+        assert_eq!(detect_project_jdk_requirement(temp.path()).as_deref(), Some("17"));
+        fs::remove_file(temp.path().join(".java-version")).unwrap();
+        fs::write(
+            temp.path().join("build.gradle.kts"),
+            "java { toolchain { languageVersion.set(JavaLanguageVersion.of(21)) } }",
+        )
+        .unwrap();
+        assert_eq!(detect_project_jdk_requirement(temp.path()).as_deref(), Some("21"));
+    }
+
+    #[test]
+    fn command_stream_decodes_utf16le() {
+        let bytes = "WSL 正常"
+            .encode_utf16()
+            .flat_map(u16::to_le_bytes)
+            .collect::<Vec<_>>();
+        assert_eq!(decode_command_stream(&bytes), "WSL 正常");
+    }
+
+    #[test]
+    fn cleanup_architecture_never_enables_deletion() {
+        let architecture = cleanup::architecture();
+        assert!(architecture.categories.iter().all(|category| {
+            category.scan_only && !category.cleanup_enabled
+        }));
     }
 }
