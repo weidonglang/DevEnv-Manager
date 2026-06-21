@@ -1,11 +1,12 @@
 {
-  "version": "0.4.0",
-  "date": "2026-06-20",
+  "version": "1.0.0",
+  "date": "2026-06-21",
   "notes": [
-    "修复环境医生排版并固定左侧导航",
-    "新增端口冲突解释、进程详情和历史记录",
-    "新增 Docker、WSL、数据库与本地服务诊断",
-    "新增配置模板导入导出和可分享诊断报告"
+    "Python 改用完整 NuGet 发行包安装，可靠创建受管目录并验证 pip 与 venv",
+    "新增安全存储扫描、预览选择、回收站清理和操作历史",
+    "新增 devenv CLI、多 JDK 发行版、配置模板缺失版本补齐与环境医生安全修复",
+    "新增程序内校验更新、Docker/WSL 管理、数据库服务控制和项目端口配置"
   ],
-  "downloadUrl": "https://github.com/weidonglang/dailytools/releases/latest"
+  "downloadUrl": "https://github.com/weidonglang/dailytools/releases/download/v1.0.0/DevEnv.Manager_1.0.0_x64-setup.exe",
+  "sha256": "d9a669a5baafbc6b3dcae8552adf1d337ed74447f1009b714232fabbba1355e7"
 }

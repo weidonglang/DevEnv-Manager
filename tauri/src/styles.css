@@ -1019,3 +1019,100 @@ select {
   margin: 0;
   accent-color: #17745a;
 }
+
+.cleanup-summary {
+  display: grid;
+  grid-template-columns: minmax(130px, 1fr) minmax(130px, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0 12px;
+  padding: 12px;
+  border: 1px solid #dbe4e8;
+  border-radius: 8px;
+  background: #f7faf9;
+}
+
+.cleanup-summary > div:not(.toolbar) {
+  display: grid;
+  gap: 2px;
+}
+
+.cleanup-summary span,
+.cleanup-candidate small {
+  color: #62717c;
+}
+
+.cleanup-candidate-list {
+  display: grid;
+  gap: 8px;
+  max-height: 420px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.cleanup-candidate {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 11px 12px;
+  border: 1px solid #dbe4e8;
+  border-radius: 8px;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+.cleanup-candidate.high-risk {
+  border-color: #efc7bd;
+}
+
+.cleanup-candidate input {
+  width: 17px;
+  height: 17px;
+  margin: 2px 0 0;
+  accent-color: #17745a;
+}
+
+.cleanup-candidate-main {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.cleanup-candidate-main small {
+  overflow-wrap: anywhere;
+}
+
+.warning-text {
+  color: #a34d32;
+}
+
+.port-monitor-toggle {
+  margin-left: auto;
+  padding: 0 4px;
+}
+
+.wsl-install-row,
+.project-port-section {
+  margin-top: 14px;
+}
+
+.project-port-section {
+  padding-top: 14px;
+  border-top: 1px solid #e2e8ec;
+}
+
+.service-log-output {
+  min-height: 96px;
+  max-height: 220px;
+}
+
+.port-config-actions {
+  display: grid;
+  grid-template-columns: minmax(110px, 160px) auto;
+  justify-content: start;
+}
+
+.port-config-actions input {
+  min-width: 0;
+}
