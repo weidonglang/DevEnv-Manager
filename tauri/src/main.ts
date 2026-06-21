@@ -237,6 +237,15 @@ type ProjectAnalysis = {
   }>;
   warnings: string[];
 };
+type ProjectPortConfig = {
+  id: string;
+  kind: string;
+  file: string;
+  currentPort: number;
+  line: number;
+  description: string;
+};
+
 
 type ToolState = {
   name: string;
@@ -315,6 +324,12 @@ type SystemPlatformReport = {
   wsl: ToolState;
   wslStatus: string;
   wslDistributions: string[];
+  wslItems: Array<{
+    name: string;
+    state: string;
+    version: string;
+    isDefault: boolean;
+  }>;
 };
 
 type LocalServiceStatus = {
@@ -328,6 +343,10 @@ type LocalServiceStatus = {
   serviceNames: string[];
   safeToStop: boolean;
   connectionCommand: string;
+  installed: boolean;
+  serviceName: string;
+  serviceState: string;
+  binaryPath: string;
 };
 
 type JdkDistribution = {
@@ -345,6 +364,7 @@ type UpdateCheckResult = {
   date: string;
   notes: string[];
   downloadUrl: string;
+  sha256: string;
 };
 
 type CleanupArchitecture = {
@@ -359,6 +379,60 @@ type CleanupArchitecture = {
     protectedPatterns: string[];
   }>;
   safetyRules: string[];
+};
+
+type DoctorRepairResult = {
+  beforeScore: number;
+  afterScore: number;
+  applied: string[];
+  remaining: string[];
+  report: DoctorReport;
+};
+
+type ConfigProfileImportPreview = {
+  source: string;
+  exportedAt: string;
+  profiles: Array<{
+    name: string;
+    current: Record<string, string | null>;
+    missing: string[];
+    willReplace: boolean;
+  }>;
+};
+
+type ProfileRequirement = {
+  kind: string;
+  version: string;
+  installed: boolean;
+  autoInstallSupported: boolean;
+};
+
+type CleanupCandidate = {
+  id: string;
+  categoryId: string;
+  categoryName: string;
+  path: string;
+  size: number;
+  modifiedAt: number;
+  risk: string;
+  selectedByDefault: boolean;
+  reason: string;
+};
+
+type CleanupScanReport = {
+  generatedAt: number;
+  totalSize: number;
+  defaultSelectedSize: number;
+  candidates: CleanupCandidate[];
+  truncated: boolean;
+  notes: string[];
+};
+
+type CleanupRunResult = {
+  cleanedCount: number;
+  reclaimedBytes: number;
+  skipped: string[];
+  historyFile: string;
 };
 
 const app = document.querySelector<HTMLDivElement>("#app");
@@ -457,6 +531,7 @@ app.innerHTML = `
             <div class="panel-title">${icon(Shield)}<h2>环境医生</h2></div>
             <div class="toolbar compact">
               <button id="run-doctor" class="primary">${icon(Activity)}<span>一键诊断</span></button>
+              <button id="repair-doctor-safe">${icon(Hammer)}<span>安全修复</span></button>
               <button id="export-doctor">${icon(FileText)}<span>导出 Markdown</span></button>
               <button id="export-doctor-json">${icon(FileText)}<span>导出 JSON</span></button>
               <button id="copy-doctor-report">${icon(Clipboard)}<span>复制报告</span></button>
@@ -479,6 +554,10 @@ app.innerHTML = `
           </div>
           <div class="port-tools">
             <div class="search-box">${icon(Search)}<input id="port-search" placeholder="输入 8080、java、web、mysql、pid、进程名..." /></div>
+            <label class="toggle-row port-monitor-toggle" title="每 5 秒检查新出现的常用监听端口">
+              <input id="port-monitor-enabled" type="checkbox" />
+              <span>占用提醒</span>
+            </label>
             <div id="port-quick-filters" class="chip-row port-filter-row">
               <button class="filter-chip active" data-port-filter="all">全部</button>
               <button class="filter-chip" data-port-filter="spring">Spring</button>
@@ -615,9 +694,11 @@ app.innerHTML = `
             </div>
             <div class="form-row profile-file-row">
               <input id="profile-file-path" placeholder="团队模板 JSON 文件路径" />
-              <button id="import-profiles">${icon(Download)}<span>导入</span></button>
+              <button id="preview-profiles">${icon(Search)}<span>预览</span></button>
+              <button id="import-profiles" disabled>${icon(Download)}<span>确认导入</span></button>
               <button id="export-profiles">${icon(FileText)}<span>导出全部</span></button>
             </div>
+            <div id="profile-import-preview"></div>
             <div id="profile-list" class="runtime-list profile-list"></div>
           </section>
           <section class="panel">
@@ -781,8 +862,15 @@ app.innerHTML = `
             <div id="system-platform-result" class="platform-content"><div class="empty">尚未检查 Docker 与 WSL</div></div>
             <div class="toolbar system-platform-actions">
               <button id="open-docker-desktop">${icon(Play)}<span>启动 Docker Desktop</span></button>
-              <button data-action="copy-text" data-copy="docker info">${icon(Clipboard)}<span>复制 Docker 检查</span></button>
-              <button data-action="copy-text" data-copy="wsl --status; wsl --list --verbose">${icon(Clipboard)}<span>复制 WSL 检查</span></button>
+              <button data-action="system-platform" data-platform-action="docker_install">${icon(Download)}<span>安装 Docker</span></button>
+              <button data-action="system-platform" data-platform-action="docker_update">${icon(RefreshCw)}<span>升级 Docker</span></button>
+              <button data-action="system-platform" data-platform-action="docker_shutdown">${icon(Trash2)}<span>退出 Docker</span></button>
+              <button data-action="system-platform" data-platform-action="wsl_install">${icon(Download)}<span>安装 WSL</span></button>
+              <button data-action="system-platform" data-platform-action="wsl_update">${icon(RefreshCw)}<span>更新 WSL</span></button>
+            </div>
+            <div class="form-row wsl-install-row">
+              <input id="wsl-distro-name" value="Ubuntu" placeholder="WSL 在线发行版名称" />
+              <button data-action="system-platform" data-platform-action="wsl_install_distro">${icon(Download)}<span>安装发行版</span></button>
             </div>
           </section>
           <section class="panel">
@@ -791,6 +879,7 @@ app.innerHTML = `
               <button id="inspect-local-services">${icon(RefreshCw)}<span>检查</span></button>
             </div>
             <div id="local-service-result" class="runtime-list"><div class="empty">尚未检查常见开发服务</div></div>
+            <pre id="local-service-logs" class="command-output compact-output service-log-output">选择已安装服务查看最近日志</pre>
           </section>
         </div>
         <div class="grid two">
@@ -835,7 +924,13 @@ app.innerHTML = `
           <div id="update-result"><div class="empty">尚未检查新版本</div></div>
         </section>
         <section class="panel runtime-manager cleanup-architecture">
-          <div class="panel-title">${icon(Trash2)}<h2>存储清理架构</h2></div>
+          <div class="panel-head">
+            <div class="panel-title">${icon(Trash2)}<h2>存储空间清理</h2></div>
+            <div class="toolbar compact">
+              <button id="scan-storage">${icon(Search)}<span>扫描</span></button>
+              <button id="clean-storage" class="danger-button" disabled>${icon(Trash2)}<span>移入回收站</span></button>
+            </div>
+          </div>
           <div id="cleanup-architecture-result"><div class="empty">正在读取安全架构</div></div>
         </section>
         <section class="panel runtime-manager danger-panel">
@@ -860,6 +955,10 @@ app.innerHTML = `
           <div id="project-health" class="project-health"></div>
           <pre id="project-output" class="command-output"></pre>
         </section>
+          <div class="project-port-section">
+            <div class="panel-head"><div class="panel-title">${icon(Network)}<h2>项目端口配置</h2></div><button id="inspect-project-ports">${icon(Search)}<span>分析端口</span></button></div>
+            <div id="project-port-configs" class="runtime-list"><div class="empty">分析项目后显示可安全修改的端口配置</div></div>
+          </div>
       </section>
     </section>
   </main>
@@ -877,16 +976,21 @@ const state = {
   cache: [] as CacheEntry[],
   health: [] as EnvHealthCheck[],
   profiles: [] as ConfigProfile[],
+  profileImportPreview: null as ConfigProfileImportPreview | null,
   doctor: null as DoctorReport | null,
   python: null as PythonAnalysis | null,
   project: null as ProjectAnalysis | null,
   toolchains: null as ToolchainReport | null,
   platforms: null as PlatformReport | null,
+  projectPorts: [] as ProjectPortConfig[],
   systemPlatforms: null as SystemPlatformReport | null,
   localServices: [] as LocalServiceStatus[],
   jdkDistributions: [] as JdkDistribution[],
   update: null as UpdateCheckResult | null,
+  updateDownloaded: false,
   cleanupArchitecture: null as CleanupArchitecture | null,
+  cleanupReport: null as CleanupScanReport | null,
+  cleanupSelected: new Set<string>(),
 };
 
 const portState = {
@@ -895,6 +999,35 @@ const portState = {
   query: "",
   quickFilter: "all",
 };
+let portMonitorTimer: number | null = null;
+let knownListeningPorts = new Set<string>();
+
+async function pollPortMonitor(initial = false) {
+  try {
+    const records = await invoke<PortRecord[]>("scan_ports");
+    const listening = records.filter((item) => item.state.toLowerCase() === "listening");
+    const current = new Set(listening.map((item) => `${item.protocol}:${item.localPort}:${item.pid}`));
+    if (!initial) {
+      const appeared = listening.filter((item) => {
+        const key = `${item.protocol}:${item.localPort}:${item.pid}`;
+        return !knownListeningPorts.has(key) && (portHint(item) || item.risk !== "普通");
+      });
+      if (appeared.length) {
+        const summary = appeared
+          .slice(0, 3)
+          .map((item) => `${item.localPort} ${item.processName}`)
+          .join("、");
+        showToast(`发现新的常用端口占用：${summary}`);
+      }
+    }
+    knownListeningPorts = current;
+    state.ports = records;
+    renderPorts();
+  } catch {
+    // 监控失败保持静默，手动扫描仍会显示错误。
+  }
+}
+
 
 const commonPorts: Array<{ key: string; label: string; ports: number[]; keywords: string[] }> = [
   { key: "spring", label: "Spring", ports: [8080, 8081, 8082, 8888, 8761], keywords: ["java", "spring"] },
@@ -1283,6 +1416,7 @@ function renderProfiles() {
               <small>${escapeHtml(current || "仅保存环境变量")}</small>
               <div class="row-actions">
                 <button data-action="apply-profile" data-id="${escapeHtml(profile.id)}">${icon(RefreshCw)}<span>应用</span></button>
+                <button data-action="install-apply-profile" data-id="${escapeHtml(profile.id)}">${icon(Download)}<span>补齐并应用</span></button>
                 <button data-action="delete-profile" data-id="${escapeHtml(profile.id)}">${icon(Trash2)}<span>删除</span></button>
               </div>
             </article>
@@ -1290,6 +1424,28 @@ function renderProfiles() {
         })
         .join("")
     : `<div class="empty">还没有保存配置模板</div>`;
+}
+
+function renderProfileImportPreview() {
+  const element = document.querySelector<HTMLElement>("#profile-import-preview");
+  const importButton = document.querySelector<HTMLButtonElement>("#import-profiles");
+  if (!element || !importButton) return;
+  const preview = state.profileImportPreview;
+  importButton.disabled = !preview;
+  element.innerHTML = preview
+    ? `<div class="profile-preview">
+        <div class="project-summary"><strong>${preview.profiles.length} 个模板</strong><span>${escapeHtml(preview.source)}</span></div>
+        <div class="runtime-list">
+          ${preview.profiles.map((profile) => `
+            <article class="runtime">
+              <div><strong>${escapeHtml(profile.name)}</strong><span>${profile.willReplace ? "将覆盖同名模板" : "新增"}</span></div>
+              <small>${Object.entries(profile.current).filter(([, value]) => value).map(([kind, value]) => `${kind} ${value}`).join(" · ") || "仅环境变量"}</small>
+              <small>${profile.missing.length ? `缺失：${escapeHtml(profile.missing.join("、"))}` : "所需运行时均已安装"}</small>
+            </article>
+          `).join("")}
+        </div>
+      </div>`
+    : "";
 }
 
 function renderDoctor() {
@@ -1702,6 +1858,36 @@ function renderProjectAnalysis(analysis: ProjectAnalysis) {
   `;
 }
 
+function renderProjectPortConfigs() {
+  const element = document.querySelector<HTMLElement>("#project-port-configs");
+  if (!element) return;
+  element.innerHTML = state.projectPorts.length
+    ? state.projectPorts.map((config) => `
+        <article class="runtime project-port-item">
+          <div><strong>${escapeHtml(config.description)}</strong><span>当前 ${config.currentPort}</span></div>
+          <small>${escapeHtml(config.file)}${config.line ? ` · 第 ${config.line} 行` : " · 将创建配置"}</small>
+          <div class="row-actions port-config-actions">
+            <input type="number" min="1024" max="65535" value="${config.currentPort + 1}" data-port-config-input="${escapeHtml(config.id)}" aria-label="新端口" />
+            <button data-action="update-project-port" data-config-id="${escapeHtml(config.id)}">${icon(RefreshCw)}<span>备份并修改</span></button>
+          </div>
+        </article>
+      `).join("")
+    : `<div class="empty">没有发现可修改的 Spring Boot、Tomcat、Vite 或 .env 端口配置</div>`;
+}
+
+async function inspectProjectPorts(showProgress = true) {
+  const path = document.querySelector<HTMLInputElement>("#project-path")?.value.trim() || "";
+  if (!path) return;
+  if (showProgress) showToast("正在分析项目端口配置");
+  try {
+    state.projectPorts = await invoke<ProjectPortConfig[]>("inspect_project_port_configs", { path });
+    renderProjectPortConfigs();
+    if (showProgress) showToast(`发现 ${state.projectPorts.length} 个端口配置`);
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), true);
+  }
+}
+
 async function refreshBase() {
   const [snapshot, config, envSnapshot, profiles, jdkDistributions, cleanupArchitecture] = await Promise.all([
     invoke<AppSnapshot>("app_snapshot"),
@@ -1722,6 +1908,7 @@ async function refreshBase() {
   renderEnv();
   renderHealth();
   renderProfiles();
+  renderProfileImportPreview();
   renderDoctor();
   renderPythonAnalysis();
   renderRuntimes();
@@ -1942,7 +2129,18 @@ function renderSystemPlatforms() {
       <div><span>Docker Desktop</span><strong>${escapeHtml(report.dockerDesktopPath || "未发现")}</strong></div>
       <div><span>WSL 状态</span><strong>${escapeHtml(report.wslStatus || "未读取")}</strong></div>
     </div>
-    <pre class="command-output compact-output">${escapeHtml(report.wslDistributions.join("\n") || "没有发现 WSL 发行版")}</pre>
+    <div class="runtime-list wsl-list">
+      ${report.wslItems.map((item) => `
+        <article class="runtime">
+          <div><strong>${escapeHtml(item.name)}</strong><span>${item.isDefault ? "默认 · " : ""}${escapeHtml(item.state)} · WSL ${escapeHtml(item.version)}</span></div>
+          <div class="row-actions">
+            <button data-action="system-platform" data-platform-action="wsl_start" data-platform-value="${escapeHtml(item.name)}">${icon(Play)}<span>启动</span></button>
+            <button data-action="system-platform" data-platform-action="wsl_set_default" data-platform-value="${escapeHtml(item.name)}">${icon(RefreshCw)}<span>设为默认</span></button>
+            <button data-action="system-platform" data-platform-action="wsl_terminate" data-platform-value="${escapeHtml(item.name)}">${icon(Trash2)}<span>终止</span></button>
+          </div>
+        </article>
+      `).join("") || `<div class="empty">没有发现 WSL 发行版</div>`}
+    </div>
   `;
 }
 
@@ -1953,12 +2151,21 @@ function renderLocalServices() {
     ? state.localServices
         .map(
           (service) => `
-            <article class="runtime ${service.occupied ? "warn" : ""}">
-              <div><strong>${escapeHtml(service.name)} · ${service.port}</strong><span>${service.occupied ? "运行中" : "未监听"}</span></div>
-              <small>${service.occupied ? `${escapeHtml(service.processName)} / PID ${service.pid} · ${escapeHtml(service.serviceNames.join("、") || "普通进程")}` : "端口空闲"}</small>
+            <article class="runtime ${service.occupied ? "warn" : service.installed ? "ok" : ""}">
+              <div>
+                <strong>${escapeHtml(service.name)} · ${service.port}</strong>
+                <span>${service.occupied ? "运行中" : service.installed ? `已安装 · ${escapeHtml(service.serviceState)}` : "未安装"}</span>
+              </div>
+              <small>${service.occupied ? `${escapeHtml(service.processName)} / PID ${service.pid}` : service.binaryPath ? escapeHtml(service.binaryPath) : "端口空闲"}</small>
               <div class="row-actions">
                 <button data-action="copy-text" data-copy="${escapeHtml(service.connectionCommand)}">${icon(Clipboard)}<span>复制连接命令</span></button>
-                ${service.safeToStop && service.serviceNames[0] ? `<button class="danger-button" data-action="stop-local-service" data-port="${service.port}" data-service="${escapeHtml(service.serviceNames[0])}">${icon(Trash2)}<span>停止服务</span></button>` : ""}
+                ${service.installed && service.serviceName ? `
+                  ${service.serviceState.toLowerCase() !== "running" ? `<button data-action="local-service-manage" data-service-action="start" data-service="${escapeHtml(service.serviceName)}">${icon(Play)}<span>启动</span></button>` : ""}
+                  <button data-action="local-service-manage" data-service-action="restart" data-service="${escapeHtml(service.serviceName)}">${icon(RefreshCw)}<span>重启</span></button>
+                  ${service.serviceState.toLowerCase() === "running" ? `<button class="danger-button" data-action="local-service-manage" data-service-action="stop" data-service="${escapeHtml(service.serviceName)}">${icon(Trash2)}<span>停止</span></button>` : ""}
+                  <button data-action="local-service-logs" data-service="${escapeHtml(service.serviceName)}">${icon(FileText)}<span>日志</span></button>
+                  <button data-action="local-service-directory" data-service="${escapeHtml(service.serviceName)}">${icon(FolderSearch)}<span>目录</span></button>
+                ` : ""}
               </div>
             </article>
           `,
@@ -2017,7 +2224,11 @@ function renderUpdate() {
       <span>${update.updateAvailable ? "发现新版本" : "当前已是最新版本"} · ${escapeHtml(update.date)}</span>
     </div>
     ${update.notes.length ? `<ul>${update.notes.map((note) => `<li>${escapeHtml(note)}</li>`).join("")}</ul>` : ""}
-    <button data-action="copy-text" data-copy="${escapeHtml(update.downloadUrl)}">${icon(Clipboard)}<span>复制 GitHub Releases 地址</span></button>
+    <div class="toolbar compact">
+      ${update.updateAvailable ? `<button data-action="download-update">${icon(Download)}<span>${state.updateDownloaded ? "重新校验下载" : "下载更新"}</span></button>` : ""}
+      ${update.updateAvailable && state.updateDownloaded ? `<button class="primary" data-action="install-update">${icon(Play)}<span>安装并重启</span></button>` : ""}
+      <button data-action="copy-text" data-copy="${escapeHtml(update.downloadUrl)}">${icon(Clipboard)}<span>复制 Releases 地址</span></button>
+    </div>
   `;
 }
 
@@ -2025,21 +2236,69 @@ function renderCleanupArchitecture() {
   const element = document.querySelector<HTMLElement>("#cleanup-architecture-result");
   const architecture = state.cleanupArchitecture;
   if (!element || !architecture) return;
+  const report = state.cleanupReport;
+  const selectedSize = report?.candidates
+    .filter((item) => state.cleanupSelected.has(item.id))
+    .reduce((sum, item) => sum + item.size, 0) || 0;
+  const cleanButton = document.querySelector<HTMLButtonElement>("#clean-storage");
+  if (cleanButton) {
+    cleanButton.disabled = state.cleanupSelected.size === 0;
+    cleanButton.querySelector("span")!.textContent = state.cleanupSelected.size
+      ? `移入回收站（${state.cleanupSelected.size}）`
+      : "移入回收站";
+  }
   element.innerHTML = `
     <div class="cleanup-category-grid">
       ${architecture.categories
         .map(
           (category) => `
             <article class="runtime cleanup-category">
-              <div><strong>${escapeHtml(category.name)}</strong><span>${category.scanOnly ? "仅规划扫描" : "未启用"}</span></div>
+              <div><strong>${escapeHtml(category.name)}</strong><span>${category.cleanupEnabled ? "可安全清理" : "仅供系统管理"}</span></div>
               <small>风险：${escapeHtml(category.risk)} · 保护：${escapeHtml(category.protectedPatterns.join("、"))}</small>
             </article>
           `,
         )
         .join("")}
     </div>
-    <ul>${architecture.safetyRules.map((rule) => `<li>${escapeHtml(rule)}</li>`).join("")}</ul>
+    ${report ? `
+      <div class="cleanup-summary">
+        <div><strong>${formatBytes(report.totalSize)}</strong><span>${report.candidates.length} 个候选项</span></div>
+        <div><strong>${formatBytes(selectedSize)}</strong><span>当前选择</span></div>
+        <div class="toolbar compact">
+          <button data-action="cleanup-select-defaults">选择建议项</button>
+          <button data-action="cleanup-clear-selection">清空选择</button>
+        </div>
+      </div>
+      ${report.truncated ? `<div class="small-note warning-text">候选项较多，仅显示体积最大的 500 项。</div>` : ""}
+      <div class="cleanup-candidate-list">
+        ${report.candidates.map((item) => `
+          <label class="cleanup-candidate ${item.risk === "high" ? "high-risk" : ""}">
+            <input type="checkbox" data-cleanup-id="${escapeHtml(item.id)}" ${state.cleanupSelected.has(item.id) ? "checked" : ""} />
+            <span class="cleanup-candidate-main">
+              <strong>${escapeHtml(item.categoryName)} · ${formatBytes(item.size)}</strong>
+              <small>${escapeHtml(item.path)}</small>
+              <small>${escapeHtml(item.reason)} · 风险 ${escapeHtml(item.risk)}</small>
+            </span>
+          </label>
+        `).join("") || `<div class="empty">没有发现可清理项目</div>`}
+      </div>
+      <ul>${report.notes.map((note) => `<li>${escapeHtml(note)}</li>`).join("")}</ul>
+    ` : `<ul>${architecture.safetyRules.map((rule) => `<li>${escapeHtml(rule)}</li>`).join("")}</ul>`}
   `;
+}
+
+async function scanStorageCleanup(showProgress = true) {
+  if (showProgress) showToast("正在统计可安全清理的空间");
+  try {
+    state.cleanupReport = await invoke<CleanupScanReport>("scan_storage_cleanup");
+    state.cleanupSelected = new Set(
+      state.cleanupReport.candidates.filter((item) => item.selectedByDefault).map((item) => item.id),
+    );
+    renderCleanupArchitecture();
+    if (showProgress) showToast(`扫描完成，可检查 ${formatBytes(state.cleanupReport.totalSize)}`);
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), true);
+  }
 }
 
 function formatBytes(size: number) {
@@ -2299,13 +2558,54 @@ document.querySelector("#save-profile")?.addEventListener("click", () => {
 document.querySelector("#export-profiles")?.addEventListener("click", () => {
   void runOperation(() => invoke<OperationResult>("export_config_profiles"), "正在导出配置模板");
 });
-document.querySelector("#import-profiles")?.addEventListener("click", () => {
+document.querySelector("#repair-doctor-safe")?.addEventListener("click", async () => {
+  if (!window.confirm("将自动清理真实失效/重复 PATH，并修复 DevEnv 管理的用户级环境变量。不会安装软件、结束进程或修改系统级变量。确定继续吗？")) return;
+  showToast("正在执行安全修复并重新诊断");
+  try {
+    const result = await invoke<DoctorRepairResult>("repair_doctor_safe");
+    state.doctor = result.report;
+    renderDoctor();
+    const detail = result.applied.length ? result.applied.join("\n") : "没有可自动修复的安全项目";
+    window.alert(`环境评分：${result.beforeScore} → ${result.afterScore}\n\n${detail}${result.remaining.length ? `\n\n仍需手动处理 ${result.remaining.length} 项。` : ""}`);
+    showToast(`安全修复完成，当前评分 ${result.afterScore}`);
+    await refreshBase();
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), true);
+  }
+});
+document.querySelector("#profile-file-path")?.addEventListener("input", () => {
+  state.profileImportPreview = null;
+  renderProfileImportPreview();
+});
+document.querySelector("#preview-profiles")?.addEventListener("click", async () => {
   const path = document.querySelector<HTMLInputElement>("#profile-file-path")?.value.trim() || "";
   if (!path) {
     showToast("请输入团队模板 JSON 文件路径", true);
     return;
   }
-  void runOperation(() => invoke<OperationResult>("import_config_profiles", { path }), "正在导入配置模板");
+  showToast("正在校验并预览配置模板");
+  try {
+    state.profileImportPreview = await invoke<ConfigProfileImportPreview>("preview_config_profiles", { path });
+    renderProfileImportPreview();
+    showToast(`模板预览完成，共 ${state.profileImportPreview.profiles.length} 个`);
+  } catch (error) {
+    state.profileImportPreview = null;
+    renderProfileImportPreview();
+    showToast(error instanceof Error ? error.message : String(error), true);
+  }
+});
+document.querySelector("#import-profiles")?.addEventListener("click", () => {
+  const path = document.querySelector<HTMLInputElement>("#profile-file-path")?.value.trim() || "";
+  if (!path || !state.profileImportPreview) {
+    showToast("请先预览并校验模板", true);
+    return;
+  }
+  const replacements = state.profileImportPreview.profiles.filter((item) => item.willReplace).length;
+  if (!window.confirm(`将导入 ${state.profileImportPreview.profiles.length} 个模板${replacements ? `，覆盖 ${replacements} 个同名模板` : ""}。确定继续吗？`)) return;
+  void runOperation(() => invoke<OperationResult>("import_config_profiles", { path }), "正在导入配置模板").then(() => {
+    state.profileImportPreview = null;
+    renderProfileImportPreview();
+  });
 });
 document.querySelector("#run-network")?.addEventListener("click", async () => {
   showToast("正在执行网络诊断");
@@ -2323,6 +2623,30 @@ document.querySelector("#load-cache")?.addEventListener("click", async () => {
 });
 document.querySelector("#clear-cache")?.addEventListener("click", () => {
   void runOperation(() => invoke<OperationResult>("clear_download_cache"), "正在清理下载缓存");
+});
+document.querySelector("#scan-storage")?.addEventListener("click", () => void scanStorageCleanup());
+document.querySelector("#clean-storage")?.addEventListener("click", async () => {
+  const report = state.cleanupReport;
+  const ids = [...state.cleanupSelected];
+  if (!report || !ids.length) return;
+  const size = report.candidates
+    .filter((item) => state.cleanupSelected.has(item.id))
+    .reduce((sum, item) => sum + item.size, 0);
+  const confirmed = window.confirm(
+    `将 ${ids.length} 个项目（约 ${formatBytes(size)}）移入 Windows 回收站。不会清空回收站，仍可恢复。确定继续吗？`,
+  );
+  if (!confirmed) return;
+  showToast("正在将选中项目移入回收站");
+  try {
+    const result = await invoke<CleanupRunResult>("clean_storage_items", { ids });
+    showToast(`已清理 ${result.cleanedCount} 项，释放约 ${formatBytes(result.reclaimedBytes)}`);
+    if (result.skipped.length) {
+      window.alert(`以下项目已安全跳过：\n${result.skipped.slice(0, 12).join("\n")}`);
+    }
+    await scanStorageCleanup(false);
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), true);
+  }
 });
 document.querySelector("#check-updates")?.addEventListener("click", async () => {
   showToast("正在检查新版本");
@@ -2394,6 +2718,7 @@ document.querySelector("#check-project")?.addEventListener("click", async () => 
   try {
     const analysis = await invoke<ProjectAnalysis>("analyze_project", { path: input.value });
     renderProjectAnalysis(analysis);
+    await inspectProjectPorts(false);
     showToast("项目分析完成");
   } catch (error) {
     showToast(error instanceof Error ? error.message : String(error), true);
@@ -2408,9 +2733,35 @@ document.querySelector("#generate-vscode")?.addEventListener("click", () => {
   );
 });
 
+document.querySelector("#inspect-project-ports")?.addEventListener("click", () => void inspectProjectPorts());
+document.querySelector("#port-monitor-enabled")?.addEventListener("change", (event) => {
+  const enabled = (event.target as HTMLInputElement).checked;
+  if (portMonitorTimer !== null) {
+    window.clearInterval(portMonitorTimer);
+    portMonitorTimer = null;
+  }
+  if (enabled) {
+    void pollPortMonitor(true);
+    portMonitorTimer = window.setInterval(() => void pollPortMonitor(false), 5000);
+    showToast("已开启常用端口占用提醒");
+  } else {
+    knownListeningPorts.clear();
+    showToast("已关闭端口占用提醒");
+  }
+});
+
 document.querySelector("#port-search")?.addEventListener("input", (event) => {
   portState.query = (event.target as HTMLInputElement).value;
   renderPorts();
+});
+
+document.querySelector("#cleanup-architecture-result")?.addEventListener("change", (event) => {
+  const input = (event.target as HTMLElement).closest<HTMLInputElement>("input[data-cleanup-id]");
+  if (!input) return;
+  const id = input.dataset.cleanupId || "";
+  if (input.checked) state.cleanupSelected.add(id);
+  else state.cleanupSelected.delete(id);
+  renderCleanupArchitecture();
 });
 
 document.querySelector("#port-quick-filters")?.addEventListener("click", (event) => {
@@ -2447,6 +2798,85 @@ document.addEventListener("click", (event) => {
   if (action === "copy-text") {
     void copyText(button.dataset.copy || "");
   }
+  if (action === "system-platform") {
+    const platformAction = button.dataset.platformAction || "";
+    const value =
+      button.dataset.platformValue ||
+      (platformAction === "wsl_install_distro"
+        ? document.querySelector<HTMLInputElement>("#wsl-distro-name")?.value.trim()
+        : undefined);
+    const labels: Record<string, string> = {
+      docker_install: "安装 Docker Desktop",
+      docker_update: "升级 Docker Desktop",
+      docker_shutdown: "退出 Docker Desktop",
+      wsl_install: "安装 WSL",
+      wsl_update: "更新 WSL",
+      wsl_install_distro: `安装 WSL 发行版 ${value || ""}`,
+      wsl_start: `启动 WSL 发行版 ${value || ""}`,
+      wsl_terminate: `终止 WSL 发行版 ${value || ""}`,
+      wsl_set_default: `将 ${value || ""} 设为默认发行版`,
+    };
+    if (!window.confirm(`${labels[platformAction] || "执行平台操作"}。需要管理员权限时 Windows 会显示 UAC，确定继续吗？`)) return;
+    void runOperation(
+      () => invoke<OperationResult>("manage_system_platform", { action: platformAction, value: value || null }),
+      `正在${labels[platformAction] || "执行平台操作"}`,
+    ).then(async () => {
+      state.systemPlatforms = await invoke<SystemPlatformReport>("inspect_system_platforms");
+      renderSystemPlatforms();
+    });
+  }
+  if (action === "download-update") {
+    void (async () => {
+      if (!window.confirm("将从 GitHub Releases 下载新版安装包，并使用发布清单中的 SHA256 校验。确定继续吗？")) return;
+      showToast("正在下载并校验更新安装包");
+      try {
+        const result = await invoke<OperationResult>("download_update");
+        state.updateDownloaded = true;
+        renderUpdate();
+        showToast(result.message);
+      } catch (error) {
+        state.updateDownloaded = false;
+        showToast(error instanceof Error ? error.message : String(error), true);
+      }
+    })();
+  }
+  if (action === "install-update") {
+    if (!window.confirm("将启动已校验的安装器并退出当前程序。请保存正在进行的工作，确定继续吗？")) return;
+    void (async () => {
+      showToast("正在重新校验并启动更新安装器");
+      try {
+        await invoke<OperationResult>("launch_update_installer");
+      } catch (error) {
+        showToast(error instanceof Error ? error.message : String(error), true);
+      }
+    })();
+  }
+  if (action === "cleanup-select-defaults") {
+    state.cleanupSelected = new Set(
+      state.cleanupReport?.candidates.filter((item) => item.selectedByDefault).map((item) => item.id) || [],
+    );
+    renderCleanupArchitecture();
+  }
+  if (action === "cleanup-clear-selection") {
+    state.cleanupSelected.clear();
+    renderCleanupArchitecture();
+  }
+  if (action === "update-project-port") {
+    const configId = button.dataset.configId || "";
+    const config = state.projectPorts.find((item) => item.id === configId);
+    const input = document.querySelector<HTMLInputElement>(`input[data-port-config-input="${configId}"]`);
+    const newPort = Number(input?.value || 0);
+    const path = document.querySelector<HTMLInputElement>("#project-path")?.value.trim() || "";
+    if (!config || !Number.isInteger(newPort) || newPort < 1024 || newPort > 65535) {
+      showToast("请输入 1024 到 65535 之间的有效端口", true);
+      return;
+    }
+    if (!window.confirm(`将备份 ${config.file}，并把端口 ${config.currentPort} 修改为 ${newPort}。确定继续吗？`)) return;
+    void runOperation(
+      () => invoke<OperationResult>("update_project_port", { path, configId, newPort }),
+      "正在备份并修改项目端口",
+    ).then(() => void inspectProjectPorts(false));
+  }
   if (action === "port-details") {
     const pid = Number(button.dataset.pid || 0);
     const port = Number(button.dataset.port || 0);
@@ -2456,6 +2886,38 @@ document.addEventListener("click", (event) => {
   if (action === "open-process-location") {
     const pid = Number(button.dataset.pid || 0);
     void runOperation(() => invoke<OperationResult>("open_process_location", { pid }), "正在打开进程位置");
+  }
+  if (action === "local-service-manage") {
+    const serviceName = button.dataset.service || "";
+    const serviceAction = button.dataset.serviceAction || "";
+    const actionLabel = serviceAction === "start" ? "启动" : serviceAction === "stop" ? "停止" : "重启";
+    if (!window.confirm(`将${actionLabel} Windows 服务 ${serviceName}。数据库连接可能短暂中断，确定继续吗？`)) return;
+    void runOperation(
+      () => invoke<OperationResult>("manage_local_service", { serviceName, action: serviceAction }),
+      `正在${actionLabel}服务 ${serviceName}`,
+    ).then(async () => {
+      state.localServices = await invoke<LocalServiceStatus[]>("inspect_local_services");
+      renderLocalServices();
+    });
+  }
+  if (action === "local-service-logs") {
+    const serviceName = button.dataset.service || "";
+    const output = document.querySelector<HTMLElement>("#local-service-logs");
+    if (output) output.textContent = `正在读取 ${serviceName} 最近 7 天日志...`;
+    void invoke<string>("local_service_logs", { serviceName })
+      .then((text) => {
+        if (output) output.textContent = text;
+      })
+      .catch((error) => {
+        if (output) output.textContent = error instanceof Error ? error.message : String(error);
+      });
+  }
+  if (action === "local-service-directory") {
+    const serviceName = button.dataset.service || "";
+    void runOperation(
+      () => invoke<OperationResult>("open_local_service_directory", { serviceName }),
+      `正在打开 ${serviceName} 程序目录`,
+    );
   }
   if (action === "stop-local-service") {
     const port = Number(button.dataset.port || 0);
@@ -2607,6 +3069,26 @@ document.addEventListener("click", (event) => {
       "正在应用配置模板",
       "PATH",
     );
+  }
+  if (action === "install-apply-profile") {
+    const id = button.dataset.id || "";
+    void (async () => {
+      try {
+        const requirements = await invoke<ProfileRequirement[]>("config_profile_requirements", { id });
+        const missing = requirements.filter((item) => !item.installed);
+        const message = missing.length
+          ? `将联网安装：${missing.map((item) => `${item.kind} ${item.version}`).join("、")}，安装完成后应用模板。确定继续吗？`
+          : "所需运行时均已安装，将直接应用模板。确定继续吗？";
+        if (!window.confirm(message)) return;
+        await runRuntimeOperation(
+          () => invoke<OperationResult>("install_profile_missing", { id }),
+          missing.length ? "正在补齐模板所需运行时" : "正在应用配置模板",
+          "PATH",
+        );
+      } catch (error) {
+        showToast(error instanceof Error ? error.message : String(error), true);
+      }
+    })();
   }
   if (action === "delete-profile") {
     const id = button.dataset.id || "";

@@ -12,7 +12,7 @@
 
 一句话：Windows 开发环境坏了？用 DevEnv Manager 一键诊断、一键修复、一键跑项目。
 
-## 当前版本
+## 1.0 正式版
 
 仓库包含两个实现：
 
@@ -21,14 +21,14 @@
 
 ## Tauri/Rust 重构版能力
 
-- JDK、Python、Node.js、Maven、Gradle 的下载、安装、切换、卸载和 `current` 指针管理。
+- Temurin、Zulu、Liberica、Microsoft OpenJDK，以及 Python、Node.js、Maven、Gradle 的下载、安装、切换、卸载和 `current` 指针管理。
 - 安装根目录智能规范化：选择 `D:\` 时自动使用 `D:\DevEnvManager`，避免把文件散在盘符根目录。
 - 安装和切换后自动健康检查，验证命令和环境变量是否真的生效。
 - 下载安装过程展示进度：查询、下载、解压、静默安装、验证。
 - 用户级环境变量管理：`DEVENV_HOME`、`JAVA_HOME`、PATH 备份、恢复、清理。
 - 环境医生：按类别对齐展示诊断项和修复建议，可导出 Markdown/JSON 或复制脱敏报告。
 - Python 冲突分析：检测默认 `python`、`pip`、`py -0p`、注册表、Microsoft Store 执行别名风险。
-- 配置模板：保存当前 JDK/Python/Node/Maven/Gradle 组合和用户环境变量，可导入、导出并快速恢复。
+- 配置模板：保存当前 JDK/Python/Node/Maven/Gradle 组合和用户环境变量，导入前预览差异，并可自动补齐缺失版本后恢复。
 - 项目启动向导：识别 Node/Python/Maven/Gradle/Rust/Tauri/.NET/Go 项目，给出运行时建议和常用操作。
 - Git / GitHub 工具链：检测 Git、Git Bash、Git LFS、OpenSSH、用户身份、SSH 公钥和 GitHub HTTPS/SSH 连接，可安全配置身份或生成 ed25519 Key。
 - Node.js 生态：检测 npm、npx、pnpm、Yarn、Corepack、registry、全局目录和 pnpm store，支持安装包管理器及切换官方源/npmmirror。
@@ -38,10 +38,12 @@
 - Rust / rustup 诊断：检测 rustup、rustc、Cargo、已安装工具链、默认工具链和 MSVC Build Tools，支持切换 stable 与更新。
 - .NET SDK 诊断：检测 SDK/Runtime 列表，识别项目 `global.json`，支持 restore、build 和 test 项目动作。
 - 镜像加速中心：集中查看 npm、pip、GOPROXY、Maven、Gradle 和 Cargo 配置，Maven/Gradle 写入前自动备份并可恢复。
-- 端口管理：固定列宽排序、智能搜索、进程/父进程/Windows 服务解释、7 天历史、安全结束普通进程和打开进程位置。
-- Docker / WSL 检测，以及 MySQL、PostgreSQL、Redis、MongoDB、Elasticsearch、SQL Server 本地服务检查和受保护的停止操作。
-- JDK 发行版能力模型、项目 JDK 版本建议，以及可选的启动时更新检查和 GitHub Releases 入口。
-- 存储清理已建立只读安全架构和实施计划；当前版本不扫描、不删除电脑文件。
+- 端口管理：固定列宽排序、智能搜索、实时新增占用提醒、进程/父进程/Windows 服务解释、7 天历史、安全结束进程，以及 Spring Boot、Tomcat、Vite、`.env` 项目端口识别和备份修改。
+- Docker Desktop 安装、更新、启动和关闭；WSL 更新、发行版安装、启动、停止和默认发行版管理。
+- MySQL、PostgreSQL、Redis、MongoDB、Elasticsearch、SQL Server 服务检测、启动、停止、重启、日志和安装目录访问。
+- 程序内更新：下载官方 Release 安装包、强制 SHA256 校验并启动升级。
+- 存储清理：扫描临时文件、开发缓存、浏览器纯缓存和崩溃转储，逐项预览后移入 Windows 回收站，并保存清理历史。
+- `devenv` CLI：环境诊断、版本查看/切换、项目检查、清理扫描和配置模板应用。
 - 网络诊断、下载缓存管理、命令面板、自身卸载入口。
 - 后台执行耗时任务，隐藏 Windows 命令窗口，减少闪屏和界面卡顿。
 
@@ -57,6 +59,22 @@
 8. 在“端口”搜索 `8080`、`spring`、`mysql`、`vite` 等关键词快速定位冲突。
 9. 在“工具链”检查 Git/GitHub、Node 和 Python 生态，需要时配置 Git 身份、包管理器或镜像源。
 10. 在“平台/镜像”安装 Go、检查 Rust/.NET，或管理 GOPROXY、Maven 和 Gradle 镜像。
+
+## 命令行 CLI
+
+安装包附带的 `devenv.exe` 可用于终端和自动化：
+
+```powershell
+devenv doctor
+devenv doctor --json
+devenv list --json
+devenv use jdk 21
+devenv use python 3.12
+devenv project check .
+devenv cleanup scan --json
+devenv profile list
+devenv profile apply "Java 21 + Python 3.12"
+```
 
 ## 开发运行
 
@@ -75,9 +93,10 @@ npm run tauri:build
 
 输出位置：
 
-- `tauri\src-tauri\target\release\bundle\nsis\DevEnv Manager_0.4.0_x64-setup.exe`
-- `tauri\src-tauri\target\release\bundle\msi\DevEnv Manager_0.4.0_x64_en-US.msi`
+- `tauri\src-tauri\target\release\bundle\nsis\DevEnv Manager_1.0.0_x64-setup.exe`
+- `tauri\src-tauri\target\release\bundle\msi\DevEnv Manager_1.0.0_x64_en-US.msi`
 - `tauri\src-tauri\target\release\dailytools-tauri.exe`
+- `tauri\src-tauri\target\release\devenv.exe`
 
 ## 测试
 
@@ -95,7 +114,8 @@ npm run build
 - 下载域名走白名单：Adoptium、GitHub、Node.js、Python、Apache、Gradle 等官方源。
 - ZIP 解压阻止路径穿越。
 - 删除和卸载受管运行时前会校验路径必须位于 DevEnv Manager 根目录内。
-- 外部运行时只通过 Windows 正式卸载注册表入口启动卸载器，不直接删除用户外部目录。
+- 外部运行时优先使用 Windows 卸载注册表；Scoop/Chocolatey 项使用对应包管理器；严格识别的独立绿色运行时只移入回收站；IDE 内置 JDK 始终受保护。
+- 存储清理只接受本轮扫描返回的候选 ID，执行前重新扫描并校验路径；受管运行时、`current`、文档目录和符号链接不会进入候选。
 - 结束进程会拦截 PID 0、PID 4、System、lsass.exe、csrss.exe、wininit.exe、winlogon.exe、services.exe 等关键进程。
 - 导出诊断报告会脱敏用户目录和常见敏感键值，不导出私钥、token、密码。
 - SSH Key 生成发现同名密钥时会拒绝覆盖，界面只允许复制公钥，绝不读取或显示私钥。
@@ -113,10 +133,10 @@ npm run build
 这是有意设计，避免把 `current`、`envs`、`downloads` 等目录直接散在 D 盘根目录。
 
 **为什么 Python 安装后没有全局 `py` 命令？**  
-受管 Python 默认不安装全局 Python Launcher，避免和你已有的系统 Python 抢占。建议使用受管 PATH 中的 `python`，或在 Python 分析里检查现有 `py -0p`。
+受管 Python 使用官方 NuGet 完整包直接解压到 DevEnv Manager 根目录，并验证 `python`、`pip` 和 `venv`，但不会安装全局 Python Launcher，以免和已有系统 Python 抢占。建议使用受管 PATH 中的 `python`。
 
-**为什么卸载外部运行时提示找不到卸载入口？**  
-它可能是绿色版、IDE 内置运行时、Scoop/压缩包安装，或没有注册到 Windows 卸载表。此时工具不会直接删除外部目录，只会给出手动建议。
+**为什么有些外部运行时仍不能卸载？**
+IDE 内置 JDK、无法确认所有权的目录和未知便携版会被有意拦截。注册表、Scoop、Chocolatey 和严格识别的独立绿色运行时可直接处理。
 
 **为什么 Maven / Gradle 要求 JAVA_HOME？**  
 Maven 和 Gradle 需要有效 JDK。新版会在受管命令执行时注入 `JAVA_HOME=%DEVENV_HOME%\current\jdk`，安装或切换后也会重新验证。
@@ -173,13 +193,20 @@ Maven 和 Gradle 需要有效 JDK。新版会在受管命令执行时注入 `JAV
 - 配置模板导入、导出和团队分享
 - Markdown/JSON 脱敏诊断报告和复制分享
 - 项目 JDK 建议、JDK 发行版扩展结构和更新检查
-- 存储清理只读架构（尚未启用扫描或删除）
+- 安全存储扫描、预览、回收站清理和历史记录
+- `devenv` 命令行工具
+- Temurin、Zulu、Liberica、Microsoft OpenJDK 自动安装
+- 程序内下载、SHA256 校验和自动升级
+- Docker Desktop、WSL 发行版和数据库服务管理
+- 项目端口配置识别、备份修改和占用提醒
+- 配置模板差异预览和缺失版本补齐
+- 环境医生安全一键修复
 
 后续规划：
 
-- 可选 CLI：`devenv doctor`、`devenv use jdk 21`、`devenv project check .`。
-- 在明确预览、白名单、回收站和恢复策略完成后，实现存储占用扫描；删除能力继续后置。
-- 按许可和稳定下载源逐步增加 Zulu、Liberica、Microsoft OpenJDK 等自动安装适配器。
+- 持续扩充运行时和数据库适配器，并增加真实 Windows 环境的自动化安装回归测试。
+- 在不牺牲预览与回收站保护的前提下扩充可清理缓存类型。
+- 为 WSL 发行版增加导入、导出与迁移能力。
 
 ## 旧版 Python 开发运行
 

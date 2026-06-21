@@ -1,13 +1,18 @@
 [package]
 name = "dailytools-tauri"
-version = "0.4.0"
+version = "1.0.0"
 description = "A lightweight Tauri rewrite of DevEnv Manager."
 authors = ["weidonglang"]
 edition = "2021"
+default-run = "dailytools-tauri"
 
 [lib]
 name = "dailytools_tauri_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
+
+[[bin]]
+name = "devenv"
+path = "src/bin/devenv.rs"
 
 [build-dependencies]
 tauri-build = { version = "2.4.1", features = [] }
@@ -21,6 +26,7 @@ sha2 = "0.10"
 tempfile = "3.15"
 tauri = { version = "2.11.3", features = [] }
 sysinfo = "0.39.3"
+trash = "5.2"
 zip = { version = "2.2", default-features = false, features = ["deflate"] }
 
 [target.'cfg(windows)'.dependencies]
