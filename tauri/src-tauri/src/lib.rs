@@ -1,5 +1,6 @@
 mod cleanup;
 mod diagnostics;
+mod mysql_repair;
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -372,6 +373,17 @@ struct CacheEntry {
     sha256: Option<String>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct ArchivePlanItem {
+    id: String,
+    path: String,
+    size: u64,
+    source: String,
+    added_at: String,
+    suggestion: String,
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct CommandRunResult {
@@ -464,14 +476,43 @@ struct PythonEntry {
 struct PythonAnalysis {
     current_python: Option<PythonToolState>,
     current_pip: Option<PythonToolState>,
+    launcher_path: String,
     launcher_output: String,
     discovered_pythons: Vec<PythonEntry>,
     discovered_pips: Vec<PythonEntry>,
+    user_path_entry_count: usize,
+    current_terminal_matches_user_path: bool,
+    store_alias_risk: bool,
     risks: Vec<String>,
     recommendations: Vec<String>,
     pip_repair_command: String,
     alias_settings_command: String,
 }
+
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct PythonRepairPlan {
+    plan_id: String,
+    created_at: String,
+    python_path: String,
+    actions: Vec<String>,
+    commands: Vec<String>,
+    path_added: Vec<String>,
+    warnings: Vec<String>,
+    backup_name: String,
+}
+
+#[derive(Clone)]
+struct PendingPythonRepair {
+    public: PythonRepairPlan,
+    baseline_fingerprint: String,
+    proposed_path: String,
+    repair_pip: bool,
+    repair_path: bool,
+}
+
+static PYTHON_REPAIR_PREVIEWS: OnceLock<Mutex<HashMap<String, PendingPythonRepair>>> =
+    OnceLock::new();
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -981,6 +1022,107 @@ async fn inspect_app_usage() -> Result<cleanup::AppUsageReport, String> {
 async fn inspect_installed_software_usage() -> Result<Vec<cleanup::InstalledSoftwareUsage>, String>
 {
     run_blocking(|| Ok(cleanup::inspect_installed_software_usage())).await?
+}
+
+#[tauri::command]
+async fn create_move_plan(
+    source: String,
+    target_drive: String,
+    mode: String,
+) -> Result<cleanup::MovePlan, String> {
+    run_blocking(move || cleanup::create_move_plan(source, target_drive, mode)).await?
+}
+
+#[tauri::command]
+async fn execute_move_plan(plan: cleanup::MovePlan) -> Result<cleanup::MoveResult, String> {
+    run_blocking(move || {
+        let paths = load_paths()?;
+        Ok(cleanup::execute_move_plan(&paths.root, plan))
+    })
+    .await?
+}
+
+#[tauri::command]
+async fn list_rollback_records() -> Result<Vec<cleanup::RollbackRecord>, String> {
+    run_blocking(move || {
+        let paths = load_paths()?;
+        Ok(cleanup::list_rollback_records(&paths.root))
+    })
+    .await?
+}
+
+#[tauri::command]
+async fn rollback_move(rollback_id: String) -> Result<OperationResult, String> {
+    run_blocking(move || {
+        let paths = load_paths()?;
+        let message = cleanup::rollback_move(&paths.root, rollback_id)?;
+        Ok(OperationResult {
+            success: true,
+            message,
+        })
+    })
+    .await?
+}
+
+#[tauri::command]
+async fn create_junction_bridge(
+    source: String,
+    target: String,
+) -> Result<cleanup::MoveResult, String> {
+    run_blocking(move || {
+        let paths = load_paths()?;
+        cleanup::create_junction_bridge(&paths.root, source, target)
+    })
+    .await?
+}
+
+#[tauri::command]
+async fn create_desktop_archive_plan(target_drive: String) -> Result<cleanup::MovePlan, String> {
+    run_blocking(move || cleanup::create_desktop_archive_plan(target_drive)).await?
+}
+
+#[tauri::command]
+async fn execute_desktop_archive_plan(
+    plan: cleanup::MovePlan,
+) -> Result<cleanup::MoveResult, String> {
+    run_blocking(move || {
+        let paths = load_paths()?;
+        Ok(cleanup::execute_desktop_archive_plan(&paths.root, plan))
+    })
+    .await?
+}
+
+#[tauri::command]
+async fn create_downloads_archive_plan(target_drive: String) -> Result<cleanup::MovePlan, String> {
+    run_blocking(move || cleanup::create_downloads_archive_plan(target_drive)).await?
+}
+
+#[tauri::command]
+async fn execute_downloads_archive_plan(
+    plan: cleanup::MovePlan,
+) -> Result<cleanup::MoveResult, String> {
+    run_blocking(move || {
+        let paths = load_paths()?;
+        Ok(cleanup::execute_downloads_archive_plan(&paths.root, plan))
+    })
+    .await?
+}
+
+#[tauri::command]
+async fn inspect_partition_layout() -> Result<cleanup::PartitionLayoutReport, String> {
+    run_blocking(cleanup::inspect_partition_layout).await?
+}
+
+#[tauri::command]
+async fn create_c_drive_expansion_plan() -> Result<cleanup::ExpansionPlan, String> {
+    run_blocking(cleanup::create_c_drive_expansion_plan).await?
+}
+
+#[tauri::command]
+async fn execute_c_drive_expansion(
+    plan: cleanup::ExpansionPlan,
+) -> Result<cleanup::ExpansionResult, String> {
+    run_blocking(move || Ok(cleanup::execute_c_drive_expansion(plan))).await?
 }
 
 #[tauri::command]
@@ -1939,16 +2081,18 @@ fn install_maven_latest_blocking(app: tauri::AppHandle) -> Result<OperationResul
     let target = paths.mavens().join(format!("maven-{}", release.tag));
     paths.assert_inside_root(&target)?;
     if target.exists() {
-        return Err(format!(
-            "Maven {} 已安装：{}",
-            release.tag,
-            display_path(&target)
-        ));
+        emit_task_progress(
+            &app,
+            &task,
+            18,
+            "检测到 Maven 已安装，正在修复登记与 current 指针",
+        );
+    } else {
+        emit_task_progress(&app, &task, 18, "正在下载 Maven");
+        download_file_with_progress(&release.url, &archive, None, Some((&app, &task, 18, 70)))?;
+        emit_task_progress(&app, &task, 72, "正在解压 Maven");
+        install_zip_payload(&archive, &target, &["bin/mvn.cmd"])?;
     }
-    emit_task_progress(&app, &task, 18, "正在下载 Maven");
-    download_file_with_progress(&release.url, &archive, None, Some((&app, &task, 18, 70)))?;
-    emit_task_progress(&app, &task, 72, "正在解压 Maven");
-    install_zip_payload(&archive, &target, &["bin/mvn.cmd"])?;
     emit_task_progress(&app, &task, 88, "正在验证 Maven");
     let output = run_managed_command_output(&paths, target.join("bin/mvn.cmd"), &["-v"], 60)?;
     record_install(
@@ -1963,7 +2107,7 @@ fn install_maven_latest_blocking(app: tauri::AppHandle) -> Result<OperationResul
     emit_task_progress(&app, &task, 100, "安装完成");
     Ok(OperationResult {
         success: true,
-        message: format!("安装成功 Maven {}", release.tag),
+        message: format!("Maven {} 已就绪并已切换到 current", release.tag),
     })
 }
 
@@ -1982,21 +2126,23 @@ fn install_gradle_latest_blocking(app: tauri::AppHandle) -> Result<OperationResu
     let target = paths.gradles().join(format!("gradle-{}", release.tag));
     paths.assert_inside_root(&target)?;
     if target.exists() {
-        return Err(format!(
-            "Gradle {} 已安装：{}",
-            release.tag,
-            display_path(&target)
-        ));
+        emit_task_progress(
+            &app,
+            &task,
+            18,
+            "检测到 Gradle 已安装，正在修复登记与 current 指针",
+        );
+    } else {
+        emit_task_progress(&app, &task, 18, "正在下载 Gradle");
+        download_file_with_progress(
+            &release.url,
+            &archive,
+            release.sha256.as_deref(),
+            Some((&app, &task, 18, 70)),
+        )?;
+        emit_task_progress(&app, &task, 72, "正在解压 Gradle");
+        install_zip_payload(&archive, &target, &["bin/gradle.bat"])?;
     }
-    emit_task_progress(&app, &task, 18, "正在下载 Gradle");
-    download_file_with_progress(
-        &release.url,
-        &archive,
-        release.sha256.as_deref(),
-        Some((&app, &task, 18, 70)),
-    )?;
-    emit_task_progress(&app, &task, 72, "正在解压 Gradle");
-    install_zip_payload(&archive, &target, &["bin/gradle.bat"])?;
     emit_task_progress(&app, &task, 88, "正在验证 Gradle");
     let output = run_managed_command_output(&paths, target.join("bin/gradle.bat"), &["-v"], 120)?;
     record_install(
@@ -2011,7 +2157,7 @@ fn install_gradle_latest_blocking(app: tauri::AppHandle) -> Result<OperationResu
     emit_task_progress(&app, &task, 100, "安装完成");
     Ok(OperationResult {
         success: true,
-        message: format!("安装成功 Gradle {}", release.tag),
+        message: format!("Gradle {} 已就绪并已切换到 current", release.tag),
     })
 }
 
@@ -2798,6 +2944,108 @@ fn cache_entries(calculate_hash: bool) -> Result<Vec<CacheEntry>, String> {
     }
     entries.sort_by(|a, b| a.name.cmp(&b.name));
     Ok(entries)
+}
+
+fn archive_plan_file(paths: &AppPaths) -> PathBuf {
+    paths.config().join("archive-plan.json")
+}
+
+fn load_archive_plan(paths: &AppPaths) -> Result<Vec<ArchivePlanItem>, String> {
+    load_json_with_default(&archive_plan_file(paths), Vec::<ArchivePlanItem>::new())
+}
+
+fn archive_user_root_allowed(path: &Path) -> bool {
+    dirs::home_dir().is_some_and(|home| {
+        [home.join("Desktop"), home.join("Downloads")]
+            .iter()
+            .any(|root| path.starts_with(root))
+    })
+}
+
+fn archive_path_is_sensitive(path: &Path) -> bool {
+    let lower = display_path(path).replace('/', "\\").to_ascii_lowercase();
+    lower.contains("\\wechat files\\")
+        || lower.contains("\\tencent files\\")
+        || lower.contains("\\google\\chrome\\")
+        || lower.contains("\\microsoft\\edge\\")
+        || lower.contains("\\mozilla\\firefox\\")
+        || lower.contains("cookie")
+        || lower.contains("login data")
+        || lower.contains("password")
+}
+
+#[tauri::command]
+fn add_archive_plan_item(path: String, source: String) -> Result<OperationResult, String> {
+    let candidate = PathBuf::from(path.trim())
+        .canonicalize()
+        .map_err(|error| format!("解析归档候选失败：{error}"))?;
+    let metadata =
+        fs::symlink_metadata(&candidate).map_err(|error| format!("读取归档候选失败：{error}"))?;
+    if !metadata.is_file() || metadata.file_type().is_symlink() {
+        return Err("归档计划当前只接受普通文件，不接受目录或符号链接".to_string());
+    }
+    if archive_path_is_sensitive(&candidate) {
+        return Err("聊天数据、浏览器用户数据和凭据不能加入归档计划".to_string());
+    }
+    if cleanup::is_inside_managed_runtime(&candidate)
+        || env::current_dir()
+            .ok()
+            .is_some_and(|root| candidate.starts_with(root))
+        || (cleanup::should_skip_path(&candidate).is_some()
+            && !archive_user_root_allowed(&candidate))
+    {
+        return Err("系统、当前项目或受管运行时不能加入归档计划".to_string());
+    }
+    let paths = load_paths()?;
+    let mut plan = load_archive_plan(&paths)?;
+    let mut hasher = Sha256::new();
+    hasher.update(display_path(&candidate).to_ascii_lowercase().as_bytes());
+    let id = format!("{:x}", hasher.finalize());
+    if plan.iter().any(|item| item.id == id) {
+        return Ok(OperationResult {
+            success: true,
+            message: "该文件已经在归档计划中；本阶段不会移动它".to_string(),
+        });
+    }
+    plan.push(ArchivePlanItem {
+        id,
+        path: display_path(&candidate),
+        size: metadata.len(),
+        source: source.trim().chars().take(80).collect(),
+        added_at: current_timestamp(),
+        suggestion: "Phase 4 执行移动前将重新校验路径、目标空间并生成回滚计划".to_string(),
+    });
+    save_json(&archive_plan_file(&paths), &plan)?;
+    Ok(OperationResult {
+        success: true,
+        message: format!(
+            "已加入归档计划；当前共 {} 项，本阶段没有移动文件",
+            plan.len()
+        ),
+    })
+}
+
+#[tauri::command]
+fn list_archive_plan_items() -> Result<Vec<ArchivePlanItem>, String> {
+    load_archive_plan(&load_paths()?)
+}
+
+#[tauri::command]
+fn remove_archive_plan_item(id: String) -> Result<OperationResult, String> {
+    let paths = load_paths()?;
+    let mut plan = load_archive_plan(&paths)?;
+    let before = plan.len();
+    plan.retain(|item| item.id != id);
+    save_json(&archive_plan_file(&paths), &plan)?;
+    Ok(OperationResult {
+        success: true,
+        message: if plan.len() < before {
+            "已从归档计划移除；原文件没有变化"
+        } else {
+            "归档计划中没有该项目"
+        }
+        .to_string(),
+    })
 }
 
 #[tauri::command]
@@ -3676,6 +3924,28 @@ fn analyze_python_environment_blocking() -> PythonAnalysis {
         .output()
         .map(|output| command_text(&output.stdout, &output.stderr))
         .unwrap_or_else(|_| "未发现 Python Launcher 或 py -0p 执行失败".to_string());
+    let launcher_path = find_on_path("py").unwrap_or_default();
+    let user = user_environment().unwrap_or_default();
+    let user_path = user
+        .get("Path")
+        .or_else(|| user.get("PATH"))
+        .cloned()
+        .unwrap_or_default();
+    let user_path_entry_count = split_path_entries(&user_path).len();
+    let configured_python = load_paths()
+        .ok()
+        .and_then(|paths| find_in_configured_path("python", &user_path, &paths));
+    let current_terminal_matches_user_path = match (&current_python, configured_python) {
+        (Some(current), Some(configured)) => {
+            path_key(&current.path) == path_key(&display_path(configured))
+        }
+        (None, None) => true,
+        _ => false,
+    };
+    let store_alias_risk = discovered_pythons.iter().any(|item| {
+        item.source == "Microsoft Store"
+            || item.path.to_ascii_lowercase().contains("\\windowsapps\\")
+    });
 
     let mut risks = Vec::new();
     if discovered_pythons.len() > 1 {
@@ -3684,11 +3954,12 @@ fn analyze_python_environment_blocking() -> PythonAnalysis {
             discovered_pythons.len()
         ));
     }
-    if discovered_pythons
-        .iter()
-        .any(|item| item.source == "Microsoft Store")
-    {
+    if store_alias_risk {
         risks.push("Microsoft Store Python 执行别名可能抢占 python 命令".to_string());
+    }
+    if !current_terminal_matches_user_path {
+        risks
+            .push("当前进程 PATH 与最新用户 PATH 不一致；修复后需要重新打开终端和 IDE".to_string());
     }
     if current_pip.as_ref().map(|item| item.status.as_str()) != Some("正常") {
         risks.push("pip 与当前 python -m pip 不一致或当前 Python 缺少 pip".to_string());
@@ -3700,10 +3971,7 @@ fn analyze_python_environment_blocking() -> PythonAnalysis {
     let mut recommendations = Vec::new();
     recommendations.push("优先使用 DevEnv Manager 受管 Python 或官网安装版 Python。".to_string());
     recommendations.push("安装包时尽量使用 python -m pip，而不是直接运行 pip。".to_string());
-    if discovered_pythons
-        .iter()
-        .any(|item| item.source == "Microsoft Store")
-    {
+    if store_alias_risk {
         recommendations.push(
             "如默认 python 指向 WindowsApps，请在 Windows“应用执行别名”中关闭 Python 别名。"
                 .to_string(),
@@ -3713,15 +3981,250 @@ fn analyze_python_environment_blocking() -> PythonAnalysis {
     PythonAnalysis {
         current_python,
         current_pip,
+        launcher_path,
         launcher_output,
         discovered_pythons,
         discovered_pips,
+        user_path_entry_count,
+        current_terminal_matches_user_path,
+        store_alias_risk,
         risks,
         recommendations,
         pip_repair_command: "python -m ensurepip --upgrade; python -m pip install --upgrade pip"
             .to_string(),
         alias_settings_command: "start ms-settings:appsfeatures-app".to_string(),
     }
+}
+
+fn learning_command_allowed(parts: &[String]) -> bool {
+    let Some(program) = parts.first() else {
+        return false;
+    };
+    let program = program
+        .rsplit(['\\', '/'])
+        .next()
+        .unwrap_or(program)
+        .trim_end_matches(".exe")
+        .trim_end_matches(".cmd")
+        .to_ascii_lowercase();
+    let args = parts.iter().skip(1).map(String::as_str).collect::<Vec<_>>();
+    match program.as_str() {
+        "java" | "javac" | "mvn" | "gradle" => args == ["-version"],
+        "python" | "python3" => args == ["--version"] || args == ["-m", "pip", "--version"],
+        "py" => args == ["--version"] || args == ["-0p"],
+        "node" | "npm" | "rustc" | "cargo" | "uv" | "chsrc" | "scoop" => args == ["--version"],
+        "go" => args == ["version"] || args == ["env", "GOROOT"] || args == ["env", "GOPATH"],
+        "dotnet" => args == ["--info"] || args == ["--list-sdks"] || args == ["--list-runtimes"],
+        "mise" => args == ["doctor"] || args == ["--version"],
+        "vfox" => args == ["version"] || args == ["--version"],
+        "where" => {
+            args.len() == 1
+                && [
+                    "java", "javac", "python", "pip", "py", "node", "npm", "mvn", "gradle", "go",
+                    "rustc", "cargo", "dotnet",
+                ]
+                .contains(&args[0].to_ascii_lowercase().as_str())
+        }
+        _ => false,
+    }
+}
+
+#[tauri::command]
+async fn run_learning_check(command: String) -> Result<CommandRunResult, String> {
+    run_blocking(move || {
+        let parts = parse_command_line(&command)?;
+        if !learning_command_allowed(&parts) {
+            return Err("学习中心只允许固定的版本、位置和环境只读检查命令".to_string());
+        }
+        let executable = parts.first().ok_or_else(|| "命令不能为空".to_string())?;
+        let started = Instant::now();
+        let output = hidden_command(executable)
+            .args(parts.iter().skip(1))
+            .output()
+            .map_err(|error| format!("执行只读检查失败：{error}"))?;
+        Ok(CommandRunResult {
+            success: output.status.success(),
+            return_code: output.status.code().unwrap_or(-1),
+            output: command_text(&output.stdout, &output.stderr),
+            elapsed_ms: started.elapsed().as_millis(),
+        })
+    })
+    .await?
+}
+
+fn python_repair_store() -> &'static Mutex<HashMap<String, PendingPythonRepair>> {
+    PYTHON_REPAIR_PREVIEWS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn prepend_path_entries(existing: &str, additions: &[String]) -> (String, Vec<String>) {
+    let existing_entries = split_path_entries(existing);
+    let existing_keys = existing_entries
+        .iter()
+        .map(|item| path_key(item))
+        .collect::<BTreeSet<_>>();
+    let mut result = Vec::new();
+    let mut added = Vec::new();
+    let mut seen = BTreeSet::new();
+    for item in additions.iter().chain(existing_entries.iter()) {
+        let key = path_key(item);
+        if key.is_empty() || !seen.insert(key.clone()) {
+            continue;
+        }
+        if additions.iter().any(|value| path_key(value) == key) && !existing_keys.contains(&key) {
+            added.push(item.clone());
+        }
+        result.push(item.clone());
+    }
+    (result.join(";"), added)
+}
+
+#[tauri::command]
+fn preview_python_repair(repair_pip: bool, repair_path: bool) -> Result<PythonRepairPlan, String> {
+    if !repair_pip && !repair_path {
+        return Err("请至少选择 pip 修复或 PATH 修复".to_string());
+    }
+    let analysis = analyze_python_environment_blocking();
+    let python = analysis
+        .current_python
+        .as_ref()
+        .ok_or_else(|| "没有找到可修复的当前 Python；请先安装或切换 Python".to_string())?;
+    if python.path.to_ascii_lowercase().contains("\\windowsapps\\")
+        || !Path::new(&python.path).is_file()
+    {
+        return Err(
+            "当前 python 是 Microsoft Store 别名或路径无效；请先关闭应用执行别名或切换受管 Python"
+                .to_string(),
+        );
+    }
+    let python_home = Path::new(&python.path)
+        .parent()
+        .ok_or_else(|| "无法识别 Python 安装目录".to_string())?;
+    let environment = user_environment()?;
+    let old_path = environment
+        .get("Path")
+        .or_else(|| environment.get("PATH"))
+        .cloned()
+        .unwrap_or_default();
+    let additions = vec![
+        display_path(python_home),
+        display_path(python_home.join("Scripts")),
+    ];
+    let (proposed_path, path_added) = if repair_path {
+        prepend_path_entries(&old_path, &additions)
+    } else {
+        (old_path, Vec::new())
+    };
+    let created = unix_timestamp();
+    let mut hasher = Sha256::new();
+    hasher.update(python.path.as_bytes());
+    hasher.update(created.to_le_bytes());
+    hasher.update([repair_pip as u8, repair_path as u8]);
+    let plan_id = format!("python-{:x}", hasher.finalize());
+    let mut actions = Vec::new();
+    let mut commands = Vec::new();
+    if repair_pip {
+        actions.push("使用当前 python 运行 ensurepip，再升级 pip，并回读 pip 归属".to_string());
+        commands.push(format!("\"{}\" -m ensurepip --upgrade", python.path));
+        commands.push(format!("\"{}\" -m pip install --upgrade pip", python.path));
+    }
+    if repair_path {
+        actions.push(
+            "把当前 Python 与 Scripts 置于用户 PATH 前部；不删除其他 Python 路径".to_string(),
+        );
+    }
+    let public = PythonRepairPlan {
+        plan_id: plan_id.clone(),
+        created_at: created.to_string(),
+        python_path: python.path.clone(),
+        actions,
+        commands,
+        path_added,
+        warnings: vec![
+            "计划有效 10 分钟且只能应用一次；用户环境在预览后变化会拒绝写入".to_string(),
+            "pip 升级需要联网；不会卸载其他 Python，也不会自动关闭 Microsoft Store 别名"
+                .to_string(),
+            "PATH 修改后必须重新打开终端和 IDE".to_string(),
+        ],
+        backup_name: "env-backup-<应用时间>.json".to_string(),
+    };
+    let pending = PendingPythonRepair {
+        public: public.clone(),
+        baseline_fingerprint: environment_fingerprint(&environment),
+        proposed_path,
+        repair_pip,
+        repair_path,
+    };
+    let mut store = python_repair_store()
+        .lock()
+        .map_err(|_| "Python 修复预览暂时不可用".to_string())?;
+    store.retain(|_, item| {
+        item.public
+            .created_at
+            .parse::<u64>()
+            .unwrap_or(0)
+            .saturating_add(10 * 60)
+            >= created
+    });
+    store.insert(plan_id, pending);
+    Ok(public)
+}
+
+#[tauri::command]
+async fn apply_python_repair(plan_id: String) -> Result<OperationResult, String> {
+    run_blocking(move || {
+        let pending = python_repair_store()
+            .lock()
+            .map_err(|_| "Python 修复预览暂时不可用".to_string())?
+            .remove(&plan_id)
+            .ok_or_else(|| "Python 修复计划不存在、已应用或已过期".to_string())?;
+        let created = pending.public.created_at.parse::<u64>().unwrap_or(0);
+        if created.saturating_add(10 * 60) < unix_timestamp() {
+            return Err("Python 修复计划已过期，请重新分析和预览".to_string());
+        }
+        let environment = user_environment()?;
+        if environment_fingerprint(&environment) != pending.baseline_fingerprint {
+            return Err("用户环境在预览后发生变化，已拒绝覆盖；请重新分析".to_string());
+        }
+        if !Path::new(&pending.public.python_path).is_file() {
+            return Err("预览中的 Python 已不存在".to_string());
+        }
+        let paths = load_paths()?;
+        let backup = create_environment_backup(&paths, &environment)?;
+        if pending.repair_pip {
+            run_command_output(
+                PathBuf::from(&pending.public.python_path),
+                &["-m", "ensurepip", "--upgrade"],
+                180,
+            )?;
+            run_command_output(
+                PathBuf::from(&pending.public.python_path),
+                &["-m", "pip", "install", "--upgrade", "pip"],
+                300,
+            )?;
+        }
+        if pending.repair_path {
+            restore_environment_values(
+                environment.get("DEVENV_HOME").map(String::as_str),
+                environment.get("JAVA_HOME").map(String::as_str),
+                &pending.proposed_path,
+            )?;
+            broadcast_environment_change();
+        }
+        let verified = run_command_output(
+            PathBuf::from(&pending.public.python_path),
+            &["-m", "pip", "--version"],
+            60,
+        )?;
+        Ok(OperationResult {
+            success: true,
+            message: format!(
+                "Python 修复完成并回读验证：{}；环境备份：{}",
+                verified.lines().next().unwrap_or("pip 可用"),
+                backup
+            ),
+        })
+    })
+    .await?
 }
 
 #[tauri::command]
@@ -4793,6 +5296,33 @@ fn database_service_definitions() -> Vec<(&'static str, &'static str, u16, &'sta
     ]
 }
 
+#[tauri::command]
+async fn inspect_mysql_repair() -> Result<mysql_repair::MySqlRepairReport, String> {
+    run_blocking(|| Ok(mysql_repair::inspect())).await?
+}
+
+#[tauri::command]
+async fn create_mysql_repair_plan(
+    candidate_id: String,
+    action: String,
+) -> Result<mysql_repair::MySqlRepairPlan, String> {
+    run_blocking(move || mysql_repair::create_plan(candidate_id, action)).await?
+}
+
+#[tauri::command]
+async fn execute_mysql_repair_plan(
+    plan_id: String,
+    backup_destination: Option<String>,
+) -> Result<OperationResult, String> {
+    run_blocking(move || {
+        mysql_repair::execute(plan_id, backup_destination).map(|message| OperationResult {
+            success: true,
+            message,
+        })
+    })
+    .await?
+}
+
 fn service_matches_database(port: u16, service: &str) -> bool {
     let service = service.to_ascii_lowercase();
     match port {
@@ -5123,6 +5653,17 @@ fn run_project_action_blocking(path: String, action: String) -> Result<CommandRu
     }
     if action == "nacos_start" {
         let paths = load_paths()?;
+        let user = user_environment()?;
+        let java_home = select_java_home(&paths, &user)
+            .map(|value| expand_environment_path(&value, &paths))
+            .ok_or_else(|| {
+                "Nacos 启动前没有找到同时包含 java.exe 与 javac.exe 的有效 JDK".to_string()
+            })?;
+        let java_exe = Path::new(&java_home).join("bin").join("java.exe");
+        let java_version = first_output_line(&java_exe, &["-version"]);
+        if java_version.is_empty() {
+            return Err("Nacos 启动前 JDK 回读验证失败；请在环境页重新预览配置".to_string());
+        }
         let started = Instant::now();
         let mut command = hidden_command("cmd");
         command
@@ -5138,7 +5679,10 @@ fn run_project_action_blocking(path: String, action: String) -> Result<CommandRu
         return Ok(CommandRunResult {
             success: true,
             return_code: 0,
-            output: "已使用经过校验的 JAVA_HOME 后台启动 Nacos 单机模式".to_string(),
+            output: format!(
+                "已使用最新用户环境中的 JAVA_HOME 后台启动 Nacos 单机模式：{} · {}",
+                java_home, java_version
+            ),
             elapsed_ms: started.elapsed().as_millis(),
         });
     }
@@ -5990,6 +6534,18 @@ pub fn run() {
             inspect_desktop,
             inspect_app_usage,
             inspect_installed_software_usage,
+            create_move_plan,
+            execute_move_plan,
+            list_rollback_records,
+            rollback_move,
+            create_junction_bridge,
+            create_desktop_archive_plan,
+            execute_desktop_archive_plan,
+            create_downloads_archive_plan,
+            execute_downloads_archive_plan,
+            inspect_partition_layout,
+            create_c_drive_expansion_plan,
+            execute_c_drive_expansion,
             open_analysis_path,
             open_apps_features,
             jdk_distributions,
@@ -6028,6 +6584,8 @@ pub fn run() {
             export_doctor_report_json,
             doctor_report_text,
             analyze_python_environment,
+            preview_python_repair,
+            apply_python_repair,
             inspect_toolchains,
             run_toolchain_action,
             inspect_platform_toolchains,
@@ -6036,6 +6594,9 @@ pub fn run() {
             inspect_system_platforms,
             manage_system_platform,
             inspect_local_services,
+            inspect_mysql_repair,
+            create_mysql_repair_plan,
+            execute_mysql_repair_plan,
             manage_local_service,
             local_service_logs,
             open_local_service_directory,
@@ -6048,9 +6609,13 @@ pub fn run() {
             run_project_action,
             network_diagnostics,
             cache_entries,
+            add_archive_plan_item,
+            list_archive_plan_items,
+            remove_archive_plan_item,
             clear_download_cache,
             inspect_command_safety,
             run_tool_command,
+            run_learning_check,
             environment_health,
             list_config_profiles,
             config_profile_requirements,
@@ -6163,6 +6728,23 @@ fn run_cli(args: Vec<String>) -> Result<String, String> {
                 ))
             }
         }
+        "db" if args.get(1).map(String::as_str) == Some("doctor")
+            && args.get(2).map(String::as_str) == Some("mysql") =>
+        {
+            serde_json::to_string_pretty(&mysql_repair::inspect())
+                .map_err(|error| format!("生成 MySQL 诊断 JSON 失败：{error}"))
+        }
+        "db" if args.get(1).map(String::as_str) == Some("repair-plan")
+            && args.get(2).map(String::as_str) == Some("mysql") =>
+        {
+            let candidate = args.get(3).ok_or_else(|| {
+                "用法：devenv db repair-plan mysql <candidate-id> <action>".to_string()
+            })?;
+            let action = args.get(4).ok_or_else(|| "缺少修复动作".to_string())?;
+            let plan = mysql_repair::create_plan(candidate.clone(), action.clone())?;
+            serde_json::to_string_pretty(&plan)
+                .map_err(|error| format!("生成 MySQL 修复计划失败：{error}"))
+        }
         "profile" if args.get(1).map(String::as_str) == Some("list") => {
             let profiles = list_config_profiles_blocking()?;
             if profiles.is_empty() {
@@ -6187,7 +6769,7 @@ fn run_cli(args: Vec<String>) -> Result<String, String> {
 
 fn cli_help() -> String {
     format!(
-        "DevEnv Manager CLI {}\n\n用法：\n  devenv doctor [--json]\n  devenv list [--json]\n  devenv use <kind> <version>\n  devenv project check [path] [--json]\n  devenv cleanup scan [--json]\n  devenv profile list\n  devenv profile apply <id>\n  devenv version",
+        "DevEnv Manager CLI {}\n\n用法：\n  devenv doctor [--json]\n  devenv list [--json]\n  devenv use <kind> <version>\n  devenv project check [path] [--json]\n  devenv cleanup scan [--json]\n  devenv db doctor mysql --json\n  devenv db repair-plan mysql <candidate-id> <action>\n  devenv profile list\n  devenv profile apply <id>\n  devenv version",
         env!("CARGO_PKG_VERSION")
     )
 }
@@ -6658,11 +7240,16 @@ fn select_java_home(
         && managed.join("bin/java.exe").is_file()
         && managed.join("bin/javac.exe").is_file()
     {
-        return Some(r"%DEVENV_HOME%\current\jdk".to_string());
+        return Some(display_path(managed));
     }
     if let Some(value) = user_environment.get("JAVA_HOME") {
         if is_valid_java_home(value, paths) {
             return Some(expand_environment_path(value, paths));
+        }
+    }
+    if let Ok(value) = env::var("JAVA_HOME") {
+        if is_valid_java_home(&value, paths) {
+            return Some(expand_environment_path(&value, paths));
         }
     }
     if let Some(java) = find_on_path("java") {
@@ -7153,16 +7740,25 @@ fn resolve_node_checksum(release: &ReleaseInfo) -> Result<Option<String>, String
         .map_err(|err| format!("查询 Node.js 校验文件失败：{err}"))?
         .text()
         .map_err(|err| format!("读取 Node.js 校验文件失败：{err}"))?;
-    Ok(text.lines().find_map(|line| {
+    parse_sha256_for_file(&text, &release.name)
+        .map(Some)
+        .ok_or_else(|| "Node.js 校验文件没有目标文件的有效 SHA-256".to_string())
+}
+
+fn parse_sha256_for_file(text: &str, expected_name: &str) -> Option<String> {
+    text.lines().find_map(|line| {
         let mut parts = line.split_whitespace();
         let sha = parts.next()?;
-        let name = parts.next()?;
-        if name == release.name && sha.len() == 64 {
-            Some(sha.to_string())
+        let name = parts.next()?.trim_start_matches('*');
+        if name == expected_name
+            && sha.len() == 64
+            && sha.chars().all(|character| character.is_ascii_hexdigit())
+        {
+            Some(sha.to_ascii_lowercase())
         } else {
             None
         }
-    }))
+    })
 }
 
 fn resolve_python_release(version: &str) -> Result<ReleaseInfo, String> {
@@ -7300,6 +7896,10 @@ fn download_file_with_progress(
     progress: Option<(&tauri::AppHandle, &str, u8, u8)>,
 ) -> Result<(), String> {
     validate_download_url(url)?;
+    if let Some(expected) = expected_sha256 {
+        validate_update_checksum(expected)
+            .map_err(|_| "下载元数据中的 SHA-256 格式无效，已拒绝下载".to_string())?;
+    }
     let cache_valid = target_path.exists()
         && target_path.metadata().map(|item| item.len()).unwrap_or(0) > 0
         && expected_sha256
@@ -8299,13 +8899,32 @@ fn run_managed_command_output(
 
 fn apply_managed_environment(paths: &AppPaths, command: &mut Command) {
     command.env("DEVENV_HOME", display_path(&paths.root));
-    let java_home = paths.current().join("jdk");
-    if java_home.join("bin/java.exe").is_file() {
-        command.env("JAVA_HOME", display_path(&java_home));
+    let user = user_environment().unwrap_or_default();
+    let selected_java = select_java_home(paths, &user)
+        .map(|value| expand_environment_path(&value, paths))
+        .filter(|value| {
+            Path::new(value).join("bin/java.exe").is_file()
+                && Path::new(value).join("bin/javac.exe").is_file()
+        });
+    if let Some(java_home) = &selected_java {
+        command.env("JAVA_HOME", java_home);
     }
 
-    let current_path = env::var("PATH").unwrap_or_default();
+    let latest_user_path = user
+        .get("Path")
+        .or_else(|| user.get("PATH"))
+        .cloned()
+        .unwrap_or_default();
+    let inherited_path = env::var("PATH").unwrap_or_default();
+    let current_path = [latest_user_path, inherited_path]
+        .into_iter()
+        .filter(|value| !value.trim().is_empty())
+        .collect::<Vec<_>>()
+        .join(";");
     let mut entries = Vec::new();
+    if let Some(java_home) = &selected_java {
+        entries.push(display_path(Path::new(java_home).join("bin")));
+    }
     for item in [
         paths.current().join("jdk/bin"),
         paths.current().join("python"),
@@ -8316,18 +8935,30 @@ fn apply_managed_environment(paths: &AppPaths, command: &mut Command) {
         paths.current().join("go/bin"),
         paths.npm_global(),
     ] {
-        entries.push(display_path(item));
+        let value = display_path(item);
+        if !entries
+            .iter()
+            .any(|existing| path_key(existing) == path_key(&value))
+        {
+            entries.push(value);
+        }
     }
-    entries.extend(
-        current_path
-            .split(';')
-            .map(|item| expand_environment_path(item, paths))
-            .filter(|item| !item.trim().is_empty()),
-    );
+    for item in current_path
+        .split(';')
+        .map(|item| expand_environment_path(item, paths))
+        .filter(|item| !item.trim().is_empty())
+    {
+        if !entries
+            .iter()
+            .any(|existing| path_key(existing) == path_key(&item))
+        {
+            entries.push(item);
+        }
+    }
     command.env("PATH", entries.join(";"));
 }
 
-fn command_text(stdout: &[u8], stderr: &[u8]) -> String {
+pub(crate) fn command_text(stdout: &[u8], stderr: &[u8]) -> String {
     let stdout = decode_command_stream(stdout).trim().to_string();
     let stderr = decode_command_stream(stderr).trim().to_string();
     [stdout, stderr]
@@ -8337,7 +8968,7 @@ fn command_text(stdout: &[u8], stderr: &[u8]) -> String {
         .join("\n")
 }
 
-fn decode_command_stream(bytes: &[u8]) -> String {
+pub(crate) fn decode_command_stream(bytes: &[u8]) -> String {
     let looks_utf16 = bytes.len() >= 4
         && bytes.len().is_multiple_of(2)
         && bytes
@@ -8355,9 +8986,59 @@ fn decode_command_stream(bytes: &[u8]) -> String {
         String::from_utf16_lossy(&words)
             .trim_start_matches('\u{feff}')
             .to_string()
+    } else if let Ok(value) = std::str::from_utf8(bytes) {
+        value.to_string()
     } else {
-        String::from_utf8_lossy(bytes).to_string()
+        decode_windows_ansi(bytes).unwrap_or_else(|| String::from_utf8_lossy(bytes).to_string())
     }
+}
+
+#[cfg(windows)]
+fn decode_windows_ansi(bytes: &[u8]) -> Option<String> {
+    #[link(name = "kernel32")]
+    extern "system" {
+        fn MultiByteToWideChar(
+            code_page: u32,
+            flags: u32,
+            source: *const u8,
+            source_len: i32,
+            target: *mut u16,
+            target_len: i32,
+        ) -> i32;
+    }
+    if bytes.is_empty() || bytes.len() > i32::MAX as usize {
+        return Some(String::new());
+    }
+    let required = unsafe {
+        MultiByteToWideChar(
+            0,
+            0,
+            bytes.as_ptr(),
+            bytes.len() as i32,
+            std::ptr::null_mut(),
+            0,
+        )
+    };
+    if required <= 0 {
+        return None;
+    }
+    let mut words = vec![0_u16; required as usize];
+    let written = unsafe {
+        MultiByteToWideChar(
+            0,
+            0,
+            bytes.as_ptr(),
+            bytes.len() as i32,
+            words.as_mut_ptr(),
+            required,
+        )
+    };
+    (written > 0).then(|| String::from_utf16_lossy(&words[..written as usize]))
+}
+
+#[cfg(not(windows))]
+fn decode_windows_ansi(_bytes: &[u8]) -> Option<String> {
+    None
 }
 
 fn hidden_command(program: impl AsRef<OsStr>) -> Command {
@@ -9872,6 +10553,70 @@ mod tests {
         assert!(validate_update_checksum(&"a".repeat(64)).is_ok());
         assert!(validate_update_checksum(&"g".repeat(64)).is_err());
         assert!(validate_update_checksum("abc").is_err());
+    }
+
+    #[test]
+    fn checksum_text_parser_rejects_non_hash_text() {
+        let valid = format!("{}  python.zip\n", "a".repeat(64));
+        assert_eq!(
+            parse_sha256_for_file(&valid, "python.zip"),
+            Some("a".repeat(64))
+        );
+        assert!(parse_sha256_for_file("SHA256 (python.zip) = downloading", "python.zip").is_none());
+        assert!(
+            parse_sha256_for_file(&format!("{}  other.zip", "b".repeat(64)), "python.zip")
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn python_path_preview_only_prepends_and_deduplicates() {
+        let additions = vec![
+            r"C:\Python312".to_string(),
+            r"C:\Python312\Scripts".to_string(),
+        ];
+        let (path, added) = prepend_path_entries(r"C:\Tools;C:\Python312", &additions);
+        assert_eq!(added, vec![r"C:\Python312\Scripts"]);
+        assert!(path.starts_with(r"C:\Python312;C:\Python312\Scripts;C:\Tools"));
+    }
+
+    #[test]
+    fn learning_center_rejects_state_changing_commands() {
+        assert!(learning_command_allowed(&[
+            "python".to_string(),
+            "--version".to_string()
+        ]));
+        assert!(learning_command_allowed(&[
+            "python".to_string(),
+            "-m".to_string(),
+            "pip".to_string(),
+            "--version".to_string()
+        ]));
+        assert!(!learning_command_allowed(&[
+            "python".to_string(),
+            "-m".to_string(),
+            "pip".to_string(),
+            "install".to_string(),
+            "requests".to_string()
+        ]));
+        assert!(!learning_command_allowed(&[
+            "cmd".to_string(),
+            "/c".to_string(),
+            "set".to_string()
+        ]));
+    }
+
+    #[test]
+    fn archive_plan_rejects_chat_and_browser_credentials() {
+        assert!(archive_path_is_sensitive(Path::new(
+            r"C:\Users\test\Documents\WeChat Files\wxid\Msg\MicroMsg.db"
+        )));
+        assert!(archive_path_is_sensitive(Path::new(
+            r"C:\Users\test\AppData\Local\Google\Chrome\User Data\Default\Login Data"
+        )));
+        assert!(!archive_path_is_sensitive(Path::new(
+            r"C:\Users\test\Downloads\archive.zip"
+        )));
     }
 
     #[test]

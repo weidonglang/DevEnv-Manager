@@ -232,13 +232,28 @@ type DoctorReport = {
 type PythonAnalysis = {
   currentPython?: PythonToolState;
   currentPip?: PythonToolState;
+  launcherPath: string;
   launcherOutput: string;
   discoveredPythons: PythonEntry[];
   discoveredPips: PythonEntry[];
+  userPathEntryCount: number;
+  currentTerminalMatchesUserPath: boolean;
+  storeAliasRisk: boolean;
   risks: string[];
   recommendations: string[];
   pipRepairCommand: string;
   aliasSettingsCommand: string;
+};
+
+type PythonRepairPlan = {
+  planId: string;
+  createdAt: string;
+  pythonPath: string;
+  actions: string[];
+  commands: string[];
+  pathAdded: string[];
+  warnings: string[];
+  backupName: string;
 };
 
 type PythonToolState = {
@@ -408,6 +423,47 @@ type LocalServiceStatus = {
   binaryPath: string;
 };
 
+type MySqlCandidate = {
+  id: string;
+  status: string;
+  versionHint: string;
+  serviceName: string;
+  serviceState: string;
+  mysqldPath: string;
+  myIniPath: string;
+  basedir: string;
+  datadir: string;
+  port: number;
+  portOccupied: boolean;
+  dataHealth: string;
+  systemSchemaMissing: boolean;
+  businessDatabases: string[];
+  lastError: string;
+  suggestions: string[];
+  registrationCommand: string;
+  consoleCommand: string;
+};
+
+type MySqlRepairReport = {
+  generatedAt: string;
+  candidates: MySqlCandidate[];
+  warnings: string[];
+  privacyNotice: string;
+};
+
+type MySqlRepairPlan = {
+  planId: string;
+  createdAt: string;
+  candidateId: string;
+  action: string;
+  title: string;
+  steps: string[];
+  commands: string[];
+  warnings: string[];
+  requiresAdmin: boolean;
+  requiresBackup: boolean;
+};
+
 type JdkDistribution = {
   id: string;
   name: string;
@@ -532,6 +588,96 @@ type CleanupResult = {
   reportMarkdown: string;
 };
 
+type MovePlan = {
+  planId: string;
+  createdAt: string;
+  source: string;
+  target: string;
+  mode: string;
+  estimatedBytes: number;
+  itemCount: number;
+  risk: string;
+  requiresAdmin: boolean;
+  reversible: boolean;
+  warnings: string[];
+};
+
+type MoveResult = {
+  planId: string;
+  success: boolean;
+  movedBytes: number;
+  movedItems: number;
+  sourceBackup?: string;
+  targetPath: string;
+  junctionCreated: boolean;
+  failures: string[];
+  rollbackId?: string;
+  reportMarkdown: string;
+};
+
+type RollbackRecord = {
+  rollbackId: string;
+  createdAt: string;
+  operationType: string;
+  source: string;
+  target: string;
+  backupPath?: string;
+  junctionPath?: string;
+  reversible: boolean;
+  notes: string[];
+};
+
+type PartitionInfo = {
+  diskIndex: string;
+  partitionIndex: string;
+  driveLetter?: string;
+  size: number;
+  fileSystem?: string;
+  partitionType: string;
+  isBoot: boolean;
+  isSystem: boolean;
+  isRecovery: boolean;
+  isEmpty: boolean;
+};
+
+type PartitionLayoutReport = {
+  systemDisk: string;
+  cPartition: PartitionInfo;
+  adjacentRight?: PartitionInfo;
+  unallocatedAfterC?: number;
+  recoveryPartitionBlocks: boolean;
+  dPartitionSameDisk: boolean;
+  bitlockerSuspected: boolean;
+  canExtendSafely: boolean;
+  canDeleteEmptyAdjacentPartition: boolean;
+  resultLevel: string;
+  explanation: string;
+  suggestedActions: string[];
+};
+
+type ExpansionPlan = {
+  planId: string;
+  mode: string;
+  canExecute: boolean;
+  requiresAdmin: boolean;
+  estimatedAddedBytes: number;
+  commandsPreview: string[];
+  risks: string[];
+  backupRequired: boolean;
+  explanation: string;
+};
+
+type ExpansionResult = {
+  planId: string;
+  success: boolean;
+  beforeFree: number;
+  afterFree: number;
+  beforeTotal: number;
+  afterTotal: number;
+  output: string;
+  reportMarkdown: string;
+};
+
 type DiskVolumeInfo = {
   drive: string;
   totalBytes: number;
@@ -589,6 +735,7 @@ app.innerHTML = `
         <button class="nav-item" data-view="project">${icon(FolderSearch)}<span>项目</span></button>
         <button class="nav-item" data-view="toolchains">${icon(PackageCheck)}<span>工具链</span></button>
         <button class="nav-item" data-view="platforms">${icon(Cpu)}<span>平台/镜像</span></button>
+        <button class="nav-item" data-view="learning">${icon(FileText)}<span>学习中心</span></button>
         <span class="nav-group">维护与系统</span>
         <button class="nav-item" data-view="maintenance">${icon(Shield)}<span>C盘急救</span></button>
         <button class="nav-item" data-view="toolbox">${icon(Hammer)}<span>工具箱</span></button>
@@ -664,6 +811,18 @@ app.innerHTML = `
             <button id="save-root"><span>保存</span></button>
           </div>
           <div id="root-detail" class="small-note"></div>
+        </section>
+        <section class="panel recommendation-panel">
+          <div class="panel-head"><div class="panel-title">${icon(PackageCheck)}<h2>成熟开源工具推荐</h2></div><button data-action="open-learning">查看使用边界</button></div>
+          <div class="recommendation-grid">
+            ${[
+              ["Scoop", "Windows 命令行安装器", "https://scoop.sh/"],
+              ["mise", "多语言版本管理", "https://mise.en.dev/"],
+              ["vfox", "跨平台 SDK 版本管理", "https://vfox.dev/"],
+              ["uv", "高速 Python 项目与包管理", "https://docs.astral.sh/uv/"],
+              ["chsrc", "多生态换源工具", "https://github.com/RubyMetric/chsrc"],
+            ].map(([name, summary, url]) => `<article class="recommendation-card"><strong>${name}</strong><span>${summary}</span><button data-action="copy-text" data-copy="${url}">复制官网</button></article>`).join("")}
+          </div>
         </section>
       </section>
 
@@ -804,6 +963,12 @@ app.innerHTML = `
             <button id="analyze-python">${icon(Search)}<span>分析</span></button>
           </div>
           <div id="python-analysis" class="python-analysis"></div>
+          <div class="repair-options">
+            <label><input id="python-repair-pip" type="checkbox" checked /> 修复并验证当前 Python 的 pip</label>
+            <label><input id="python-repair-path" type="checkbox" checked /> 将当前 Python/Scripts 置于用户 PATH 前部</label>
+            <button id="preview-python-repair">生成可审计修复计划</button>
+          </div>
+          <div id="python-repair-preview"><div class="empty">先分析，再预览；不会卸载其他 Python 或自动关闭 Store 别名</div></div>
         </section>
         <section class="panel runtime-manager">
           <div class="panel-title">${icon(Download)}<h2>构建工具</h2></div>
@@ -1022,6 +1187,35 @@ app.innerHTML = `
         </section>
       </section>
 
+      <section id="view-learning" class="view learning-view">
+        <section class="panel learning-hero">
+          <div class="panel-title">${icon(FileText)}<h2>环境配置学习中心</h2></div>
+          <p>这里解释工具边界、安装来源和检查命令。学习中心只运行固定的只读检测命令，不安装软件、不写环境变量；配置仍由你在对应页面预览和确认。</p>
+        </section>
+        <section class="panel">
+          <div class="panel-title">${icon(Terminal)}<h2>只读命令练习区</h2></div>
+          <p class="small-note">支持：java/javac、python/pip/py、node/npm、mvn、gradle、go、rustc/cargo、dotnet 的版本与位置检查。安装、set、config、删除和 Shell 命令会被后端拒绝。</p>
+          <div class="form-row wide"><input id="learning-command" value="python --version" placeholder="输入只读检测命令，例如 python -m pip --version" /><button id="run-learning-command" class="primary">安全检查并运行</button></div>
+          <pre id="learning-output" class="command-output">命令不会自动配置环境；请先理解输出，再前往环境或版本管理页面操作。</pre>
+        </section>
+        <section class="panel">
+          <div class="panel-title">${icon(PackageCheck)}<h2>推荐工具与适用边界</h2></div>
+          <div class="learning-cards">
+            ${[
+              ["Scoop", "https://scoop.sh/", "适合安装 Windows CLI 工具；软件归属仍由 Scoop 管理。", "scoop --version"],
+              ["mise", "https://mise.en.dev/", "适合项目级多语言版本；不要和多个版本管理器同时接管同一 PATH。", "mise doctor"],
+              ["vfox", "https://vfox.dev/", "适合通过插件管理 SDK；先检查插件来源和项目配置。", "vfox version"],
+              ["uv", "https://docs.astral.sh/uv/", "适合 Python 项目、虚拟环境和依赖；全局 Python 仍需明确来源。", "uv --version"],
+              ["chsrc", "https://github.com/RubyMetric/chsrc", "只负责查看、测速和切换软件源，不负责安装运行时。", "chsrc --version"],
+            ].map(([name, url, boundary, command]) => `<article class="learning-card"><div><strong>${name}</strong><span>${boundary}</span></div><code>${command}</code><div class="row-actions"><button data-action="copy-text" data-copy="${url}">复制官网</button><button data-action="copy-text" data-copy="${command}">复制检查命令</button></div></article>`).join("")}
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-title">${icon(Route)}<h2>推荐学习顺序</h2></div>
+          <ol class="learning-steps"><li>用 <code>where.exe</code> 与版本命令确认当前真正生效的程序。</li><li>在“环境医生”查看 PATH、JAVA_HOME、pip 归属和多版本冲突。</li><li>选择一个主要版本管理方案，避免 Scoop、mise、vfox、手工 PATH 同时接管同一工具。</li><li>任何配置先预览和备份；完成后重新打开终端，再次运行只读命令验证。</li></ol>
+        </section>
+      </section>
+
       <section id="view-maintenance" class="view maintenance-view">
         <section class="maintenance-hero">
           <div>
@@ -1106,9 +1300,41 @@ app.innerHTML = `
           <div class="scan-only-banner">${icon(Shield)}<span>微信/QQ 不读取聊天数据库；浏览器不扫描 Cookie、密码和登录态；软件与游戏不直接删除安装目录。</span></div>
           <div id="app-usage-result"><div class="empty">尚未分析常见应用与已安装软件</div></div>
         </section>
+        <section class="maintenance-panel" data-maintenance-panel="move">
+          <div class="panel-head"><div class="panel-title">${icon(Boxes)}<h2>空间搬家与归档</h2></div><button id="load-archive-plan">刷新计划</button></div>
+          <div class="scan-only-banner">${icon(Shield)}<span>Phase 4 支持桌面/下载归档、白名单目录搬家和 Junction 桥接；执行前必须预览计划并二次确认。</span></div>
+          <div class="form-row">
+            <input id="move-source" placeholder="源目录，例如 C:\\Users\\你\\Downloads 或缓存目录" />
+            <input id="move-target-drive" value="D:" placeholder="目标盘或目标目录，例如 D:" />
+            <select id="move-mode">
+              <option value="archive_only">归档整理</option>
+              <option value="move_cache_folder">缓存搬家</option>
+              <option value="move_user_folder">用户目录搬家</option>
+              <option value="junction_bridge">Junction 桥接</option>
+            </select>
+            <button id="preview-move-plan">生成搬家计划</button>
+          </div>
+          <div class="toolbar compact">
+            <button id="preview-desktop-archive">桌面归档计划</button>
+            <button id="preview-downloads-archive">下载归档计划</button>
+            <button id="execute-move-plan" class="danger-button" disabled>二次确认后执行</button>
+          </div>
+          <div id="move-plan-result" class="runtime-list"><div class="empty">尚未生成空间搬家计划</div></div>
+          <div id="archive-plan-list" class="runtime-list"><div class="empty">可从大文件或重复文件结果加入归档计划</div></div>
+          <div class="panel-head"><div class="panel-title">${icon(RefreshCw)}<h3>回滚记录</h3></div><button id="load-rollback-records">刷新回滚</button></div>
+          <div id="rollback-records" class="runtime-list"><div class="empty">暂无可自动回滚记录</div></div>
+        </section>
+        <section class="maintenance-panel" data-maintenance-panel="expand">
+          <div class="panel-head"><div class="panel-title">${icon(Activity)}<h2>C 盘真扩容安全向导</h2></div><button id="inspect-partition-layout">只读检测分区</button></div>
+          <div class="scan-only-banner">${icon(Shield)}<span>分区检测只读；真扩容仅在安全 A/B 模式下启用，并需要管理员权限、备份和三次确认。</span></div>
+          <div id="partition-layout-result"><div class="empty">尚未检测分区布局</div></div>
+          <div class="toolbar compact">
+            <button id="create-expansion-plan">生成扩容计划</button>
+            <button id="execute-expansion-plan" class="danger-button" disabled>三次确认后执行扩容</button>
+          </div>
+          <div id="expansion-plan-result"><div class="empty">尚未生成扩容计划</div></div>
+        </section>
         ${[
-          ["move", "空间搬家", "后续阶段会提供可预览、可回滚的目录迁移。"],
-          ["expand", "扩容检测", "后续阶段会检测分区布局与可扩容条件。"],
           ["startup", "启动项/进程", "当前版本仅在总览统计启动目录项目数量。"],
           ["report", "报告", "清理完成后会在这里显示结果。"],
         ].map(([id, title, text]) => `
@@ -1149,6 +1375,12 @@ app.innerHTML = `
             <pre id="local-service-logs" class="command-output compact-output service-log-output">选择已安装服务查看最近日志</pre>
           </section>
         </div>
+        <section class="panel mysql-repair-panel">
+          <div class="panel-head"><div class="panel-title">${icon(Database)}<h2>MySQL 修复中心</h2></div><button id="inspect-mysql-repair" class="primary">只读深度诊断</button></div>
+          <div class="advanced-warning">${icon(Shield)}<span><strong>先诊断、再计划、再确认。</strong> 不读取表内容或密码；补回系统库前必须先由本程序完成完整 Data 备份，且永不覆盖业务库、ibdata1 或 ib_logfile。</span></div>
+          <div id="mysql-repair-result"><div class="empty">检查服务丢失、1067 线索、my.ini、Data 系统库和候选业务库</div></div>
+          <section id="mysql-plan-preview" class="repair-plan"><div class="empty">选择候选与动作后显示一次性修复计划</div></section>
+        </section>
         <div class="grid two">
           <section class="panel">
             <div class="panel-head">
@@ -1249,6 +1481,7 @@ const state = {
   profileImportPreview: null as ConfigProfileImportPreview | null,
   doctor: null as DoctorReport | null,
   python: null as PythonAnalysis | null,
+  pythonRepairPlan: null as PythonRepairPlan | null,
   project: null as ProjectAnalysis | null,
   projectConfigPreview: null as ProjectConfigPreview | null,
   toolchains: null as ToolchainReport | null,
@@ -1256,6 +1489,8 @@ const state = {
   projectPorts: [] as ProjectPortConfig[],
   systemPlatforms: null as SystemPlatformReport | null,
   localServices: [] as LocalServiceStatus[],
+  mysqlRepair: null as MySqlRepairReport | null,
+  mysqlPlan: null as MySqlRepairPlan | null,
   jdkDistributions: [] as JdkDistribution[],
   update: null as UpdateCheckResult | null,
   updateError: "",
@@ -1270,6 +1505,13 @@ const state = {
   desktopUsage: null as FolderUsageReport | null,
   downloadsUsage: null as FolderUsageReport | null,
   largeFiles: [] as LargeFileItem[],
+  archivePlan: [] as ArchivePlanItem[],
+  movePlan: null as MovePlan | null,
+  moveResult: null as MoveResult | null,
+  rollbackRecords: [] as RollbackRecord[],
+  partitionLayout: null as PartitionLayoutReport | null,
+  expansionPlan: null as ExpansionPlan | null,
+  expansionResult: null as ExpansionResult | null,
   duplicateGroups: [] as DuplicateGroup[],
   appUsage: null as AppUsageReport | null,
 };
@@ -1281,6 +1523,15 @@ type LargeFileItem = {
   fileType: string;
   suggestion: string;
   risk: string;
+};
+
+type ArchivePlanItem = {
+  id: string;
+  path: string;
+  size: number;
+  source: string;
+  addedAt: string;
+  suggestion: string;
 };
 
 type DuplicateGroup = {
@@ -1944,6 +2195,11 @@ function renderPythonAnalysis() {
 
   element.innerHTML = `
     <div class="runtime-list">${currentPython}${currentPip}</div>
+    <div class="kv-list toolchain-kv">
+      <div><span>Python Launcher</span><strong>${escapeHtml(analysis.launcherPath || "未发现")}</strong></div>
+      <div><span>用户 PATH</span><strong>${analysis.userPathEntryCount} 项 · ${analysis.currentTerminalMatchesUserPath ? "当前进程已同步" : "当前进程仍是旧 PATH"}</strong></div>
+      <div><span>Store 执行别名</span><strong>${analysis.storeAliasRisk ? "可能抢占" : "未发现抢占"}</strong></div>
+    </div>
     <div class="chip-row">${analysis.risks.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}</div>
     <div class="toolbar compact">
       <button data-action="copy-text" data-copy="${escapeHtml(analysis.pipRepairCommand)}">${icon(Clipboard)}<span>复制 pip 修复命令</span></button>
@@ -1984,6 +2240,22 @@ function renderPythonAnalysis() {
     </div>
     <ul>${analysis.recommendations.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
   `;
+}
+
+function renderPythonRepairPlan() {
+  const element = document.querySelector<HTMLElement>("#python-repair-preview");
+  const plan = state.pythonRepairPlan;
+  if (!element) return;
+  if (!plan) {
+    element.innerHTML = `<div class="empty">先分析，再预览；不会卸载其他 Python 或自动关闭 Store 别名</div>`;
+    return;
+  }
+  element.innerHTML = `<article class="repair-plan-card"><div><strong>${escapeHtml(plan.pythonPath)}</strong><span>一次性计划 · 备份 ${escapeHtml(plan.backupName)}</span></div>
+    <h4>将执行</h4><ol>${plan.actions.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ol>
+    ${plan.pathAdded.length ? `<h4>PATH 新增</h4><code>${plan.pathAdded.map(escapeHtml).join("<br>")}</code>` : ""}
+    ${plan.commands.length ? `<h4>命令</h4><pre class="command-output compact-output">${escapeHtml(plan.commands.join("\n"))}</pre>` : ""}
+    <ul>${plan.warnings.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+    <button id="apply-python-repair" class="primary">二次确认并执行</button></article>`;
 }
 
 function renderToolStates(items: ToolState[]) {
@@ -2458,7 +2730,9 @@ async function runDoctorAction(action: string) {
   if (action === "python_analysis") {
     activateView("runtimes");
     state.python = await invoke<PythonAnalysis>("analyze_python_environment");
+    state.pythonRepairPlan = null;
     renderPythonAnalysis();
+    renderPythonRepairPlan();
     showToast("Python 环境分析完成");
     return;
   }
@@ -2586,6 +2860,37 @@ function renderLocalServices() {
             </article>
           `)
     : `<div class="empty">尚未检查常见开发服务</div>`;
+}
+
+function renderMySqlRepair() {
+  const element = document.querySelector<HTMLElement>("#mysql-repair-result");
+  const report = state.mysqlRepair;
+  if (!element) return;
+  if (!report) {
+    element.innerHTML = `<div class="empty">检查服务丢失、1067 线索、my.ini、Data 系统库和候选业务库</div>`;
+    return;
+  }
+  element.innerHTML = `<div class="scan-only-banner">${icon(Shield)}<span>${escapeHtml(report.privacyNotice)}</span></div>
+    ${report.warnings.map((item) => `<p class="small-note">${escapeHtml(item)}</p>`).join("")}
+    <div class="runtime-list">${report.candidates.length ? report.candidates.map((candidate) => `
+      <article class="runtime mysql-candidate ${candidate.status === "Running" ? "ok" : "warn"}">
+        <div><strong>${escapeHtml(candidate.serviceName)} · MySQL ${escapeHtml(candidate.versionHint)}</strong><span>${escapeHtml(candidate.status)} / ${escapeHtml(candidate.serviceState)}</span></div>
+        <div class="kv-list toolchain-kv"><div><span>mysqld</span><strong>${escapeHtml(candidate.mysqldPath)}</strong></div><div><span>my.ini</span><strong>${escapeHtml(candidate.myIniPath)}</strong></div><div><span>Data</span><strong>${escapeHtml(candidate.datadir)}</strong></div><div><span>端口</span><strong>${candidate.port} · ${candidate.portOccupied ? "已占用" : "空闲"}</strong></div><div><span>Data 健康</span><strong>${escapeHtml(candidate.dataHealth)}</strong></div><div><span>业务库候选</span><strong>${escapeHtml(candidate.businessDatabases.join("、") || "未发现")}</strong></div></div>
+        <ul>${candidate.suggestions.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+        ${candidate.lastError ? `<details><summary>最近错误摘要（最多 80 行）</summary><pre class="command-output compact-output">${escapeHtml(candidate.lastError)}</pre></details>` : ""}
+        <div class="row-actions"><button data-mysql-action="backup" data-candidate="${candidate.id}">备份 Data</button>${candidate.status === "NotInstalled" ? `<button data-mysql-action="register_service" data-candidate="${candidate.id}">预览注册服务</button>` : ""}${candidate.serviceState.toLowerCase() !== "running" && candidate.status !== "NotInstalled" ? `<button data-mysql-action="start_service" data-candidate="${candidate.id}">预览启动</button>` : ""}${candidate.systemSchemaMissing ? `<button data-mysql-action="repair_system_schema" data-candidate="${candidate.id}">预览补回系统库</button>` : ""}<button data-mysql-action="reset_root_guide" data-candidate="${candidate.id}">认证恢复向导</button>${candidate.businessDatabases.length ? `<button data-mysql-action="dump_guide" data-candidate="${candidate.id}">导出建议</button>` : ""}<button data-action="copy-text" data-copy="${escapeHtml(candidate.consoleCommand)}">复制控制台诊断命令</button></div>
+      </article>`).join("") : `<div class="empty">常见安装位置没有发现 mysqld.exe；不会自动深扫整个磁盘</div>`}</div>`;
+}
+
+function renderMySqlPlan() {
+  const element = document.querySelector<HTMLElement>("#mysql-plan-preview");
+  const plan = state.mysqlPlan;
+  if (!element) return;
+  if (!plan) {
+    element.innerHTML = `<div class="empty">选择候选与动作后显示一次性修复计划</div>`;
+    return;
+  }
+  element.innerHTML = `<article class="repair-plan-card"><div><strong>${escapeHtml(plan.title)}</strong><span>${plan.requiresAdmin ? "需要管理员权限" : "当前用户权限"}${plan.requiresBackup ? " · 强制先备份" : ""}</span></div><ol>${plan.steps.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ol><pre class="command-output compact-output">${escapeHtml(plan.commands.join("\n"))}</pre><ul>${plan.warnings.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>${plan.action === "backup" ? `<input id="mysql-backup-destination" placeholder="备份目标，例如 D:\\DevEnvManagerBackups\\mysql-data-20260624" />` : ""}<button id="execute-mysql-plan" class="${plan.action === "reset_root_guide" || plan.action === "dump_guide" ? "" : "danger-button"}">${plan.action === "reset_root_guide" || plan.action === "dump_guide" ? "生成只读向导" : "二次确认并执行计划"}</button></article>`;
 }
 
 function renderNetwork() {
@@ -2841,15 +3146,111 @@ function renderLargeFiles() {
   const element = document.querySelector<HTMLElement>("#large-file-result");
   if (!element) return;
   element.innerHTML = state.largeFiles.length
-    ? paginate("large-files", state.largeFiles, (item) => `<article class="runtime"><div><strong>${escapeHtml(item.fileType)} · ${formatBytes(item.size)}</strong><span class="risk-chip risk-${escapeHtml(item.risk)}">${riskText(item.risk)}风险</span></div><small>${escapeHtml(item.path)}</small><small>${escapeHtml(item.suggestion)}</small><div class="row-actions"><button data-action="open-analysis-path" data-path="${escapeHtml(item.path)}">打开所在目录</button><button data-action="copy-text" data-copy="${escapeHtml(item.path)}">复制路径</button></div></article>`, 10)
+    ? paginate("large-files", state.largeFiles, (item) => `<article class="runtime"><div><strong>${escapeHtml(item.fileType)} · ${formatBytes(item.size)}</strong><span class="risk-chip risk-${escapeHtml(item.risk)}">${riskText(item.risk)}风险</span></div><small>${escapeHtml(item.path)}</small><small>${escapeHtml(item.suggestion)}</small><div class="row-actions"><button data-action="open-analysis-path" data-path="${escapeHtml(item.path)}">打开所在目录</button><button data-action="copy-text" data-copy="${escapeHtml(item.path)}">复制路径</button><button data-action="archive-add" data-path="${escapeHtml(item.path)}" data-source="大文件">加入归档计划</button></div></article>`, 10)
     : `<div class="empty">扫描范围内没有达到阈值的大文件</div>`;
+}
+
+function renderArchivePlan() {
+  const element = document.querySelector<HTMLElement>("#archive-plan-list");
+  if (!element) return;
+  element.innerHTML = state.archivePlan.length
+    ? paginate("archive-plan", state.archivePlan, (item) => `<article class="runtime"><div><strong>${escapeHtml(item.source)} · ${formatBytes(item.size)}</strong><span>仅计划</span></div><small>${escapeHtml(item.path)}</small><small>${escapeHtml(item.suggestion)}</small><div class="row-actions"><button data-action="open-analysis-path" data-path="${escapeHtml(item.path)}">打开位置</button><button data-action="archive-remove" data-archive-id="${escapeHtml(item.id)}">移出计划</button></div></article>`, 10)
+    : `<div class="empty">归档计划为空；Phase 4 执行前仍需先生成搬家或归档计划</div>`;
+}
+
+async function loadArchivePlan() {
+  state.archivePlan = await invoke<ArchivePlanItem[]>("list_archive_plan_items");
+  renderArchivePlan();
+}
+
+function renderMovePlan() {
+  const element = document.querySelector<HTMLElement>("#move-plan-result");
+  const execute = document.querySelector<HTMLButtonElement>("#execute-move-plan");
+  if (!element || !execute) return;
+  const plan = state.movePlan;
+  execute.disabled = !plan;
+  const result = state.moveResult;
+  element.innerHTML = plan
+    ? `<article class="runtime move-plan-card">
+        <div><strong>${escapeHtml(plan.mode)} · ${formatBytes(plan.estimatedBytes)}</strong><span class="risk-chip risk-${escapeHtml(plan.risk)}">${riskText(plan.risk)}风险</span></div>
+        <small>源：${escapeHtml(plan.source)}</small>
+        <small>目标：${escapeHtml(plan.target)}</small>
+        <small>${plan.itemCount} 个文件 · ${plan.reversible ? "可自动回滚" : "归档需按报告手动恢复"}</small>
+        ${plan.warnings.length ? `<ul>${plan.warnings.map((warning) => `<li>${escapeHtml(warning)}</li>`).join("")}</ul>` : ""}
+      </article>
+      ${result ? `<article class="runtime">
+        <div><strong>${result.success ? "执行成功" : "执行未完全成功"} · ${formatBytes(result.movedBytes)}</strong><span>${result.movedItems} 项</span></div>
+        <small>目标：${escapeHtml(result.targetPath)}</small>
+        <small>备份：${escapeHtml(result.sourceBackup || "无")} · 回滚 ID：${escapeHtml(result.rollbackId || "无")}</small>
+        ${result.failures.length ? `<ul>${result.failures.map((failure) => `<li>${escapeHtml(failure)}</li>`).join("")}</ul>` : "<small>无失败项</small>"}
+        <pre class="command-output compact-output">${escapeHtml(result.reportMarkdown)}</pre>
+      </article>` : ""}`
+    : `<div class="empty">尚未生成空间搬家计划</div>`;
+}
+
+function renderRollbackRecords() {
+  const element = document.querySelector<HTMLElement>("#rollback-records");
+  if (!element) return;
+  element.innerHTML = state.rollbackRecords.length
+    ? paginate("rollback-records", state.rollbackRecords, (record) => `<article class="runtime">
+        <div><strong>${escapeHtml(record.operationType)}</strong><span>${record.reversible ? "可回滚" : "仅报告"}</span></div>
+        <small>${escapeHtml(record.source)} → ${escapeHtml(record.target)}</small>
+        <small>备份：${escapeHtml(record.backupPath || "无")} · Junction：${escapeHtml(record.junctionPath || "无")}</small>
+        <div class="row-actions">${record.reversible ? `<button data-action="rollback-move" data-rollback-id="${escapeHtml(record.rollbackId)}">执行回滚</button>` : ""}<button data-action="copy-text" data-copy="${escapeHtml(record.rollbackId)}">复制 ID</button></div>
+      </article>`, 10)
+    : `<div class="empty">暂无可自动回滚记录</div>`;
+}
+
+async function loadRollbackRecords() {
+  state.rollbackRecords = await invoke<RollbackRecord[]>("list_rollback_records");
+  renderRollbackRecords();
+}
+
+function renderPartitionLayout() {
+  const element = document.querySelector<HTMLElement>("#partition-layout-result");
+  if (!element) return;
+  const report = state.partitionLayout;
+  element.innerHTML = report
+    ? `<section class="panel maintenance-advice">
+        <div class="panel-title">${icon(Activity)}<h3>分区布局结论</h3></div>
+        <p>${escapeHtml(report.explanation)}</p>
+        <div class="maintenance-facts">
+          <span>系统磁盘 ${escapeHtml(report.systemDisk)}</span>
+          <span>C 盘 ${formatBytes(report.cPartition.size)} · ${escapeHtml(report.cPartition.fileSystem || "未知 FS")}</span>
+          <span>右侧未分配 ${report.unallocatedAfterC ? formatBytes(report.unallocatedAfterC) : "无"}</span>
+          <span>${report.recoveryPartitionBlocks ? "恢复分区阻挡" : "未见恢复分区阻挡"}</span>
+          <span>${report.dPartitionSameDisk ? "D 盘同盘" : "D 盘不同盘或不存在"}</span>
+        </div>
+        ${report.adjacentRight ? `<article class="runtime"><div><strong>右侧相邻分区 ${escapeHtml(report.adjacentRight.driveLetter || `#${report.adjacentRight.partitionIndex}`)}</strong><span>${formatBytes(report.adjacentRight.size)}</span></div><small>${escapeHtml(report.adjacentRight.partitionType)} · ${report.adjacentRight.isEmpty ? "空分区候选" : "非空或未知"}</small></article>` : ""}
+        <ul>${report.suggestedActions.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+      </section>`
+    : `<div class="empty">尚未检测分区布局</div>`;
+}
+
+function renderExpansionPlan() {
+  const element = document.querySelector<HTMLElement>("#expansion-plan-result");
+  const execute = document.querySelector<HTMLButtonElement>("#execute-expansion-plan");
+  if (!element || !execute) return;
+  const plan = state.expansionPlan;
+  execute.disabled = !plan?.canExecute;
+  const result = state.expansionResult;
+  element.innerHTML = plan
+    ? `<article class="runtime">
+        <div><strong>${escapeHtml(plan.mode)}</strong><span>${plan.canExecute ? "允许执行" : "仅说明"}</span></div>
+        <small>${escapeHtml(plan.explanation)}</small>
+        <small>预计新增：${formatBytes(plan.estimatedAddedBytes)} · ${plan.requiresAdmin ? "需要管理员权限" : "无需管理员权限"}</small>
+        ${plan.commandsPreview.length ? `<pre class="command-output compact-output">${escapeHtml(plan.commandsPreview.join("\n"))}</pre>` : ""}
+        <ul>${plan.risks.map((risk) => `<li>${escapeHtml(risk)}</li>`).join("")}</ul>
+      </article>
+      ${result ? `<article class="runtime"><div><strong>${result.success ? "扩容成功" : "扩容未成功"}</strong><span>${formatBytes(result.beforeTotal)} → ${formatBytes(result.afterTotal)}</span></div><pre class="command-output compact-output">${escapeHtml(result.reportMarkdown)}</pre></article>` : ""}`
+    : `<div class="empty">尚未生成扩容计划</div>`;
 }
 
 function renderDuplicates() {
   const element = document.querySelector<HTMLElement>("#duplicate-result");
   if (!element) return;
   element.innerHTML = state.duplicateGroups.length
-    ? `<div class="scan-summary"><strong>${state.duplicateGroups.length} 组</strong><span>预计可归档 ${formatBytes(state.duplicateGroups.reduce((sum, group) => sum + group.reclaimableEstimate, 0))}</span></div>${paginate("duplicate-groups", state.duplicateGroups, (group) => `<details class="maintenance-category"><summary><span><strong>${group.files.length} 个完全相同文件</strong><small>SHA256 ${escapeHtml(group.hash.slice(0, 16))}…</small></span><span><b>${formatBytes(group.size)}</b><i>可归档 ${formatBytes(group.reclaimableEstimate)}</i></span></summary><div class="runtime-list">${paginate(`duplicate-${group.hash}`, group.files, (file) => `<article class="runtime"><small>${escapeHtml(file.path)}</small><small>${escapeHtml(file.keepSuggestion)}</small><div class="row-actions"><button data-action="open-analysis-path" data-path="${escapeHtml(file.path)}">打开所在目录</button><button data-action="copy-text" data-copy="${escapeHtml(file.path)}">复制路径</button></div></article>`)}</div></details>`)} `
+    ? `<div class="scan-summary"><strong>${state.duplicateGroups.length} 组</strong><span>预计可归档 ${formatBytes(state.duplicateGroups.reduce((sum, group) => sum + group.reclaimableEstimate, 0))}</span></div>${paginate("duplicate-groups", state.duplicateGroups, (group) => `<details class="maintenance-category"><summary><span><strong>${group.files.length} 个完全相同文件</strong><small>SHA256 ${escapeHtml(group.hash.slice(0, 16))}…</small></span><span><b>${formatBytes(group.size)}</b><i>可归档 ${formatBytes(group.reclaimableEstimate)}</i></span></summary><div class="runtime-list">${paginate(`duplicate-${group.hash}`, group.files, (file) => `<article class="runtime"><small>${escapeHtml(file.path)}</small><small>${escapeHtml(file.keepSuggestion)}</small><div class="row-actions"><button data-action="open-analysis-path" data-path="${escapeHtml(file.path)}">打开所在目录</button><button data-action="copy-text" data-copy="${escapeHtml(file.path)}">复制路径</button><button data-action="archive-add" data-path="${escapeHtml(file.path)}" data-source="重复文件候选">加入归档计划</button></div></article>`)}</div></details>`)} `
     : `<div class="empty">没有发现达到阈值且 SHA256 完全相同的文件</div>`;
 }
 
@@ -2920,7 +3321,8 @@ function activateView(view: string) {
     project: "选择项目根目录后只读分析配置；运行按钮只接受后端生成的固定 action id。",
     toolchains: "优先检测并调用 Git、npm、pnpm、uv 等成熟工具，不替代它们。",
     platforms: "用于诊断 Go、Rust、.NET 与镜像配置；写配置前会备份或明确确认。",
-    maintenance: "默认不进入任何个人目录；当前版本只扫描并预览，不删除文件。",
+    learning: "只运行固定的版本、位置与环境检查命令；不会安装工具或修改配置。",
+    maintenance: "Phase 2 清理必须经过扫描、一次性计划和二次确认；Phase 3 个人目录与应用分析保持只读。",
     toolbox: "命令面板是高级功能且启用白名单；不要粘贴不理解的 AI 或网页命令。",
   };
   const guide = document.querySelector<HTMLElement>("#view-guide-text");
@@ -2953,10 +3355,12 @@ document.querySelectorAll<HTMLButtonElement>("[data-maintenance-tab]").forEach((
     const tab = button.dataset.maintenanceTab || "overview";
     document.querySelectorAll("[data-maintenance-tab]").forEach((item) => item.classList.toggle("active", item === button));
     document.querySelectorAll<HTMLElement>("[data-maintenance-panel]").forEach((panel) => panel.classList.toggle("active", panel.dataset.maintenancePanel === tab));
+    if (tab === "move") void loadArchivePlan();
   });
 });
 
 document.querySelector("#refresh-all")?.addEventListener("click", () => void refreshAll(true));
+document.querySelector("#load-archive-plan")?.addEventListener("click", () => void loadArchivePlan());
 document.querySelector("#run-doctor")?.addEventListener("click", async () => {
   showToast("环境医生正在诊断");
   try {
@@ -3071,6 +3475,31 @@ document.querySelector("#analyze-python")?.addEventListener("click", async () =>
     state.python = await invoke<PythonAnalysis>("analyze_python_environment");
     renderPythonAnalysis();
     showToast("Python 环境分析完成");
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), true);
+  }
+});
+document.querySelector("#preview-python-repair")?.addEventListener("click", async () => {
+  const repairPip = document.querySelector<HTMLInputElement>("#python-repair-pip")?.checked ?? false;
+  const repairPath = document.querySelector<HTMLInputElement>("#python-repair-path")?.checked ?? false;
+  showToast("正在重新诊断并生成 Python 修复计划");
+  try {
+    state.python = await invoke<PythonAnalysis>("analyze_python_environment");
+    state.pythonRepairPlan = await invoke<PythonRepairPlan>("preview_python_repair", { repairPip, repairPath });
+    renderPythonAnalysis();
+    renderPythonRepairPlan();
+    showToast("Python 修复计划已生成；确认命令和 PATH 差异后再执行");
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), true);
+  }
+});
+document.querySelector("#run-learning-command")?.addEventListener("click", async () => {
+  const command = document.querySelector<HTMLInputElement>("#learning-command")?.value.trim() || "";
+  const output = document.querySelector<HTMLElement>("#learning-output");
+  try {
+    const result = await invoke<CommandRunResult>("run_learning_check", { command });
+    if (output) output.textContent = `退出码 ${result.returnCode} · ${result.elapsedMs} ms\n${result.output}`;
+    showToast(result.success ? "只读检查完成" : "检查命令返回异常", !result.success);
   } catch (error) {
     showToast(error instanceof Error ? error.message : String(error), true);
   }
@@ -3379,6 +3808,112 @@ document.querySelector("#inspect-app-usage")?.addEventListener("click", async ()
     showToast(error instanceof Error ? error.message : String(error), true);
   }
 });
+document.querySelector("#preview-move-plan")?.addEventListener("click", async () => {
+  const source = document.querySelector<HTMLInputElement>("#move-source")?.value.trim() || "";
+  const targetDrive = document.querySelector<HTMLInputElement>("#move-target-drive")?.value.trim() || "D:";
+  const mode = document.querySelector<HTMLSelectElement>("#move-mode")?.value || "archive_only";
+  if (!source) {
+    showToast("请先填写源目录", true);
+    return;
+  }
+  showToast("正在生成空间搬家计划");
+  try {
+    state.movePlan = await invoke<MovePlan>("create_move_plan", { source, targetDrive, mode });
+    state.moveResult = null;
+    renderMovePlan();
+    showToast(`搬家计划已生成：${formatBytes(state.movePlan.estimatedBytes)}`);
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), true);
+  }
+});
+document.querySelector("#preview-desktop-archive")?.addEventListener("click", async () => {
+  const targetDrive = document.querySelector<HTMLInputElement>("#move-target-drive")?.value.trim() || "D:";
+  showToast("正在生成桌面归档计划");
+  try {
+    state.movePlan = await invoke<MovePlan>("create_desktop_archive_plan", { targetDrive });
+    state.moveResult = null;
+    renderMovePlan();
+    showToast("桌面归档计划已生成");
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), true);
+  }
+});
+document.querySelector("#preview-downloads-archive")?.addEventListener("click", async () => {
+  const targetDrive = document.querySelector<HTMLInputElement>("#move-target-drive")?.value.trim() || "D:";
+  showToast("正在生成下载目录归档计划");
+  try {
+    state.movePlan = await invoke<MovePlan>("create_downloads_archive_plan", { targetDrive });
+    state.moveResult = null;
+    renderMovePlan();
+    showToast("下载归档计划已生成");
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), true);
+  }
+});
+document.querySelector("#execute-move-plan")?.addEventListener("click", async () => {
+  const plan = state.movePlan;
+  if (!plan) return;
+  if (!window.confirm(`将执行 ${plan.mode}：\n${plan.source}\n→ ${plan.target}\n\n执行前请关闭相关程序。确定继续吗？`)) return;
+  showToast("正在执行空间搬家/归档计划");
+  try {
+    const command = plan.source.toLowerCase().includes("\\desktop") && plan.mode === "archive_only"
+      ? "execute_desktop_archive_plan"
+      : plan.source.toLowerCase().includes("\\downloads") && plan.mode === "archive_only"
+        ? "execute_downloads_archive_plan"
+        : "execute_move_plan";
+    state.moveResult = await invoke<MoveResult>(command, { plan });
+    renderMovePlan();
+    await loadRollbackRecords();
+    showToast(`执行完成：${formatBytes(state.moveResult.movedBytes)}，失败 ${state.moveResult.failures.length} 项`, state.moveResult.failures.length > 0);
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), true);
+  }
+});
+document.querySelector("#load-rollback-records")?.addEventListener("click", () => void loadRollbackRecords());
+document.querySelector("#inspect-partition-layout")?.addEventListener("click", async () => {
+  showToast("正在只读检测磁盘分区布局");
+  try {
+    state.partitionLayout = await invoke<PartitionLayoutReport>("inspect_partition_layout");
+    renderPartitionLayout();
+    showToast("分区检测完成");
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), true);
+  }
+});
+document.querySelector("#create-expansion-plan")?.addEventListener("click", async () => {
+  showToast("正在生成 C 盘扩容安全计划");
+  try {
+    state.expansionPlan = await invoke<ExpansionPlan>("create_c_drive_expansion_plan");
+    state.expansionResult = null;
+    renderExpansionPlan();
+    showToast(state.expansionPlan.canExecute ? "扩容计划可执行，但仍需三次确认" : "当前只生成说明计划，不允许执行");
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), true);
+  }
+});
+document.querySelector("#execute-expansion-plan")?.addEventListener("click", async () => {
+  const plan = state.expansionPlan;
+  if (!plan?.canExecute) return;
+  const prompts = [
+    "扩容会修改磁盘分区表。请确认已经备份重要数据，输入 YES 继续。",
+    `计划模式：${plan.mode}，需要管理员权限。再次输入 YES 继续。`,
+    "最后确认：执行期间不要断电，不要关闭程序。输入 YES 执行。",
+  ];
+  for (const prompt of prompts) {
+    if (window.prompt(prompt) !== "YES") {
+      showToast("已取消扩容执行");
+      return;
+    }
+  }
+  showToast("正在执行 C 盘扩容计划");
+  try {
+    state.expansionResult = await invoke<ExpansionResult>("execute_c_drive_expansion", { plan });
+    renderExpansionPlan();
+    showToast(state.expansionResult.success ? "扩容执行完成" : "扩容未成功，请查看报告", !state.expansionResult.success);
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), true);
+  }
+});
 document.querySelector("#check-updates")?.addEventListener("click", async () => {
   showToast("正在检查新版本");
   try {
@@ -3416,6 +3951,18 @@ document.querySelector("#inspect-local-services")?.addEventListener("click", asy
     state.localServices = await invoke<LocalServiceStatus[]>("inspect_local_services");
     renderLocalServices();
     showToast("本地服务检查完成");
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), true);
+  }
+});
+document.querySelector("#inspect-mysql-repair")?.addEventListener("click", async () => {
+  showToast("正在只读检查 MySQL 服务、配置与 Data 健康状态");
+  try {
+    state.mysqlRepair = await invoke<MySqlRepairReport>("inspect_mysql_repair");
+    state.mysqlPlan = null;
+    renderMySqlRepair();
+    renderMySqlPlan();
+    showToast(`MySQL 诊断完成：发现 ${state.mysqlRepair.candidates.length} 个候选`);
   } catch (error) {
     showToast(error instanceof Error ? error.message : String(error), true);
   }
@@ -3528,9 +4075,58 @@ document.querySelectorAll<HTMLButtonElement>(".sort-head").forEach((button) => {
 
 document.addEventListener("click", (event) => {
   const button = (event.target as HTMLElement).closest<HTMLButtonElement>(
-    "button[data-action], button[data-toolchain-action], button[data-python-tool], button[data-page-key], button[data-dev-cache], button[data-chsrc-action], button[data-cleanup-report-action], button[data-restore-env-backup], #apply-project-config, #apply-environment-preview",
+    "button[data-action], button[data-toolchain-action], button[data-python-tool], button[data-page-key], button[data-dev-cache], button[data-chsrc-action], button[data-cleanup-report-action], button[data-restore-env-backup], button[data-mysql-action], #apply-project-config, #apply-environment-preview, #apply-python-repair, #execute-mysql-plan",
   );
   if (!button) return;
+  const mysqlAction = button.dataset.mysqlAction;
+  if (mysqlAction) {
+    const candidateId = button.dataset.candidate || "";
+    void invoke<MySqlRepairPlan>("create_mysql_repair_plan", { candidateId, action: mysqlAction })
+      .then((plan) => {
+        state.mysqlPlan = plan;
+        renderMySqlPlan();
+        showToast("MySQL 一次性计划已生成；请逐项核对");
+      })
+      .catch((error) => showToast(error instanceof Error ? error.message : String(error), true));
+    return;
+  }
+  if (button.id === "apply-python-repair") {
+    const plan = state.pythonRepairPlan;
+    if (!plan) return;
+    if (!window.confirm(`将执行 ${plan.actions.length} 项 Python 修复，并先保存用户环境备份。pip 升级可能联网，确定继续吗？`)) return;
+    void runOperation(() => invoke<OperationResult>("apply_python_repair", { planId: plan.planId }), "正在执行并验证 Python 修复").then(async () => {
+      state.pythonRepairPlan = null;
+      state.python = await invoke<PythonAnalysis>("analyze_python_environment");
+      renderPythonAnalysis();
+      renderPythonRepairPlan();
+    });
+    return;
+  }
+  if (button.id === "execute-mysql-plan") {
+    const plan = state.mysqlPlan;
+    if (!plan) return;
+    const backupDestination = document.querySelector<HTMLInputElement>("#mysql-backup-destination")?.value.trim() || null;
+    const guideOnly = plan.action === "reset_root_guide" || plan.action === "dump_guide";
+    if (!guideOnly && !window.confirm(`将执行 MySQL 计划“${plan.title}”。程序会重新诊断路径和状态；失败不会绕过保护规则。确定继续吗？`)) return;
+    void (async () => {
+      showToast(guideOnly ? "正在生成安全向导" : "正在执行 MySQL 修复计划");
+      try {
+        const result = await invoke<OperationResult>("execute_mysql_repair_plan", { planId: plan.planId, backupDestination });
+        if (guideOnly) {
+          const output = document.querySelector<HTMLElement>("#local-service-logs");
+          if (output) output.textContent = result.message;
+        }
+        showToast(result.message);
+        state.mysqlPlan = null;
+        state.mysqlRepair = await invoke<MySqlRepairReport>("inspect_mysql_repair");
+        renderMySqlPlan();
+        renderMySqlRepair();
+      } catch (error) {
+        showToast(error instanceof Error ? error.message : String(error), true);
+      }
+    })();
+    return;
+  }
   const pageKey = button.dataset.pageKey;
   if (pageKey) {
     paginationState.set(pageKey, Number(button.dataset.page || "1"));
@@ -3550,6 +4146,8 @@ document.addEventListener("click", (event) => {
     else if (pageKey === "desktop-usage") renderFolderUsage("#desktop-usage", state.desktopUsage, "desktop-usage");
     else if (pageKey === "downloads-usage") renderFolderUsage("#downloads-usage", state.downloadsUsage, "downloads-usage");
     else if (pageKey === "large-files") renderLargeFiles();
+    else if (pageKey === "archive-plan") renderArchivePlan();
+    else if (pageKey === "rollback-records") renderRollbackRecords();
     else if (pageKey === "duplicate-groups" || pageKey.startsWith("duplicate-")) renderDuplicates();
     else if (pageKey === "app-usage" || pageKey === "installed-software") renderAppUsage();
     else if (pageKey.startsWith("cleanup-")) {
@@ -3590,6 +4188,12 @@ document.addEventListener("click", (event) => {
     void invoke<string>("export_cleanup_report", { format: "json" })
       .then((path) => showToast(`JSON 报告已导出：${path}`))
       .catch((error) => showToast(error instanceof Error ? error.message : String(error), true));
+    return;
+  }
+  if (button.dataset.action === "rollback-move") {
+    const rollbackId = button.dataset.rollbackId || "";
+    if (!window.confirm(`将执行回滚 ${rollbackId}：删除 Junction 并恢复备份目录（如存在）。确定继续吗？`)) return;
+    void runOperation(() => invoke<OperationResult>("rollback_move", { rollbackId }), "正在执行空间搬家回滚").then(() => void loadRollbackRecords());
     return;
   }
   if (button.id === "apply-project-config") {
@@ -3640,6 +4244,28 @@ document.addEventListener("click", (event) => {
     return;
   }
   const action = button.dataset.action;
+  if (action === "open-learning") {
+    activateView("learning");
+    return;
+  }
+  if (action === "archive-add") {
+    void invoke<OperationResult>("add_archive_plan_item", { path: button.dataset.path || "", source: button.dataset.source || "空间分析" })
+      .then(async (result) => {
+        showToast(result.message);
+        await loadArchivePlan();
+      })
+      .catch((error) => showToast(error instanceof Error ? error.message : String(error), true));
+    return;
+  }
+  if (action === "archive-remove") {
+    void invoke<OperationResult>("remove_archive_plan_item", { id: button.dataset.archiveId || "" })
+      .then(async (result) => {
+        showToast(result.message);
+        await loadArchivePlan();
+      })
+      .catch((error) => showToast(error instanceof Error ? error.message : String(error), true));
+    return;
+  }
   if (action === "open-analysis-path") {
     void invoke<OperationResult>("open_analysis_path", { path: button.dataset.path || "" })
       .then((result) => showToast(result.message))
