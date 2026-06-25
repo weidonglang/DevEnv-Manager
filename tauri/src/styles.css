@@ -1712,3 +1712,58 @@ select {
 .port-config-actions input {
   min-width: 0;
 }
+
+.recommendation-grid,
+.learning-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+}
+
+.recommendation-card,
+.learning-card,
+.repair-plan-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid #dbe3e8;
+  border-radius: 12px;
+  background: #f7f9fa;
+}
+
+.recommendation-card span,
+.learning-card span,
+.repair-plan-card span {
+  color: #60717c;
+  font-size: 12px;
+}
+
+.learning-hero p,
+.learning-steps,
+.repair-plan-card ol,
+.repair-plan-card ul {
+  line-height: 1.7;
+}
+
+.repair-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.repair-options label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mysql-repair-panel,
+.repair-plan {
+  margin-top: 16px;
+}
+
+.mysql-candidate .kv-list strong {
+  overflow-wrap: anywhere;
+}

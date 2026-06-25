@@ -206,3 +206,107 @@ pub struct InstalledSoftwareUsage {
     pub uninstall_command_exists: bool,
     pub suggestion: String,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct MovePlan {
+    pub plan_id: String,
+    pub created_at: String,
+    pub source: String,
+    pub target: String,
+    pub mode: String,
+    pub estimated_bytes: u64,
+    pub item_count: usize,
+    pub risk: String,
+    pub requires_admin: bool,
+    pub reversible: bool,
+    pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct MoveResult {
+    pub plan_id: String,
+    pub success: bool,
+    pub moved_bytes: u64,
+    pub moved_items: usize,
+    pub source_backup: Option<String>,
+    pub target_path: String,
+    pub junction_created: bool,
+    pub failures: Vec<String>,
+    pub rollback_id: Option<String>,
+    pub report_markdown: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct RollbackRecord {
+    pub rollback_id: String,
+    pub created_at: String,
+    pub operation_type: String,
+    pub source: String,
+    pub target: String,
+    pub backup_path: Option<String>,
+    pub junction_path: Option<String>,
+    pub reversible: bool,
+    pub notes: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct PartitionLayoutReport {
+    pub system_disk: String,
+    pub c_partition: PartitionInfo,
+    pub adjacent_right: Option<PartitionInfo>,
+    pub unallocated_after_c: Option<u64>,
+    pub recovery_partition_blocks: bool,
+    pub d_partition_same_disk: bool,
+    pub bitlocker_suspected: bool,
+    pub can_extend_safely: bool,
+    pub can_delete_empty_adjacent_partition: bool,
+    pub result_level: String,
+    pub explanation: String,
+    pub suggested_actions: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct PartitionInfo {
+    pub disk_index: String,
+    pub partition_index: String,
+    pub drive_letter: Option<String>,
+    pub size: u64,
+    pub file_system: Option<String>,
+    pub partition_type: String,
+    pub is_boot: bool,
+    pub is_system: bool,
+    pub is_recovery: bool,
+    pub is_empty: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ExpansionPlan {
+    pub plan_id: String,
+    pub mode: String,
+    pub can_execute: bool,
+    pub requires_admin: bool,
+    pub estimated_added_bytes: u64,
+    pub commands_preview: Vec<String>,
+    pub risks: Vec<String>,
+    pub backup_required: bool,
+    pub explanation: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ExpansionResult {
+    pub plan_id: String,
+    pub success: bool,
+    pub before_free: u64,
+    pub after_free: u64,
+    pub before_total: u64,
+    pub after_total: u64,
+    pub output: String,
+    pub report_markdown: String,
+}
