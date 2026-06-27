@@ -1767,3 +1767,61 @@ select {
 .mysql-candidate .kv-list strong {
   overflow-wrap: anywhere;
 }
+
+.disclaimer-panel {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 16px;
+  border: 1px solid #fed7aa;
+  border-radius: 14px;
+  background: #fff7ed;
+  color: #7c2d12;
+}
+
+.disclaimer-panel p {
+  line-height: 1.7;
+}
+
+.feature-help-card,
+.env-reliability-panel {
+  grid-column: 1 / -1;
+}
+
+.feature-help-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid #dbe3e8;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.env-reliability-grid {
+  margin: 12px 0;
+}
+
+.risk-info {
+  background: #e0f2fe;
+  color: #075985;
+}
+
+.risk-low {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.risk-medium {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.risk-high {
+  background: #ffedd5;
+  color: #9a3412;
+}
+
+.risk-critical {
+  background: #fee2e2;
+  color: #991b1b;
+}

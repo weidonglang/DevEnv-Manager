@@ -23,6 +23,11 @@ import {
   Trash2,
   type IconNode,
 } from "lucide";
+import { envReliabilityIntro } from "./envReliability";
+import { confirmRisk } from "./components/confirmDialog";
+import { disclaimerPanel } from "./components/disclaimerPanel";
+import { featureHelpCard } from "./components/featureHelpCard";
+import { riskBadge } from "./components/riskBadge";
 import "./styles.css";
 
 type AppSnapshot = {
@@ -46,6 +51,7 @@ type ConfigView = {
     autoCheckUpdate: boolean;
     downloadTimeoutSeconds: number;
     theme: string;
+    safetyDisclaimerAccepted: boolean;
   };
   installed: {
     jdks: ManagedRuntime[];
@@ -75,6 +81,81 @@ type ManagedRuntime = {
 type OperationResult = {
   success: boolean;
   message: string;
+};
+
+type ToolProbe = { path?: string; version: string; source: string };
+type EnvRepairAction = {
+  id: string;
+  title: string;
+  description: string;
+  variable: string;
+  oldValue?: string;
+  newValue?: string;
+  risk: string;
+  reversible: boolean;
+};
+type EnvRepairPlan = {
+  planId: string;
+  createdAt: string;
+  target: string;
+  actions: EnvRepairAction[];
+  expectedAfter: { javaHome?: string; devenvHome?: string; path?: string };
+  warnings: string[];
+  riskLevel: string;
+  requiresTerminalRestart: boolean;
+  backupName: string;
+  disclaimer: string;
+  diff: string[];
+};
+type EnvRepairResult = {
+  planId: string;
+  success: boolean;
+  message: string;
+  backupName: string;
+};
+type EnvBackupRecord = {
+  backupName: string;
+  createdAt: string;
+  reason: string;
+  variables: string[];
+  javaHomePreview?: string;
+  devenvHomePreview?: string;
+  pathEntryCount: number;
+  sourcePlanId?: string;
+};
+type EnvReliabilitySnapshot = {
+  generatedAt: string;
+  userEnv: {
+    javaHomeRaw?: string;
+    javaHomeExpanded?: string;
+    devenvHomeRaw?: string;
+    devenvHomeExpanded?: string;
+    pathRaw: string;
+    pathEntries: Array<{ raw: string; expanded: string; exists: boolean; isDuplicate: boolean; isStaleDevenvEntry: boolean; containsJava: boolean; containsJavac: boolean; containsPython: boolean; containsPip: boolean; containsNode: boolean; containsNpm: boolean; risk: string }>;
+  };
+  processEnv: { javaHomeRaw?: string; javaHomeExpanded?: string; pathRaw: string };
+  effectiveTools: { java: ToolProbe; javac: ToolProbe; python: ToolProbe; pip: ToolProbe; node: ToolProbe; npm: ToolProbe; maven: ToolProbe; gradle: ToolProbe; go: ToolProbe };
+  pathAnalysis: { totalEntries: number; duplicateCount: number; missingCount: number; staleDevenvCount: number; javaEntryCount: number; pythonEntryCount: number; storeAliasDetected: boolean; pathTooLong: boolean; explanation: string[] };
+  java: { javaHomeRaw?: string; javaHomeExpanded?: string; javaHomeValid: boolean; pathJava?: string; pathJavac?: string; commandJavaVersion: string; commandJavacVersion: string; consistency: string; conflicts: string[]; candidates: Array<{ path: string; version: string; source: string }> };
+  python: { currentPython?: ToolProbe; currentPip?: ToolProbe; pyLauncherOutput: string; discoveredPythons: Array<{ path: string; version: string; source: string }>; discoveredPips: Array<{ path: string; version: string; source: string }>; storeAliasRisk: boolean; pipMatchesPython: boolean; userPathEffective: boolean; conflicts: string[]; suggestions: string[] };
+  mavenGradle: { mavenPath?: string; mavenVersion: string; mavenJava: string; gradlePath?: string; gradleVersion: string; gradleJava: string; conflicts: string[]; suggestions: string[] };
+  node: { nodePath?: string; nodeVersion: string; npmPath?: string; npmVersion: string; npmPrefix: string; npmRegistry: string; pnpmStore: string; conflicts: string[]; suggestions: string[] };
+  issues: Array<{ id: string; title: string; severity: string; detail: string }>;
+  suggestions: Array<{ id: string; title: string; detail: string; action?: string }>;
+};
+
+type FeatureRiskInfo = {
+  featureId: string;
+  title: string;
+  riskLevel: string;
+  whatItDoes: string[];
+  whatItDoesNotDo: string[];
+  possibleImpact: string[];
+  reversible: boolean;
+  requiresBackup: boolean;
+  requiresAdmin: boolean;
+  confirmationLevel: string;
+  safeAlternatives: string[];
 };
 
 type KillResult = OperationResult & {
@@ -758,6 +839,7 @@ app.innerHTML = `
         <summary>${icon(FileText)}<span>这个页面怎么用？</span></summary>
         <p id="view-guide-text">先看系统快照和当前生效工具；需要深入排查时再进入环境医生。</p>
       </details>
+      <div id="feature-help-slot"></div>
 
       <section id="view-overview" class="view active">
         <div class="metrics">
@@ -981,7 +1063,27 @@ app.innerHTML = `
       </section>
 
       <section id="view-environment" class="view">
+        <div id="safety-disclaimer-slot"></div>
         <div class="grid two">
+          <section class="panel env-reliability-panel">
+            <div class="panel-head">
+              <div class="panel-title">${icon(Shield)}<h2>环境可靠性中心</h2></div>
+              <div class="toolbar compact">
+                <button id="inspect-env-reliability" class="primary">${icon(Activity)}<span>检查可靠性</span></button>
+                <button id="export-env-reliability">${icon(FileText)}<span>导出报告</span></button>
+              </div>
+            </div>
+            <div class="scan-only-banner">${icon(Shield)}<span>只读检查会同时比较当前进程环境和用户环境；修复计划只修改当前用户级环境变量。</span></div>
+            <div id="env-reliability-result"><div class="empty">点击“检查可靠性”查看 JAVA_HOME raw/expanded、PATH 命中顺序、Python/pip、Maven/Gradle 和 Nacos 风险。</div></div>
+            <div class="form-row">
+              <input id="java-stabilize-path" placeholder="JDK 根目录，例如 D:\\DevEnvManager\\current\\jdk" />
+              <button id="create-java-stabilize-plan">生成 Java 稳定修复计划</button>
+              <button id="apply-env-repair-plan" class="danger-button" disabled>确认写入用户级 JAVA_HOME/PATH</button>
+            </div>
+            <div id="env-repair-plan-result"><div class="empty">修复计划会展示 diff、备份名、风险说明和验证结果。</div></div>
+            <div class="panel-head compact-title"><div class="panel-title">${icon(RefreshCw)}<h3>Phase 5 环境备份中心</h3></div><button id="load-env-backup-records">刷新备份记录</button></div>
+            <div id="env-backup-records" class="runtime-list"><div class="empty">尚未读取 Phase 5 环境备份</div></div>
+          </section>
           <section class="panel">
             <div class="panel-title">${icon(Route)}<h2>环境变量</h2></div>
             <div class="toolbar">
@@ -1468,6 +1570,12 @@ const state = {
   env: null as EnvSnapshot | null,
   environmentPreview: null as EnvironmentConfigPreview | null,
   environmentBackups: [] as EnvironmentBackupInfo[],
+  envReliability: null as EnvReliabilitySnapshot | null,
+  envRepairPlan: null as EnvRepairPlan | null,
+  envRepairResult: null as EnvRepairResult | null,
+  envBackupRecords: [] as EnvBackupRecord[],
+  safetyDisclaimer: "",
+  featureRisks: [] as FeatureRiskInfo[],
   config: null as ConfigView | null,
   runtimes: [] as RuntimeInfo[],
   javaEnvironment: null as JavaEnvironmentReport | null,
@@ -2561,7 +2669,7 @@ async function inspectProjectPorts(showProgress = true) {
 }
 
 async function refreshBase() {
-  const [snapshot, config, envSnapshot, profiles, jdkDistributions, cleanupArchitecture, environmentBackups] = await Promise.all([
+  const [snapshot, config, envSnapshot, profiles, jdkDistributions, cleanupArchitecture, environmentBackups, safetyDisclaimer, featureRisks] = await Promise.all([
     invoke<AppSnapshot>("app_snapshot"),
     invoke<ConfigView>("load_config"),
     invoke<EnvSnapshot>("env_snapshot"),
@@ -2569,6 +2677,8 @@ async function refreshBase() {
     invoke<JdkDistribution[]>("jdk_distributions"),
     invoke<CleanupArchitecture>("storage_cleanup_architecture"),
     invoke<EnvironmentBackupInfo[]>("list_environment_backups"),
+    invoke<string>("safety_disclaimer"),
+    invoke<FeatureRiskInfo[]>("feature_risk_registry"),
   ]);
 
   state.snapshot = snapshot;
@@ -2578,10 +2688,16 @@ async function refreshBase() {
   state.jdkDistributions = jdkDistributions;
   state.cleanupArchitecture = cleanupArchitecture;
   state.environmentBackups = environmentBackups;
+  state.safetyDisclaimer = safetyDisclaimer;
+  state.featureRisks = featureRisks;
   renderSnapshot();
   renderEnv();
   renderEnvironmentPreview();
   renderEnvironmentBackups();
+  renderSafetyDisclaimer();
+  renderEnvReliability();
+  renderEnvRepairPlan();
+  renderEnvBackupRecords();
   renderHealth();
   renderProfiles();
   renderProfileImportPreview();
@@ -2603,6 +2719,7 @@ async function refreshBase() {
   renderDuplicates();
   renderAppUsage();
   renderPorts();
+  renderFeatureHelp();
   const autoCheckUpdates = document.querySelector<HTMLInputElement>("#auto-check-updates");
   if (autoCheckUpdates) autoCheckUpdates.checked = config.settings.autoCheckUpdate;
 }
@@ -3079,6 +3196,53 @@ function renderEnvironmentBackups() {
     : `<div class="empty">还没有环境备份；首次应用配置时会自动创建</div>`;
 }
 
+function renderSafetyDisclaimer() {
+  const slot = document.querySelector<HTMLElement>("#safety-disclaimer-slot");
+  if (!slot) return;
+  const accepted = state.config?.settings.safetyDisclaimerAccepted;
+  slot.innerHTML = accepted ? "" : disclaimerPanel(escapeHtml(state.safetyDisclaimer || "执行修改类操作前请先阅读风险说明，并备份重要数据。"));
+}
+
+function renderEnvReliability() {
+  const element = document.querySelector<HTMLElement>("#env-reliability-result");
+  const snapshot = state.envReliability;
+  if (!element || !snapshot) return;
+  const pathEntries = snapshot.userEnv.pathEntries.filter((entry) => entry.containsJava || entry.containsJavac || entry.containsPython || entry.containsPip || entry.isDuplicate || entry.isStaleDevenvEntry).slice(0, 12);
+  element.innerHTML = `
+    <div class="grid two env-reliability-grid">
+      <article class="runtime"><div><strong>JAVA_HOME</strong>${riskBadge(snapshot.java.consistency === "ok" ? "info" : snapshot.java.consistency)}</div><small>raw：${escapeHtml(snapshot.java.javaHomeRaw || "未设置")}</small><small>expanded：${escapeHtml(snapshot.java.javaHomeExpanded || "未设置")}</small></article>
+      <article class="runtime"><div><strong>PATH 首个 Java</strong><span>${snapshot.java.javaHomeValid ? "JDK 根目录有效" : "需要修复"}</span></div><small>java：${escapeHtml(snapshot.java.pathJava || "未发现")}</small><small>javac：${escapeHtml(snapshot.java.pathJavac || "未发现")}</small></article>
+      <article class="runtime"><div><strong>Java / javac 版本</strong><span>只读验证</span></div><small>${escapeHtml(snapshot.java.commandJavaVersion || "java 无输出")}</small><small>${escapeHtml(snapshot.java.commandJavacVersion || "javac 无输出")}</small></article>
+      <article class="runtime"><div><strong>Python / pip</strong>${riskBadge(snapshot.python.pipMatchesPython ? "info" : "medium")}</div><small>Python：${escapeHtml(snapshot.python.currentPython?.path || "未发现")}</small><small>pip：${escapeHtml(snapshot.python.currentPip?.path || "未发现")} · ${snapshot.python.discoveredPythons.length} 个 Python / ${snapshot.python.discoveredPips.length} 个 pip</small></article>
+      <article class="runtime"><div><strong>Maven / Gradle 使用 Java</strong><span>可选工具</span></div><small>Maven：${escapeHtml(snapshot.mavenGradle.mavenJava || snapshot.mavenGradle.mavenVersion || "未安装/未读取")}</small><small>Gradle：${escapeHtml(snapshot.mavenGradle.gradleJava || snapshot.mavenGradle.gradleVersion || "未安装/未读取")}</small></article>
+      <article class="runtime"><div><strong>PATH 质量</strong>${riskBadge(snapshot.pathAnalysis.staleDevenvCount || snapshot.pathAnalysis.duplicateCount ? "medium" : "info")}</div><small>${snapshot.pathAnalysis.totalEntries} 项；重复 ${snapshot.pathAnalysis.duplicateCount}；失效 ${snapshot.pathAnalysis.missingCount}；旧 DevEnv ${snapshot.pathAnalysis.staleDevenvCount}</small><small>Java 入口 ${snapshot.pathAnalysis.javaEntryCount}；Python 入口 ${snapshot.pathAnalysis.pythonEntryCount}</small></article>
+    </div>
+    <section class="runtime-list">${pathEntries.map((entry) => `<article class="runtime"><div><strong>${escapeHtml(entry.raw)}</strong>${riskBadge(entry.risk)}</div><small>${escapeHtml(entry.expanded)}</small><small>${entry.exists ? "存在" : "不存在"}${entry.isDuplicate ? " · 重复" : ""}${entry.isStaleDevenvEntry ? " · 旧 DevEnv 受管残留" : ""}</small></article>`).join("") || `<div class="empty">没有需要特别关注的 PATH 项</div>`}</section>
+    <ul class="scan-warnings">${[...envReliabilityIntro(), ...snapshot.java.conflicts, ...snapshot.python.conflicts, ...snapshot.mavenGradle.conflicts].map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+  `;
+}
+
+function renderEnvRepairPlan() {
+  const element = document.querySelector<HTMLElement>("#env-repair-plan-result");
+  const button = document.querySelector<HTMLButtonElement>("#apply-env-repair-plan");
+  if (!element || !button) return;
+  const plan = state.envRepairPlan;
+  button.disabled = !plan;
+  element.innerHTML = plan
+    ? `<article class="runtime"><div><strong>${escapeHtml(plan.target)} · ${plan.actions.length} 个动作</strong>${riskBadge(plan.riskLevel)}</div><small>备份：${escapeHtml(plan.backupName)} · 需要重启终端：${plan.requiresTerminalRestart ? "是" : "否"}</small><small>${escapeHtml(plan.disclaimer)}</small>${plan.diff.length ? `<pre class="command-output compact-output">${escapeHtml(plan.diff.join("\n"))}</pre>` : ""}</article>
+       <div class="runtime-list">${plan.actions.map((action) => `<article class="runtime"><div><strong>${escapeHtml(action.title)}</strong>${riskBadge(action.risk)}</div><small>${escapeHtml(action.description)}</small><small>${escapeHtml(action.oldValue || "未设置")} → ${escapeHtml(action.newValue || "不设置")}</small></article>`).join("")}</div>
+       ${state.envRepairResult ? `<article class="runtime"><div><strong>${state.envRepairResult.success ? "验证通过" : "验证有警告"}</strong><span>备份 ${escapeHtml(state.envRepairResult.backupName)}</span></div><small>${escapeHtml(state.envRepairResult.message)}</small></article>` : ""}`
+    : `<div class="empty">修复计划会展示 diff、备份名、风险说明和验证结果。</div>`;
+}
+
+function renderEnvBackupRecords() {
+  const element = document.querySelector<HTMLElement>("#env-backup-records");
+  if (!element) return;
+  element.innerHTML = state.envBackupRecords.length
+    ? paginate("env-backup-records", state.envBackupRecords, (record) => `<article class="runtime"><div><strong>${escapeHtml(record.backupName)}</strong><span>${record.pathEntryCount} 个 PATH 条目</span></div><small>${escapeHtml(record.reason)} · JAVA_HOME：${escapeHtml(record.javaHomePreview || "未设置")}</small><div class="row-actions"><button data-action="restore-env-record" data-backup-name="${escapeHtml(record.backupName)}">二次确认恢复</button></div></article>`, 10)
+    : `<div class="empty">暂无 Phase 5 环境备份</div>`;
+}
+
 function runtimeSwitchOptions(items: ManagedRuntime[], current?: string | null) {
   return `<option value="">不切换${current ? `（当前 ${escapeHtml(current)}）` : ""}</option>${items.map((item) => `<option value="${escapeHtml(item.version)}">${escapeHtml(item.version)}</option>`).join("")}`;
 }
@@ -3327,6 +3491,46 @@ function activateView(view: string) {
   };
   const guide = document.querySelector<HTMLElement>("#view-guide-text");
   if (guide) guide.textContent = guides[view] || guides.overview;
+  renderFeatureHelp(view);
+}
+
+const VIEW_FEATURE_MAP: Record<string, string> = {
+  overview: "overview",
+  doctor: "doctor",
+  ports: "ports",
+  runtimes: "runtime-switch",
+  environment: "environment",
+  project: "project",
+  toolchains: "toolchains",
+  platforms: "toolchains",
+  learning: "learning",
+  maintenance: "cleanup",
+  toolbox: "command-panel",
+};
+
+function renderFeatureHelp(view = document.querySelector(".nav-item.active")?.getAttribute("data-view") || "overview") {
+  const slot = document.querySelector<HTMLElement>("#feature-help-slot");
+  if (!slot) return;
+  const featureId = VIEW_FEATURE_MAP[view] || "overview";
+  const info = state.featureRisks.find((item) => item.featureId === featureId);
+  if (!info) {
+    slot.innerHTML = "";
+    return;
+  }
+  const card = featureHelpCard(
+    escapeHtml(info.title),
+    escapeHtml(info.riskLevel),
+    [
+      ...info.whatItDoes,
+      `确认级别：${info.confirmationLevel === "none" ? "无需确认" : info.confirmationLevel === "triple" ? "三次确认" : "二次确认"}`,
+      info.requiresBackup ? "执行前需要备份或生成可恢复记录。" : "只读或低风险操作通常不需要备份。",
+    ].map(escapeHtml),
+    [
+      ...info.whatItDoesNotDo,
+      info.requiresAdmin ? "需要管理员权限时会明确提示。" : "不会静默请求管理员权限。",
+    ].map(escapeHtml),
+  );
+  slot.innerHTML = card;
 }
 
 function escapeHtml(value: string) {
@@ -3589,6 +3793,59 @@ document.querySelector("#configure-env")?.addEventListener("click", async () => 
     showToast(error instanceof Error ? error.message : String(error), true);
   }
 });
+document.querySelector("#inspect-env-reliability")?.addEventListener("click", async () => {
+  showToast("正在读取当前进程环境、用户环境和 PATH 命中顺序");
+  try {
+    state.envReliability = await invoke<EnvReliabilitySnapshot>("inspect_env_reliability");
+    renderEnvReliability();
+    showToast(`环境可靠性检查完成：${state.envReliability.issues.length} 个问题/提示`);
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), true);
+  }
+});
+document.querySelector("#create-java-stabilize-plan")?.addEventListener("click", async () => {
+  const input = document.querySelector<HTMLInputElement>("#java-stabilize-path");
+  const jdkPath = input?.value.trim() || state.envReliability?.java.javaHomeExpanded || "";
+  if (!jdkPath) {
+    showToast("请填写 JDK 根目录，不能填写 bin 目录", true);
+    return;
+  }
+  showToast("正在生成 Java 稳定修复计划");
+  try {
+    state.envRepairPlan = await invoke<EnvRepairPlan>("create_java_stabilize_plan", { jdkPath });
+    state.envRepairResult = null;
+    renderEnvRepairPlan();
+    showToast("计划已生成；请检查 diff、备份名和风险说明");
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), true);
+  }
+});
+document.querySelector("#apply-env-repair-plan")?.addEventListener("click", async () => {
+  const plan = state.envRepairPlan;
+  if (!plan) return;
+  if (!confirmRisk(`将写入当前用户级环境变量，并创建备份：${plan.backupName}`, plan.riskLevel)) return;
+  showToast("正在应用环境修复计划并验证");
+  try {
+    state.envRepairResult = await invoke<EnvRepairResult>("apply_env_repair_plan", { plan });
+    state.envRepairPlan = null;
+    state.envReliability = await invoke<EnvReliabilitySnapshot>("inspect_env_reliability");
+    state.envBackupRecords = await invoke<EnvBackupRecord[]>("list_env_backups");
+    renderEnvRepairPlan();
+    renderEnvReliability();
+    renderEnvBackupRecords();
+    showToast(state.envRepairResult.message, !state.envRepairResult.success);
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), true);
+  }
+});
+document.querySelector("#export-env-reliability")?.addEventListener("click", async () => {
+  try {
+    const path = await invoke<string>("export_env_reliability_report", { format: "markdown" });
+    showToast(`环境可靠性报告已导出：${path}`);
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), true);
+  }
+});
 async function loadEnvironmentBackups() {
   try {
     state.environmentBackups = await invoke<EnvironmentBackupInfo[]>("list_environment_backups");
@@ -3598,6 +3855,15 @@ async function loadEnvironmentBackups() {
   }
 }
 document.querySelector("#load-env-backups")?.addEventListener("click", () => void loadEnvironmentBackups());
+document.querySelector("#load-env-backup-records")?.addEventListener("click", async () => {
+  try {
+    state.envBackupRecords = await invoke<EnvBackupRecord[]>("list_env_backups");
+    renderEnvBackupRecords();
+    showToast(`读取到 ${state.envBackupRecords.length} 个 Phase 5 环境备份`);
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), true);
+  }
+});
 document.querySelector("#check-env-health")?.addEventListener("click", async () => {
   showToast("正在检查环境配置");
   try {
@@ -4075,7 +4341,7 @@ document.querySelectorAll<HTMLButtonElement>(".sort-head").forEach((button) => {
 
 document.addEventListener("click", (event) => {
   const button = (event.target as HTMLElement).closest<HTMLButtonElement>(
-    "button[data-action], button[data-toolchain-action], button[data-python-tool], button[data-page-key], button[data-dev-cache], button[data-chsrc-action], button[data-cleanup-report-action], button[data-restore-env-backup], button[data-mysql-action], #apply-project-config, #apply-environment-preview, #apply-python-repair, #execute-mysql-plan",
+    "button[data-action], button[data-toolchain-action], button[data-python-tool], button[data-page-key], button[data-dev-cache], button[data-chsrc-action], button[data-cleanup-report-action], button[data-restore-env-backup], button[data-mysql-action], #apply-project-config, #apply-environment-preview, #apply-python-repair, #execute-mysql-plan, #accept-safety-disclaimer",
   );
   if (!button) return;
   const mysqlAction = button.dataset.mysqlAction;
@@ -4187,6 +4453,29 @@ document.addEventListener("click", (event) => {
   if (button.dataset.cleanupReportAction === "json") {
     void invoke<string>("export_cleanup_report", { format: "json" })
       .then((path) => showToast(`JSON 报告已导出：${path}`))
+      .catch((error) => showToast(error instanceof Error ? error.message : String(error), true));
+    return;
+  }
+  if (button.id === "accept-safety-disclaimer") {
+    void runOperation(() => invoke<OperationResult>("accept_safety_disclaimer"), "正在记录安全说明已读状态").then(async () => {
+      if (state.config) state.config.settings.safetyDisclaimerAccepted = true;
+      renderSafetyDisclaimer();
+    });
+    return;
+  }
+  if (button.dataset.action === "restore-env-record") {
+    const backupName = button.dataset.backupName || "";
+    if (!confirmRisk(`将恢复用户级环境变量备份：${backupName}\n恢复前会先备份当前状态。`, "medium")) return;
+    void invoke<EnvRepairResult>("restore_env_backup", { backupName })
+      .then(async (result) => {
+        state.envRepairResult = result;
+        state.envReliability = await invoke<EnvReliabilitySnapshot>("inspect_env_reliability");
+        state.envBackupRecords = await invoke<EnvBackupRecord[]>("list_env_backups");
+        renderEnvReliability();
+        renderEnvRepairPlan();
+        renderEnvBackupRecords();
+        showToast(result.message, !result.success);
+      })
       .catch((error) => showToast(error instanceof Error ? error.message : String(error), true));
     return;
   }

@@ -1,6 +1,6 @@
-# Issues #35–#42 实现说明
+# Issues #35–#48 实现说明
 
-本文件记录 1.4.0 中对近期 GitHub Issue 的处理结果，以及与 C 盘急救 Phase 4 的安全边界。
+本文件记录 1.4.0 与 1.5.0 中对近期 GitHub Issue 的处理结果，以及与 C 盘急救 Phase 4、环境可靠性 Phase 5 的安全边界。
 
 ## #35 开源项目推荐
 
@@ -52,6 +52,48 @@ Maven/Gradle 安装按钮改为幂等：
 - 如果目标目录不存在，按原流程下载、解压、验证。
 - 如果目标目录已存在，不再直接返回错误；会重新验证可执行文件、登记安装记录、切换 `current` 指针。
 - 受管 Maven/Gradle 命令使用已验证的绝对 `JAVA_HOME`，避免间接环境变量展开失败。
+
+## #44 pip 与当前 Python 不一致
+
+1.5.0 新增 Python/pip 可靠性检查：
+
+- 展示当前 `python`、`pip`、`python -m pip --version` 与 `py -0p`。
+- 判断 `pip.exe` 是否属于当前 `python.exe`。
+- 检测 Microsoft Store Alias 风险。
+- 优先建议使用 `python -m pip`。
+
+程序不会卸载其他 Python，也不会自动关闭 Store Alias。
+
+## #45 Gradle 显示异常
+
+Gradle 输出中的分隔线会被跳过。环境医生和 Java 环境检查会优先展示有意义的版本行或 JVM 行，避免把 `------------------------------------------------------------` 当作状态。
+
+## #46 Go 可选缺失误报
+
+环境医生扩展工具检测优先读取最新 Windows 用户 PATH，再回退到当前进程 PATH。这样可以减少 Go 已安装、但 DevEnv Manager 进程还没有重启时的误报。
+
+Go 仍然属于可选工具；只有 Go 项目或 Go 生态功能需要它。
+
+## #47 功能讲解、原理和风险说明
+
+1.5.0 新增统一安全说明模块和前端组件：
+
+- 风险等级：Info、Low、Medium、High、Critical。
+- 主要页面提供功能说明、不会做什么、适合场景、风险等级、备份建议和恢复说明。
+- 中高风险操作要求确认；极高风险操作要求三次确认。
+- README、用户手册、报告和安全说明文档补充免责声明。
+
+## #48 Java 配置不生效与本地导入
+
+1.5.0 新增 Java 稳定修复计划：
+
+- 用户可输入本地 JDK 根目录。
+- 拒绝 `%DEVENV_HOME%` 间接引用。
+- 拒绝 `bin` 目录。
+- 拒绝缺少 `bin\java.exe` 或 `bin\javac.exe` 的目录。
+- 写入前展示 diff 和备份名，写入后重新验证 Java、javac、Maven、Gradle 与 Nacos 相关环境。
+
+这相当于给本地 JDK 提供安全导入与稳定化入口，但不会接管 IDE 内置 JDK、Scoop、Chocolatey 或系统外部运行时。
 
 ## Phase 4：空间搬家与扩容
 

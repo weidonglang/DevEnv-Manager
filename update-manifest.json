@@ -1,13 +1,13 @@
 {
-  "version": "1.4.0",
-  "date": "2026-06-25",
+  "version": "1.5.0",
+  "date": "2026-06-27",
   "notes": [
-    "C 盘急救 Phase 4 新增空间搬家、桌面/下载归档、Junction 桥接、回滚记录和 C 盘扩容安全向导",
-    "JAVA_HOME 改为写入真实绝对 JDK 路径，避免部分程序无法二次展开 %DEVENV_HOME%",
-    "Maven/Gradle 安装改为幂等修复：已存在目录时重新登记、切换 current 并验证",
-    "新增 Python 修复闭环、MySQL 修复中心、学习中心和优秀开源工具推荐",
-    "补强 SHA256 文本解析、Windows 中文命令输出解码和 Nacos 最新用户环境注入"
+    "新增环境可靠性中心：展示进程环境、用户环境、JAVA_HOME raw/expanded、PATH 命中顺序和工具来源",
+    "新增 Java 稳定修复计划：写入真实绝对 JAVA_HOME，保留未知 PATH，执行前备份并执行后验证",
+    "增强 Python/pip、Go、Maven、Gradle 与 Nacos 环境识别，减少环境医生误报和显示异常",
+    "新增统一风险等级、功能说明卡片、首次使用安全说明和报告风险尾部",
+    "CLI 新增 devenv env inspect/plan/apply/verify/backups/restore、java verify、python verify 和 safety risks"
   ],
-  "downloadUrl": "https://github.com/weidonglang/DevEnv-Manager/releases/download/v1.4.0/DevEnv.Manager_1.4.0_x64-setup.exe",
-  "sha256": "76caffdbc4cd3706e223085887c01a7ac6da0f8539a14682499a9f4b1a58c1cb"
+  "downloadUrl": "https://github.com/weidonglang/DevEnv-Manager/releases/download/v1.5.0/DevEnv.Manager_1.5.0_x64-setup.exe",
+  "sha256": "af191848729f533d99ab78662a52260f77340c3c4d55f1011f71f3f7b576e582"
 }

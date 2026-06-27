@@ -1,21 +1,21 @@
-# DevEnv Manager 1.4 操作手册
+# DevEnv Manager 1.5 操作手册
 
-本手册适用于 Windows 10/11 上的 DevEnv Manager 1.4。程序定位是开发环境诊断器与安全操作面板，不替代 npm、pnpm、pip、uv、Maven、Gradle、Cargo、chsrc、Scoop、Chocolatey、WSL 等成熟工具。
+本手册适用于 Windows 10/11 上的 DevEnv Manager 1.5。程序定位是开发环境诊断器与安全操作面板，不替代 npm、pnpm、pip、uv、Maven、Gradle、Cargo、chsrc、Scoop、Chocolatey、WSL 等成熟工具。
 
 ## 1. 下载、安装与校验
 
 只从项目的 GitHub Releases 页面下载安装包。发布页同时提供：
 
-- `DevEnv.Manager_1.4.0_x64-setup.exe`：推荐安装包。
-- `DevEnv.Manager_1.4.0_x64_en-US.msi`：MSI 安装包。
+- `DevEnv.Manager_1.5.0_x64-setup.exe`：推荐安装包。
+- `DevEnv.Manager_1.5.0_x64_en-US.msi`：MSI 安装包。
 - `devenv.exe`：命令行工具。
 - `SHA256SUMS.txt`：文件校验值。
 
 PowerShell 校验示例：
 
 ```powershell
-Get-FileHash .\DevEnv.Manager_1.4.0_x64-setup.exe -Algorithm SHA256
-Get-FileHash .\DevEnv.Manager_1.4.0_x64_en-US.msi -Algorithm SHA256
+Get-FileHash .\DevEnv.Manager_1.5.0_x64-setup.exe -Algorithm SHA256
+Get-FileHash .\DevEnv.Manager_1.5.0_x64_en-US.msi -Algorithm SHA256
 Get-FileHash .\devenv.exe -Algorithm SHA256
 ```
 
@@ -27,7 +27,8 @@ Get-FileHash .\devenv.exe -Algorithm SHA256
 2. 查看“当前实际生效环境”，确认 Java、Python、Node.js、Maven、Gradle、Go 的真实路径与来源。
 3. 打开“环境医生”运行诊断。先看证据，再执行修复。
 4. 在“版本管理”安装或切换受管运行时。
-5. 重新打开终端或 IDE，验证新的用户级环境变量。
+5. 在“环境”检查可靠性快照，确认 `JAVA_HOME` raw/expanded、PATH 首个命中项和工具来源。
+6. 重新打开终端或 IDE，验证新的用户级环境变量。
 
 程序不会修改系统级环境变量。已经启动的终端、IDE 和服务不会自动继承新环境变量。
 
@@ -44,13 +45,26 @@ Get-FileHash .\devenv.exe -Algorithm SHA256
 
 ### 环境配置、备份与回滚
 
-1. 打开“环境”，先点击“预览配置”。
-2. 核对 `DEVENV_HOME`、`JAVA_HOME` 和 PATH 条目数，并检查新增、移除项和风险提示。
-3. 预览只在 10 分钟内有效且只能应用一次；确认无误后再点击“应用这份预览”。
-4. 如果预览后其他程序修改了用户环境变量，应用会被拒绝，必须重新预览，避免覆盖外部修改。
-5. 每次应用、PATH 清理、JDK 切换或历史恢复前都会保存环境备份；页面可查看并恢复最近 20 份历史记录。
+1. 打开“环境”，先点击“检查可靠性”。
+2. 核对当前进程环境与 Windows 用户环境的 `DEVENV_HOME`、`JAVA_HOME` raw/expanded、PATH 条目、重复项、旧受管项和首个命中的 Java/Python/Node。
+3. 需要普通配置时点击“预览配置”；需要修复 Java 时填写 JDK 根目录并生成“Java 稳定修复计划”。
+4. 核对计划中的 diff、备份名、风险等级和执行后验证项。
+5. 计划有效期为 30 分钟，只能执行一次；确认后程序会再次检查用户环境指纹，避免覆盖外部修改。
+6. 每次应用、PATH 清理、JDK 切换或历史恢复前都会保存环境备份；页面可查看、比对并恢复历史记录。
 
 环境操作只写当前用户作用域。恢复历史备份同样需要二次确认，并会先保存恢复前的当前状态。
+
+### 安全说明与风险等级
+
+首次启动会显示“使用前请阅读”。这段说明只保存在本机配置中，不上传任何数据。你可以在“设置 / 关于 / 安全说明”重新查看。
+
+主要页面都会说明：
+
+- 这个功能能做什么、不会做什么。
+- 风险等级、是否需要管理员权限、是否可恢复。
+- 执行前建议、可能失败原因和备份位置。
+
+中风险和高风险操作会要求二次确认；涉及分区、服务注册/删除、数据库 Data 修复等极高风险操作会要求三次确认和指定文字确认。
 
 ### Python 诊断与修复
 
@@ -60,7 +74,7 @@ Get-FileHash .\devenv.exe -Algorithm SHA256
 4. 计划会展示准确的 Python 路径、`ensurepip`/pip 命令、PATH 新增项和备份名称；计划 10 分钟过期且只能使用一次。
 5. 二次确认后，程序先保存环境备份，再执行 pip 修复和 PATH 写入，最后用同一个 Python 回读 `python -m pip --version`。
 
-修复不会卸载其他 Python，也不会自动关闭 Microsoft Store 执行别名。Store 别名需在 Windows“管理应用执行别名”中由用户处理。Windows 命令输出会按 UTF-16、UTF-8 与当前系统代码页依次解码，减少中文 CMD 乱码；SHA-256 文本只接受与目标文件名匹配的 64 位十六进制值。
+修复不会卸载其他 Python，也不会自动关闭 Microsoft Store 执行别名。Store 别名需在 Windows“管理应用执行别名”中由用户处理。1.5 会明确提示 `pip.exe` 不一定属于当前 `python.exe`，推荐使用 `python -m pip`。Windows 命令输出会按 UTF-16、UTF-8 与当前系统代码页依次解码，减少中文 CMD 乱码；SHA-256 文本只接受与目标文件名匹配的 64 位十六进制值。
 
 ## 4. 版本安装与切换
 
@@ -70,7 +84,7 @@ Get-FileHash .\devenv.exe -Algorithm SHA256
 2. 点击安装，等待下载、SHA256 校验、解压和健康检查完成。
 3. 切换 JDK 前确认目标目录。
 4. 切换完成后点击“检查当前 JDK”。
-5. 同时核对 `JAVA_HOME`、PATH 中的 `java`/`javac`、Maven JVM 和 Gradle JVM。
+5. 同时核对 `JAVA_HOME`、PATH 中的 `java`/`javac`、Maven JVM 和 Gradle JVM。`JAVA_HOME` 必须是 JDK 根目录，不能是 `bin` 目录，也不能写成间接引用。
 
 如果任何一步不一致，切换会报告错误并尝试恢复切换前的指针和用户环境变量。
 
@@ -269,11 +283,11 @@ CLI 不提供绕过 GUI 二次确认直接修改 Data 的入口。
 
 ### 下载地址不在安全白名单
 
-记录错误中的完整 URL、运行时类型、版本和发行版，然后提交 Issue。1.4 会验证每一次重定向，只允许 HTTPS 和明确登记的官方/CDN 域名。不要手动关闭校验。
+记录错误中的完整 URL、运行时类型、版本和发行版，然后提交 Issue。1.5 会验证每一次重定向，只允许 HTTPS 和明确登记的官方/CDN 域名。不要手动关闭校验。
 
 ### JDK 找不到或校验格式异常
 
-先切换到 Temurin 验证网络，再记录失败发行版。1.4 兼容 Liberica API 的数组响应，并补充 Go 与 BellSoft 官方下载 CDN。
+先切换到 Temurin 验证网络，再记录失败发行版。1.5 兼容 Liberica API 的数组响应，并补充 Go 与 BellSoft 官方下载 CDN。
 
 ### 官方缓存命令不存在
 
@@ -289,16 +303,28 @@ CLI 不提供绕过 GUI 二次确认直接修改 Data 的入口。
 
 ### Nacos 仍识别不到 Java
 
-先在“环境”重新预览并应用配置，再在项目页重新分析 Nacos。1.4 起 `JAVA_HOME` 会写成真实绝对路径，例如 `D:\DevEnvManager\current\jdk`，避免 Nacos 或脚本不展开 `%DEVENV_HOME%`。Nacos 启动动作会重新读取最新用户环境，要求 `JAVA_HOME` 同时存在 `bin\java.exe` 与 `bin\javac.exe`，回读版本后显式传入子进程；如果仍失败，复制页面显示的 JAVA_HOME 与 Java 版本提交 Issue。
+先在“环境”检查可靠性快照，再生成 Java 稳定修复计划。1.5 继续要求 `JAVA_HOME` 写成真实绝对路径，例如 `D:\DevEnvManager\current\jdk`，避免 Nacos 或脚本不展开 `%DEVENV_HOME%`。Nacos 验证会重新读取最新用户环境，要求 `JAVA_HOME` 同时存在 `bin\java.exe` 与 `bin\javac.exe`，回读版本后说明子进程会看到的 JAVA_HOME 和 Java 路径；如果仍失败，复制页面显示的 JAVA_HOME、Java 版本和 Nacos 根目录提交 Issue。
 
 ### Maven/Gradle 显示已安装但不可用
 
-1.4 起再次点击安装不会直接报“已安装”。如果 Maven/Gradle 目录已经存在，程序会重新验证 `mvn.cmd` / `gradle.bat`，重新登记安装记录，修复 `current` 指针，并在受管命令中注入已验证的绝对 `JAVA_HOME`。如果仍失败，请复制验证输出和安装目录提交 Issue。
+1.5 继续支持 Maven/Gradle 幂等修复。如果 Maven/Gradle 目录已经存在，程序会重新验证 `mvn.cmd` / `gradle.bat`，重新登记安装记录，修复 `current` 指针，并在受管命令中注入已验证的绝对 `JAVA_HOME`。Gradle 输出中的分隔线不会再被当作版本号展示。如果仍失败，请复制验证输出和安装目录提交 Issue。
 
 ## 11. 命令行
 
 ```powershell
 devenv doctor --json
+devenv env inspect
+devenv env inspect --json
+devenv env plan java --jdk "D:\DevEnvManager\current\jdk"
+devenv env apply <plan-id> --confirm-risk
+devenv env verify
+devenv env backups
+devenv env restore <backup-name> --confirm-risk
+devenv java verify
+devenv python verify
+devenv nacos verify <nacos-root>
+devenv safety disclaimer
+devenv safety risks
 devenv list --json
 devenv project check . --json
 devenv cleanup scan --json

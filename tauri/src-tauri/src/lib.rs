@@ -1,6 +1,8 @@
 mod cleanup;
 mod diagnostics;
+mod env_core;
 mod mysql_repair;
+mod safety;
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -90,6 +92,8 @@ struct Settings {
     last_page: String,
     update_manifest_url: String,
     port_process_exclusions: Vec<String>,
+    #[serde(default)]
+    safety_disclaimer_accepted: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -1022,6 +1026,176 @@ async fn inspect_app_usage() -> Result<cleanup::AppUsageReport, String> {
 async fn inspect_installed_software_usage() -> Result<Vec<cleanup::InstalledSoftwareUsage>, String>
 {
     run_blocking(|| Ok(cleanup::inspect_installed_software_usage())).await?
+}
+
+#[tauri::command]
+async fn inspect_env_reliability() -> Result<env_core::EnvReliabilitySnapshot, String> {
+    run_blocking(move || {
+        let paths = load_paths()?;
+        Ok(env_core::inspect_env_reliability(&paths.root))
+    })
+    .await?
+}
+
+#[tauri::command]
+async fn create_env_repair_plan(
+    target: String,
+    options: env_core::EnvRepairOptions,
+) -> Result<env_core::EnvRepairPlan, String> {
+    run_blocking(move || {
+        let paths = load_paths()?;
+        env_core::create_env_repair_plan(&paths.root, target, options)
+    })
+    .await?
+}
+
+#[tauri::command]
+async fn apply_env_repair_plan(
+    plan: env_core::EnvRepairPlan,
+) -> Result<env_core::EnvRepairResult, String> {
+    run_blocking(move || {
+        let paths = load_paths()?;
+        Ok(env_core::apply_env_repair_plan(&paths.root, plan))
+    })
+    .await?
+}
+
+#[tauri::command]
+async fn verify_env_after_apply(
+    plan_id: String,
+) -> Result<env_core::EnvVerificationReport, String> {
+    run_blocking(move || {
+        let paths = load_paths()?;
+        Ok(env_core::verify_env_after_apply(&paths.root, plan_id))
+    })
+    .await?
+}
+
+#[tauri::command]
+async fn rollback_env_repair(backup_name: String) -> Result<env_core::EnvRepairResult, String> {
+    run_blocking(move || env_core::restore_env_backup(backup_name)).await?
+}
+
+#[tauri::command]
+async fn export_env_reliability_report(format: String) -> Result<String, String> {
+    run_blocking(move || {
+        let paths = load_paths()?;
+        env_core::export_env_reliability_report(&paths.root, format)
+    })
+    .await?
+}
+
+#[tauri::command]
+async fn create_java_stabilize_plan(jdk_path: String) -> Result<env_core::EnvRepairPlan, String> {
+    run_blocking(move || {
+        let paths = load_paths()?;
+        env_core::create_java_stabilize_plan(&paths.root, jdk_path)
+    })
+    .await?
+}
+
+#[tauri::command]
+async fn apply_java_stabilize_plan(
+    plan: env_core::EnvRepairPlan,
+) -> Result<env_core::EnvRepairResult, String> {
+    apply_env_repair_plan(plan).await
+}
+
+#[tauri::command]
+async fn verify_java_toolchain() -> Result<env_core::JavaVerificationReport, String> {
+    run_blocking(move || {
+        let paths = load_paths()?;
+        Ok(env_core::verify_java_toolchain(&paths.root))
+    })
+    .await?
+}
+
+#[tauri::command]
+async fn verify_nacos_java_environment(
+    nacos_root: String,
+) -> Result<env_core::NacosEnvReport, String> {
+    run_blocking(move || {
+        let paths = load_paths()?;
+        Ok(env_core::verify_nacos_java_environment(
+            &paths.root,
+            nacos_root,
+        ))
+    })
+    .await?
+}
+
+#[tauri::command]
+async fn verify_maven_gradle_with_current_jdk() -> Result<env_core::MavenGradleReliability, String>
+{
+    run_blocking(move || {
+        let paths = load_paths()?;
+        let user = user_environment().unwrap_or_default();
+        let java_home = user
+            .get("JAVA_HOME")
+            .map(|value| expand_environment_path(value, &paths));
+        Ok(env_core::maven_gradle::inspect_maven_gradle_reliability(
+            &paths.root,
+            &user,
+            java_home.as_deref(),
+        ))
+    })
+    .await?
+}
+
+#[tauri::command]
+async fn repair_maven_gradle_registration(
+    kind: String,
+    path: String,
+) -> Result<OperationResult, String> {
+    run_blocking(move || {
+        let message = env_core::repair_maven_gradle_registration(kind, path)?;
+        Ok(OperationResult {
+            success: true,
+            message,
+        })
+    })
+    .await?
+}
+
+#[tauri::command]
+async fn list_env_backups() -> Result<Vec<env_core::EnvBackupRecord>, String> {
+    run_blocking(|| Ok(env_core::list_env_backups())).await?
+}
+
+#[tauri::command]
+async fn inspect_env_backup(backup_name: String) -> Result<env_core::EnvBackupDiff, String> {
+    run_blocking(move || env_core::inspect_env_backup(backup_name)).await?
+}
+
+#[tauri::command]
+async fn restore_env_backup(backup_name: String) -> Result<env_core::EnvRepairResult, String> {
+    run_blocking(move || env_core::restore_env_backup(backup_name)).await?
+}
+
+#[tauri::command]
+fn safety_disclaimer() -> String {
+    safety::disclaimer_text()
+}
+
+#[tauri::command]
+fn feature_risk_registry() -> Vec<safety::FeatureRiskInfo> {
+    safety::feature_risk_registry()
+}
+
+#[tauri::command]
+fn get_feature_risk(feature_id: String) -> Option<safety::FeatureRiskInfo> {
+    safety::get_feature_risk(feature_id)
+}
+
+#[tauri::command]
+fn accept_safety_disclaimer() -> Result<OperationResult, String> {
+    let mut settings = load_settings()?;
+    settings.safety_disclaimer_accepted = true;
+    save_json(&settings_file(), &settings)?;
+    Ok(OperationResult {
+        success: true,
+        message: "已记录安全说明已读状态；不会上传任何数据。".to_string(),
+    })
 }
 
 #[tauri::command]
@@ -6534,6 +6708,25 @@ pub fn run() {
             inspect_desktop,
             inspect_app_usage,
             inspect_installed_software_usage,
+            inspect_env_reliability,
+            create_env_repair_plan,
+            apply_env_repair_plan,
+            verify_env_after_apply,
+            rollback_env_repair,
+            export_env_reliability_report,
+            create_java_stabilize_plan,
+            apply_java_stabilize_plan,
+            verify_java_toolchain,
+            verify_nacos_java_environment,
+            verify_maven_gradle_with_current_jdk,
+            repair_maven_gradle_registration,
+            list_env_backups,
+            inspect_env_backup,
+            restore_env_backup,
+            safety_disclaimer,
+            feature_risk_registry,
+            get_feature_risk,
+            accept_safety_disclaimer,
             create_move_plan,
             execute_move_plan,
             list_rollback_records,
@@ -6728,6 +6921,99 @@ fn run_cli(args: Vec<String>) -> Result<String, String> {
                 ))
             }
         }
+        "env" if args.get(1).map(String::as_str) == Some("inspect") => {
+            let paths = load_paths()?;
+            let snapshot = env_core::inspect_env_reliability(&paths.root);
+            if args.iter().any(|item| item == "--json") {
+                serde_json::to_string_pretty(&snapshot)
+                    .map_err(|err| format!("生成 JSON 失败：{err}"))
+            } else {
+                Ok(format!(
+                    "环境可靠性：Java={}，PATH {} 项，问题 {} 个\n提示：当前进程环境和新终端用户环境可能不同，修改后请重启终端/IDE。",
+                    snapshot.java.consistency,
+                    snapshot.path_analysis.total_entries,
+                    snapshot.issues.len()
+                ))
+            }
+        }
+        "env"
+            if args.get(1).map(String::as_str) == Some("plan")
+                && args.get(2).map(String::as_str) == Some("java") =>
+        {
+            let jdk = args
+                .iter()
+                .position(|item| item == "--jdk")
+                .and_then(|index| args.get(index + 1))
+                .ok_or_else(|| "用法：devenv env plan java --jdk <JDK根目录>".to_string())?;
+            let paths = load_paths()?;
+            let plan = env_core::create_java_stabilize_plan(&paths.root, jdk.clone())?;
+            serde_json::to_string_pretty(&plan).map_err(|err| format!("生成计划失败：{err}"))
+        }
+        "env" if args.get(1).map(String::as_str) == Some("apply") => {
+            if !args.iter().any(|item| item == "--confirm-risk") {
+                return Err(
+                    "执行环境修复计划需要 --confirm-risk。请先确认 diff、备份和风险说明。"
+                        .to_string(),
+                );
+            }
+            let plan_id = args
+                .get(2)
+                .ok_or_else(|| "用法：devenv env apply <plan-id> --confirm-risk".to_string())?;
+            let paths = load_paths()?;
+            let plan = env_core::plan::load_plan(plan_id)?;
+            let result = env_core::apply_env_repair_plan(&paths.root, plan);
+            serde_json::to_string_pretty(&result).map_err(|err| format!("生成结果失败：{err}"))
+        }
+        "env" if args.get(1).map(String::as_str) == Some("verify") => {
+            let paths = load_paths()?;
+            let report = env_core::verify_env_after_apply(&paths.root, "cli".to_string());
+            serde_json::to_string_pretty(&report).map_err(|err| format!("生成验证报告失败：{err}"))
+        }
+        "env" if args.get(1).map(String::as_str) == Some("backups") => {
+            serde_json::to_string_pretty(&env_core::list_env_backups())
+                .map_err(|err| format!("生成备份列表失败：{err}"))
+        }
+        "env" if args.get(1).map(String::as_str) == Some("restore") => {
+            if !args.iter().any(|item| item == "--confirm-risk") {
+                return Err(
+                    "恢复环境备份需要 --confirm-risk。恢复前会创建当前状态备份。".to_string(),
+                );
+            }
+            let backup = args.get(2).ok_or_else(|| {
+                "用法：devenv env restore <backup-name> --confirm-risk".to_string()
+            })?;
+            let result = env_core::restore_env_backup(backup.clone())?;
+            serde_json::to_string_pretty(&result).map_err(|err| format!("生成恢复结果失败：{err}"))
+        }
+        "java" if args.get(1).map(String::as_str) == Some("verify") => {
+            let paths = load_paths()?;
+            serde_json::to_string_pretty(&env_core::verify_java_toolchain(&paths.root))
+                .map_err(|err| format!("生成 Java 验证失败：{err}"))
+        }
+        "python" if args.get(1).map(String::as_str) == Some("verify") => {
+            let paths = load_paths()?;
+            let snapshot = env_core::inspect_env_reliability(&paths.root);
+            serde_json::to_string_pretty(&snapshot.python)
+                .map_err(|err| format!("生成 Python 验证失败：{err}"))
+        }
+        "nacos" if args.get(1).map(String::as_str) == Some("verify") => {
+            let root = args
+                .get(2)
+                .ok_or_else(|| "用法：devenv nacos verify <nacos-root>".to_string())?;
+            let paths = load_paths()?;
+            serde_json::to_string_pretty(&env_core::verify_nacos_java_environment(
+                &paths.root,
+                root.clone(),
+            ))
+            .map_err(|err| format!("生成 Nacos 验证失败：{err}"))
+        }
+        "safety" if args.get(1).map(String::as_str) == Some("disclaimer") => {
+            Ok(safety::disclaimer_text())
+        }
+        "safety" if args.get(1).map(String::as_str) == Some("risks") => {
+            serde_json::to_string_pretty(&safety::feature_risk_registry())
+                .map_err(|err| format!("生成风险表失败：{err}"))
+        }
         "db" if args.get(1).map(String::as_str) == Some("doctor")
             && args.get(2).map(String::as_str) == Some("mysql") =>
         {
@@ -6769,7 +7055,7 @@ fn run_cli(args: Vec<String>) -> Result<String, String> {
 
 fn cli_help() -> String {
     format!(
-        "DevEnv Manager CLI {}\n\n用法：\n  devenv doctor [--json]\n  devenv list [--json]\n  devenv use <kind> <version>\n  devenv project check [path] [--json]\n  devenv cleanup scan [--json]\n  devenv db doctor mysql --json\n  devenv db repair-plan mysql <candidate-id> <action>\n  devenv profile list\n  devenv profile apply <id>\n  devenv version",
+        "DevEnv Manager CLI {}\n\n用法：\n  devenv doctor [--json]\n  devenv env inspect [--json]\n  devenv env plan java --jdk <JDK根目录>\n  devenv env apply <plan-id> --confirm-risk\n  devenv env verify\n  devenv env backups\n  devenv env restore <backup-name> --confirm-risk\n  devenv java verify\n  devenv python verify\n  devenv nacos verify <nacos-root>\n  devenv safety disclaimer\n  devenv safety risks\n  devenv list [--json]\n  devenv use <kind> <version>\n  devenv project check [path] [--json]\n  devenv cleanup scan [--json]\n  devenv db doctor mysql --json\n  devenv db repair-plan mysql <candidate-id> <action>\n  devenv profile list\n  devenv profile apply <id>\n  devenv version",
         env!("CARGO_PKG_VERSION")
     )
 }
@@ -6975,6 +7261,7 @@ fn default_settings() -> Settings {
             "https://raw.githubusercontent.com/weidonglang/DevEnv-Manager/main/update-manifest.json"
                 .to_string(),
         port_process_exclusions: Vec::new(),
+        safety_disclaimer_accepted: false,
     }
 }
 
@@ -7287,13 +7574,22 @@ fn java_root_from_executable(executable: &Path) -> Option<PathBuf> {
 }
 
 fn first_output_line(executable: &Path, args: &[&str]) -> String {
-    run_command_output(executable.to_path_buf(), args, 30)
-        .unwrap_or_default()
-        .lines()
-        .find(|line| !line.trim().is_empty())
-        .unwrap_or("")
-        .trim()
-        .to_string()
+    first_meaningful_output_line(
+        &run_command_output(executable.to_path_buf(), args, 30).unwrap_or_default(),
+    )
+    .unwrap_or_default()
+}
+
+fn first_meaningful_output_line(text: &str) -> Option<String> {
+    text.lines()
+        .map(str::trim)
+        .find(|line| {
+            !line.is_empty()
+                && !line
+                    .chars()
+                    .all(|ch| ch == '-' || ch == '=' || ch.is_whitespace())
+        })
+        .map(str::to_string)
 }
 
 fn inspect_java_environment_blocking() -> Result<JavaEnvironmentReport, String> {
@@ -7363,14 +7659,20 @@ fn inspect_java_environment_blocking() -> Result<JavaEnvironmentReport, String> 
         .take(3)
         .collect::<Vec<_>>()
         .join(" · ");
-    let gradle_runtime = resolve_tool(&paths, "gradle")
+    let gradle_output = resolve_tool(&paths, "gradle")
         .map(|path| command_value(Some(path), &["-version"]))
-        .unwrap_or_default()
+        .unwrap_or_default();
+    let gradle_runtime = gradle_output
         .lines()
         .filter(|line| line.contains("JVM") || line.contains("Java"))
         .take(2)
         .collect::<Vec<_>>()
         .join(" · ");
+    let gradle_runtime = if gradle_runtime.trim().is_empty() {
+        first_meaningful_output_line(&gradle_output).unwrap_or_default()
+    } else {
+        gradle_runtime
+    };
     Ok(JavaEnvironmentReport {
         java_home,
         java_home_expanded,
@@ -8313,7 +8615,7 @@ fn detect_runtime_at(
     if text.is_empty() {
         text = String::from_utf8_lossy(&output.stderr).trim().to_string();
     }
-    let version = text.lines().next().unwrap_or("unknown").to_string();
+    let version = first_meaningful_output_line(&text).unwrap_or_else(|| "unknown".to_string());
     let path = display_path(executable);
 
     Some(RuntimeInfo {
@@ -9321,7 +9623,15 @@ fn optional_command_probe(name: &str, executable: &str, args: &[&str]) -> Doctor
     } else {
         "discover_runtimes"
     };
-    match detect_runtime(name, executable, args) {
+    let detected = load_paths()
+        .ok()
+        .and_then(|paths| resolve_tool(&paths, executable))
+        .and_then(|path| {
+            let source = Some(classify_source(&display_path(&path)));
+            detect_runtime_at(name, &path, args, source)
+        })
+        .or_else(|| detect_runtime(name, executable, args));
+    match detected {
         Some(info) => DoctorCheck {
             id: format!("tool-{}", slug(name)),
             title: name.to_string(),
@@ -9685,10 +9995,12 @@ fn probe_tool(name: &str, executable: Option<PathBuf>, args: &[&str]) -> ToolSta
     match output {
         Ok(output) => {
             let detail = command_text(&output.stdout, &output.stderr);
+            let version =
+                first_meaningful_output_line(&detail).unwrap_or_else(|| "未返回版本".to_string());
             ToolState {
                 name: name.to_string(),
                 installed: output.status.success(),
-                version: detail.lines().next().unwrap_or("未返回版本").to_string(),
+                version,
                 path: display_path(&executable),
                 detail: if output.status.success() {
                     classify_source(&display_path(&executable))
