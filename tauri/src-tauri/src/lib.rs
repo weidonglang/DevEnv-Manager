@@ -11939,6 +11939,10 @@ fn doctor_report_markdown(report: &DoctorReport) -> String {
 }
 
 fn redact_report_text(text: &str) -> String {
+    redact_sensitive_text(text)
+}
+
+fn redact_sensitive_text(text: &str) -> String {
     let mut result = text.to_string();
     for key in ["USERPROFILE", "HOME"] {
         if let Ok(value) = env::var(key) {
@@ -11951,10 +11955,29 @@ fn redact_report_text(text: &str) -> String {
     result
         .lines()
         .map(|line| {
+            let line = redact_bearer_token(line);
             line.split(' ')
                 .map(|part| {
                     let lower = part.to_ascii_lowercase();
-                    for marker in ["token=", "password=", "secret=", "access_key="] {
+                    if lower == "bearer" {
+                        return "Bearer".to_string();
+                    }
+                    if lower.starts_with("bearer ") || lower.starts_with("authorization:bearer") {
+                        return "Bearer <redacted>".to_string();
+                    }
+                    for marker in [
+                        "token=",
+                        "password=",
+                        "passwd=",
+                        "pwd=",
+                        "secret=",
+                        "apikey=",
+                        "api_key=",
+                        "access_key=",
+                        "private_key=",
+                        "--token=",
+                        "--password=",
+                    ] {
                         if lower.starts_with(marker) {
                             return format!("{marker}<redacted>");
                         }
@@ -11966,6 +11989,63 @@ fn redact_report_text(text: &str) -> String {
         })
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+fn redact_bearer_token(line: &str) -> String {
+    let lower = line.to_ascii_lowercase();
+    let Some(index) = lower.find("bearer ") else {
+        return line.to_string();
+    };
+    let token_start = index + "bearer ".len();
+    let token_tail = &line[token_start..];
+    let token_end = token_tail
+        .find([' ', '\t', '\r', '\n', '"', '\''])
+        .unwrap_or(token_tail.len());
+    format!(
+        "{}Bearer <redacted>{}",
+        &line[..index],
+        &token_tail[token_end..]
+    )
+}
+
+fn redact_path(path: &str) -> String {
+    redact_windows_user_paths(path)
+}
+
+fn redact_command_line(command_line: &str) -> String {
+    redact_sensitive_text(command_line)
+}
+
+fn redact_json_value(value: &mut Value) {
+    match value {
+        Value::String(text) => *text = redact_sensitive_text(text),
+        Value::Array(items) => items.iter_mut().for_each(redact_json_value),
+        Value::Object(map) => {
+            for (key, value) in map.iter_mut() {
+                let lower = key.to_ascii_lowercase();
+                if [
+                    "password",
+                    "passwd",
+                    "pwd",
+                    "token",
+                    "secret",
+                    "apikey",
+                    "api_key",
+                    "access_key",
+                    "private_key",
+                    "authorization",
+                ]
+                .iter()
+                .any(|marker| lower.contains(marker))
+                {
+                    *value = Value::String("<redacted>".to_string());
+                } else {
+                    redact_json_value(value);
+                }
+            }
+        }
+        _ => {}
+    }
 }
 
 fn redact_windows_user_paths(text: &str) -> String {
@@ -12602,6 +12682,34 @@ mod tests {
         let redacted = redact_report_text(&text);
         assert!(!redacted.contains("abc123"));
         assert!(!redacted.contains("hunter2"));
+    }
+
+    #[test]
+    fn redaction_masks_bearer_cli_flags_paths_and_json() {
+        let command = r#"server.exe --token=abc --password=hunter2 Authorization: Bearer secret C:\Users\Alice\project"#;
+        let redacted = redact_command_line(command);
+        assert!(!redacted.contains("abc"));
+        assert!(!redacted.contains("hunter2"));
+        assert!(!redacted.contains("secret"));
+        assert!(!redacted.contains(r"C:\Users\Alice"));
+        assert!(redacted.contains("%USERPROFILE%"));
+        assert_eq!(
+            redact_path(r"C:\Users\Alice\Desktop"),
+            r"%USERPROFILE%\Desktop"
+        );
+
+        let mut value = json!({
+            "nested": {
+                "api_key": "abc123",
+                "path": "C:\\Users\\Alice\\Downloads\\tool.zip",
+                "mysql": "ERROR 1045 (28000)"
+            }
+        });
+        redact_json_value(&mut value);
+        let text = serde_json::to_string(&value).unwrap();
+        assert!(!text.contains("abc123"));
+        assert!(!text.contains(r"C:\\Users\\Alice"));
+        assert!(text.contains("ERROR 1045"));
     }
 
     #[test]
