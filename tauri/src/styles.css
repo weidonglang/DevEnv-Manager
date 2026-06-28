@@ -1597,6 +1597,35 @@ select {
   flex: 0 0 auto;
 }
 
+.mysql-sections {
+  display: grid;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.mysql-sections section {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #e0e7e9;
+  border-radius: 8px;
+  background: #f8faf9;
+}
+
+.mysql-sections h3 {
+  margin: 0;
+  color: #315f4d;
+  font-size: 13px;
+}
+
+.mysql-sections ul {
+  margin: 0;
+  padding-left: 18px;
+  color: #52616b;
+  line-height: 1.55;
+}
+
 .agent-trace-list {
   margin-top: 12px;
 }

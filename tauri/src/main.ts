@@ -599,9 +599,15 @@ type MySqlCandidate = {
   datadir: string;
   port: number;
   portOccupied: boolean;
+  portProcess: string;
   dataHealth: string;
   confidence: string;
   conclusionLevel: string;
+  staticFileCheck: string;
+  connectionCheck: string;
+  systemSchemaCheck: string;
+  reasoning: string[];
+  backupManifest?: MySqlBackupManifestStatus | null;
   evidence: string[];
   nextSteps: string[];
   systemSchemaMissing: boolean;
@@ -610,6 +616,21 @@ type MySqlCandidate = {
   suggestions: string[];
   registrationCommand: string;
   consoleCommand: string;
+};
+
+type MySqlBackupManifestStatus = {
+  valid: boolean;
+  reason: string;
+  createdAt: number;
+  expiresAt: number;
+  destination: string;
+  files: number;
+  bytes: number;
+  ibdata: boolean;
+  frm: boolean;
+  businessSchema: boolean;
+  systemSchema: boolean;
+  manifestPath: string;
 };
 
 type MySqlRepairReport = {
@@ -3423,13 +3444,42 @@ function renderMySqlRepair() {
   element.innerHTML = `<div class="scan-only-banner">${icon(Shield)}<span>${escapeHtml(report.privacyNotice)}</span></div>
     ${report.warnings.map((item) => `<p class="small-note">${escapeHtml(item)}</p>`).join("")}
     <div class="runtime-list">${report.candidates.length ? report.candidates.map((candidate) => `
-      <article class="runtime mysql-candidate ${candidate.status === "Running" ? "ok" : "warn"}">
-        <div><strong>${escapeHtml(candidate.serviceName)} · MySQL ${escapeHtml(candidate.versionHint)}</strong><span>${escapeHtml(candidate.status)} / ${escapeHtml(candidate.serviceState)}</span></div>
-        <div class="kv-list toolchain-kv"><div><span>mysqld</span><strong>${escapeHtml(candidate.mysqldPath)}</strong></div><div><span>my.ini</span><strong>${escapeHtml(candidate.myIniPath)}</strong></div><div><span>Data</span><strong>${escapeHtml(candidate.datadir)}</strong></div><div><span>端口</span><strong>${candidate.port} · ${candidate.portOccupied ? "已占用" : "空闲"}</strong></div><div><span>Data 健康</span><strong>${escapeHtml(candidate.dataHealth)}</strong></div><div><span>业务库候选</span><strong>${escapeHtml(candidate.businessDatabases.join("、") || "未发现")}</strong></div></div>
-        <ul>${candidate.suggestions.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+      <article class="runtime mysql-candidate ${candidate.conclusionLevel === "Healthy" ? "ok" : "warn"}">
+        <div><strong>${escapeHtml(candidate.serviceName)} · MySQL ${escapeHtml(candidate.versionHint)}</strong><span>${escapeHtml(candidate.conclusionLevel)} / ${escapeHtml(candidate.serviceState)}</span></div>
+        <div class="mysql-sections">
+          <section><h3>概览</h3><div class="kv-list toolchain-kv"><div><span>服务名</span><strong>${escapeHtml(candidate.serviceName)}</strong></div><div><span>服务状态</span><strong>${escapeHtml(candidate.serviceState)}</strong></div><div><span>端口</span><strong>${candidate.port} · ${candidate.portOccupied ? "已占用" : "空闲"}</strong></div><div><span>端口占用进程</span><strong>${escapeHtml(candidate.portProcess)}</strong></div><div><span>结论可信度</span><strong>${escapeHtml(candidate.confidence)}</strong></div></div></section>
+          <section><h3>证据</h3><div class="kv-list toolchain-kv"><div><span>mysqld</span><strong>${escapeHtml(candidate.mysqldPath)}</strong></div><div><span>my.ini</span><strong>${escapeHtml(candidate.myIniPath)}</strong></div><div><span>basedir</span><strong>${escapeHtml(candidate.basedir)}</strong></div><div><span>datadir</span><strong>${escapeHtml(candidate.datadir)}</strong></div><div><span>静态文件检查</span><strong>${escapeHtml(candidate.staticFileCheck)}</strong></div><div><span>连接验证</span><strong>${escapeHtml(candidate.connectionCheck)}</strong></div><div><span>系统 schema</span><strong>${escapeHtml(candidate.systemSchemaCheck)}</strong></div><div><span>业务库候选</span><strong>${escapeHtml(candidate.businessDatabases.join("、") || "未发现")}</strong></div></div></section>
+          <section><h3>风险</h3><ul>${candidate.reasoning.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}${candidate.suggestions.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul></section>
+          <section><h3>备份</h3>${renderMySqlBackupManifest(candidate.backupManifest)}</section>
+        </div>
         ${candidate.lastError ? `<details><summary>最近错误摘要（最多 80 行）</summary><pre class="command-output compact-output">${escapeHtml(candidate.lastError)}</pre></details>` : ""}
-        <div class="row-actions"><button data-mysql-action="backup" data-candidate="${candidate.id}">备份 Data</button>${candidate.status === "NotInstalled" ? `<button data-mysql-action="register_service" data-candidate="${candidate.id}">预览注册服务</button>` : ""}${candidate.serviceState.toLowerCase() !== "running" && candidate.status !== "NotInstalled" ? `<button data-mysql-action="start_service" data-candidate="${candidate.id}">预览启动</button>` : ""}${candidate.systemSchemaMissing ? `<button data-mysql-action="repair_system_schema" data-candidate="${candidate.id}">预览补回系统库</button>` : ""}<button data-mysql-action="reset_root_guide" data-candidate="${candidate.id}">认证恢复向导</button>${candidate.businessDatabases.length ? `<button data-mysql-action="dump_guide" data-candidate="${candidate.id}">导出建议</button>` : ""}<button data-action="copy-text" data-copy="${escapeHtml(candidate.consoleCommand)}">复制控制台诊断命令</button></div>
+        <div class="row-actions"><button data-mysql-action="backup" data-candidate="${candidate.id}">备份 Data</button>${candidate.status === "NotInstalled" ? `<button data-mysql-action="register_service" data-candidate="${candidate.id}">预览注册服务</button>` : ""}${candidate.serviceState.toLowerCase() !== "running" && candidate.status !== "NotInstalled" ? `<button data-mysql-action="start_service" data-candidate="${candidate.id}">预览启动</button>` : ""}${canRepairMySqlSystemSchema(candidate) ? `<button data-mysql-action="repair_system_schema" data-candidate="${candidate.id}" class="danger-button">预览补回系统库</button>` : ""}<button data-mysql-action="reset_root_guide" data-candidate="${candidate.id}">认证恢复向导</button>${candidate.businessDatabases.length ? `<button data-mysql-action="dump_guide" data-candidate="${candidate.id}">导出建议</button>` : ""}<button data-action="copy-text" data-copy="${escapeHtml(candidate.consoleCommand)}">复制控制台诊断命令</button></div>
+        ${candidate.systemSchemaMissing && !canRepairMySqlSystemSchema(candidate) ? `<p class="small-note warning-text">系统库修复暂不可用：${escapeHtml(mysqlRepairBlockReason(candidate))}</p>` : ""}
       </article>`).join("") : `<div class="empty">常见安装位置没有发现 mysqld.exe；不会自动深扫整个磁盘</div>`}</div>`;
+}
+
+function renderMySqlBackupManifest(manifest?: MySqlBackupManifestStatus | null) {
+  if (!manifest) return `<div class="empty">还没有本程序登记的 backup manifest；高危修复前必须先备份 Data。</div>`;
+  return `<div class="kv-list toolchain-kv">
+    <div><span>状态</span><strong>${manifest.valid ? "有效" : "无效"} · ${escapeHtml(manifest.reason)}</strong></div>
+    <div><span>最近备份时间</span><strong>${new Date(manifest.createdAt * 1000).toLocaleString("zh-CN")}</strong></div>
+    <div><span>有效期至</span><strong>${new Date(manifest.expiresAt * 1000).toLocaleString("zh-CN")}</strong></div>
+    <div><span>备份目录</span><strong>${escapeHtml(manifest.destination)}</strong></div>
+    <div><span>文件/大小</span><strong>${manifest.files} 个 · ${formatBytes(manifest.bytes)}</strong></div>
+    <div><span>关键文件</span><strong>ibdata1 ${manifest.ibdata ? "存在" : "未见"} · 系统库 ${manifest.systemSchema ? "存在" : "未见"} · 业务库 ${manifest.businessSchema ? "存在" : "未见"}</strong></div>
+    <div><span>manifest</span><strong>${escapeHtml(manifest.manifestPath)}</strong></div>
+  </div>`;
+}
+
+function canRepairMySqlSystemSchema(candidate: MySqlCandidate) {
+  return candidate.systemSchemaMissing && Boolean(candidate.backupManifest?.valid) && ["LikelyBroken", "PotentialRisk"].includes(candidate.conclusionLevel);
+}
+
+function mysqlRepairBlockReason(candidate: MySqlCandidate) {
+  if (!["LikelyBroken", "PotentialRisk"].includes(candidate.conclusionLevel)) return `当前结论为 ${candidate.conclusionLevel}`;
+  if (!candidate.backupManifest) return "没有 backup manifest";
+  if (!candidate.backupManifest.valid) return candidate.backupManifest.reason;
+  return "请重新诊断后再试";
 }
 
 function renderMySqlPlan() {
