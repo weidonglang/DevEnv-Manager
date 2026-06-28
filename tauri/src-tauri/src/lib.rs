@@ -9066,6 +9066,10 @@ fn inspect_java_environment_blocking() -> Result<JavaEnvironmentReport, String> 
     let candidates = discover_runtimes_blocking()
         .into_iter()
         .filter(|item| item.kind == "Java")
+        .map(|mut item| {
+            item.source = classify_jdk_candidate_source(&item.executable);
+            item
+        })
         .collect::<Vec<_>>();
     let effective_source = path_java
         .as_deref()
@@ -9106,6 +9110,29 @@ fn inspect_java_environment_blocking() -> Result<JavaEnvironmentReport, String> 
         warnings,
         candidates,
     })
+}
+
+fn classify_jdk_candidate_source(path: &str) -> String {
+    let lower = path.to_ascii_lowercase();
+    if lower.contains("\\devenvmanager\\") {
+        "Managed".to_string()
+    } else if lower.contains("\\jetbrains\\") || lower.contains("\\jbr\\") {
+        "IdeBundled".to_string()
+    } else if lower.contains("\\scoop\\") {
+        "Scoop".to_string()
+    } else if lower.contains("\\chocolatey\\") {
+        "Chocolatey".to_string()
+    } else if lower.contains("\\mise\\") {
+        "Mise".to_string()
+    } else if lower.contains("\\asdf\\") {
+        "Asdf".to_string()
+    } else if lower.contains("\\program files\\") || lower.contains("\\program files (x86)\\") {
+        "SystemInstaller".to_string()
+    } else if lower.contains("\\java\\") || lower.contains("\\jdk") {
+        "External".to_string()
+    } else {
+        "Unknown".to_string()
+    }
 }
 
 fn is_valid_java_home(value: &str, paths: &AppPaths) -> bool {
@@ -12499,6 +12526,30 @@ mod tests {
         assert!(report.contains("不会自动关闭别名"));
         assert!(report.contains("%USERPROFILE%"));
         assert!(!report.contains(r"C:\Users\Alice"));
+    }
+
+    #[test]
+    fn jdk_candidate_source_distinguishes_managers_and_ide_bundled() {
+        assert_eq!(
+            classify_jdk_candidate_source(r"D:\DevEnvManager\current\jdk\bin\java.exe"),
+            "Managed"
+        );
+        assert_eq!(
+            classify_jdk_candidate_source(
+                r"C:\Users\Alice\scoop\apps\openjdk\current\bin\java.exe"
+            ),
+            "Scoop"
+        );
+        assert_eq!(
+            classify_jdk_candidate_source(
+                r"C:\Program Files\JetBrains\IntelliJ IDEA\jbr\bin\java.exe"
+            ),
+            "IdeBundled"
+        );
+        assert_eq!(
+            classify_jdk_candidate_source(r"C:\Program Files\Eclipse Adoptium\jdk-21\bin\java.exe"),
+            "SystemInstaller"
+        );
     }
 
     #[test]

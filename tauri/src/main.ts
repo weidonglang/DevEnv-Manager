@@ -2091,6 +2091,26 @@ function renderJavaEnvironment() {
       <div><span>Maven 使用环境</span><strong>${escapeHtml(report.mavenRuntime || "未安装/未读取")}</strong></div>
       <div><span>Gradle 使用 JVM</span><strong>${escapeHtml(report.gradleRuntime || "未安装/未读取")}</strong></div>
     </div>
+    <section class="notice-panel">
+      <h3>JDK 候选</h3>
+      <div class="runtime-list">
+        ${report.candidates.length ? report.candidates.map((candidate) => `
+          <article class="runtime">
+            <div><strong>${escapeHtml(candidate.version.split("\n")[0] || "Java")}</strong><span>${escapeHtml(candidate.source)}</span></div>
+            <small>${escapeHtml(candidate.executable)}</small>
+            <div class="row-actions">
+              <button data-action="open-analysis-path" data-path="${escapeHtml(candidate.executable)}">${icon(FolderSearch)}<span>打开目录</span></button>
+              <button data-action="copy-text" data-copy="${escapeHtml(candidate.executable)}">${icon(Clipboard)}<span>复制路径</span></button>
+              <button data-action="copy-text" data-copy="${escapeHtml(candidate.executable.replace(/\\bin\\java\.exe$/i, ""))}">${icon(Clipboard)}<span>复制 JAVA_HOME 候选</span></button>
+            </div>
+          </article>
+        `).join("") : `<div class="empty">没有发现 JDK 候选</div>`}
+      </div>
+      <ul>
+        <li>外部、IDE 内置、Scoop、Chocolatey、mise、asdf JDK 不会被 DevEnv Manager 卸载、删除或移入回收站。</li>
+        <li>如需接管，请先复制 JAVA_HOME 候选并在环境配置里预览用户级修复计划；不要自动改系统级 PATH。</li>
+      </ul>
+    </section>
     ${report.warnings.length ? `<ul class="warning-text">${report.warnings.map((warning) => `<li>${escapeHtml(warning)}</li>`).join("")}</ul>` : ""}
   `;
 }
