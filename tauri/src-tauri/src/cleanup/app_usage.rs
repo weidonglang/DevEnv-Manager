@@ -32,6 +32,7 @@ pub(crate) fn usage_item(
             size,
             category: category.to_string(),
             suggestion: "只展示占用；请通过应用内置设置备份、迁移或清理".to_string(),
+            details: Vec::new(),
         });
     }
     let size = categories.iter().map(|item| item.size).sum();

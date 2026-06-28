@@ -25,7 +25,14 @@ import {
   type IconNode,
 } from "lucide";
 import { envReliabilityIntro } from "./envReliability";
-import { confirmRisk, disclaimerPanel, featureHelpCard } from "./features/safety";
+import { askForConfirmation, confirmRisk, disclaimerPanel } from "./features/safety";
+import { fileDirectory } from "./features/cleanup";
+import { projectConfigurationPlanId } from "./features/jdk";
+import { MYSQL_PERMISSION_UNKNOWN_HELP, mysqlPathValue } from "./features/mysql";
+import { canShowKillPortAction } from "./features/ports";
+import { SAFE_MODE_DESCRIPTION } from "./features/safeMode";
+import { hideToast, showToast } from "./features/toast";
+import { updateEmptyState } from "./features/update";
 import { riskBadge } from "./components/riskBadge";
 import type {
   AppSnapshot,
@@ -145,7 +152,7 @@ app.innerHTML = `
         <button class="nav-item" data-view="platforms">${icon(Cpu)}<span>平台/镜像</span></button>
         <button class="nav-item" data-view="learning">${icon(FileText)}<span>学习中心</span></button>
         <span class="nav-group">维护与系统</span>
-        <button class="nav-item" data-view="maintenance">${icon(Shield)}<span>C盘急救</span></button>
+        <button class="nav-item" data-view="maintenance">${icon(Shield)}<span>空间分析</span></button>
         <button class="nav-item" data-view="toolbox">${icon(Hammer)}<span>工具箱</span></button>
       </nav>
     </aside>
@@ -165,8 +172,8 @@ app.innerHTML = `
         <div class="progress-track"><span id="task-progress-bar"></span></div>
       </div>
       <details id="view-guide" class="view-guide">
-        <summary>${icon(FileText)}<span>这个页面怎么用？</span></summary>
-        <p id="view-guide-text">先看系统快照和当前生效工具；需要深入排查时再进入环境医生。</p>
+        <summary>${icon(FileText)}<span>页面使用指南</span></summary>
+        <div id="view-guide-text" class="view-guide-body">先看系统快照和当前生效工具；需要深入排查时再进入环境医生。</div>
       </details>
       <div id="feature-help-slot"></div>
 
@@ -202,17 +209,8 @@ app.innerHTML = `
             <div id="snapshot-list" class="kv-list"></div>
           </section>
           <section class="panel">
-            <div class="panel-title">${icon(Shield)}<h2>迁移状态</h2></div>
-            <ul class="status-list">
-              <li><span class="dot done"></span> Tauri 2 桌面外壳</li>
-              <li><span class="dot done"></span> Rust 命令桥接</li>
-              <li><span class="dot done"></span> 端口扫描 MVP</li>
-              <li><span class="dot done"></span> JDK 下载、安装和切换</li>
-              <li><span class="dot done"></span> PATH 修复与恢复</li>
-              <li><span class="dot done"></span> Python / Node / Maven / Gradle 安装和验证</li>
-              <li><span class="dot done"></span> 环境医生、Python 冲突分析、项目启动向导</li>
-              <li><span class="dot done"></span> Git / Node / Python 开发工具链</li>
-            </ul>
+            <div class="panel-head"><div class="panel-title">${icon(RefreshCw)}<h2>版本更新</h2></div><button id="check-updates-overview" data-action="check-updates">${icon(RefreshCw)}<span>检查更新</span></button></div>
+            <div id="overview-update-result" data-update-result><div class="empty">尚未检查新版本</div></div>
           </section>
         </div>
         <section class="panel root-panel">
@@ -253,6 +251,7 @@ app.innerHTML = `
             <strong>--</strong>
             <span>还没有诊断结果</span>
           </div>
+          <div id="doctor-repair-result" class="runtime-list"></div>
           <div id="doctor-suggestions" class="suggestion-list"></div>
           <div id="doctor-checks" class="doctor-checks"></div>
         </section>
@@ -662,8 +661,8 @@ app.innerHTML = `
       <section id="view-maintenance" class="view maintenance-view">
         <section class="maintenance-hero">
           <div>
-            <span class="phase-badge">Phase 3 · Analyze & rescue</span>
-            <h2>C 盘急救大师</h2>
+            <span class="phase-badge">只读分析与安全清理</span>
+            <h2>开发环境空间分析</h2>
             <p>严格执行扫描 → 选择 → 计划预览 → 二次确认 → 清理 → 验证 → 报告。普通文件优先移入 Windows 回收站。</p>
           </div>
           <div class="toolbar compact">
@@ -671,7 +670,7 @@ app.innerHTML = `
             <button id="scan-maintenance">${icon(Search)}<span>安全扫描</span></button>
           </div>
         </section>
-        <nav class="maintenance-tabs" aria-label="C 盘急救功能">
+        <nav class="maintenance-tabs" aria-label="空间分析功能">
           <button class="active" data-maintenance-tab="overview">总览</button>
           <button data-maintenance-tab="cleanup">C盘专清</button>
           <button data-maintenance-tab="dev-cache">开发缓存</button>
@@ -681,8 +680,6 @@ app.innerHTML = `
           <button data-maintenance-tab="duplicates">重复文件</button>
           <button data-maintenance-tab="apps">软件与应用</button>
           <button data-maintenance-tab="move">空间搬家</button>
-          <button data-maintenance-tab="expand">扩容检测</button>
-          <button data-maintenance-tab="startup">启动项/进程</button>
           <button data-maintenance-tab="report">报告</button>
         </nav>
 
@@ -719,7 +716,7 @@ app.innerHTML = `
         </section>
         <section class="maintenance-panel" data-maintenance-panel="desktop">
           <div class="panel-head"><div class="panel-title">${icon(FolderSearch)}<h2>桌面急救</h2></div><button id="inspect-desktop">只读分析桌面</button></div>
-          <div class="scan-only-banner">${icon(Shield)}<span>只统计占用并生成整理建议；不删除、不移动桌面文件，归档计划将在 Phase 4 执行。</span></div>
+          <div class="scan-only-banner">${icon(Shield)}<span>只统计占用并生成整理建议；不删除、不移动桌面文件。归档整理必须先预览计划并再次确认。</span></div>
           <div id="desktop-usage"><div class="empty">尚未分析桌面</div></div>
         </section>
         <section class="maintenance-panel" data-maintenance-panel="downloads">
@@ -745,7 +742,7 @@ app.innerHTML = `
         </section>
         <section class="maintenance-panel" data-maintenance-panel="move">
           <div class="panel-head"><div class="panel-title">${icon(Boxes)}<h2>空间搬家与归档</h2></div><button id="load-archive-plan">刷新计划</button></div>
-          <div class="scan-only-banner">${icon(Shield)}<span>Phase 4 支持桌面/下载归档、白名单目录搬家和 Junction 桥接；执行前必须预览计划并二次确认。</span></div>
+          <div class="scan-only-banner">${icon(Shield)}<span>支持桌面/下载归档、白名单目录搬家和 Junction 桥接；执行前必须预览计划并二次确认。</span></div>
           <div class="form-row">
             <input id="move-source" placeholder="源目录，例如 C:\\Users\\你\\Downloads 或缓存目录" />
             <input id="move-target-drive" value="D:" placeholder="目标盘或目标目录，例如 D:" />
@@ -764,29 +761,18 @@ app.innerHTML = `
             <button id="preview-downloads-archive">下载归档计划</button>
             <button id="execute-move-plan" class="danger-button" disabled>二次确认后执行</button>
           </div>
-          <div id="move-plan-result" class="runtime-list"><div class="empty">尚未生成空间搬家计划</div></div>
+          <div id="move-plan-result" class="runtime-list"><div class="empty">还没有空间搬家计划</div></div>
           <div id="archive-plan-list" class="runtime-list"><div class="empty">可从大文件或重复文件结果加入归档计划</div></div>
           <div class="panel-head"><div class="panel-title">${icon(RefreshCw)}<h3>回滚记录</h3></div><button id="load-rollback-records">刷新回滚</button></div>
           <div id="rollback-records" class="runtime-list"><div class="empty">暂无可自动回滚记录</div></div>
         </section>
-        <section class="maintenance-panel" data-maintenance-panel="expand">
-          <div class="panel-head"><div class="panel-title">${icon(Activity)}<h2>C 盘真扩容安全向导</h2></div><button id="inspect-partition-layout">只读检测分区</button></div>
-          <div class="scan-only-banner">${icon(Shield)}<span>分区检测只读；真扩容仅在安全 A/B 模式下启用，并需要管理员权限、备份和三次确认。</span></div>
-          <div id="partition-layout-result"><div class="empty">尚未检测分区布局</div></div>
-          <div class="toolbar compact">
-            <button id="create-expansion-plan">生成扩容计划</button>
-            <button id="execute-expansion-plan" class="danger-button" disabled>三次确认后执行扩容</button>
+        <section class="maintenance-panel" data-maintenance-panel="report">
+          <div class="panel maintenance-placeholder">
+            <h2>报告</h2>
+            <p>清理完成后显示释放空间、跳过项、失败项和可导出的 Markdown / JSON 报告。</p>
+            <div id="cleanup-report"><div class="empty">还没有清理报告</div></div>
           </div>
-          <div id="expansion-plan-result"><div class="empty">尚未生成扩容计划</div></div>
         </section>
-        ${[
-          ["startup", "启动项/进程", "当前版本仅在总览统计启动目录项目数量。"],
-          ["report", "报告", "清理完成后会在这里显示结果。"],
-        ].map(([id, title, text]) => `
-          <section class="maintenance-panel" data-maintenance-panel="${id}">
-            <div class="panel maintenance-placeholder"><h2>${title}</h2><p>${text}</p><span>${id === "report" ? "等待清理结果" : "后续阶段开放"}</span>${id === "report" ? `<div id="cleanup-report"><div class="empty">尚无清理报告</div></div>` : ""}</div>
-          </section>
-        `).join("")}
       </section>
 
       <section id="view-toolbox" class="view">
@@ -797,18 +783,22 @@ app.innerHTML = `
               <button id="inspect-system-platforms">${icon(RefreshCw)}<span>检查</span></button>
             </div>
             <div id="system-platform-result" class="platform-content"><div class="empty">尚未检查 Docker 与 WSL</div></div>
-            <div class="toolbar system-platform-actions">
-              <button id="open-docker-desktop">${icon(Play)}<span>启动 Docker Desktop</span></button>
-              <button data-action="system-platform" data-platform-action="docker_install">${icon(Download)}<span>安装 Docker</span></button>
-              <button data-action="system-platform" data-platform-action="docker_update">${icon(RefreshCw)}<span>升级 Docker</span></button>
-              <button data-action="system-platform" data-platform-action="docker_shutdown">${icon(Trash2)}<span>退出 Docker</span></button>
-              <button data-action="system-platform" data-platform-action="wsl_install">${icon(Download)}<span>安装 WSL</span></button>
-              <button data-action="system-platform" data-platform-action="wsl_update">${icon(RefreshCw)}<span>更新 WSL</span></button>
-            </div>
-            <div class="form-row wsl-install-row">
-              <input id="wsl-distro-name" value="Ubuntu" placeholder="WSL 在线发行版名称" />
-              <button data-action="system-platform" data-platform-action="wsl_install_distro">${icon(Download)}<span>安装发行版</span></button>
-            </div>
+            <details class="advanced-tools">
+              <summary>${icon(Shield)}<span>高级 / 系统工具</span></summary>
+              <p class="small-note">这些入口可能安装、更新、退出系统级组件或触发 UAC；只在明确知道影响范围时使用。</p>
+              <div class="toolbar system-platform-actions">
+                <button id="open-docker-desktop">${icon(Play)}<span>启动 Docker Desktop</span></button>
+                <button data-action="system-platform" data-platform-action="docker_install">${icon(Download)}<span>安装 Docker</span></button>
+                <button data-action="system-platform" data-platform-action="docker_update">${icon(RefreshCw)}<span>升级 Docker</span></button>
+                <button data-action="system-platform" data-platform-action="docker_shutdown">${icon(Trash2)}<span>退出 Docker</span></button>
+                <button data-action="system-platform" data-platform-action="wsl_install">${icon(Download)}<span>安装 WSL</span></button>
+                <button data-action="system-platform" data-platform-action="wsl_update">${icon(RefreshCw)}<span>更新 WSL</span></button>
+              </div>
+              <div class="form-row wsl-install-row">
+                <input id="wsl-distro-name" value="Ubuntu" placeholder="WSL 在线发行版名称" />
+                <button data-action="system-platform" data-platform-action="wsl_install_distro">${icon(Download)}<span>安装发行版</span></button>
+              </div>
+            </details>
             <div class="small-note">Windows 主机与 WSL 是两套独立环境。本项目当前管理发行版状态；WSL 内的 SDK 优先交给 mise/asdf/sdkman/pyenv/nvm/rustup 等成熟工具。</div>
           </section>
           <section class="panel">
@@ -875,22 +865,22 @@ app.innerHTML = `
               <button id="check-updates">${icon(RefreshCw)}<span>检查更新</span></button>
             </div>
           </div>
-          <div id="update-result"><div class="empty">尚未检查新版本</div></div>
+          <div id="update-result" data-update-result><div class="empty">尚未检查新版本</div></div>
         </section>
-        <section class="panel runtime-manager danger-panel">
-          <div class="panel-title">${icon(Trash2)}<h2>卸载本程序</h2></div>
+        <details class="panel runtime-manager danger-panel advanced-tools">
+          <summary>${icon(Trash2)}<span>高级 / 卸载本程序</span></summary>
           <div class="toolbar">
             <button id="self-uninstall" class="danger-button">${icon(Trash2)}<span>启动卸载程序</span></button>
           </div>
-          <div class="small-note">会打开 Windows 卸载器并关闭当前程序。</div>
-        </section>
+          <div class="small-note">只打开 Windows 卸载器并关闭当前程序；不会自行删除用户项目、数据库或运行时目录。</div>
+        </details>
       </section>
 
       <section id="view-project" class="view">
         <section class="panel">
           <div class="panel-title">${icon(FolderSearch)}<h2>项目启动向导</h2></div>
           <div class="form-row">
-            <input id="project-path" value="E:\\\\pycode\\\\dailytools" />
+            <input id="project-path" placeholder="选择你的项目目录" />
             <button data-pick-directory="project-path" data-auto-analyze="true">${icon(FolderSearch)}<span>选择文件夹</span></button>
             <button id="check-project">${icon(Play)}<span>分析</span></button>
           </div>
@@ -929,6 +919,7 @@ const state = {
   config: null as ConfigView | null,
   runtimes: [] as RuntimeInfo[],
   javaEnvironment: null as JavaEnvironmentReport | null,
+  externalJdkChecks: {} as Record<string, ValidationCheck[]>,
   ports: [] as PortRecord[],
   portHistory: [] as PortHistorySummary[],
   selectedPort: null as PortRecord | null,
@@ -978,6 +969,7 @@ const state = {
   appUsage: null as AppUsageReport | null,
   safeMode: false,
   fatalError: "",
+  safeModeNoticeCollapsed: false,
 };
 
 const paginationState = new Map<string, number>();
@@ -1197,17 +1189,24 @@ function renderJavaEnvironment() {
     <section class="notice-panel">
       <h3>JDK 候选</h3>
       <div class="runtime-list">
-        ${report.candidates.length ? report.candidates.map((candidate) => `
+        ${report.candidates.length ? report.candidates.map((candidate) => {
+          const javaHome = candidate.executable.replace(/\\bin\\java\.exe$/i, "");
+          const checks = state.externalJdkChecks[javaHome] || [];
+          return `
           <article class="runtime">
             <div><strong>${escapeHtml(candidate.version.split("\n")[0] || "Java")}</strong><span>${escapeHtml(candidate.source)}</span></div>
             <small>${escapeHtml(candidate.executable)}</small>
+            ${checks.length ? `<div class="runtime-list compact-list">${renderValidationChecks(checks)}</div>` : ""}
             <div class="row-actions">
               <button data-action="open-analysis-path" data-path="${escapeHtml(candidate.executable)}">${icon(FolderSearch)}<span>打开目录</span></button>
               <button data-action="copy-text" data-copy="${escapeHtml(candidate.executable)}">${icon(Clipboard)}<span>复制路径</span></button>
-              <button data-action="copy-text" data-copy="${escapeHtml(candidate.executable.replace(/\\bin\\java\.exe$/i, ""))}">${icon(Clipboard)}<span>复制 JAVA_HOME 候选</span></button>
+              <button data-action="copy-text" data-copy="${escapeHtml(javaHome)}">${icon(Clipboard)}<span>复制 JAVA_HOME 候选</span></button>
+              <button data-action="verify-external-jdk" data-jdk-path="${escapeHtml(javaHome)}">${icon(Shield)}<span>验证此 JDK</span></button>
+              <button data-action="set-java-home-candidate" data-jdk-path="${escapeHtml(javaHome)}">${icon(Route)}<span>设为用户级 JAVA_HOME</span></button>
             </div>
           </article>
-        `).join("") : `<div class="empty">没有发现 JDK 候选</div>`}
+        `;
+        }).join("") : `<div class="empty">没有发现 JDK 候选</div>`}
       </div>
       <ul>
         <li>外部、IDE 内置、Scoop、Chocolatey、mise、asdf JDK 不会被 DevEnv Manager 卸载、删除或移入回收站。</li>
@@ -1378,7 +1377,7 @@ function renderPorts() {
         <tr class="${selected ? "selected" : ""}">
           <td><strong>${record.localPort}</strong><span class="port-hint">${escapeHtml(record.protocol)} · ${escapeHtml(record.localAddress)}</span></td>
           <td>${escapeHtml(record.state)}</td>
-          <td><strong>${escapeHtml(record.identity || record.commonUsage || "Unknown")}</strong>${conflict ? `<span class="conflict-badge" title="${escapeHtml((record.conflictEvidence || []).join("；") || "存在冲突证据")}">${conflict}冲突</span>` : ""}</td>
+          <td><strong>${escapeHtml(record.identity || record.commonUsage || "Unknown")}</strong>${conflict ? `<button class="conflict-badge" data-action="port-details" data-pid="${record.pid}" data-port="${record.localPort}" title="${escapeHtml((record.conflictEvidence || []).join("；") || "存在冲突证据")}">${conflict}冲突</button>` : ""}</td>
           <td>${escapeHtml(record.processName || "未读取")}</td>
           <td>${record.pid}</td>
           <td><span class="pill ${record.confidence >= 70 ? "ok" : record.confidence >= 40 ? "warn" : "muted"}">${confidenceLabel(record.confidence)}</span><small>${record.evidenceCount || record.evidence?.length || 0}证据</small></td>
@@ -1449,7 +1448,7 @@ function renderPortDetails() {
       <button data-action="copy-text" data-copy="${escapeHtml(portDiagnosticSummary(record))}">${icon(Clipboard)}<span>复制摘要</span></button>
       ${isHttpLike ? `<button data-action="copy-text" data-copy="curl -I http://127.0.0.1:${record.localPort}">${icon(Clipboard)}<span>复制 curl</span></button>` : ""}
       ${isDatabase ? `<button data-action="copy-text" data-copy="${escapeHtml(databaseCommandHint(record))}">${icon(Database)}<span>复制连接命令</span></button>` : ""}
-      <button class="danger-button" data-action="kill-port" data-pid="${record.pid}">${icon(Trash2)}<span>安全结束</span></button>
+      ${canShowKillPortAction(record) ? `<button class="danger-button" data-action="kill-port" data-pid="${record.pid}">${icon(Trash2)}<span>安全结束</span></button>` : `<span class="small-note">系统关键或高风险进程不提供结束入口</span>`}
     </div>
   `;
 }
@@ -1895,6 +1894,21 @@ async function inspectPlatforms(message = "正在检查平台工具链") {
   }
 }
 
+async function checkUpdates() {
+  showToast("正在检查新版本");
+  try {
+    state.update = await invoke<UpdateCheckResult>("check_for_updates");
+    state.updateError = "";
+    window.localStorage.setItem("devenv-last-update-check", String(Date.now()));
+    renderUpdate();
+    showToast(state.update.updateAvailable ? `发现新版本 ${state.update.latestVersion}` : "当前已是最新版本");
+  } catch (error) {
+    state.updateError = error instanceof Error ? error.message : String(error);
+    renderUpdate();
+    showToast(state.updateError, true);
+  }
+}
+
 async function runPlatformAction(action: string, value: string | null = null) {
   showToast("正在执行平台工具链操作");
   try {
@@ -2256,6 +2270,7 @@ async function refreshBase() {
   renderDuplicates();
   renderAppUsage();
   renderPorts();
+  renderViewGuide();
   renderFeatureHelp();
   const autoCheckUpdates = document.querySelector<HTMLInputElement>("#auto-check-updates");
   if (autoCheckUpdates) autoCheckUpdates.checked = config.settings.autoCheckUpdate;
@@ -2335,20 +2350,20 @@ async function runRuntimeOperation(
 async function terminatePortProcess(pid: number) {
   const record = state.ports.find((item) => item.pid === pid);
   const label = record ? `${record.processName} / PID ${pid}` : `PID ${pid}`;
-  if (!window.confirm(`将结束 ${label} 及其子进程。确定继续吗？`)) return;
+  if (!(await askForConfirmation(`将结束 ${label} 及其子进程。确定继续吗？`))) return;
   try {
     const planId = `pid-${pid}-force-false-allow-false`;
     const fingerprint = await processActionFingerprint("kill_process", planId, "high");
     const token = await createBackendConfirmation("kill_process", planId, "high", fingerprint, false);
     let result = await invoke<KillResult>("kill_process", { pid, force: false, allowCaution: false, confirmationToken: token.token });
     if (result.needsForce) {
-      const force = window.confirm(`${result.message}\n\n是否改为强制结束？`);
+      const force = await askForConfirmation(`${result.message}\n\n是否改为强制结束？`);
       if (!force) {
         showToast("已取消强制结束");
         return;
       }
-      if (!window.confirm("强制结束是极高风险操作。第一次确认：我已保存相关工作。")) return;
-      if (!window.confirm("第二次确认：我理解这可能导致数据未保存或服务中断。")) return;
+      if (!(await askForConfirmation("强制结束是极高风险操作。第一次确认：我已保存相关工作。"))) return;
+      if (!(await askForConfirmation("第二次确认：我理解这可能导致数据未保存或服务中断。"))) return;
       const forcePlanId = `pid-${pid}-force-true-allow-false`;
       const forceFingerprint = await processActionFingerprint("kill_process", forcePlanId, "critical");
       const forceToken = await createBackendConfirmation("kill_process", forcePlanId, "critical", forceFingerprint, true);
@@ -2375,7 +2390,10 @@ async function copyText(text: string) {
 
 async function runDoctorAction(action: string) {
   if (action === "cleanup_path") {
-    await runOperation(() => invoke<OperationResult>("cleanup_path_entries"), "正在清理 PATH");
+    await runOperation(async () => {
+      const token = await riskOperationToken("cleanup_path_entries", "cleanup-path-entries", "medium", false, "environment-backup");
+      return invoke<OperationResult>("cleanup_path_entries", { confirmationToken: token.token });
+    }, "正在清理 PATH");
     return;
   }
   if (action === "configure_env") {
@@ -2444,14 +2462,6 @@ async function runDoctorAction(action: string) {
   }
 }
 
-function showToast(message: string, isError = false) {
-  const toast = document.querySelector<HTMLElement>("#toast");
-  if (!toast) return;
-  toast.textContent = message;
-  toast.hidden = false;
-  toast.classList.toggle("error", isError);
-}
-
 function errorToText(error: unknown) {
   if (error instanceof Error) return `${error.name}: ${error.message}${error.stack ? `\n${error.stack}` : ""}`;
   return String(error);
@@ -2494,7 +2504,7 @@ function renderSafetyGate() {
 function renderFatalError() {
   const element = document.querySelector<HTMLElement>("#fatal-error");
   if (!element) return;
-  if (!state.safeMode && !state.fatalError) {
+  if ((!state.safeMode && !state.fatalError) || state.safeModeNoticeCollapsed) {
     element.hidden = true;
     element.innerHTML = "";
     return;
@@ -2502,9 +2512,12 @@ function renderFatalError() {
   element.hidden = false;
   element.innerHTML = `
     <section class="fatal-error-card">
-      <div>
-        <h2>已进入安全模式</h2>
-        <p>初始化或运行时出现错误。安全模式不会自动扫描、修复、清理、安装、停止服务或写入环境变量。</p>
+      <div class="fatal-error-heading">
+        <div>
+          <h2>已进入安全模式</h2>
+          <p>${escapeHtml(SAFE_MODE_DESCRIPTION)}</p>
+        </div>
+        <button data-action="dismiss-safe-mode-banner" aria-label="收起安全模式提示">×</button>
       </div>
       <pre>${escapeHtml(state.fatalError || "未知错误")}</pre>
       <div class="fatal-error-actions">
@@ -2520,8 +2533,8 @@ function renderFatalError() {
 function enterSafeMode(error: unknown, context = "运行时错误") {
   state.safeMode = true;
   state.fatalError = `${context}\n${errorToText(error)}`;
+  state.safeModeNoticeCollapsed = false;
   renderFatalError();
-  showToast("已进入安全模式", true);
 }
 
 function renderProgress(progress: TaskProgress) {
@@ -2609,9 +2622,10 @@ function renderMySqlRepair() {
     <div class="runtime-list">${report.candidates.length ? report.candidates.map((candidate) => `
       <article class="runtime mysql-candidate ${candidate.conclusionLevel === "Healthy" ? "ok" : "warn"}">
         <div><strong>${escapeHtml(candidate.serviceName)} · MySQL ${escapeHtml(candidate.versionHint)}</strong><span>${escapeHtml(candidate.conclusionLevel)} / ${escapeHtml(candidate.serviceState)}</span></div>
+        ${candidate.conclusionLevel === "PermissionUnknown" ? `<div class="advanced-warning">${icon(Shield)}<span>${escapeHtml(MYSQL_PERMISSION_UNKNOWN_HELP)}</span></div>` : ""}
         <div class="mysql-sections">
           <section><h3>概览</h3><div class="kv-list toolchain-kv"><div><span>服务名</span><strong>${escapeHtml(candidate.serviceName)}</strong></div><div><span>服务状态</span><strong>${escapeHtml(candidate.serviceState)}</strong></div><div><span>端口</span><strong>${candidate.port} · ${candidate.portOccupied ? "已占用" : "空闲"}</strong></div><div><span>端口占用进程</span><strong>${escapeHtml(candidate.portProcess)}</strong></div><div><span>结论可信度</span><strong>${escapeHtml(candidate.confidence)}</strong></div></div></section>
-          <section><h3>证据</h3><div class="kv-list toolchain-kv"><div><span>mysqld</span><strong>${escapeHtml(candidate.mysqldPath)}</strong></div><div><span>my.ini</span><strong>${escapeHtml(candidate.myIniPath)}</strong></div><div><span>basedir</span><strong>${escapeHtml(candidate.basedir)}</strong></div><div><span>datadir</span><strong>${escapeHtml(candidate.datadir)}</strong></div><div><span>静态文件检查</span><strong>${escapeHtml(candidate.staticFileCheck)}</strong></div><div><span>连接验证</span><strong>${escapeHtml(candidate.connectionCheck)}</strong></div><div><span>系统 schema</span><strong>${escapeHtml(candidate.systemSchemaCheck)}</strong></div><div><span>业务库候选</span><strong>${escapeHtml(candidate.businessDatabases.join("、") || "未发现")}</strong></div></div></section>
+          <section><h3>证据</h3><div class="kv-list toolchain-kv">${mysqlPathValue("mysqld", candidate.mysqldPath, icon(Clipboard), escapeHtml)}${mysqlPathValue("my.ini", candidate.myIniPath, icon(Clipboard), escapeHtml)}${mysqlPathValue("basedir", candidate.basedir, icon(Clipboard), escapeHtml)}${mysqlPathValue("datadir", candidate.datadir, icon(Clipboard), escapeHtml)}<div><span>静态文件检查</span><strong>${escapeHtml(candidate.staticFileCheck)}</strong></div><div><span>连接验证</span><strong>${escapeHtml(candidate.connectionCheck)}</strong></div><div><span>系统 schema</span><strong>${escapeHtml(candidate.systemSchemaCheck)}</strong></div><div><span>业务库候选</span><strong>${escapeHtml(candidate.businessDatabases.join("、") || "未发现")}</strong></div></div></section>
           <section><h3>风险</h3><ul>${candidate.reasoning.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}${candidate.suggestions.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul></section>
           <section><h3>备份</h3>${renderMySqlBackupManifest(candidate.backupManifest)}</section>
         </div>
@@ -2694,16 +2708,12 @@ function renderCache() {
 }
 
 function renderUpdate() {
-  const element = document.querySelector<HTMLElement>("#update-result");
+  const elements = Array.from(document.querySelectorAll<HTMLElement>("[data-update-result]"));
   const update = state.update;
-  if (!element) return;
-  if (!update) {
-    element.innerHTML = state.updateError
-      ? `<div class="empty warning-text">最近检查失败：${escapeHtml(state.updateError)}</div>`
-      : `<div class="empty">尚未检查新版本</div>`;
-    return;
-  }
-  element.innerHTML = `
+  if (!elements.length) return;
+  const html = !update
+    ? updateEmptyState(state.updateError, escapeHtml)
+    : `
     <div class="project-summary">
       <strong>当前 ${escapeHtml(update.currentVersion)} · 最新 ${escapeHtml(update.latestVersion)}</strong>
       <span>${update.updateAvailable ? "发现新版本" : "当前已是最新版本"} · 发布 ${escapeHtml(update.date)} · 检查 ${escapeHtml(update.checkedAt)}</span>
@@ -2715,6 +2725,9 @@ function renderUpdate() {
       <button data-action="copy-text" data-copy="${escapeHtml(update.downloadUrl)}">${icon(Clipboard)}<span>复制 Releases 地址</span></button>
     </div>
   `;
+  elements.forEach((element) => {
+    element.innerHTML = html;
+  });
 }
 
 function riskText(risk: string) {
@@ -2855,8 +2868,10 @@ async function createBackendConfirmation(
   planFingerprint: string,
   tripleConfirmed: boolean,
   backupReceipt?: string | null,
+  command?: string,
 ) {
   return invoke<ConfirmationTokenView>("create_confirmation_token", {
+    command: command || actionId,
     actionId,
     planId,
     riskLevel,
@@ -2868,6 +2883,18 @@ async function createBackendConfirmation(
 
 async function processActionFingerprint(actionId: string, planId: string, riskLevel: string) {
   return sha256Hex(`${actionId}\0${planId}\0${riskLevel}`);
+}
+
+async function riskOperationToken(
+  command: string,
+  planId: string,
+  riskLevel: "medium" | "high" | "critical",
+  tripleConfirmed = false,
+  backupReceipt: string | null = null,
+  actionId = command,
+) {
+  const fingerprint = await sha256Hex(`${command}\0${planId}\0${riskLevel}`);
+  return createBackendConfirmation(actionId, planId, riskLevel, fingerprint, tripleConfirmed, backupReceipt, command);
 }
 
 function renderSafetyDisclaimer() {
@@ -2975,16 +3002,71 @@ function renderCleanupResult() {
 function renderFolderUsage(target: string, report: FolderUsageReport | null, key: string) {
   const element = document.querySelector<HTMLElement>(target);
   if (!element || !report) return;
-  element.innerHTML = `<div class="project-summary"><strong>${escapeHtml(report.name)} · ${formatBytes(report.totalBytes)}</strong><span>${escapeHtml(report.path)}</span></div>
-    <div class="folder-usage-grid">${paginate(key, report.categories, (category) => `<article class="folder-usage-card"><div><strong>${escapeHtml(category.name)}</strong><span>${formatBytes(category.size)}</span></div><small>${escapeHtml(category.suggestion)}</small><div class="row-actions"><button data-action="open-analysis-path" data-path="${escapeHtml(category.path)}">打开目录</button><button data-action="copy-text" data-copy="${escapeHtml(category.path)}">复制路径</button></div></article>`)}</div>
-    <ul>${[...report.suggestions, ...report.warnings].map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`;
+  const rescanTarget = key.includes("desktop") ? "desktop" : "downloads";
+  const categoryKey = `${key}-categories`;
+  const topFileKey = `${key}-top-files`;
+  element.innerHTML = `
+    <section class="folder-usage-summary">
+      <div>
+        <strong>${escapeHtml(report.name)}</strong>
+        <span>${formatBytes(report.totalBytes)}</span>
+      </div>
+      <small title="${escapeHtml(report.path)}">${escapeHtml(report.path)}</small>
+      <div class="folder-usage-notes">${[...report.suggestions, ...report.warnings].map((item) => `<span>${escapeHtml(item)}</span>`).join("")}</div>
+    </section>
+    <section class="folder-usage-section">
+      <div class="section-heading">
+        <div><h3>分类占用</h3><small>按文件类型、时间和用途分组；展开分类可查看该类 Top 文件。</small></div>
+        <span>${report.categories.length} 类</span>
+      </div>
+      <div class="folder-usage-grid">${paginate(categoryKey, report.categories, (category) => `<details class="folder-usage-card"><summary><div><strong>${escapeHtml(category.name)}</strong><span>${formatBytes(category.size)}</span></div><small>${escapeHtml(category.suggestion)}</small></summary><div class="runtime-list compact-file-list">${category.details.length ? paginate(`${categoryKey}-${category.name}`, category.details, (item) => renderFileDetail(item, rescanTarget), 4) : `<div class="empty">这个分类下没有可展示的 Top 文件明细</div>`}</div></details>`, 4)}</div>
+    </section>
+    <section class="folder-usage-section top-files-section">
+      <div class="section-heading">
+        <div><h3>Top 文件明细</h3><small>优先展示最占空间的具体文件；每页最多 6 项，便于逐个定位和复制路径。</small></div>
+        <button data-action="rescan-folder" data-target="${rescanTarget}">${icon(RefreshCw)}<span>重新扫描</span></button>
+      </div>
+      <div class="file-detail-grid">${report.topFiles.length ? paginate(topFileKey, report.topFiles, (item) => renderFileDetail(item, rescanTarget), 6) : `<div class="empty">没有可展示的文件明细</div>`}</div>
+    </section>
+  `;
+}
+
+function renderFileDetail(item: LargeFileItem, rescanTarget: string) {
+  const directory = fileDirectory(item.path, item.directory);
+  const modified = item.modifiedAt || "未知修改时间";
+  const extension = item.extension || "无扩展名";
+  const locateLabel = item.exists ? "选中文件" : "尝试定位";
+  return `<article class="runtime file-detail-card ${item.exists ? "" : "missing-file"}">
+    <div class="file-detail-head">
+      <strong title="${escapeHtml(item.fileName || item.path)}">${escapeHtml(item.fileName || item.path)}</strong>
+      <span>${formatBytes(item.size)}</span>
+    </div>
+    <div class="file-detail-meta">
+      <span>${escapeHtml(extension)}</span>
+      <span>${escapeHtml(item.fileType)}</span>
+      <span>${escapeHtml(item.sourceCategory)}</span>
+      <span>${escapeHtml(modified)}</span>
+      <span>${item.exists ? "仍存在" : "已移动或删除"}</span>
+      <span>${item.canLocate ? "可定位" : "不可定位"}</span>
+    </div>
+    <small title="${escapeHtml(item.path)}">完整路径：${escapeHtml(item.path)}</small>
+    <small title="${escapeHtml(directory)}">所在目录：${escapeHtml(directory)}</small>
+    <small>${escapeHtml(item.openStatus || item.suggestion)}</small>
+    <div class="row-actions file-actions">
+      <button data-action="open-analysis-path" data-path="${escapeHtml(directory)}" ${item.canLocate ? "" : "disabled"}>打开所在目录</button>
+      <button data-action="open-analysis-path" data-path="${escapeHtml(item.path)}" ${item.canOpen || item.canLocate ? "" : "disabled"}>${locateLabel}</button>
+      <button data-action="copy-text" data-copy="${escapeHtml(item.path)}">复制完整路径</button>
+      <button data-action="copy-text" data-copy="${escapeHtml(directory)}">复制所在目录</button>
+      <button data-action="rescan-folder" data-target="${escapeHtml(rescanTarget)}">重新扫描</button>
+    </div>
+  </article>`;
 }
 
 function renderLargeFiles() {
   const element = document.querySelector<HTMLElement>("#large-file-result");
   if (!element) return;
   element.innerHTML = state.largeFiles.length
-    ? paginate("large-files", state.largeFiles, (item) => `<article class="runtime"><div><strong>${escapeHtml(item.fileType)} · ${formatBytes(item.size)}</strong><span class="risk-chip risk-${escapeHtml(item.risk)}">${riskText(item.risk)}风险</span></div><small>${escapeHtml(item.path)}</small><small>${escapeHtml(item.suggestion)}</small><div class="row-actions"><button data-action="open-analysis-path" data-path="${escapeHtml(item.path)}">打开所在目录</button><button data-action="copy-text" data-copy="${escapeHtml(item.path)}">复制路径</button><button data-action="archive-add" data-path="${escapeHtml(item.path)}" data-source="大文件">加入归档计划</button></div></article>`, 10)
+    ? paginate("large-files", state.largeFiles, (item) => `${renderFileDetail(item, "large-files")}<div class="row-actions inline-archive-action"><button data-action="archive-add" data-path="${escapeHtml(item.path)}" data-source="大文件">加入归档计划</button></div>`, 10)
     : `<div class="empty">扫描范围内没有达到阈值的大文件</div>`;
 }
 
@@ -2993,7 +3075,7 @@ function renderArchivePlan() {
   if (!element) return;
   element.innerHTML = state.archivePlan.length
     ? paginate("archive-plan", state.archivePlan, (item) => `<article class="runtime"><div><strong>${escapeHtml(item.source)} · ${formatBytes(item.size)}</strong><span>仅计划</span></div><small>${escapeHtml(item.path)}</small><small>${escapeHtml(item.suggestion)}</small><div class="row-actions"><button data-action="open-analysis-path" data-path="${escapeHtml(item.path)}">打开位置</button><button data-action="archive-remove" data-archive-id="${escapeHtml(item.id)}">移出计划</button></div></article>`, 10)
-    : `<div class="empty">归档计划为空；Phase 4 执行前仍需先生成搬家或归档计划</div>`;
+    : `<div class="empty">归档计划为空；先从大文件/重复文件结果加入候选，或生成搬家/归档计划</div>`;
 }
 
 async function loadArchivePlan() {
@@ -3023,7 +3105,7 @@ function renderMovePlan() {
         ${result.failures.length ? `<ul>${result.failures.map((failure) => `<li>${escapeHtml(failure)}</li>`).join("")}</ul>` : "<small>无失败项</small>"}
         <pre class="command-output compact-output">${escapeHtml(result.reportMarkdown)}</pre>
       </article>` : ""}`
-    : `<div class="empty">尚未生成空间搬家计划</div>`;
+    : `<div class="empty">还没有空间搬家计划</div>`;
 }
 
 function renderRollbackRecords() {
@@ -3081,7 +3163,7 @@ function renderExpansionPlan() {
         <ul>${plan.risks.map((risk) => `<li>${escapeHtml(risk)}</li>`).join("")}</ul>
       </article>
       ${result ? `<article class="runtime"><div><strong>${result.success ? "扩容成功" : "扩容未成功"}</strong><span>${formatBytes(result.beforeTotal)} → ${formatBytes(result.afterTotal)}</span></div><pre class="command-output compact-output">${escapeHtml(result.reportMarkdown)}</pre></article>` : ""}`
-    : `<div class="empty">尚未生成扩容计划</div>`;
+    : `<div class="empty">还没有扩容计划</div>`;
 }
 
 function renderDuplicates() {
@@ -3150,21 +3232,7 @@ function activateView(view: string) {
   document.querySelectorAll(".view").forEach((item) => {
     item.classList.toggle("active", item.id === `view-${view}`);
   });
-  const guides: Record<string, string> = {
-    overview: "先确认当前实际生效的工具版本与路径；这里只读刷新，不会修改环境。",
-    doctor: "先运行一键诊断，再逐条查看证据。安全修复只处理用户级 PATH 与受管环境变量。",
-    ports: "搜索端口、进程或框架名称；结束进程前务必确认它不是系统或仍在使用的服务。",
-    runtimes: "本机发现默认折叠。JDK 切换后请用“检查当前 JDK”核对 JAVA_HOME、PATH、java 和 javac。",
-    environment: "配置操作只写当前用户环境变量，并保留快照；新终端或 IDE 才会继承修改。",
-    project: "选择项目根目录后只读分析配置；运行按钮只接受后端生成的固定 action id。",
-    toolchains: "优先检测并调用 Git、npm、pnpm、uv 等成熟工具，不替代它们。",
-    platforms: "用于诊断 Go、Rust、.NET 与镜像配置；写配置前会备份或明确确认。",
-    learning: "只运行固定的版本、位置与环境检查命令；不会安装工具或修改配置。",
-    maintenance: "Phase 2 清理必须经过扫描、一次性计划和二次确认；Phase 3 个人目录与应用分析保持只读。",
-    toolbox: "命令面板是高级功能且启用白名单；不要粘贴不理解的 AI 或网页命令。",
-  };
-  const guide = document.querySelector<HTMLElement>("#view-guide-text");
-  if (guide) guide.textContent = guides[view] || guides.overview;
+  renderViewGuide(view);
   renderFeatureHelp(view);
 }
 
@@ -3207,53 +3275,142 @@ const VIEW_FEATURE_MAP: Record<string, string> = {
   toolbox: "command-panel",
 };
 
-function renderFeatureHelp(view = document.querySelector(".nav-item.active")?.getAttribute("data-view") || "overview") {
+function currentView() {
+  return document.querySelector(".nav-item.active")?.getAttribute("data-view") || "overview";
+}
+
+type GuideDefinition = {
+  title: string;
+  intro: string;
+  steps: string[];
+  readonly: string[];
+  writes: string[];
+  safety: string[];
+};
+
+const VIEW_GUIDES: Record<string, GuideDefinition> = {
+  overview: {
+    title: "总览",
+    intro: "总览用于快速判断这台 Windows 开发机当前是否健康：它聚合当前生效运行时、PATH 风险、端口数量、版本更新状态和关键提醒。适合刚打开软件时先看一眼，再决定去环境医生、端口、项目或空间分析页面继续排查。",
+    steps: ["先点“刷新”读取最新快照。", "如果看到 PATH、JAVA_HOME、端口或更新异常，再跳转到对应页面。", "需要给别人描述问题时，优先复制总览和环境医生报告。"],
+    readonly: ["读取当前配置、受管运行时清单、版本更新清单和本机状态。", "不会安装软件、修改环境变量、停止进程或清理文件。"],
+    writes: ["总览页本身没有写入动作；更新下载/安装会跳到工具箱更新流程处理。"],
+    safety: ["如果检查失败，不影响其它页面继续使用。", "更新检查失败通常是网络或 GitHub 访问问题，可以复制错误后稍后重试。"],
+  },
+  doctor: {
+    title: "环境医生",
+    intro: "环境医生把 PATH、JAVA_HOME、Python/pip、端口、缓存和常见配置问题整理成可解释的证据。适合“不知道哪里坏了”的场景，用它先定位原因，再决定是否执行安全修复。",
+    steps: ["先点“一键诊断”。", "逐条查看警告和建议，优先处理影响当前项目启动的问题。", "执行修复前先看页面里的 diff、备份名和风险等级。"],
+    readonly: ["诊断、导出报告、复制建议和网络/端口检查是只读。", "报告会脱敏本机用户名、令牌和敏感路径片段。"],
+    writes: ["安全修复可能写入当前用户 PATH 或受管环境变量。", "PATH 清理会移除重复、失效或旧 DevEnv 受管残留项。"],
+    safety: ["修改类动作需要后端 confirmation token，并在执行前建立可恢复记录。", "失败后先重新诊断，再从备份列表恢复，不要反复点击同一个修复按钮。"],
+  },
+  ports: {
+    title: "端口管理",
+    intro: "端口管理用于识别本机监听端口、进程身份、冲突证据、父进程、Windows 服务和历史记录。适合排查 8080、3306、5173、6379 等端口被占用或误判的问题。",
+    steps: ["先点“扫描”。", "点击冲突徽标或详情按钮查看证据来源。", "用搜索、排序和快捷筛选缩小到数据库、Web、桌面应用或未知进程。"],
+    readonly: ["扫描、详情、复制 curl/连接命令、打开进程位置都是只读。", "端口身份不会只凭端口号下结论，会结合进程名、路径、命令行、服务名和冲突证据。"],
+    writes: ["安全结束进程、停止服务会改变运行状态。", "系统关键进程、PID 过低或高风险进程不会显示结束入口。"],
+    safety: ["结束进程和停止服务都需要后端 token。", "如果端口属于数据库或系统服务，优先用服务管理入口停止，不建议直接杀进程。"],
+  },
+  runtimes: {
+    title: "运行时",
+    intro: "运行时页面用于发现、验证和切换 JDK、Node.js、Python、Maven、Gradle、Go 等开发工具。它区分 DevEnv 受管版本、系统安装版本、IDE 自带版本和外部手动路径。",
+    steps: ["先点“发现版本”刷新受管和外部候选。", "JDK 问题优先点“检查当前 JDK”或对外部 JDK 做只读验证。", "确认 java/javac/jar 都可用后，再生成 JAVA_HOME 稳定计划。"],
+    readonly: ["发现版本、外部 JDK 验证、java/javac/jar 检查是只读。", "外部 JDK 不会被卸载、移动或接管。"],
+    writes: ["切换受管运行时会更新 current 指针，并可能配合环境页写入用户环境变量。", "安装受管版本会下载到 DevEnv 管理目录。"],
+    safety: ["写入环境变量前会先生成计划和备份。", "IDE 捆绑运行时默认只展示和验证，不作为卸载目标。"],
+  },
+  environment: {
+    title: "环境变量",
+    intro: "环境变量页面专门检查用户级 JAVA_HOME、DEVENV_HOME、PATH 顺序、java/javac/pip 命中和 Maven/Gradle 使用的 Java。适合处理终端里版本和软件界面看到的不一致。",
+    steps: ["先点“检查可靠性”。", "确认冲突来源后再生成修复计划。", "应用计划前核对 diff、备份名和是否需要重启终端。"],
+    readonly: ["可靠性检查、修复计划预览、备份列表查看、报告导出是只读。", "页面会展示 raw 值、展开后的路径和命令验证结果。"],
+    writes: ["应用计划会写当前用户环境变量。", "恢复环境会用最近备份替换用户级配置。"],
+    safety: ["应用、恢复和 PATH 清理都需要后端 token。", "如果预览后环境变量发生变化，后端会拒绝写入并要求重新预览。"],
+  },
+  project: {
+    title: "项目",
+    intro: "项目页用于识别项目类型、读取 IDE 配置、验证 Java 消费者、生成 VS Code/IDEA 配置预览，以及备份后修改项目端口。适合启动项目、接手项目或排查端口冲突前使用。",
+    steps: ["先选择项目目录；默认不会自动填本机路径。", "点击“分析”识别项目类型和运行建议。", "需要写配置或改端口时，先生成预览并核对文件内容。"],
+    readonly: ["项目分析、IDEA 配置读取、Nacos/Nexus Java 验证和端口配置扫描是只读。", "页面只读取常见安全配置文件，不深扫源码内容。"],
+    writes: ["应用项目配置会写 VS Code/IDEA 等项目配置文件。", "修改端口会备份原文件并只替换识别到的端口项。"],
+    safety: ["写项目文件和端口修改都需要 token。", "后端会限制写入路径，避免越界修改项目外文件。"],
+  },
+  toolchains: {
+    title: "工具链",
+    intro: "工具链页面向 Git、SSH、Node 包管理器、Python/pip 和常用 CLI 配置。适合首次配置开发机、修复 pip/npm 源或确认命令是否可用。",
+    steps: ["先点“全面检查”。", "Git 身份、SSH key、pip/npm 源按页面提示逐项处理。", "执行前阅读会写入哪些用户配置文件。"],
+    readonly: ["检查命令版本、读取配置状态、复制建议命令是只读。", "命令输出会做基础脱敏。"],
+    writes: ["保存 Git 身份、生成 SSH key、切换 pip/npm/chsrc 源会写用户配置。", "受管 pip 修复会先生成计划再执行。"],
+    safety: ["写配置前会提示影响范围，必要时生成备份。", "失败后优先复制错误和命令输出，不要手动删除配置目录。"],
+  },
+  platforms: {
+    title: "平台与镜像",
+    intro: "平台页用于检查 Go、Rust、.NET、chsrc 和镜像源配置。它更像开发平台体检，不替代各生态成熟包管理器。",
+    steps: ["先点“全面检查”。", "根据生态选择 Go/Rust/.NET 或 chsrc 操作。", "切换镜像前确认团队或项目是否有固定要求。"],
+    readonly: ["版本检查、镜像测速和配置读取是只读。", "不会自动安装或卸载生态运行时。"],
+    writes: ["镜像切换会写对应工具的用户配置文件。", "chsrc 操作会调用受控白名单命令。"],
+    safety: ["写入前会备份或提示可恢复路径。", "如果公司网络有代理/内网源，先复制现有配置再改。"],
+  },
+  learning: {
+    title: "学习中心",
+    intro: "学习中心只运行固定白名单里的只读检查命令，帮助你理解 where、version、doctor 等命令输出。适合学习排查思路，而不是执行修复。",
+    steps: ["选择预置命令或输入只读命令。", "运行后看 stdout/stderr 和安全评估。", "把输出带到其它页面决定下一步。"],
+    readonly: ["允许的命令只用于查看版本、路径和诊断信息。", "被拒绝的命令会说明原因。"],
+    writes: ["学习中心不安装工具、不改配置、不清理文件、不结束进程。"],
+    safety: ["PowerShell/cmd、破坏性 Git、磁盘/注册表/权限类命令会被拦截。", "不要粘贴看不懂的网页命令。"],
+  },
+  maintenance: {
+    title: "空间分析",
+    intro: "空间分析用于做 C 盘只读体检、扫描低风险缓存、查看桌面/下载目录大文件、重复文件、常见应用占用，并在确认后生成清理或归档计划。适合先找证据，再少量、安全地释放空间。",
+    steps: ["先点“开始体检”看总体风险。", "桌面急救和下载目录先用“只读分析”，分页查看分类占用和 Top 文件。", "只把确认不需要的项目加入计划，再预览清理或归档。"],
+    readonly: ["体检、扫描、文件定位、复制路径、重复候选分析和应用占用统计都是只读。", "桌面/下载明细只展示文件名、路径、目录、大小、修改时间、类型和定位状态。"],
+    writes: ["清理会重新校验选中项，普通文件进入回收站或调用官方缓存命令。", "归档/搬家会先生成计划，展示源、目标、估算大小、风险和回滚信息。"],
+    safety: ["不会自动删除未选择文件，不会读取数据库正文或浏览器凭据。", "执行清理、搬家、回滚和扩容计划都需要 token；失败后先重新扫描。"],
+  },
+  toolbox: {
+    title: "工具箱",
+    intro: "工具箱承载命令面板、更新、本地服务、Docker/WSL 和卸载等高级入口。它适合有明确目标时使用，不建议把这里当作一键系统管家。",
+    steps: ["先展开对应高级区并阅读说明。", "服务和 Docker/WSL 操作前确认目标名称、端口和当前状态。", "更新前先检查版本，再下载并校验安装包。"],
+    readonly: ["服务检查、日志读取、Docker/WSL 状态检查、更新检查是只读。", "打开系统位置或复制日志不会修改状态。"],
+    writes: ["启动/停止服务、Docker/WSL 安装更新、下载更新、自卸载会改变系统状态或打开系统工具。", "自卸载只打开 Windows 卸载器并关闭程序，不主动删除项目、数据库或运行时目录。"],
+    safety: ["系统级动作折叠在高级区，并要求 token 或明确确认。", "失败后不要连续重复点击，先复制日志或错误信息。"],
+  },
+};
+
+function riskInfoForView(view: string) {
+  const featureId = VIEW_FEATURE_MAP[view] || "overview";
+  return state.featureRisks.find((item) => item.featureId === featureId);
+}
+
+function renderViewGuide(view = currentView()) {
+  const guide = document.querySelector<HTMLElement>("#view-guide-text");
+  if (!guide) return;
+  const definition = VIEW_GUIDES[view] || VIEW_GUIDES.overview;
+  const info = riskInfoForView(view);
+  const riskHtml = info
+    ? `<section><h4>风险与边界</h4><ul>
+        <li>风险等级：${escapeHtml(info.riskLevel)}；确认级别：${escapeHtml(info.confirmationLevel === "none" ? "无需确认" : info.confirmationLevel === "triple" ? "三次确认" : "二次确认")}。</li>
+        <li>${info.requiresBackup ? "执行前需要备份或生成可恢复记录。" : "主要是只读或低风险动作，通常不需要备份。"}</li>
+        ${info.whatItDoes.map((item) => `<li>能做：${escapeHtml(item)}</li>`).join("")}
+        ${info.whatItDoesNotDo.map((item) => `<li>不会做：${escapeHtml(item)}</li>`).join("")}
+      </ul></section>`
+    : "";
+  guide.innerHTML = `
+    <section><h3>${escapeHtml(definition.title)}</h3><p>${escapeHtml(definition.intro)}</p></section>
+    <section><h4>建议流程</h4><ol>${definition.steps.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ol></section>
+    <section><h4>只读能力</h4><ul>${definition.readonly.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul></section>
+    <section><h4>会修改什么</h4><ul>${definition.writes.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul></section>
+    <section><h4>安全与失败处理</h4><ul>${definition.safety.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul></section>
+    ${riskHtml}
+  `;
+}
+
+function renderFeatureHelp(_view = currentView()) {
   const slot = document.querySelector<HTMLElement>("#feature-help-slot");
   if (!slot) return;
-  const featureId = VIEW_FEATURE_MAP[view] || "overview";
-  const info = state.featureRisks.find((item) => item.featureId === featureId);
-  if (!info) {
-    slot.innerHTML = "";
-    return;
-  }
-  const card = featureHelpCard(
-    escapeHtml(info.title),
-    escapeHtml(info.riskLevel),
-    [
-      ...info.whatItDoes,
-      `确认级别：${info.confirmationLevel === "none" ? "无需确认" : info.confirmationLevel === "triple" ? "三次确认" : "二次确认"}`,
-      info.requiresBackup ? "执行前需要备份或生成可恢复记录。" : "只读或低风险操作通常不需要备份。",
-    ].map(escapeHtml),
-    [
-      ...info.whatItDoesNotDo,
-      info.requiresAdmin ? "需要管理员权限时会明确提示。" : "不会静默请求管理员权限。",
-    ].map(escapeHtml),
-  );
-  const collapsed = featureHelpCollapsed(view);
-  slot.innerHTML = collapsed
-    ? `<button class="feature-help-strip" data-action="feature-help-expand" data-help-view="${escapeHtml(view)}">${icon(FileText)}<span>${escapeHtml(info.title)}</span><small>点击展开说明</small></button>`
-    : `<section class="feature-help-shell" data-help-view="${escapeHtml(view)}">
-        <div class="feature-help-controls">
-          <label class="toggle-row"><input type="checkbox" data-action="feature-help-collapse-next" data-help-view="${escapeHtml(view)}" ${collapsed ? "checked" : ""} /><span>下次进入此页面默认折叠</span></label>
-        </div>
-        ${card}
-      </section>`;
-}
-
-function featureHelpCollapsed(view: string) {
-  try {
-    return window.localStorage.getItem(`devenv.featureHelp.collapsed.${view}`) === "true";
-  } catch {
-    return false;
-  }
-}
-
-function setFeatureHelpCollapsed(view: string, collapsed: boolean) {
-  try {
-    window.localStorage.setItem(`devenv.featureHelp.collapsed.${view}`, collapsed ? "true" : "false");
-  } catch {
-    // localStorage can be unavailable in recovery contexts; default-expanded remains safe.
-  }
+  slot.innerHTML = "";
 }
 
 function escapeHtml(value: string) {
@@ -3468,31 +3625,31 @@ document.querySelector("#set-go-proxy")?.addEventListener("click", () => {
 document.querySelector("#rust-stable")?.addEventListener("click", () => {
   void runPlatformAction("rust_default_stable");
 });
-document.querySelector("#rust-update")?.addEventListener("click", () => {
-  if (!window.confirm("rustup 将联网更新当前用户安装的 Rust 工具链，可能需要一些时间。确定继续吗？")) return;
+document.querySelector("#rust-update")?.addEventListener("click", async () => {
+  if (!(await askForConfirmation("rustup 将联网更新当前用户安装的 Rust 工具链，可能需要一些时间。确定继续吗？"))) return;
   void runPlatformAction("rust_update");
 });
 document.querySelector("#copy-cargo-mirror")?.addEventListener("click", () => {
   void copyText(`[source.crates-io]\nreplace-with = "rsproxy-sparse"\n\n[source.rsproxy-sparse]\nregistry = "sparse+https://rsproxy.cn/index/"`);
 });
-document.querySelector("#set-maven-mirror")?.addEventListener("click", () => {
+document.querySelector("#set-maven-mirror")?.addEventListener("click", async () => {
   const value = document.querySelector<HTMLSelectElement>("#maven-mirror")?.value || "official";
   const path = state.platforms?.mirrors.mavenSettingsPath || "%USERPROFILE%\\.m2\\settings.xml";
-  if (!window.confirm(`将写入 ${path}。若文件已存在，会先创建带时间戳的备份。确定继续吗？`)) return;
+  if (!(await askForConfirmation(`将写入 ${path}。若文件已存在，会先创建带时间戳的备份。确定继续吗？`))) return;
   void runPlatformAction("maven_mirror", value);
 });
-document.querySelector("#set-gradle-mirror")?.addEventListener("click", () => {
+document.querySelector("#set-gradle-mirror")?.addEventListener("click", async () => {
   const value = document.querySelector<HTMLSelectElement>("#gradle-mirror")?.value || "official";
   const path = state.platforms?.mirrors.gradleInitPath || "%USERPROFILE%\\.gradle\\init.gradle";
-  if (!window.confirm(`将写入 ${path}。若文件已存在，会先创建带时间戳的备份。确定继续吗？`)) return;
+  if (!(await askForConfirmation(`将写入 ${path}。若文件已存在，会先创建带时间戳的备份。确定继续吗？`))) return;
   void runPlatformAction("gradle_mirror", value);
 });
-document.querySelector("#restore-maven-config")?.addEventListener("click", () => {
-  if (!window.confirm("将恢复最近一次 DevEnv Manager 备份的 Maven 配置，并保留当前配置备份。确定继续吗？")) return;
+document.querySelector("#restore-maven-config")?.addEventListener("click", async () => {
+  if (!(await askForConfirmation("将恢复最近一次 DevEnv Manager 备份的 Maven 配置，并保留当前配置备份。确定继续吗？"))) return;
   void runPlatformAction("restore_maven_config");
 });
-document.querySelector("#restore-gradle-config")?.addEventListener("click", () => {
-  if (!window.confirm("将恢复最近一次 DevEnv Manager 备份的 Gradle 配置，并保留当前配置备份。确定继续吗？")) return;
+document.querySelector("#restore-gradle-config")?.addEventListener("click", async () => {
+  if (!(await askForConfirmation("将恢复最近一次 DevEnv Manager 备份的 Gradle 配置，并保留当前配置备份。确定继续吗？"))) return;
   void runPlatformAction("restore_gradle_config");
 });
 document.querySelector("#open-package-mirrors")?.addEventListener("click", () => {
@@ -3508,13 +3665,13 @@ document.querySelector("#save-git-identity")?.addEventListener("click", () => {
   }
   void runToolchainAction("git_identity", name, email);
 });
-document.querySelector("#generate-ssh-key")?.addEventListener("click", () => {
+document.querySelector("#generate-ssh-key")?.addEventListener("click", async () => {
   const email = document.querySelector<HTMLInputElement>("#git-user-email")?.value.trim() || "";
   if (!email) {
     showToast("请先填写用于 SSH Key 注释的邮箱", true);
     return;
   }
-  if (!window.confirm("将在当前用户 .ssh 目录生成 id_ed25519。已有同名密钥时会自动拒绝覆盖，确定继续吗？")) return;
+  if (!(await askForConfirmation("将在当前用户 .ssh 目录生成 id_ed25519。已有同名密钥时会自动拒绝覆盖，确定继续吗？"))) return;
   void runToolchainAction("git_generate_ssh", email);
 });
 document.querySelector("#test-github-ssh")?.addEventListener("click", () => void runToolchainAction("git_test_ssh"));
@@ -3574,10 +3731,11 @@ document.querySelector("#create-java-stabilize-plan")?.addEventListener("click",
 document.querySelector("#apply-env-repair-plan")?.addEventListener("click", async () => {
   const plan = state.envRepairPlan;
   if (!plan) return;
-  if (!confirmRisk(`将写入当前用户级环境变量，并创建备份：${plan.backupName}`, plan.riskLevel)) return;
+  if (!(await confirmRisk(`将写入当前用户级环境变量，并创建备份：${plan.backupName}`, plan.riskLevel))) return;
   showToast("正在应用环境修复计划并验证");
   try {
-    state.envRepairResult = await invoke<EnvRepairResult>("apply_env_repair_plan", { plan });
+    const token = await riskOperationToken("apply_env_repair_plan", plan.planId, "high", false, plan.backupName);
+    state.envRepairResult = await invoke<EnvRepairResult>("apply_env_repair_plan", { plan, confirmationToken: token.token });
     state.envRepairPlan = null;
     state.envReliability = await invoke<EnvReliabilitySnapshot>("inspect_env_reliability");
     state.envBackupRecords = await invoke<EnvBackupRecord[]>("list_env_backups");
@@ -3625,13 +3783,19 @@ document.querySelector("#check-env-health")?.addEventListener("click", async () 
     showToast(error instanceof Error ? error.message : String(error), true);
   }
 });
-document.querySelector("#cleanup-path")?.addEventListener("click", () => {
-  if (!window.confirm("将删除当前用户 PATH 中真实失效或重复的条目，并先创建环境备份；受管待安装路径会保留。确定继续吗？")) return;
-  void runOperation(() => invoke<OperationResult>("cleanup_path_entries"), "正在清理真实失效和重复 PATH");
+document.querySelector("#cleanup-path")?.addEventListener("click", async () => {
+  if (!(await askForConfirmation("将删除当前用户 PATH 中真实失效或重复的条目，并先创建环境备份；受管待安装路径会保留。确定继续吗？"))) return;
+  void runOperation(async () => {
+    const token = await riskOperationToken("cleanup_path_entries", "cleanup-path-entries", "medium", false, "environment-backup");
+    return invoke<OperationResult>("cleanup_path_entries", { confirmationToken: token.token });
+  }, "正在清理真实失效和重复 PATH");
 });
-document.querySelector("#restore-env")?.addEventListener("click", () => {
-  if (!window.confirm("将恢复最近一次环境备份；已打开的终端和 IDE 不会自动刷新。确定继续吗？")) return;
-  void runOperation(() => invoke<OperationResult>("restore_user_environment"), "正在恢复用户环境变量");
+document.querySelector("#restore-env")?.addEventListener("click", async () => {
+  if (!(await askForConfirmation("将恢复最近一次环境备份；已打开的终端和 IDE 不会自动刷新。确定继续吗？"))) return;
+  void runOperation(async () => {
+    const token = await riskOperationToken("restore_user_environment", "restore-user-environment-latest", "high", false, "environment-backup");
+    return invoke<OperationResult>("restore_user_environment", { confirmationToken: token.token });
+  }, "正在恢复用户环境变量");
 });
 document.querySelector("#save-profile")?.addEventListener("click", () => {
   const input = document.querySelector<HTMLInputElement>("#profile-name");
@@ -3645,14 +3809,21 @@ document.querySelector("#export-profiles")?.addEventListener("click", () => {
   void runOperation(() => invoke<OperationResult>("export_config_profiles"), "正在导出配置模板");
 });
 document.querySelector("#repair-doctor-safe")?.addEventListener("click", async () => {
-  if (!window.confirm("将自动清理真实失效/重复 PATH，并修复 DevEnv 管理的用户级环境变量。不会安装软件、结束进程或修改系统级变量。确定继续吗？")) return;
+  if (!(await askForConfirmation("将自动清理真实失效/重复 PATH，并修复 DevEnv 管理的用户级环境变量。不会安装软件、结束进程或修改系统级变量。确定继续吗？"))) return;
   showToast("正在执行安全修复并重新诊断");
   try {
     const result = await invoke<DoctorRepairResult>("repair_doctor_safe");
     state.doctor = result.report;
     renderDoctor();
     const detail = result.applied.length ? result.applied.join("\n") : "没有可自动修复的安全项目";
-    window.alert(`环境评分：${result.beforeScore} → ${result.afterScore}\n\n${detail}${result.remaining.length ? `\n\n仍需手动处理 ${result.remaining.length} 项。` : ""}`);
+    const repairResult = document.querySelector<HTMLElement>("#doctor-repair-result");
+    if (repairResult) {
+      repairResult.innerHTML = `<article class="runtime ${result.remaining.length ? "warn" : "ok"}">
+        <div><strong>安全修复结果</strong><span>${result.beforeScore} → ${result.afterScore}</span></div>
+        <small>${escapeHtml(detail)}</small>
+        ${result.remaining.length ? `<ul>${result.remaining.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>` : "<small>没有剩余需要手动处理的自动修复项</small>"}
+      </article>`;
+    }
     showToast(`安全修复完成，当前评分 ${result.afterScore}`);
     await refreshBase();
   } catch (error) {
@@ -3680,14 +3851,14 @@ document.querySelector("#preview-profiles")?.addEventListener("click", async () 
     showToast(error instanceof Error ? error.message : String(error), true);
   }
 });
-document.querySelector("#import-profiles")?.addEventListener("click", () => {
+document.querySelector("#import-profiles")?.addEventListener("click", async () => {
   const path = document.querySelector<HTMLInputElement>("#profile-file-path")?.value.trim() || "";
   if (!path || !state.profileImportPreview) {
     showToast("请先预览并校验模板", true);
     return;
   }
   const replacements = state.profileImportPreview.profiles.filter((item) => item.willReplace).length;
-  if (!window.confirm(`将导入 ${state.profileImportPreview.profiles.length} 个模板${replacements ? `，覆盖 ${replacements} 个同名模板` : ""}。确定继续吗？`)) return;
+  if (!(await askForConfirmation(`将导入 ${state.profileImportPreview.profiles.length} 个模板${replacements ? `，覆盖 ${replacements} 个同名模板` : ""}。确定继续吗？`))) return;
   void runOperation(() => invoke<OperationResult>("import_config_profiles", { path }), "正在导入配置模板").then(() => {
     state.profileImportPreview = null;
     renderProfileImportPreview();
@@ -3707,9 +3878,12 @@ document.querySelector("#load-cache")?.addEventListener("click", async () => {
   state.cache = await invoke<CacheEntry[]>("cache_entries", { calculateHash: false });
   renderCache();
 });
-document.querySelector("#clear-cache")?.addEventListener("click", () => {
-  if (!window.confirm("下载缓存将逐项移入 Windows 回收站，不会删除受管运行时或配置。确定继续吗？")) return;
-  void runOperation(() => invoke<OperationResult>("clear_download_cache"), "正在将下载缓存移入回收站");
+document.querySelector("#clear-cache")?.addEventListener("click", async () => {
+  if (!(await askForConfirmation("下载缓存将逐项移入 Windows 回收站，不会删除受管运行时或配置。确定继续吗？"))) return;
+  void runOperation(async () => {
+    const token = await riskOperationToken("clear_download_cache", "clear-download-cache", "medium");
+    return invoke<OperationResult>("clear_download_cache", { confirmationToken: token.token });
+  }, "正在将下载缓存移入回收站");
 });
 document.querySelector("#inspect-maintenance")?.addEventListener("click", () => void inspectMaintenance());
 document.querySelector("#scan-maintenance")?.addEventListener("click", () => void scanMaintenance());
@@ -3758,7 +3932,7 @@ document.addEventListener("change", (event) => {
 document.querySelector("#execute-cleanup-plan")?.addEventListener("click", async () => {
   const plan = state.cleanupPlan;
   if (!plan) return;
-  if (!window.confirm(`即将清理 ${plan.selectedItems.length} 项，预计释放 ${formatBytes(plan.estimatedBytes)}。后端会再次扫描并校验，普通文件移入回收站。确定继续吗？`)) return;
+  if (!(await askForConfirmation(`即将清理 ${plan.selectedItems.length} 项，预计释放 ${formatBytes(plan.estimatedBytes)}。后端会再次扫描并校验，普通文件移入回收站。确定继续吗？`))) return;
   showToast("正在重新校验并执行清理计划");
   try {
     state.cleanupResult = await invoke<CleanupResult>("clean_selected_targets", { plan });
@@ -3816,7 +3990,7 @@ document.querySelector("#scan-large-files")?.addEventListener("click", async () 
 document.querySelector("#scan-duplicates")?.addEventListener("click", async () => {
   const root = document.querySelector<HTMLInputElement>("#duplicate-root")?.value.trim() || "";
   const minSizeMb = Number(document.querySelector<HTMLInputElement>("#duplicate-min")?.value || "10");
-  if (!window.confirm(`将只在“${root || "用户目录"}”内对 ${minSizeMb} MB 以上、大小相同的候选文件计算 SHA256。不会上传或删除文件，确定继续吗？`)) return;
+  if (!(await askForConfirmation(`将只在“${root || "用户目录"}”内对 ${minSizeMb} MB 以上、大小相同的候选文件计算 SHA256。不会上传或删除文件，确定继续吗？`))) return;
   showToast("正在按大小分组并计算重复候选 SHA256");
   setScanBusy("#scan-duplicates", "#cancel-duplicate-scan", true);
   try {
@@ -3892,7 +4066,7 @@ document.querySelector("#preview-downloads-archive")?.addEventListener("click", 
 document.querySelector("#execute-move-plan")?.addEventListener("click", async () => {
   const plan = state.movePlan;
   if (!plan) return;
-  if (!window.confirm(`将执行 ${plan.mode}：\n${plan.source}\n→ ${plan.target}\n\n执行前请关闭相关程序。确定继续吗？`)) return;
+  if (!(await askForConfirmation(`将执行 ${plan.mode}：\n${plan.source}\n→ ${plan.target}\n\n执行前请关闭相关程序。确定继续吗？`))) return;
   showToast("正在执行空间搬家/归档计划");
   try {
     const command = plan.source.toLowerCase().includes("\\desktop") && plan.mode === "archive_only"
@@ -3900,7 +4074,8 @@ document.querySelector("#execute-move-plan")?.addEventListener("click", async ()
       : plan.source.toLowerCase().includes("\\downloads") && plan.mode === "archive_only"
         ? "execute_downloads_archive_plan"
         : "execute_move_plan";
-    state.moveResult = await invoke<MoveResult>(command, { plan });
+    const token = await riskOperationToken("execute_move_plan", plan.planId, "high", false, "move-plan-preview");
+    state.moveResult = await invoke<MoveResult>(command, { plan, confirmationToken: token.token });
     renderMovePlan();
     await loadRollbackRecords();
     showToast(`执行完成：${formatBytes(state.moveResult.movedBytes)}，失败 ${state.moveResult.failures.length} 项`, state.moveResult.failures.length > 0);
@@ -3939,14 +4114,15 @@ document.querySelector("#execute-expansion-plan")?.addEventListener("click", asy
     "最后确认：执行期间不要断电，不要关闭程序。输入 YES 执行。",
   ];
   for (const prompt of prompts) {
-    if (window.prompt(prompt) !== "YES") {
+    if (!(await askForConfirmation(prompt, { title: "确认磁盘扩容操作", danger: true, requiredText: "YES" }))) {
       showToast("已取消扩容执行");
       return;
     }
   }
   showToast("正在执行 C 盘扩容计划");
   try {
-    state.expansionResult = await invoke<ExpansionResult>("execute_c_drive_expansion", { plan });
+    const token = await riskOperationToken("execute_expansion_plan", plan.planId, "critical", true, "manual-backup-confirmed");
+    state.expansionResult = await invoke<ExpansionResult>("execute_c_drive_expansion", { plan, confirmationToken: token.token });
     renderExpansionPlan();
     showToast(state.expansionResult.success ? "扩容执行完成" : "扩容未成功，请查看报告", !state.expansionResult.success);
   } catch (error) {
@@ -3954,18 +4130,7 @@ document.querySelector("#execute-expansion-plan")?.addEventListener("click", asy
   }
 });
 document.querySelector("#check-updates")?.addEventListener("click", async () => {
-  showToast("正在检查新版本");
-  try {
-    state.update = await invoke<UpdateCheckResult>("check_for_updates");
-    state.updateError = "";
-    window.localStorage.setItem("devenv-last-update-check", String(Date.now()));
-    renderUpdate();
-    showToast(state.update.updateAvailable ? `发现新版本 ${state.update.latestVersion}` : "当前已是最新版本");
-  } catch (error) {
-    state.updateError = error instanceof Error ? error.message : String(error);
-    renderUpdate();
-    showToast(state.updateError, true);
-  }
+  await checkUpdates();
 });
 document.querySelector("#auto-check-updates")?.addEventListener("change", (event) => {
   const enabled = (event.target as HTMLInputElement).checked;
@@ -4009,8 +4174,8 @@ document.querySelector("#inspect-mysql-repair")?.addEventListener("click", async
 document.querySelector("#open-docker-desktop")?.addEventListener("click", () => {
   void runOperation(() => invoke<OperationResult>("open_docker_desktop"), "正在启动 Docker Desktop");
 });
-document.querySelector("#self-uninstall")?.addEventListener("click", () => {
-  const ok = window.confirm("这会启动 DevEnv Manager 的卸载程序并关闭当前程序。确定继续吗？");
+document.querySelector("#self-uninstall")?.addEventListener("click", async () => {
+  const ok = await askForConfirmation("这会启动 DevEnv Manager 的卸载程序并关闭当前程序。确定继续吗？");
   if (!ok) return;
   void runOperation(() => invoke<OperationResult>("self_uninstall"), "正在启动卸载程序");
 });
@@ -4025,7 +4190,10 @@ document.querySelector("#run-command")?.addEventListener("click", async () => {
     }
     let confirmed = false;
     if (assessment.requiresConfirmation) {
-      confirmed = window.confirm(`${assessment.reason}\n\n命令：${command}\n\n确定继续吗？`);
+      confirmed = await askForConfirmation(`${assessment.reason}\n\n命令：${command}\n\n确定继续吗？`, {
+        title: "确认运行白名单命令",
+        danger: assessment.risk === "high" || assessment.risk === "critical",
+      });
       if (!confirmed) return;
     }
     showToast(`正在运行白名单命令：${assessment.executable}`);
@@ -4157,7 +4325,7 @@ document.querySelectorAll<HTMLButtonElement>(".sort-head").forEach((button) => {
   });
 });
 
-document.addEventListener("click", (event) => {
+document.addEventListener("click", async (event) => {
   const button = (event.target as HTMLElement).closest<HTMLButtonElement>(
     "button[data-action], button[data-toolchain-action], button[data-python-tool], button[data-page-key], button[data-dev-cache], button[data-chsrc-action], button[data-cleanup-report-action], button[data-restore-env-backup], button[data-mysql-action], #apply-project-config, #apply-environment-preview, #apply-python-repair, #create-managed-python-pip-plan, #execute-mysql-plan, #accept-safety-disclaimer",
   );
@@ -4177,7 +4345,7 @@ document.addEventListener("click", (event) => {
   if (button.id === "apply-python-repair") {
     const plan = state.pythonRepairPlan;
     if (!plan) return;
-    if (!window.confirm(`将执行 ${plan.actions.length} 项 Python 修复，并先保存用户环境备份。pip 升级可能联网，确定继续吗？`)) return;
+    if (!(await askForConfirmation(`将执行 ${plan.actions.length} 项 Python 修复，并先保存用户环境备份。pip 升级可能联网，确定继续吗？`))) return;
     void runOperation(() => invoke<OperationResult>("apply_python_repair", { planId: plan.planId }), "正在执行并验证 Python 修复").then(async () => {
       state.pythonRepairPlan = null;
       state.python = await invoke<PythonAnalysis>("analyze_python_environment");
@@ -4191,7 +4359,10 @@ document.addEventListener("click", (event) => {
     if (!plan) return;
     const backupDestination = document.querySelector<HTMLInputElement>("#mysql-backup-destination")?.value.trim() || null;
     const guideOnly = plan.action === "reset_root_guide" || plan.action === "dump_guide";
-    if (!guideOnly && !window.confirm(`将执行 MySQL 计划“${plan.title}”。程序会重新诊断路径和状态；失败不会绕过保护规则。确定继续吗？`)) return;
+    if (!guideOnly && !(await askForConfirmation(`将执行 MySQL 计划“${plan.title}”。程序会重新诊断路径和状态；失败不会绕过保护规则。确定继续吗？`, {
+      title: "确认 MySQL 修复计划",
+      danger: true,
+    }))) return;
     void (async () => {
       showToast(guideOnly ? "正在生成安全向导" : "正在执行 MySQL 修复计划");
       try {
@@ -4199,13 +4370,13 @@ document.addEventListener("click", (event) => {
         if (!guideOnly) {
           const guard = await invoke<MySqlExecutionGuard>("mysql_pending_execution_guard", { planId: plan.planId });
           if (guard.riskLevel === "critical") {
-            if (!window.confirm("第一次确认：MySQL 系统库修复前必须已完成完整 Data 备份。")) return;
-            if (!window.confirm("第二次确认：我理解该操作可能影响数据库服务启动和业务库恢复。")) return;
-            const phrase = window.prompt("第三次确认：请输入“我已知晓 MySQL 修复风险并确认执行”");
-            if (phrase !== "我已知晓 MySQL 修复风险并确认执行") {
-              showToast("三次确认文本不匹配，已取消", true);
-              return;
-            }
+            if (!(await askForConfirmation("第一次确认：MySQL 系统库修复前必须已完成完整 Data 备份。"))) return;
+            if (!(await askForConfirmation("第二次确认：我理解该操作可能影响数据库服务启动和业务库恢复。"))) return;
+            if (!(await askForConfirmation("第三次确认：请输入指定文本后才允许继续。", {
+              title: "最终确认 MySQL 高危修复",
+              danger: true,
+              requiredText: "我已知晓 MySQL 修复风险并确认执行",
+            }))) return;
           }
           const token = await createBackendConfirmation(
             guard.actionId,
@@ -4214,6 +4385,7 @@ document.addEventListener("click", (event) => {
             guard.planFingerprint,
             guard.riskLevel === "critical",
             guard.backupReceipt || null,
+            "execute_mysql_repair_plan",
           );
           confirmationToken = token.token;
         }
@@ -4250,8 +4422,8 @@ document.addEventListener("click", (event) => {
     else if (pageKey === "project-ports") renderProjectPortConfigs();
     else if (pageKey.startsWith("project-") && state.project) renderProjectAnalysis(state.project);
     else if (pageKey === "environment-backups") renderEnvironmentBackups();
-    else if (pageKey === "desktop-usage") renderFolderUsage("#desktop-usage", state.desktopUsage, "desktop-usage");
-    else if (pageKey === "downloads-usage") renderFolderUsage("#downloads-usage", state.downloadsUsage, "downloads-usage");
+    else if (pageKey.startsWith("desktop-usage")) renderFolderUsage("#desktop-usage", state.desktopUsage, "desktop-usage");
+    else if (pageKey.startsWith("downloads-usage")) renderFolderUsage("#downloads-usage", state.downloadsUsage, "downloads-usage");
     else if (pageKey === "large-files") renderLargeFiles();
     else if (pageKey === "archive-plan") renderArchivePlan();
     else if (pageKey === "rollback-records") renderRollbackRecords();
@@ -4265,8 +4437,11 @@ document.addEventListener("click", (event) => {
   }
   const devCache = button.dataset.devCache;
   if (devCache) {
-    if (!window.confirm(`将调用 ${button.title || button.textContent || devCache}。该命令会清除可重新生成的开发缓存，确定继续吗？`)) return;
-    void runOperation(() => invoke<OperationResult>("clean_dev_cache", { tool: devCache }), `正在使用 ${devCache} 官方命令清理缓存`).then(() => void scanMaintenance());
+    if (!(await askForConfirmation(`将调用 ${button.title || button.textContent || devCache}。该命令会清除可重新生成的开发缓存，确定继续吗？`))) return;
+    void runOperation(async () => {
+      const token = await riskOperationToken("clean_dev_cache", `tool-${devCache.trim().toLowerCase()}`, "medium");
+      return invoke<OperationResult>("clean_dev_cache", { tool: devCache, confirmationToken: token.token });
+    }, `正在使用 ${devCache} 官方命令清理缓存`).then(() => void scanMaintenance());
     return;
   }
   const chsrcAction = button.dataset.chsrcAction;
@@ -4274,7 +4449,10 @@ document.addEventListener("click", (event) => {
     const target = document.querySelector<HTMLSelectElement>("#chsrc-target")?.value || "node";
     const source = document.querySelector<HTMLInputElement>("#chsrc-source")?.value.trim() || null;
     const changing = ["auto", "set", "reset"].includes(chsrcAction);
-    if (changing && !window.confirm(`将调用官方 chsrc 对 ${target} 执行 ${chsrcAction}，可能修改当前用户或工具配置。确定继续吗？`)) return;
+    if (changing && !(await askForConfirmation(`将调用官方 chsrc 对 ${target} 执行 ${chsrcAction}，可能修改当前用户或工具配置。确定继续吗？`, {
+      title: "确认 chsrc 配置操作",
+      danger: true,
+    }))) return;
     void (async () => {
       try {
         const result = await invoke<OperationResult>("run_chsrc_action", { action: chsrcAction, target, source });
@@ -4326,7 +4504,7 @@ document.addEventListener("click", (event) => {
   }
   if (button.dataset.action === "restore-env-record") {
     const backupName = button.dataset.backupName || "";
-    if (!confirmRisk(`将恢复用户级环境变量备份：${backupName}\n恢复前会先备份当前状态。`, "medium")) return;
+    if (!(await confirmRisk(`将恢复用户级环境变量备份：${backupName}\n恢复前会先备份当前状态。`, "medium"))) return;
     void invoke<EnvRepairResult>("restore_env_backup", { backupName })
       .then(async (result) => {
         state.envRepairResult = result;
@@ -4342,8 +4520,11 @@ document.addEventListener("click", (event) => {
   }
   if (button.dataset.action === "rollback-move") {
     const rollbackId = button.dataset.rollbackId || "";
-    if (!window.confirm(`将执行回滚 ${rollbackId}：删除 Junction 并恢复备份目录（如存在）。确定继续吗？`)) return;
-    void runOperation(() => invoke<OperationResult>("rollback_move", { rollbackId }), "正在执行空间搬家回滚").then(() => void loadRollbackRecords());
+    if (!(await askForConfirmation(`将执行回滚 ${rollbackId}：删除 Junction 并恢复备份目录（如存在）。确定继续吗？`))) return;
+    void runOperation(async () => {
+      const token = await riskOperationToken("rollback_move", rollbackId, "high");
+      return invoke<OperationResult>("rollback_move", { rollbackId, confirmationToken: token.token });
+    }, "正在执行空间搬家回滚").then(() => void loadRollbackRecords());
     return;
   }
   if (button.id === "apply-project-config") {
@@ -4359,9 +4540,13 @@ document.addEventListener("click", (event) => {
     });
     const enabled = preview.files.filter((file) => file.enabled).length;
     const switchCount = Object.keys(switches).length;
-    if (!window.confirm(`将写入 ${enabled} 个固定项目配置文件并切换 ${switchCount} 个运行时。已有文件和切换前环境都会备份，确定继续吗？`)) return;
+    if (!(await askForConfirmation(`将写入 ${enabled} 个固定项目配置文件并切换 ${switchCount} 个运行时。已有文件和切换前环境都会备份，确定继续吗？`))) return;
     void runOperation(
-      () => invoke<OperationResult>("apply_project_configuration", { request: { projectPath: preview.projectPath, files: preview.files, switches } }),
+      async () => {
+        const request = { projectPath: preview.projectPath, files: preview.files, switches };
+        const token = await riskOperationToken("apply_project_configuration", projectConfigurationPlanId(preview.projectPath, enabled, switchCount), "high", false, "project-backup");
+        return invoke<OperationResult>("apply_project_configuration", { request, confirmationToken: token.token });
+      },
       "正在备份并应用项目配置",
     );
     return;
@@ -4369,9 +4554,12 @@ document.addEventListener("click", (event) => {
   if (button.id === "apply-environment-preview") {
     const preview = state.environmentPreview;
     if (!preview) return;
-    if (!window.confirm(`将按预览写入 ${preview.changes.length} 组当前用户环境配置，并先保存 ${preview.backupName}。确定继续吗？`)) return;
+    if (!(await askForConfirmation(`将按预览写入 ${preview.changes.length} 组当前用户环境配置，并先保存 ${preview.backupName}。确定继续吗？`))) return;
     void runOperation(
-      () => invoke<OperationResult>("apply_user_environment_configuration", { previewId: preview.previewId }),
+      async () => {
+        const token = await riskOperationToken("apply_user_environment_configuration", preview.previewId, "high", false, preview.backupName);
+        return invoke<OperationResult>("apply_user_environment_configuration", { previewId: preview.previewId, confirmationToken: token.token });
+      },
       "正在备份、写入并回读验证用户环境变量",
     ).then(async () => {
       state.environmentPreview = null;
@@ -4383,7 +4571,7 @@ document.addEventListener("click", (event) => {
   }
   const restoreBackup = button.dataset.restoreEnvBackup;
   if (restoreBackup) {
-    if (!window.confirm(`将恢复环境备份 ${restoreBackup}；恢复前会再保存当前状态。确定继续吗？`)) return;
+    if (!(await askForConfirmation(`将恢复环境备份 ${restoreBackup}；恢复前会再保存当前状态。确定继续吗？`))) return;
     void runOperation(
       () => invoke<OperationResult>("restore_environment_backup", { fileName: restoreBackup }),
       "正在恢复指定环境备份",
@@ -4420,6 +4608,31 @@ document.addEventListener("click", (event) => {
     void invoke<OperationResult>("open_analysis_path", { path: button.dataset.path || "" })
       .then((result) => showToast(result.message))
       .catch((error) => showToast(error instanceof Error ? error.message : String(error), true));
+    return;
+  }
+  if (action === "rescan-folder") {
+    const target = button.dataset.target || "";
+    if (target === "desktop") {
+      showToast("正在重新扫描桌面");
+      void invoke<FolderUsageReport>("inspect_desktop")
+        .then((report) => {
+          state.desktopUsage = report;
+          renderFolderUsage("#desktop-usage", report, "desktop-usage");
+          showToast("桌面明细已刷新");
+        })
+        .catch((error) => showToast(error instanceof Error ? error.message : String(error), true));
+    } else if (target === "downloads") {
+      showToast("正在重新扫描下载目录");
+      void invoke<FolderUsageReport>("inspect_downloads")
+        .then((report) => {
+          state.downloadsUsage = report;
+          renderFolderUsage("#downloads-usage", report, "downloads-usage");
+          showToast("下载目录明细已刷新");
+        })
+        .catch((error) => showToast(error instanceof Error ? error.message : String(error), true));
+    } else if (target === "large-files") {
+      document.querySelector<HTMLButtonElement>("#scan-large-files")?.click();
+    }
     return;
   }
   if (action === "open-apps-features") {
@@ -4469,6 +4682,15 @@ document.addEventListener("click", (event) => {
     void copyText(`DevEnv Manager safe mode\n${state.fatalError}`);
     return;
   }
+  if (action === "dismiss-safe-mode-banner") {
+    state.safeModeNoticeCollapsed = true;
+    renderFatalError();
+    return;
+  }
+  if (action === "hide-toast") {
+    hideToast();
+    return;
+  }
   if (action === "copy-safety-disclaimer") {
     void copyText(state.safetyDisclaimer || "DevEnv Manager safety disclaimer");
     return;
@@ -4477,10 +4699,28 @@ document.addEventListener("click", (event) => {
     void inspectPlatforms();
     return;
   }
-  if (action === "feature-help-expand") {
-    const view = button.dataset.helpView || document.querySelector(".nav-item.active")?.getAttribute("data-view") || "overview";
-    setFeatureHelpCollapsed(view, false);
-    renderFeatureHelp(view);
+  if (action === "check-updates") {
+    void checkUpdates();
+    return;
+  }
+  if (action === "verify-external-jdk") {
+    const jdkPath = button.dataset.jdkPath || "";
+    showToast("正在只读验证 JDK 的 java、javac 和 jar");
+    void invoke<ValidationCheck[]>("verify_external_jdk", { jdkPath })
+      .then((checks) => {
+        state.externalJdkChecks[jdkPath] = checks;
+        renderJavaEnvironment();
+        showToast(checks.every((item) => item.success) ? "外部 JDK 验证通过" : "外部 JDK 验证未完全通过", !checks.every((item) => item.success));
+      })
+      .catch((error) => showToast(error instanceof Error ? error.message : String(error), true));
+    return;
+  }
+  if (action === "set-java-home-candidate") {
+    const jdkPath = button.dataset.jdkPath || "";
+    const input = document.querySelector<HTMLInputElement>("#java-stabilize-path");
+    if (input) input.value = jdkPath;
+    activateView("environment");
+    document.querySelector<HTMLButtonElement>("#create-java-stabilize-plan")?.click();
     return;
   }
   if (action === "doctor-fix") {
@@ -4508,9 +4748,13 @@ document.addEventListener("click", (event) => {
       wsl_terminate: `终止 WSL 发行版 ${value || ""}`,
       wsl_set_default: `将 ${value || ""} 设为默认发行版`,
     };
-    if (!window.confirm(`${labels[platformAction] || "执行平台操作"}。需要管理员权限时 Windows 会显示 UAC，确定继续吗？`)) return;
+    if (!(await askForConfirmation(`${labels[platformAction] || "执行平台操作"}。需要管理员权限时 Windows 会显示 UAC，确定继续吗？`))) return;
     void runOperation(
-      () => invoke<OperationResult>("manage_system_platform", { action: platformAction, value: value || null }),
+      async () => {
+        const planId = `${platformAction}:${value || ""}`;
+        const token = await riskOperationToken("manage_system_platform", planId, "high");
+        return invoke<OperationResult>("manage_system_platform", { action: platformAction, value: value || null, confirmationToken: token.token });
+      },
       `正在${labels[platformAction] || "执行平台操作"}`,
     ).then(async () => {
       state.systemPlatforms = await invoke<SystemPlatformReport>("inspect_system_platforms");
@@ -4519,7 +4763,7 @@ document.addEventListener("click", (event) => {
   }
   if (action === "download-update") {
     void (async () => {
-      if (!window.confirm("将从 GitHub Releases 下载新版安装包，并使用发布清单中的 SHA256 校验。确定继续吗？")) return;
+      if (!(await askForConfirmation("将从 GitHub Releases 下载新版安装包，并使用发布清单中的 SHA256 校验。确定继续吗？"))) return;
       showToast("正在下载并校验更新安装包");
       try {
         const result = await invoke<OperationResult>("download_update");
@@ -4533,7 +4777,7 @@ document.addEventListener("click", (event) => {
     })();
   }
   if (action === "install-update") {
-    if (!window.confirm("将启动已校验的安装器并退出当前程序。请保存正在进行的工作，确定继续吗？")) return;
+    if (!(await askForConfirmation("将启动已校验的安装器并退出当前程序。请保存正在进行的工作，确定继续吗？"))) return;
     void (async () => {
       showToast("正在重新校验并启动更新安装器");
       try {
@@ -4553,9 +4797,12 @@ document.addEventListener("click", (event) => {
       showToast("请输入 1024 到 65535 之间的有效端口", true);
       return;
     }
-    if (!window.confirm(`将备份 ${config.file}，并把端口 ${config.currentPort} 修改为 ${newPort}。确定继续吗？`)) return;
+    if (!(await askForConfirmation(`将备份 ${config.file}，并把端口 ${config.currentPort} 修改为 ${newPort}。确定继续吗？`))) return;
     void runOperation(
-      () => invoke<OperationResult>("update_project_port", { path, configId, newPort }),
+      async () => {
+        const token = await riskOperationToken("update_project_port", `${path}:${configId}:${newPort}`, "medium", false, "project-port-backup");
+        return invoke<OperationResult>("update_project_port", { path, configId, newPort, confirmationToken: token.token });
+      },
       "正在备份并修改项目端口",
     ).then(() => void inspectProjectPorts(false));
   }
@@ -4573,9 +4820,12 @@ document.addEventListener("click", (event) => {
     const serviceName = button.dataset.service || "";
     const serviceAction = button.dataset.serviceAction || "";
     const actionLabel = serviceAction === "start" ? "启动" : serviceAction === "stop" ? "停止" : "重启";
-    if (!window.confirm(`将${actionLabel} Windows 服务 ${serviceName}。数据库连接可能短暂中断，确定继续吗？`)) return;
+    if (!(await askForConfirmation(`将${actionLabel} Windows 服务 ${serviceName}。数据库连接可能短暂中断，确定继续吗？`))) return;
     void runOperation(
-      () => invoke<OperationResult>("manage_local_service", { serviceName, action: serviceAction }),
+      async () => {
+        const token = await riskOperationToken("manage_local_service", `${serviceName}:${serviceAction}`, "high");
+        return invoke<OperationResult>("manage_local_service", { serviceName, action: serviceAction, confirmationToken: token.token });
+      },
       `正在${actionLabel}服务 ${serviceName}`,
     ).then(async () => {
       state.localServices = await invoke<LocalServiceStatus[]>("inspect_local_services");
@@ -4604,10 +4854,13 @@ document.addEventListener("click", (event) => {
   if (action === "stop-local-service") {
     const port = Number(button.dataset.port || 0);
     const serviceName = button.dataset.service || "";
-    const ok = window.confirm(`将停止 Windows 服务 ${serviceName}（端口 ${port}）。这会中断当前数据库连接，确定继续吗？`);
+    const ok = await askForConfirmation(`将停止 Windows 服务 ${serviceName}（端口 ${port}）。这会中断当前数据库连接，确定继续吗？`);
     if (!ok) return;
     void runOperation(
-      () => invoke<OperationResult>("stop_local_service", { port, serviceName }),
+      async () => {
+        const token = await riskOperationToken("stop_local_service", `${port}:${serviceName}`, "high");
+        return invoke<OperationResult>("stop_local_service", { port, serviceName, confirmationToken: token.token });
+      },
       `正在停止服务 ${serviceName}`,
     ).then(async () => {
       state.localServices = await invoke<LocalServiceStatus[]>("inspect_local_services");
@@ -4635,7 +4888,7 @@ document.addEventListener("click", (event) => {
       return;
     }
     const longRunning = projectAction === "npm_dev" || projectAction === "npm_tauri_dev";
-    const ok = longRunning || window.confirm(`将运行：${command}\n\n工作目录：${input.value}\n\n确定继续吗？`);
+    const ok = longRunning || (await askForConfirmation(`将运行：${command}\n\n工作目录：${input.value}\n\n确定继续吗？`));
     if (!ok) return;
     showToast(longRunning ? "正在后台启动开发服务" : "正在运行项目命令");
     void invoke<CommandRunResult>("run_project_action", { path: input.value, action: projectAction })
@@ -4652,7 +4905,7 @@ document.addEventListener("click", (event) => {
     const path = button.dataset.path || null;
     const currentHome = state.javaEnvironment?.javaHome || state.env?.javaHome || "未设置";
     const targetHome = path || `%DEVENV_HOME%\\current\\jdk（JDK ${version}）`;
-    if (!window.confirm(`将修改当前用户的 JDK 生效链：\n\nJAVA_HOME：${currentHome}\n→ ${targetHome}\n\n受管 PATH 中的 JDK 会保持在首位；切换后将自动验证 java、javac、Maven 与 Gradle。确定继续吗？`)) return;
+    if (!(await askForConfirmation(`将修改当前用户的 JDK 生效链：\n\nJAVA_HOME：${currentHome}\n→ ${targetHome}\n\n受管 PATH 中的 JDK 会保持在首位；切换后将自动验证 java、javac、Maven 与 Gradle。确定继续吗？`))) return;
     void runRuntimeOperation(
       () => invoke<OperationResult>("switch_runtime", { kind: "jdk", version, path }),
       `正在切换 JDK ${version}`,
@@ -4754,7 +5007,7 @@ document.addEventListener("click", (event) => {
         const message = missing.length
           ? `将联网安装：${missing.map((item) => `${item.kind} ${item.version}`).join("、")}，安装完成后应用模板。确定继续吗？`
           : "所需运行时均已安装，将直接应用模板。确定继续吗？";
-        if (!window.confirm(message)) return;
+        if (!(await askForConfirmation(message))) return;
         await runRuntimeOperation(
           () => invoke<OperationResult>("install_profile_missing", { id }),
           missing.length ? "正在补齐模板所需运行时" : "正在应用配置模板",
@@ -4784,13 +5037,6 @@ window.addEventListener("error", (event) => {
 
 window.addEventListener("unhandledrejection", (event) => {
   enterSafeMode(event.reason, "未处理的异步错误");
-});
-
-document.addEventListener("change", (event) => {
-  const input = (event.target as HTMLElement).closest<HTMLInputElement>('input[data-action="feature-help-collapse-next"]');
-  if (!input) return;
-  const view = input.dataset.helpView || document.querySelector(".nav-item.active")?.getAttribute("data-view") || "overview";
-  setFeatureHelpCollapsed(view, input.checked);
 });
 
 window.addEventListener(
@@ -4848,3 +5094,4 @@ document.querySelector("#inspect-agent-traces")?.addEventListener("click", async
     showToast(error instanceof Error ? error.message : String(error), true);
   }
 });
+

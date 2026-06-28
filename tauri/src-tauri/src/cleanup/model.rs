@@ -126,10 +126,18 @@ pub struct CleanupFailure {
 #[derive(Debug, Clone, Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct LargeFileItem {
+    pub file_name: String,
     pub path: String,
+    pub directory: String,
+    pub extension: String,
     pub size: u64,
     pub modified_at: Option<String>,
     pub file_type: String,
+    pub source_category: String,
+    pub exists: bool,
+    pub can_open: bool,
+    pub can_locate: bool,
+    pub open_status: String,
     pub suggestion: String,
     pub risk: String,
 }
@@ -159,6 +167,7 @@ pub struct FolderUsageItem {
     pub size: u64,
     pub category: String,
     pub suggestion: String,
+    pub details: Vec<LargeFileItem>,
 }
 
 #[derive(Debug, Clone, Serialize, Default)]
@@ -168,6 +177,7 @@ pub struct FolderUsageReport {
     pub path: String,
     pub total_bytes: u64,
     pub categories: Vec<FolderUsageItem>,
+    pub top_files: Vec<LargeFileItem>,
     pub suggestions: Vec<String>,
     pub warnings: Vec<String>,
 }

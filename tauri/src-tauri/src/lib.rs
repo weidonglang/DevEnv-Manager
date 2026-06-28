@@ -219,6 +219,7 @@ struct KillResult {
 #[serde(rename_all = "camelCase")]
 struct ConfirmationToken {
     token: String,
+    command: String,
     action_id: String,
     plan_id: String,
     risk_level: String,
@@ -234,6 +235,7 @@ struct ConfirmationToken {
 #[serde(rename_all = "camelCase")]
 struct ConfirmationTokenView {
     token: String,
+    command: String,
     action_id: String,
     plan_id: String,
     risk_level: String,
@@ -953,8 +955,179 @@ fn confirmation_tokens() -> &'static Mutex<HashMap<String, ConfirmationToken>> {
     CONFIRMATION_TOKENS.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
+const RISK_OPERATION_REGISTRY: &[RiskOperationSpec] = &[
+    RiskOperationSpec {
+        command: "apply_env_repair_plan",
+        action_id: "apply_env_repair_plan",
+        risk_level: "high",
+        requires_backup: true,
+        requires_token: true,
+        description: "写入用户级环境修复计划",
+    },
+    RiskOperationSpec {
+        command: "restore_user_environment",
+        action_id: "restore_user_environment",
+        risk_level: "high",
+        requires_backup: true,
+        requires_token: true,
+        description: "恢复用户环境变量备份",
+    },
+    RiskOperationSpec {
+        command: "cleanup_path_entries",
+        action_id: "cleanup_path_entries",
+        risk_level: "medium",
+        requires_backup: true,
+        requires_token: true,
+        description: "清理用户 PATH 失效或重复条目",
+    },
+    RiskOperationSpec {
+        command: "apply_user_environment_configuration",
+        action_id: "apply_user_environment_configuration",
+        risk_level: "high",
+        requires_backup: true,
+        requires_token: true,
+        description: "写入用户级 DEVENV_HOME/JAVA_HOME/PATH 配置",
+    },
+    RiskOperationSpec {
+        command: "manage_system_platform",
+        action_id: "manage_system_platform",
+        risk_level: "high",
+        requires_backup: false,
+        requires_token: true,
+        description: "安装、升级、退出 Docker/WSL 等系统平台操作",
+    },
+    RiskOperationSpec {
+        command: "manage_local_service",
+        action_id: "manage_local_service",
+        risk_level: "high",
+        requires_backup: false,
+        requires_token: true,
+        description: "启动、停止或重启本地数据库 Windows 服务",
+    },
+    RiskOperationSpec {
+        command: "stop_local_service",
+        action_id: "stop_local_service",
+        risk_level: "high",
+        requires_backup: false,
+        requires_token: true,
+        description: "停止占用数据库端口的 Windows 服务",
+    },
+    RiskOperationSpec {
+        command: "apply_project_configuration",
+        action_id: "apply_project_configuration",
+        risk_level: "high",
+        requires_backup: true,
+        requires_token: true,
+        description: "写入项目配置并可切换运行时",
+    },
+    RiskOperationSpec {
+        command: "update_project_port",
+        action_id: "update_project_port",
+        risk_level: "medium",
+        requires_backup: true,
+        requires_token: true,
+        description: "备份并修改项目端口配置",
+    },
+    RiskOperationSpec {
+        command: "rollback_move",
+        action_id: "rollback_move",
+        risk_level: "high",
+        requires_backup: false,
+        requires_token: true,
+        description: "回滚空间搬家或 Junction 操作",
+    },
+    RiskOperationSpec {
+        command: "execute_move_plan",
+        action_id: "execute_move_plan",
+        risk_level: "high",
+        requires_backup: true,
+        requires_token: true,
+        description: "执行空间搬家或归档计划",
+    },
+    RiskOperationSpec {
+        command: "execute_expansion_plan",
+        action_id: "execute_expansion_plan",
+        risk_level: "critical",
+        requires_backup: true,
+        requires_token: true,
+        description: "执行磁盘扩容计划",
+    },
+    RiskOperationSpec {
+        command: "clear_download_cache",
+        action_id: "clear_download_cache",
+        risk_level: "medium",
+        requires_backup: false,
+        requires_token: true,
+        description: "将下载缓存移入回收站",
+    },
+    RiskOperationSpec {
+        command: "clean_dev_cache",
+        action_id: "clean_dev_cache",
+        risk_level: "medium",
+        requires_backup: false,
+        requires_token: true,
+        description: "调用官方命令清理开发缓存",
+    },
+    RiskOperationSpec {
+        command: "kill_process",
+        action_id: "kill_process",
+        risk_level: "high",
+        requires_backup: false,
+        requires_token: true,
+        description: "结束进程及子进程",
+    },
+    RiskOperationSpec {
+        command: "execute_mysql_repair_plan",
+        action_id: "execute_mysql_repair_plan",
+        risk_level: "critical",
+        requires_backup: true,
+        requires_token: true,
+        description: "执行 MySQL 高危修复计划",
+    },
+];
+
+fn risk_operation_spec(command: &str) -> Option<RiskOperationSpec> {
+    RISK_OPERATION_REGISTRY
+        .iter()
+        .copied()
+        .find(|item| item.command == command)
+}
+
+fn risk_operation_fingerprint(command: &str, plan_id: &str, risk_level: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(command.as_bytes());
+    hasher.update(b"\0");
+    hasher.update(plan_id.as_bytes());
+    hasher.update(b"\0");
+    hasher.update(risk_level.as_bytes());
+    format!("{:x}", hasher.finalize())
+}
+
+fn require_risk_operation_token(
+    command: &str,
+    plan_id: &str,
+    confirmation_token: Option<String>,
+) -> Result<(), String> {
+    let spec = risk_operation_spec(command).ok_or_else(|| format!("高危操作未登记：{command}"))?;
+    if !spec.requires_token {
+        return Ok(());
+    }
+    let fingerprint = risk_operation_fingerprint(command, plan_id, spec.risk_level);
+    require_confirmation_token(
+        confirmation_token,
+        command,
+        spec.action_id,
+        plan_id,
+        spec.risk_level,
+        &fingerprint,
+        spec.requires_backup,
+    )
+    .map_err(|message| format!("{message}（操作：{}）", spec.description))
+}
+
 #[tauri::command]
 fn create_confirmation_token(
+    command: Option<String>,
     action_id: String,
     plan_id: String,
     risk_level: String,
@@ -962,10 +1135,18 @@ fn create_confirmation_token(
     triple_confirmed: bool,
     backup_receipt: Option<String>,
 ) -> Result<ConfirmationTokenView, String> {
+    let command = command
+        .unwrap_or_else(|| action_id.clone())
+        .trim()
+        .to_string();
+    let command = validate_confirmation_field(command, "command")?;
     let action_id = validate_confirmation_field(action_id, "action_id")?;
     let plan_id = validate_confirmation_field(plan_id, "plan_id")?;
     let risk_level = validate_confirmation_field(risk_level, "risk_level")?;
     let plan_fingerprint = validate_confirmation_field(plan_fingerprint, "plan_fingerprint")?;
+    if risk_operation_spec(&command).is_none() && command != action_id {
+        return Err("confirmation token command 未登记".to_string());
+    }
     if risk_level == "critical" && !triple_confirmed {
         return Err("极高风险操作必须完成三次确认".to_string());
     }
@@ -973,6 +1154,8 @@ fn create_confirmation_token(
     let expires_at = now + 5 * 60;
     let mut hasher = Sha256::new();
     hasher.update(action_id.as_bytes());
+    hasher.update(b"\0");
+    hasher.update(command.as_bytes());
     hasher.update(b"\0");
     hasher.update(plan_id.as_bytes());
     hasher.update(b"\0");
@@ -983,6 +1166,7 @@ fn create_confirmation_token(
     let token = format!("{:x}", hasher.finalize());
     let record = ConfirmationToken {
         token: token.clone(),
+        command: command.clone(),
         action_id: action_id.clone(),
         plan_id: plan_id.clone(),
         risk_level: risk_level.clone(),
@@ -1000,6 +1184,7 @@ fn create_confirmation_token(
     store.insert(token.clone(), record);
     Ok(ConfirmationTokenView {
         token,
+        command,
         action_id,
         plan_id,
         risk_level,
@@ -1017,6 +1202,7 @@ fn validate_confirmation_field(value: String, label: &str) -> Result<String, Str
 
 fn require_confirmation_token(
     token: Option<String>,
+    command: &str,
     action_id: &str,
     plan_id: &str,
     risk_level: &str,
@@ -1041,7 +1227,8 @@ fn require_confirmation_token(
         record.used = true;
         return Err("confirmation token 已过期，请重新确认".to_string());
     }
-    if record.action_id != action_id
+    if record.command != command
+        || record.action_id != action_id
         || record.plan_id != plan_id
         || record.risk_level != risk_level
         || record.plan_fingerprint != plan_fingerprint
@@ -1236,8 +1423,13 @@ async fn clean_managed_download_cache() -> Result<cleanup::CleanupResult, String
 }
 
 #[tauri::command]
-async fn clean_dev_cache(tool: String) -> Result<OperationResult, String> {
+async fn clean_dev_cache(
+    tool: String,
+    confirmation_token: Option<String>,
+) -> Result<OperationResult, String> {
     run_blocking(move || {
+        let plan_id = format!("tool-{}", tool.trim().to_ascii_lowercase());
+        require_risk_operation_token("clean_dev_cache", &plan_id, confirmation_token)?;
         let paths = load_paths()?;
         let message = cleanup::clean_dev_cache(&tool, &paths.root)?;
         Ok(OperationResult {
@@ -1468,8 +1660,10 @@ async fn create_env_repair_plan(
 #[tauri::command]
 async fn apply_env_repair_plan(
     plan: env_core::EnvRepairPlan,
+    confirmation_token: Option<String>,
 ) -> Result<env_core::EnvRepairResult, String> {
     run_blocking(move || {
+        require_risk_operation_token("apply_env_repair_plan", &plan.plan_id, confirmation_token)?;
         let paths = load_paths()?;
         Ok(env_core::apply_env_repair_plan(&paths.root, plan))
     })
@@ -1510,11 +1704,27 @@ async fn create_java_stabilize_plan(jdk_path: String) -> Result<env_core::EnvRep
     .await?
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct RiskOperationSpec {
+    command: &'static str,
+    action_id: &'static str,
+    risk_level: &'static str,
+    requires_backup: bool,
+    requires_token: bool,
+    description: &'static str,
+}
+
+#[tauri::command]
+async fn verify_external_jdk(jdk_path: String) -> Result<Vec<ValidationCheck>, String> {
+    run_blocking(move || verify_external_jdk_blocking(jdk_path)).await?
+}
+
 #[tauri::command]
 async fn apply_java_stabilize_plan(
     plan: env_core::EnvRepairPlan,
+    confirmation_token: Option<String>,
 ) -> Result<env_core::EnvRepairResult, String> {
-    apply_env_repair_plan(plan).await
+    apply_env_repair_plan(plan, confirmation_token).await
 }
 
 #[tauri::command]
@@ -1524,6 +1734,80 @@ async fn verify_java_toolchain() -> Result<env_core::JavaVerificationReport, Str
         Ok(env_core::verify_java_toolchain(&paths.root))
     })
     .await?
+}
+
+fn verify_external_jdk_blocking(jdk_path: String) -> Result<Vec<ValidationCheck>, String> {
+    let root = PathBuf::from(jdk_path.trim());
+    if jdk_path.trim().is_empty() {
+        return Err("请先选择 JDK 根目录".to_string());
+    }
+    if root
+        .file_name()
+        .and_then(|value| value.to_str())
+        .is_some_and(|name| name.eq_ignore_ascii_case("bin"))
+    {
+        return Err("请填写 JDK 根目录，不能填写 bin 目录".to_string());
+    }
+    if !root.is_dir() {
+        return Err("JDK 根目录不存在".to_string());
+    }
+    let exe_suffix = if cfg!(windows) { ".exe" } else { "" };
+    Ok(vec![
+        verify_jdk_tool(
+            "java-version",
+            "java -version",
+            &root.join("bin").join(format!("java{exe_suffix}")),
+            &["-version"],
+        ),
+        verify_jdk_tool(
+            "javac-version",
+            "javac -version",
+            &root.join("bin").join(format!("javac{exe_suffix}")),
+            &["-version"],
+        ),
+        verify_jdk_tool(
+            "jar-version",
+            "jar --version",
+            &root.join("bin").join(format!("jar{exe_suffix}")),
+            &["--version"],
+        ),
+    ])
+}
+
+fn verify_jdk_tool(id: &str, title: &str, executable: &Path, args: &[&str]) -> ValidationCheck {
+    if !executable.is_file() {
+        return ValidationCheck {
+            id: id.to_string(),
+            title: title.to_string(),
+            success: false,
+            required: true,
+            detail: format!("未找到 {}", display_path(executable)),
+            stage: "external-jdk".to_string(),
+        };
+    }
+    match hidden_command(executable).args(args).output() {
+        Ok(output) => {
+            let detail =
+                first_meaningful_output_line(&command_text(&output.stdout, &output.stderr))
+                    .unwrap_or_else(|| "命令没有返回版本文本".to_string());
+            ValidationCheck {
+                id: id.to_string(),
+                title: title.to_string(),
+                success: output.status.success(),
+                required: true,
+                detail,
+                stage: "external-jdk".to_string(),
+            }
+        }
+        Err(error) => ValidationCheck {
+            id: id.to_string(),
+            title: title.to_string(),
+            success: false,
+            required: true,
+            detail: format!("执行失败：{error}"),
+            stage: "external-jdk".to_string(),
+        },
+    }
 }
 
 #[tauri::command]
@@ -1653,8 +1937,12 @@ async fn create_move_plan(
 }
 
 #[tauri::command]
-async fn execute_move_plan(plan: cleanup::MovePlan) -> Result<cleanup::MoveResult, String> {
+async fn execute_move_plan(
+    plan: cleanup::MovePlan,
+    confirmation_token: Option<String>,
+) -> Result<cleanup::MoveResult, String> {
     run_blocking(move || {
+        require_risk_operation_token("execute_move_plan", &plan.plan_id, confirmation_token)?;
         let paths = load_paths()?;
         Ok(cleanup::execute_move_plan(&paths.root, plan))
     })
@@ -1671,8 +1959,12 @@ async fn list_rollback_records() -> Result<Vec<cleanup::RollbackRecord>, String>
 }
 
 #[tauri::command]
-async fn rollback_move(rollback_id: String) -> Result<OperationResult, String> {
+async fn rollback_move(
+    rollback_id: String,
+    confirmation_token: Option<String>,
+) -> Result<OperationResult, String> {
     run_blocking(move || {
+        require_risk_operation_token("rollback_move", &rollback_id, confirmation_token)?;
         let paths = load_paths()?;
         let message = cleanup::rollback_move(&paths.root, rollback_id)?;
         Ok(OperationResult {
@@ -1703,8 +1995,10 @@ async fn create_desktop_archive_plan(target_drive: String) -> Result<cleanup::Mo
 #[tauri::command]
 async fn execute_desktop_archive_plan(
     plan: cleanup::MovePlan,
+    confirmation_token: Option<String>,
 ) -> Result<cleanup::MoveResult, String> {
     run_blocking(move || {
+        require_risk_operation_token("execute_move_plan", &plan.plan_id, confirmation_token)?;
         let paths = load_paths()?;
         Ok(cleanup::execute_desktop_archive_plan(&paths.root, plan))
     })
@@ -1719,8 +2013,10 @@ async fn create_downloads_archive_plan(target_drive: String) -> Result<cleanup::
 #[tauri::command]
 async fn execute_downloads_archive_plan(
     plan: cleanup::MovePlan,
+    confirmation_token: Option<String>,
 ) -> Result<cleanup::MoveResult, String> {
     run_blocking(move || {
+        require_risk_operation_token("execute_move_plan", &plan.plan_id, confirmation_token)?;
         let paths = load_paths()?;
         Ok(cleanup::execute_downloads_archive_plan(&paths.root, plan))
     })
@@ -1740,8 +2036,13 @@ async fn create_c_drive_expansion_plan() -> Result<cleanup::ExpansionPlan, Strin
 #[tauri::command]
 async fn execute_c_drive_expansion(
     plan: cleanup::ExpansionPlan,
+    confirmation_token: Option<String>,
 ) -> Result<cleanup::ExpansionResult, String> {
-    run_blocking(move || Ok(cleanup::execute_c_drive_expansion(plan))).await?
+    run_blocking(move || {
+        require_risk_operation_token("execute_expansion_plan", &plan.plan_id, confirmation_token)?;
+        Ok(cleanup::execute_c_drive_expansion(plan))
+    })
+    .await?
 }
 
 #[tauri::command]
@@ -2157,7 +2458,22 @@ fn preview_user_environment_configuration() -> Result<EnvironmentConfigPreview, 
 }
 
 #[tauri::command]
-fn apply_user_environment_configuration(preview_id: String) -> Result<OperationResult, String> {
+fn apply_user_environment_configuration(
+    preview_id: String,
+    confirmation_token: Option<String>,
+) -> Result<OperationResult, String> {
+    apply_user_environment_configuration_with_token(preview_id, confirmation_token)
+}
+
+fn apply_user_environment_configuration_with_token(
+    preview_id: String,
+    confirmation_token: Option<String>,
+) -> Result<OperationResult, String> {
+    require_risk_operation_token(
+        "apply_user_environment_configuration",
+        &preview_id,
+        confirmation_token,
+    )?;
     let pending = environment_preview_store()
         .lock()
         .map_err(|_| "环境配置预览暂时不可用".to_string())?
@@ -2254,8 +2570,18 @@ fn configure_user_environment_blocking() -> Result<OperationResult, String> {
 }
 
 #[tauri::command]
-async fn cleanup_path_entries() -> Result<OperationResult, String> {
-    run_blocking(cleanup_path_entries_blocking).await?
+async fn cleanup_path_entries(
+    confirmation_token: Option<String>,
+) -> Result<OperationResult, String> {
+    run_blocking(move || {
+        require_risk_operation_token(
+            "cleanup_path_entries",
+            "cleanup-path-entries",
+            confirmation_token,
+        )?;
+        cleanup_path_entries_blocking()
+    })
+    .await?
 }
 
 fn cleanup_path_entries_blocking() -> Result<OperationResult, String> {
@@ -2311,8 +2637,18 @@ fn cleanup_path_entries_blocking() -> Result<OperationResult, String> {
 }
 
 #[tauri::command]
-async fn restore_user_environment() -> Result<OperationResult, String> {
-    run_blocking(restore_user_environment_blocking).await?
+async fn restore_user_environment(
+    confirmation_token: Option<String>,
+) -> Result<OperationResult, String> {
+    run_blocking(move || {
+        require_risk_operation_token(
+            "restore_user_environment",
+            "restore-user-environment-latest",
+            confirmation_token,
+        )?;
+        restore_user_environment_blocking()
+    })
+    .await?
 }
 
 fn restore_user_environment_blocking() -> Result<OperationResult, String> {
@@ -3290,6 +3626,7 @@ fn kill_process(
     if let Err(message) = require_confirmation_token(
         confirmation_token,
         "kill_process",
+        "kill_process",
         &plan_id,
         risk_level,
         &fingerprint,
@@ -3514,9 +3851,14 @@ async fn update_project_port(
     path: String,
     config_id: String,
     new_port: u16,
+    confirmation_token: Option<String>,
 ) -> Result<OperationResult, String> {
-    run_blocking(move || update_project_port_blocking(Path::new(path.trim()), &config_id, new_port))
-        .await?
+    run_blocking(move || {
+        let plan_id = format!("{}:{config_id}:{new_port}", path.trim());
+        require_risk_operation_token("update_project_port", &plan_id, confirmation_token)?;
+        update_project_port_blocking(Path::new(path.trim()), &config_id, new_port)
+    })
+    .await?
 }
 
 fn inspect_project_port_configs_blocking(root: &Path) -> Result<Vec<ProjectPortConfig>, String> {
@@ -3991,7 +4333,7 @@ fn add_archive_plan_item(path: String, source: String) -> Result<OperationResult
         size: metadata.len(),
         source: source.trim().chars().take(80).collect(),
         added_at: current_timestamp(),
-        suggestion: "Phase 4 执行移动前将重新校验路径、目标空间并生成回滚计划".to_string(),
+        suggestion: "执行移动前将重新校验路径、目标空间并生成回滚计划".to_string(),
     });
     save_json(&archive_plan_file(&paths), &plan)?;
     Ok(OperationResult {
@@ -4027,7 +4369,12 @@ fn remove_archive_plan_item(id: String) -> Result<OperationResult, String> {
 }
 
 #[tauri::command]
-fn clear_download_cache() -> Result<OperationResult, String> {
+fn clear_download_cache(confirmation_token: Option<String>) -> Result<OperationResult, String> {
+    require_risk_operation_token(
+        "clear_download_cache",
+        "clear-download-cache",
+        confirmation_token,
+    )?;
     let paths = load_paths()?;
     let result = cleanup::clean_managed_download_cache(&paths.root);
     Ok(OperationResult {
@@ -6188,8 +6535,14 @@ async fn manage_system_platform(
     app: tauri::AppHandle,
     action: String,
     value: Option<String>,
+    confirmation_token: Option<String>,
 ) -> Result<OperationResult, String> {
-    run_blocking(move || manage_system_platform_blocking(app, action, value)).await?
+    run_blocking(move || {
+        let plan_id = format!("{}:{}", action.trim(), value.as_deref().unwrap_or(""));
+        require_risk_operation_token("manage_system_platform", &plan_id, confirmation_token)?;
+        manage_system_platform_blocking(app, action, value)
+    })
+    .await?
 }
 
 fn manage_system_platform_blocking(
@@ -6412,8 +6765,17 @@ fn inspect_local_services_blocking() -> Result<Vec<LocalServiceStatus>, String> 
 }
 
 #[tauri::command]
-async fn stop_local_service(port: u16, service_name: String) -> Result<OperationResult, String> {
-    run_blocking(move || stop_local_service_blocking(port, service_name)).await?
+async fn stop_local_service(
+    port: u16,
+    service_name: String,
+    confirmation_token: Option<String>,
+) -> Result<OperationResult, String> {
+    run_blocking(move || {
+        let plan_id = format!("{port}:{}", service_name.trim());
+        require_risk_operation_token("stop_local_service", &plan_id, confirmation_token)?;
+        stop_local_service_blocking(port, service_name)
+    })
+    .await?
 }
 
 fn stop_local_service_blocking(port: u16, service_name: String) -> Result<OperationResult, String> {
@@ -6504,8 +6866,14 @@ fn validated_database_service(name: &str) -> Result<(WindowsServiceInfo, u16), S
 async fn manage_local_service(
     service_name: String,
     action: String,
+    confirmation_token: Option<String>,
 ) -> Result<OperationResult, String> {
-    run_blocking(move || manage_local_service_blocking(service_name, action)).await?
+    run_blocking(move || {
+        let plan_id = format!("{}:{}", service_name.trim(), action.trim());
+        require_risk_operation_token("manage_local_service", &plan_id, confirmation_token)?;
+        manage_local_service_blocking(service_name, action)
+    })
+    .await?
 }
 
 fn manage_local_service_blocking(
@@ -6689,6 +7057,7 @@ async fn execute_mysql_repair_plan(
         if guard.risk_level != "low" {
             require_confirmation_token(
                 confirmation_token,
+                "execute_mysql_repair_plan",
                 &guard.action_id,
                 &guard.plan_id,
                 &guard.risk_level,
@@ -8053,10 +8422,40 @@ fn restore_project_files(changes: &[(PathBuf, Option<PathBuf>)]) {
     }
 }
 
+fn project_configuration_plan_id(request: &ProjectConfigApplyRequest) -> String {
+    let enabled = request.files.iter().filter(|file| file.enabled).count();
+    let switch_count = [
+        &request.switches.jdk,
+        &request.switches.python,
+        &request.switches.node,
+        &request.switches.maven,
+        &request.switches.gradle,
+        &request.switches.go,
+    ]
+    .iter()
+    .filter(|value| value.is_some())
+    .count();
+    format!(
+        "{}:{enabled}:{switch_count}",
+        request
+            .project_path
+            .trim()
+            .replace('/', "\\")
+            .to_ascii_lowercase()
+    )
+}
+
 #[tauri::command]
 fn apply_project_configuration(
     request: ProjectConfigApplyRequest,
+    confirmation_token: Option<String>,
 ) -> Result<OperationResult, String> {
+    let project_plan_id = project_configuration_plan_id(&request);
+    require_risk_operation_token(
+        "apply_project_configuration",
+        &project_plan_id,
+        confirmation_token,
+    )?;
     let root = PathBuf::from(request.project_path.trim());
     analyze_project_blocking(&root)?;
     if request.files.len() > 4 {
@@ -8172,15 +8571,11 @@ fn apply_project_configuration(
 
 #[tauri::command]
 fn generate_vscode_config(project_path: String) -> Result<OperationResult, String> {
-    let preview = preview_project_configuration(project_path.clone())?;
-    apply_project_configuration(ProjectConfigApplyRequest {
-        project_path,
-        files: preview
-            .files
-            .into_iter()
-            .filter(|file| file.relative_path.starts_with(".vscode/"))
-            .collect(),
-        switches: CurrentVersions::default(),
+    let _ = preview_project_configuration(project_path)?;
+    Ok(OperationResult {
+        success: false,
+        message: "请在项目页先生成配置预览，再通过受保护的应用流程写入；直接写入入口已禁用。"
+            .to_string(),
     })
 }
 
@@ -8213,6 +8608,7 @@ pub fn run() {
             rollback_env_repair,
             export_env_reliability_report,
             create_java_stabilize_plan,
+            verify_external_jdk,
             apply_java_stabilize_plan,
             verify_java_toolchain,
             verify_nacos_java_environment,
@@ -10892,6 +11288,9 @@ fn analyze_port_signature(
                 "wechat",
                 "weixin",
                 "wxwork",
+                "bilibili",
+                "哔哩哔哩",
+                "uu",
                 "chrome.exe",
                 "msedge.exe",
                 "firefox.exe",
@@ -10905,8 +11304,25 @@ fn analyze_port_signature(
                 "code.exe",
                 "wechat.exe",
                 "webview",
+                "mumu",
+                "nemu",
+                "armourycrate",
+                "autodesk",
             ],
             "桌面应用",
+        ),
+        (
+            "系统/驱动服务",
+            &[
+                "system",
+                "svchost.exe",
+                "vmware-authd.exe",
+                "nvcontainer.exe",
+                "nvidia overlay.exe",
+                "avp.exe",
+                "kaspersky",
+            ],
+            "系统/驱动服务",
         ),
     ];
     let is_generic_signature = |label: &str| {
@@ -12905,6 +13321,7 @@ mod tests {
         let plan_id = format!("test-plan-{}", unix_timestamp());
         let fingerprint = process_action_fingerprint("kill_process", &plan_id, "high");
         let token = create_confirmation_token(
+            Some("kill_process".to_string()),
             "kill_process".to_string(),
             plan_id.clone(),
             "high".to_string(),
@@ -12916,6 +13333,7 @@ mod tests {
         assert!(require_confirmation_token(
             Some(token.token.clone()),
             "kill_process",
+            "kill_process",
             &plan_id,
             "high",
             &fingerprint,
@@ -12925,12 +13343,91 @@ mod tests {
         assert!(require_confirmation_token(
             Some(token.token),
             "kill_process",
+            "kill_process",
             &plan_id,
             "high",
             &fingerprint,
             false,
         )
         .is_err());
+    }
+
+    #[test]
+    fn risk_gate_rejects_missing_mismatch_expired_and_reused_tokens() {
+        let command = "manage_system_platform";
+        let plan_id = "docker_update:";
+        assert!(require_risk_operation_token(command, plan_id, None).is_err());
+
+        let fingerprint = risk_operation_fingerprint(command, plan_id, "high");
+        let token = create_confirmation_token(
+            Some(command.to_string()),
+            command.to_string(),
+            plan_id.to_string(),
+            "high".to_string(),
+            fingerprint,
+            false,
+            None,
+        )
+        .unwrap();
+
+        assert!(require_risk_operation_token(
+            "execute_move_plan",
+            plan_id,
+            Some(token.token.clone())
+        )
+        .is_err());
+        assert!(
+            require_risk_operation_token(command, "different-plan", Some(token.token.clone()))
+                .is_err()
+        );
+        assert!(require_risk_operation_token(command, plan_id, Some(token.token.clone())).is_ok());
+        assert!(require_risk_operation_token(command, plan_id, Some(token.token)).is_err());
+
+        let expired_plan = "expired-plan";
+        let expired_token = create_confirmation_token(
+            Some(command.to_string()),
+            command.to_string(),
+            expired_plan.to_string(),
+            "high".to_string(),
+            risk_operation_fingerprint(command, expired_plan, "high"),
+            false,
+            None,
+        )
+        .unwrap();
+        {
+            let mut store = confirmation_tokens().lock().unwrap();
+            let record = store.get_mut(&expired_token.token).unwrap();
+            record.expires_at = unix_timestamp().saturating_sub(1);
+        }
+        assert!(
+            require_risk_operation_token(command, expired_plan, Some(expired_token.token)).is_err()
+        );
+    }
+
+    #[test]
+    fn risk_operation_registry_covers_required_commands() {
+        for command in [
+            "apply_env_repair_plan",
+            "restore_user_environment",
+            "cleanup_path_entries",
+            "apply_user_environment_configuration",
+            "manage_system_platform",
+            "manage_local_service",
+            "stop_local_service",
+            "apply_project_configuration",
+            "update_project_port",
+            "rollback_move",
+            "execute_move_plan",
+            "execute_expansion_plan",
+            "clear_download_cache",
+            "clean_dev_cache",
+            "kill_process",
+            "execute_mysql_repair_plan",
+        ] {
+            let spec = risk_operation_spec(command).unwrap_or_else(|| panic!("missing {command}"));
+            assert!(spec.requires_token);
+            assert!(matches!(spec.risk_level, "medium" | "high" | "critical"));
+        }
     }
 
     #[test]
