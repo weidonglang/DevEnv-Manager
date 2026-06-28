@@ -509,7 +509,8 @@ fn database_directories(datadir: &Path) -> Vec<String> {
     result
 }
 
-fn mysql_conclusion_level(
+#[derive(Debug, Clone, Copy, Default)]
+struct MySqlConclusionSignals {
     unsupported_layout: bool,
     permission_unknown: bool,
     multiple_instances: bool,
@@ -518,22 +519,24 @@ fn mysql_conclusion_level(
     system_schema_missing: bool,
     business_database_count: usize,
     connection_ok: bool,
-) -> &'static str {
-    if unsupported_layout {
+}
+
+fn mysql_conclusion_level(signals: MySqlConclusionSignals) -> &'static str {
+    if signals.unsupported_layout {
         "UnsupportedLayout"
-    } else if multiple_instances {
+    } else if signals.multiple_instances {
         "MultipleInstancesAmbiguous"
-    } else if permission_unknown {
+    } else if signals.permission_unknown {
         "PermissionUnknown"
-    } else if system_schema_missing && connection_ok {
+    } else if signals.system_schema_missing && signals.connection_ok {
         "FalsePositiveSuspected"
-    } else if service_running && port_occupied && !system_schema_missing {
+    } else if signals.service_running && signals.port_occupied && !signals.system_schema_missing {
         "Healthy"
-    } else if service_running || connection_ok || port_occupied {
+    } else if signals.service_running || signals.connection_ok || signals.port_occupied {
         "UsableWithWarnings"
-    } else if system_schema_missing && business_database_count > 0 {
+    } else if signals.system_schema_missing && signals.business_database_count > 0 {
         "LikelyBroken"
-    } else if system_schema_missing {
+    } else if signals.system_schema_missing {
         "PotentialRisk"
     } else {
         "UsableWithWarnings"
@@ -627,16 +630,16 @@ fn candidate_from(
     let permission_unknown = !datadir_readable;
     let service_running = service_state.eq_ignore_ascii_case("Running");
     let connection_ok = service_running && port_occupied && !raw_error.contains("1045");
-    let conclusion_level = mysql_conclusion_level(
+    let conclusion_level = mysql_conclusion_level(MySqlConclusionSignals {
         unsupported_layout,
         permission_unknown,
         multiple_instances,
         service_running,
         port_occupied,
         system_schema_missing,
-        business_databases.len(),
+        business_database_count: business_databases.len(),
         connection_ok,
-    )
+    })
     .to_string();
     let status = if conclusion_level == "UnsupportedLayout" {
         "UnsupportedLayout"
@@ -1300,19 +1303,41 @@ mod tests {
     #[test]
     fn mysql_conclusion_suppresses_false_positive_when_service_is_usable() {
         assert_eq!(
-            mysql_conclusion_level(false, false, false, true, true, true, 1, true),
+            mysql_conclusion_level(MySqlConclusionSignals {
+                service_running: true,
+                port_occupied: true,
+                system_schema_missing: true,
+                business_database_count: 1,
+                connection_ok: true,
+                ..Default::default()
+            }),
             "FalsePositiveSuspected"
         );
         assert_eq!(
-            mysql_conclusion_level(false, true, false, false, false, true, 1, false),
+            mysql_conclusion_level(MySqlConclusionSignals {
+                permission_unknown: true,
+                system_schema_missing: true,
+                business_database_count: 1,
+                ..Default::default()
+            }),
             "PermissionUnknown"
         );
         assert_eq!(
-            mysql_conclusion_level(false, false, true, false, false, true, 1, false),
+            mysql_conclusion_level(MySqlConclusionSignals {
+                multiple_instances: true,
+                system_schema_missing: true,
+                business_database_count: 1,
+                ..Default::default()
+            }),
             "MultipleInstancesAmbiguous"
         );
         assert_eq!(
-            mysql_conclusion_level(true, false, false, false, false, true, 1, false),
+            mysql_conclusion_level(MySqlConclusionSignals {
+                unsupported_layout: true,
+                system_schema_missing: true,
+                business_database_count: 1,
+                ..Default::default()
+            }),
             "UnsupportedLayout"
         );
     }

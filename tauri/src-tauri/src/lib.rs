@@ -3262,7 +3262,7 @@ fn scan_ports_blocking() -> Result<Vec<PortRecord>, String> {
             &command_line,
             &service_names,
         );
-        let command_line = redact_report_text(&command_line);
+        let command_line = redact_command_line(&command_line);
         let common_usage = signature.identity.clone();
         let explanation = signature.explanation.clone();
         let risk = signature.risk.clone();
@@ -4658,10 +4658,12 @@ fn export_doctor_report_json_blocking(report: DoctorReport) -> Result<OperationR
     let target = paths
         .logs()
         .join(format!("doctor-report-{}.json", filename_timestamp()));
-    let text = serde_json::to_string_pretty(&report)
-        .map_err(|err| format!("生成 JSON 报告失败：{err}"))?;
-    fs::write(&target, redact_report_text(&text))
-        .map_err(|err| format!("写入 JSON 报告失败：{err}"))?;
+    let mut value =
+        serde_json::to_value(&report).map_err(|err| format!("生成 JSON 报告失败：{err}"))?;
+    redact_json_value(&mut value);
+    let text =
+        serde_json::to_string_pretty(&value).map_err(|err| format!("生成 JSON 报告失败：{err}"))?;
+    fs::write(&target, text).map_err(|err| format!("写入 JSON 报告失败：{err}"))?;
     Ok(OperationResult {
         success: true,
         message: format!("已导出 JSON 诊断报告：{}", display_path(target)),
@@ -4672,8 +4674,13 @@ fn export_doctor_report_json_blocking(report: DoctorReport) -> Result<OperationR
 fn doctor_report_text(report: DoctorReport, format: String) -> Result<String, String> {
     let text = match format.as_str() {
         "markdown" => doctor_report_markdown(&report),
-        "json" => serde_json::to_string_pretty(&report)
-            .map_err(|err| format!("生成 JSON 报告失败：{err}"))?,
+        "json" => {
+            let mut value = serde_json::to_value(&report)
+                .map_err(|err| format!("生成 JSON 报告失败：{err}"))?;
+            redact_json_value(&mut value);
+            serde_json::to_string_pretty(&value)
+                .map_err(|err| format!("生成 JSON 报告失败：{err}"))?
+        }
         _ => return Err("不支持的报告格式".to_string()),
     };
     Ok(redact_report_text(&text))
@@ -4853,20 +4860,20 @@ fn analyze_python_environment_blocking() -> PythonAnalysis {
         recovery_actions
             .push("安装受管 Python，再用预览计划切换；不会删除系统 Python。".to_string());
     }
-    let diagnostic_report = python_diagnostic_report(
-        current_python.as_ref(),
-        current_pip.as_ref(),
-        &launcher_path,
-        &launcher_output,
-        &first_python_on_path,
-        &first_pip_on_path,
+    let diagnostic_report = python_diagnostic_report(PythonDiagnosticInput {
+        current_python: current_python.as_ref(),
+        current_pip: current_pip.as_ref(),
+        launcher_path: &launcher_path,
+        launcher_output: &launcher_output,
+        first_python_on_path: &first_python_on_path,
+        first_pip_on_path: &first_pip_on_path,
         python_m_pip_available,
         store_alias_risk,
         managed_python_available,
-        &risks,
-        &repair_blockers,
-        &recovery_actions,
-    );
+        risks: &risks,
+        repair_blockers: &repair_blockers,
+        recovery_actions: &recovery_actions,
+    });
 
     PythonAnalysis {
         current_python,
@@ -4893,38 +4900,40 @@ fn analyze_python_environment_blocking() -> PythonAnalysis {
     }
 }
 
-fn python_diagnostic_report(
-    current_python: Option<&PythonToolState>,
-    current_pip: Option<&PythonToolState>,
-    launcher_path: &str,
-    launcher_output: &str,
-    first_python_on_path: &str,
-    first_pip_on_path: &str,
+struct PythonDiagnosticInput<'a> {
+    current_python: Option<&'a PythonToolState>,
+    current_pip: Option<&'a PythonToolState>,
+    launcher_path: &'a str,
+    launcher_output: &'a str,
+    first_python_on_path: &'a str,
+    first_pip_on_path: &'a str,
     python_m_pip_available: bool,
     store_alias_risk: bool,
     managed_python_available: bool,
-    risks: &[String],
-    repair_blockers: &[String],
-    recovery_actions: &[String],
-) -> String {
+    risks: &'a [String],
+    repair_blockers: &'a [String],
+    recovery_actions: &'a [String],
+}
+
+fn python_diagnostic_report(input: PythonDiagnosticInput<'_>) -> String {
     redact_report_text(&format!(
         "# Python diagnostic\n\n默认 python: {}\n默认 pip: {}\nPATH 首个 python: {}\nPATH 首个 pip: {}\npy launcher: {}\npython -m pip: {}\nWindowsApps Alias: {}\n受管 Python: {}\n\n## py -0p\n{}\n\n## 风险\n{}\n\n## 阻断原因\n{}\n\n## 下一步\n{}\n",
-        current_python
+        input.current_python
             .map(|item| format!("{} · {} · {}", item.status, item.version, item.path))
             .unwrap_or_else(|| "未发现".to_string()),
-        current_pip
+        input.current_pip
             .map(|item| format!("{} · {} · {}", item.status, item.version, item.path))
             .unwrap_or_else(|| "未发现".to_string()),
-        if first_python_on_path.is_empty() { "未发现" } else { first_python_on_path },
-        if first_pip_on_path.is_empty() { "未发现" } else { first_pip_on_path },
-        if launcher_path.is_empty() { "未发现" } else { launcher_path },
-        if python_m_pip_available { "可用" } else { "不可用" },
-        if store_alias_risk { "可能命中" } else { "未发现" },
-        if managed_python_available { "存在" } else { "不存在" },
-        launcher_output,
-        risks.iter().map(|item| format!("- {item}")).collect::<Vec<_>>().join("\n"),
-        repair_blockers.iter().map(|item| format!("- {item}")).collect::<Vec<_>>().join("\n"),
-        recovery_actions.iter().map(|item| format!("- {item}")).collect::<Vec<_>>().join("\n"),
+        if input.first_python_on_path.is_empty() { "未发现" } else { input.first_python_on_path },
+        if input.first_pip_on_path.is_empty() { "未发现" } else { input.first_pip_on_path },
+        if input.launcher_path.is_empty() { "未发现" } else { input.launcher_path },
+        if input.python_m_pip_available { "可用" } else { "不可用" },
+        if input.store_alias_risk { "可能命中" } else { "未发现" },
+        if input.managed_python_available { "存在" } else { "不存在" },
+        input.launcher_output,
+        input.risks.iter().map(|item| format!("- {item}")).collect::<Vec<_>>().join("\n"),
+        input.repair_blockers.iter().map(|item| format!("- {item}")).collect::<Vec<_>>().join("\n"),
+        input.recovery_actions.iter().map(|item| format!("- {item}")).collect::<Vec<_>>().join("\n"),
     ))
 }
 
@@ -11951,7 +11960,7 @@ fn redact_sensitive_text(text: &str) -> String {
             }
         }
     }
-    result = redact_windows_user_paths(&result);
+    result = redact_path(&result);
     result
         .lines()
         .map(|line| {
@@ -12602,20 +12611,27 @@ mod tests {
             status: "风险".to_string(),
             detail: "Microsoft Store".to_string(),
         };
-        let report = python_diagnostic_report(
-            Some(&python),
-            None,
-            r"C:\Windows\py.exe",
-            r"-V:3.12 C:\Python312\python.exe",
-            &python.path,
-            "",
-            false,
-            true,
-            false,
-            &["Microsoft Store Python 执行别名可能抢占 python 命令".to_string()],
-            &["命中 WindowsApps Store Alias 时，DevEnv Manager 不会自动关闭别名或删除 WindowsApps PATH。".to_string()],
-            &["打开 Windows 应用执行别名设置，人工关闭 python.exe / python3.exe Store Alias。".to_string()],
-        );
+        let risks = ["Microsoft Store Python 执行别名可能抢占 python 命令".to_string()];
+        let repair_blockers =
+            ["命中 WindowsApps Store Alias 时，DevEnv Manager 不会自动关闭别名或删除 WindowsApps PATH。".to_string()];
+        let recovery_actions = [
+            "打开 Windows 应用执行别名设置，人工关闭 python.exe / python3.exe Store Alias。"
+                .to_string(),
+        ];
+        let report = python_diagnostic_report(PythonDiagnosticInput {
+            current_python: Some(&python),
+            current_pip: None,
+            launcher_path: r"C:\Windows\py.exe",
+            launcher_output: r"-V:3.12 C:\Python312\python.exe",
+            first_python_on_path: &python.path,
+            first_pip_on_path: "",
+            python_m_pip_available: false,
+            store_alias_risk: true,
+            managed_python_available: false,
+            risks: &risks,
+            repair_blockers: &repair_blockers,
+            recovery_actions: &recovery_actions,
+        });
         assert!(report.contains("WindowsApps"));
         assert!(report.contains("不会自动关闭别名"));
         assert!(report.contains("%USERPROFILE%"));
