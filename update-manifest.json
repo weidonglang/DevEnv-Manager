@@ -1,9 +1,9 @@
 {
-  "version": "1.5.2",
-  "date": "2026-06-27",
+  "version": "1.5.3",
+  "date": "2026-06-28",
   "notes": [
-    "1.5.2 Patch：收口更新清单、后端高危确认、部分端口 process-first 识别、MySQL 备份凭证、Tauri CSP、CI 与仓库卫生；端口 UI、首次安全声明、Python/chsrc 闭环等用户可见增强将进入 1.5.3。"
+    "1.5.3 Stable：基于真实用户反馈的质量收口版本，补全端口管理、外部运行时安全、MySQL 诊断闭环、Python/chsrc 可恢复路径、页面帮助、扫描体验和隐私脱敏。"
   ],
-  "downloadUrl": "https://github.com/weidonglang/DevEnv-Manager/releases/download/v1.5.2/DevEnv.Manager_1.5.2_x64-setup.exe",
-  "sha256": "1244d8888bf1e197fa59131381c4e52a897e94ceec518d743e4fdd9a20224a90"
+  "downloadUrl": "https://github.com/weidonglang/DevEnv-Manager/releases/download/v1.5.3/DevEnv.Manager_1.5.3_x64-setup.exe",
+  "sha256": "32439838bc46687010b83d4c5f80583fbb0c2b99ed4a836078772184f50e069c"
 }
