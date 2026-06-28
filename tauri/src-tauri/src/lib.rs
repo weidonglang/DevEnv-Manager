@@ -10412,7 +10412,12 @@ fn analyze_port_signature(
     let signatures: &[(&str, &[&str], &str)] = &[
         (
             "Spring Boot",
-            &["spring-boot", "org.springframework.boot", "bootrun"],
+            &[
+                "spring-boot",
+                "org.springframework.boot",
+                "bootrun",
+                "springapplication",
+            ],
             "Java / JVM",
         ),
         (
@@ -10420,6 +10425,15 @@ fn analyze_port_signature(
             &["tomcat", "catalina", "org.apache.catalina"],
             "Java / JVM",
         ),
+        ("Jetty", &["jetty", "org.eclipse.jetty"], "Java / JVM"),
+        ("Undertow", &["undertow", "io.undertow"], "Java / JVM"),
+        ("Nacos", &["nacos", "com.alibaba.nacos"], "Java / JVM"),
+        ("Sentinel", &["sentinel", "csp.sentinel"], "Java / JVM"),
+        ("Seata", &["seata"], "Java / JVM"),
+        ("Eureka", &["eureka"], "Java / JVM"),
+        ("Jenkins", &["jenkins"], "Java / JVM"),
+        ("Nexus", &["nexus", "sonatype"], "Java / JVM"),
+        ("SonarQube", &["sonarqube", "sonar"], "Java / JVM"),
         (
             "Java / JVM",
             &["java.exe", "\\jdk", "\\jre", "java -jar"],
@@ -10429,11 +10443,24 @@ fn analyze_port_signature(
         ("Gradle", &["gradle", "gradlew"], "Java / JVM"),
         (
             "Node.js",
-            &["node.exe", "\\nodejs\\", "npm", "pnpm", "yarn"],
+            &["node.exe", "\\nodejs\\", "npm", "pnpm", "yarn", "bun"],
             "Node / 前端",
         ),
         ("Vite", &["vite", "vite.config"], "Node / 前端"),
+        (
+            "Webpack Dev Server",
+            &["webpack-dev-server", "webpack serve"],
+            "Node / 前端",
+        ),
         ("Next.js", &["next dev", "next-server"], "Node / 前端"),
+        ("Nuxt", &["nuxt", "nuxi"], "Node / 前端"),
+        ("React Scripts", &["react-scripts"], "Node / 前端"),
+        ("Vue CLI", &["vue-cli-service"], "Node / 前端"),
+        ("Angular", &["ng serve", "@angular/cli"], "Node / 前端"),
+        ("Storybook", &["storybook"], "Node / 前端"),
+        ("NestJS", &["nestjs", "@nestjs"], "Node / 前端"),
+        ("Electron Dev", &["electron", "electron.exe"], "Node / 前端"),
+        ("Tauri Dev", &["tauri dev", "tauri-cli"], "Node / 前端"),
         (
             "Python",
             &[
@@ -10446,11 +10473,23 @@ fn analyze_port_signature(
             ],
             "Python / AI",
         ),
+        ("FastAPI / Uvicorn", &["fastapi", "uvicorn"], "Python / AI"),
         (
             "Jupyter",
             &["jupyter", "ipykernel", "notebook"],
             "Python / AI",
         ),
+        ("Streamlit", &["streamlit"], "Python / AI"),
+        ("Gradio", &["gradio"], "Python / AI"),
+        ("ComfyUI", &["comfyui"], "Python / AI"),
+        (
+            "Stable Diffusion WebUI",
+            &["stable-diffusion-webui", "webui-user"],
+            "Python / AI",
+        ),
+        ("Ollama", &["ollama"], "Python / AI"),
+        ("LM Studio", &["lm studio", "lmstudio"], "Python / AI"),
+        ("vLLM", &["vllm"], "Python / AI"),
         ("Go", &["go.exe", "\\go\\bin", ".go"], "Go / Rust / .NET"),
         (
             "Rust",
@@ -10469,40 +10508,86 @@ fn analyze_port_signature(
         ("Redis", &["redis-server"], "数据库"),
         ("MongoDB", &["mongod"], "数据库"),
         ("Elasticsearch", &["elasticsearch"], "数据库"),
+        ("OpenSearch", &["opensearch"], "数据库"),
         ("SQL Server", &["sqlservr", "mssql"], "数据库"),
+        ("Oracle", &["oracle", "tnslsnr"], "数据库"),
         ("Nginx", &["nginx.exe", "\\nginx\\"], "Web 服务器"),
         ("Apache HTTPD", &["httpd.exe", "apache"], "Web 服务器"),
         ("RabbitMQ", &["rabbitmq", "beam.smp"], "中间件"),
-        ("Kafka", &["kafka", "zookeeper"], "中间件"),
+        ("Kafka", &["kafka"], "中间件"),
+        ("ZooKeeper", &["zookeeper"], "中间件"),
+        ("MinIO", &["minio"], "中间件"),
+        ("Prometheus", &["prometheus"], "中间件"),
+        ("Grafana", &["grafana"], "中间件"),
         (
             "Docker / Container",
-            &["docker", "com.docker", "containerd"],
+            &["docker", "com.docker", "com.docker.backend", "containerd"],
             "Docker / WSL",
         ),
-        ("WSL", &["wsl", "\\wsl$"], "Docker / WSL"),
+        (
+            "WSL",
+            &["wsl", "wslhost", "vmmem", "\\wsl$"],
+            "Docker / WSL",
+        ),
         (
             "本地代理",
-            &["clash", "v2ray", "sing-box", "mihomo", "privoxy"],
+            &[
+                "clash", "mihomo", "v2ray", "xray", "sing-box", "privoxy", "fiddler", "charles",
+            ],
             "本地代理",
         ),
         (
+            "Node Inspector",
+            &["--inspect", "inspector"],
             "IDE / 调试器",
-            &["idea64", "pycharm", "webstorm", "code.exe", "debug"],
+        ),
+        ("Java JDWP", &["jdwp", "address=*:"], "IDE / 调试器"),
+        ("Python debugpy", &["debugpy"], "IDE / 调试器"),
+        (
+            "IDE / 调试器",
+            &[
+                "idea64",
+                "pycharm",
+                "webstorm",
+                "code.exe",
+                "cursor.exe",
+                "trae.exe",
+                "debug",
+            ],
             "IDE / 调试器",
         ),
         (
             "桌面应用",
             &[
                 "steam.exe",
+                "steamwebhelper.exe",
                 "qq.exe",
-                "wechat.exe",
+                "wechat",
+                "weixin",
+                "wxwork",
                 "chrome.exe",
                 "msedge.exe",
+                "firefox.exe",
+                "discord.exe",
+                "telegram.exe",
+                "onedrive.exe",
+                "baidunetdisk",
+                "baiduyunguanjia",
+                "cursor.exe",
+                "trae.exe",
+                "code.exe",
+                "wechat.exe",
                 "webview",
             ],
             "桌面应用",
         ),
     ];
+    let is_generic_signature = |label: &str| {
+        matches!(
+            label,
+            "Java / JVM" | "Node.js" | "Python" | "Go" | "Rust" | ".NET"
+        )
+    };
     for (label, markers, group) in signatures {
         let hits = markers
             .iter()
@@ -10510,7 +10595,12 @@ fn analyze_port_signature(
             .count();
         if hits > 0 {
             score += (hits as i32) * 25;
-            identity = (*label).to_string();
+            if identity == "未识别的本地服务"
+                || (!is_generic_signature(label) && is_generic_signature(&identity))
+                || matches!(*label, "桌面应用" | "IDE / 调试器")
+            {
+                identity = (*label).to_string();
+            }
             evidence.push(format!(
                 "{group} 强证据：{label} 命中 {hits} 个进程/路径/命令行标记"
             ));
@@ -10521,17 +10611,40 @@ fn analyze_port_signature(
         conflict.push(format!("{state} 不是本地监听状态，不能当作正在提供服务"));
         score -= 25;
     }
+    if matches!(
+        lower_name.as_str(),
+        "chrome.exe" | "msedge.exe" | "firefox.exe"
+    ) && (port == 9222 || haystack.contains("remote-debugging-port"))
+    {
+        let browser = match lower_name.as_str() {
+            "msedge.exe" => "Edge 调试端口",
+            "firefox.exe" => "Firefox 调试端口",
+            _ => "Chrome 调试端口",
+        };
+        identity = browser.to_string();
+        score += 60;
+        evidence.push(format!("{browser} 强证据：浏览器进程使用远程调试端口"));
+    }
+
     if [
         "steam.exe",
+        "steamwebhelper.exe",
         "qq.exe",
         "wechat.exe",
+        "weixin.exe",
+        "wxwork.exe",
         "chrome.exe",
         "msedge.exe",
+        "firefox.exe",
+        "code.exe",
+        "cursor.exe",
+        "trae.exe",
     ]
     .iter()
     .any(|name| lower_name == *name)
     {
-        conflict.push("桌面/浏览器进程只按实际进程识别，不按端口号猜测为 Web 框架".to_string());
+        conflict
+            .push("桌面/浏览器/IDE 进程只按实际进程识别，不按端口号猜测为 Web 框架".to_string());
         score -= 20;
     }
     let port_hint = match port {
@@ -10553,17 +10666,24 @@ fn analyze_port_signature(
     };
     if let Some(hint) = port_hint {
         evidence.push(format!("弱证据：端口 {port} 常见于 {hint}"));
-        if identity == "未识别的本地服务" && state.eq_ignore_ascii_case("LISTENING") {
+        let ambiguous_web_port = matches!(port, 80 | 443 | 8000 | 8080..=8082 | 8888);
+        if identity == "未识别的本地服务"
+            && state.eq_ignore_ascii_case("LISTENING")
+            && !ambiguous_web_port
+        {
             identity = format!("{hint}（仅端口弱证据）");
         }
         score += 8;
     }
 
     let confidence = score.clamp(0, 100) as u8;
+    let unknown_or_weak = identity == "未识别的本地服务" || identity.contains("仅端口弱证据");
     let risk_level = if !state.eq_ignore_ascii_case("LISTENING") {
         "low"
     } else if matches!(port, 3306 | 5432 | 6379 | 27017 | 9200 | 1433) {
         "high"
+    } else if unknown_or_weak && matches!(port, 80 | 443 | 8000 | 8080..=8082 | 8888) {
+        "low"
     } else if matches!(port, 80 | 443 | 8080..=8082 | 8000 | 8888) {
         "medium"
     } else {
@@ -12275,17 +12395,120 @@ mod tests {
         let signature = analyze_port_signature(
             8080,
             "LISTENING",
-            "steam.exe",
-            r"C:\Program Files (x86)\Steam\steam.exe",
-            r#""C:\Program Files (x86)\Steam\steam.exe""#,
+            "steamwebhelper.exe",
+            r"C:\Program Files (x86)\Steam\bin\cef\steamwebhelper.exe",
+            r#""C:\Program Files (x86)\Steam\bin\cef\steamwebhelper.exe""#,
             &[],
         );
         assert_eq!(signature.identity, "桌面应用");
         assert!(signature
             .conflict_evidence
             .iter()
-            .any(|item| item.contains("桌面/浏览器")));
+            .any(|item| item.contains("桌面/浏览器/IDE")));
         assert!(!signature.identity.contains("Spring"));
+    }
+
+    #[test]
+    fn qq_on_8082_is_not_spring() {
+        let signature = analyze_port_signature(
+            8082,
+            "LISTENING",
+            "QQ.exe",
+            r"C:\Program Files\Tencent\QQNT\QQ.exe",
+            r#""C:\Program Files\Tencent\QQNT\QQ.exe""#,
+            &[],
+        );
+        assert_eq!(signature.identity, "桌面应用");
+        assert!(!signature.identity.contains("Spring"));
+        assert!(!signature.identity.contains("Tomcat"));
+    }
+
+    #[test]
+    fn chrome_debug_port_is_specific_not_generic_web() {
+        let signature = analyze_port_signature(
+            9222,
+            "LISTENING",
+            "chrome.exe",
+            r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+            r#""C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222"#,
+            &[],
+        );
+        assert_eq!(signature.identity, "Chrome 调试端口");
+        assert!(!signature.identity.contains("Web 服务"));
+    }
+
+    #[test]
+    fn code_process_is_not_user_project_service_by_port_only() {
+        let signature = analyze_port_signature(
+            5173,
+            "LISTENING",
+            "Code.exe",
+            r"C:\Users\Alice\AppData\Local\Programs\Microsoft VS Code\Code.exe",
+            r#""C:\Users\Alice\AppData\Local\Programs\Microsoft VS Code\Code.exe""#,
+            &[],
+        );
+        assert!(matches!(
+            signature.identity.as_str(),
+            "IDE / 调试器" | "桌面应用"
+        ));
+        assert!(!signature.identity.contains("Vite"));
+    }
+
+    #[test]
+    fn unknown_8080_stays_low_confidence_unknown() {
+        let signature = analyze_port_signature(
+            8080,
+            "LISTENING",
+            "unknown.exe",
+            r"C:\Tools\unknown.exe",
+            r#""C:\Tools\unknown.exe""#,
+            &[],
+        );
+        assert_eq!(signature.identity, "未识别的本地服务");
+        assert!(signature.confidence < 40);
+        assert_eq!(signature.risk_level, "low");
+    }
+
+    #[test]
+    fn established_connection_is_not_local_listening_service() {
+        let signature = analyze_port_signature(
+            8080,
+            "ESTABLISHED",
+            "java.exe",
+            r"C:\Program Files\Java\jdk-21\bin\java.exe",
+            r#""C:\Program Files\Java\jdk-21\bin\java.exe" -jar app.jar"#,
+            &[],
+        );
+        assert_eq!(signature.risk_level, "low");
+        assert!(signature
+            .conflict_evidence
+            .iter()
+            .any(|item| item.contains("不是本地监听状态")));
+    }
+
+    #[test]
+    fn vite_and_spring_have_strong_identity() {
+        let vite = analyze_port_signature(
+            5173,
+            "LISTENING",
+            "node.exe",
+            r"C:\Program Files\nodejs\node.exe",
+            r#""node.exe" "C:\app\node_modules\.bin\vite" --host 127.0.0.1"#,
+            &[],
+        );
+        assert_eq!(vite.identity, "Vite");
+        assert!(vite.confidence >= 40);
+
+        let spring = analyze_port_signature(
+            8080,
+            "LISTENING",
+            "java.exe",
+            r"C:\Program Files\Java\jdk-21\bin\java.exe",
+            r#""java.exe" -jar demo-spring-boot.jar"#,
+            &[],
+        );
+        assert_eq!(spring.identity, "Spring Boot");
+        assert!(spring.confidence >= 40);
     }
 
     #[test]
