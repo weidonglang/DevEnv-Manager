@@ -2007,7 +2007,7 @@ function renderRuntimes() {
             <article class="runtime">
               <div><strong>${escapeHtml(runtime.kind)}</strong><span>${escapeHtml(runtime.version)}</span></div>
               <small>${escapeHtml(runtime.source)} · ${escapeHtml(runtime.executable)}</small>
-              ${canUninstallExternal(runtime) ? `<div class="row-actions"><button data-action="uninstall-external-runtime" data-kind="${escapeHtml(runtime.kind)}" data-source="${escapeHtml(runtime.source)}" data-executable="${escapeHtml(runtime.executable)}">${icon(Trash2)}<span>${runtime.source === "Scoop" || runtime.source === "Chocolatey" ? "用包管理器卸载" : "系统卸载"}</span></button></div>` : ""}
+              ${runtimeSafeActions(runtime)}
             </article>
           `)
     : `<div class="empty">还没有发现开发工具</div>`;
@@ -2308,12 +2308,15 @@ function renderPortHistory() {
     : `<div class="empty">还没有端口历史</div>`;
 }
 
-function canUninstallExternal(runtime: RuntimeInfo) {
-  const source = runtime.source.toLowerCase();
-  return (
-    !source.includes("devenv") &&
-    ["Java", "Python", "Node.js", "Maven", "Gradle", "Go"].includes(runtime.kind)
-  );
+function runtimeSafeActions(runtime: RuntimeInfo) {
+  const external = !runtime.source.toLowerCase().includes("devenv");
+  if (!external) return "";
+  const canOpenApps = ["System", "Microsoft Store", "Scoop", "Chocolatey", "PATH"].includes(runtime.source);
+  return `<div class="row-actions">
+    <button data-action="open-analysis-path" data-path="${escapeHtml(runtime.executable)}">${icon(FolderSearch)}<span>打开位置</span></button>
+    <button data-action="copy-text" data-copy="${escapeHtml(runtime.executable)}">${icon(Clipboard)}<span>复制路径</span></button>
+    ${canOpenApps ? `<button data-action="open-apps-features">${icon(FolderOpen)}<span>系统卸载入口</span></button>` : ""}
+  </div>`;
 }
 
 function renderHealth() {
@@ -5451,18 +5454,6 @@ document.addEventListener("click", (event) => {
     void runOperation(
       () => invoke<OperationResult>("uninstall_runtime", { kind, version, path }),
       `正在卸载 ${kind} ${version}`,
-    );
-  }
-  if (action === "uninstall-external-runtime") {
-    const kind = button.dataset.kind || "";
-    const executable = button.dataset.executable || "";
-    const source = button.dataset.source || "未知来源";
-    const method = source === "Scoop" || source === "Chocolatey" ? `调用 ${source} 的卸载流程` : "启动匹配的 Windows 卸载器";
-    const ok = window.confirm(`来源：${source}\n将${method}卸载 ${kind}。不会直接删除包管理器目录。\n\n${executable}\n\n确定继续吗？`);
-    if (!ok) return;
-    void runOperation(
-      () => invoke<OperationResult>("uninstall_external_runtime", { kind, executable }),
-      `正在启动 ${kind} 的系统卸载程序`,
     );
   }
   if (action === "apply-profile") {

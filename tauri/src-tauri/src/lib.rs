@@ -7512,77 +7512,44 @@ fn uninstall_external_runtime_blocking(
     if !executable_path.exists() {
         return Err("运行时路径不存在，无法定位卸载器".to_string());
     }
-    if find_uninstall_entry_for_path(&executable_path, &kind).is_none() {
-        return uninstall_unregistered_runtime(&executable_path, &kind);
-    }
-    let entry = find_uninstall_entry_for_path(&executable_path, &kind)
-        .ok_or_else(|| {
-            format!(
-                "没有在 Windows 卸载注册表中找到匹配的卸载入口。{} 可能是绿色版、IDE 内置运行时，或没有单独卸载器；可以先用“配置”切换到 DevEnv 管理的版本，再手动删除原软件目录。",
-                display_path(&executable_path)
-            )
-        })?;
-    launch_uninstall_string(&entry.uninstall_string)?;
-    Ok(OperationResult {
-        success: true,
-        message: format!("已启动 {} 的系统卸载程序", entry.display_name),
-    })
+    Err(external_runtime_manual_action_message(
+        &executable_path,
+        &kind,
+    ))
 }
 
-fn uninstall_unregistered_runtime(
-    executable: &Path,
-    kind: &str,
-) -> Result<OperationResult, String> {
+fn external_runtime_manual_action_message(executable: &Path, kind: &str) -> String {
     let normalized = executable.to_string_lossy().to_ascii_lowercase();
     if normalized.contains("\\jetbrains\\") || normalized.contains("\\jbr\\") {
-        return Err("这是 IDE 内置运行时。直接删除会破坏 IDE；请先切换到 DevEnv 管理版本，并从 IDE 设置中取消使用该 JBR。".to_string());
+        return "这是 IDE 内置运行时。DevEnv Manager 不会卸载或删除它；请先切换到 DevEnv 管理版本，并从 IDE 设置中取消使用该 JBR。".to_string();
     }
     if let Some(app) = package_name_from_path(executable, "scoop", "apps") {
-        let scoop = find_on_path("scoop.cmd")
-            .or_else(|| find_on_path("scoop"))
-            .ok_or_else(|| "路径属于 Scoop，但当前找不到 scoop 命令".to_string())?;
-        return run_package_uninstall(
-            scoop,
-            &["uninstall", app.as_str()],
-            &format!("Scoop 卸载 {app}"),
+        return format!(
+            "路径属于 Scoop 应用 {app}。DevEnv Manager 不会调用包管理器卸载；请在终端自行运行 scoop uninstall {app}，或打开系统卸载入口。"
         );
     }
     if let Some(package) = package_name_from_path(executable, "chocolatey", "lib") {
-        let choco = find_on_path("choco.exe")
-            .ok_or_else(|| "路径属于 Chocolatey，但当前找不到 choco.exe".to_string())?;
-        return run_package_uninstall(
-            choco,
-            &["uninstall", package.as_str(), "-y"],
-            &format!("Chocolatey 卸载 {package}"),
+        return format!(
+            "路径属于 Chocolatey 包 {package}。DevEnv Manager 不会调用包管理器卸载；请在管理员终端自行运行 choco uninstall {package}，或打开系统卸载入口。"
         );
     }
-    let root = portable_runtime_root(executable, kind)?;
-    trash::delete(&root).map_err(|err| format!("将便携运行时移入回收站失败：{err}"))?;
-    Ok(OperationResult {
-        success: true,
-        message: format!("已将便携运行时移入 Windows 回收站：{}", display_path(root)),
-    })
-}
-
-fn run_package_uninstall(
-    executable: String,
-    args: &[&str],
-    title: &str,
-) -> Result<OperationResult, String> {
-    let output = hidden_command(executable)
-        .args(args)
-        .output()
-        .map_err(|err| format!("{title}失败：{err}"))?;
-    if !output.status.success() {
-        return Err(format!(
-            "{title}失败：{}",
-            command_text(&output.stdout, &output.stderr)
-        ));
+    if let Some(entry) = find_uninstall_entry_for_path(executable, kind) {
+        return format!(
+            "已找到 Windows 卸载入口：{}。DevEnv Manager 不会直接启动卸载器；请点击“系统卸载入口”后由用户手动卸载。",
+            entry.display_name
+        );
     }
-    Ok(OperationResult {
-        success: true,
-        message: format!("已完成 {title}"),
-    })
+    if let Ok(root) = portable_runtime_root(executable, kind) {
+        return format!(
+            "疑似便携运行时：{}。DevEnv Manager 不会删除外部目录；请确认不再使用后由用户手动处理。",
+            display_path(root)
+        );
+    }
+    format!(
+        "未识别到可由 DevEnv Manager 安全管理的 {} 卸载方式。请先切换到受管版本，再通过系统设置、原安装器或包管理器手动处理：{}",
+        kind,
+        display_path(executable)
+    )
 }
 
 fn package_name_from_path(path: &Path, manager: &str, collection: &str) -> Option<String> {
@@ -12805,6 +12772,27 @@ mod tests {
         let unrelated_exe = unrelated.join("python.exe");
         fs::write(&unrelated_exe, b"test").unwrap();
         assert!(portable_runtime_root(&unrelated_exe, "Python").is_err());
+    }
+
+    #[test]
+    fn external_runtime_manual_action_never_deletes_portable_go() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path().join("go1.22");
+        let bin = root.join("bin");
+        fs::create_dir_all(&bin).unwrap();
+        let executable = bin.join("go.exe");
+        fs::write(&executable, b"test").unwrap();
+        let message = external_runtime_manual_action_message(&executable, "Go");
+        assert!(message.contains("不会删除外部目录"));
+        assert!(root.exists());
+    }
+
+    #[test]
+    fn external_runtime_package_manager_paths_are_manual_only() {
+        let scoop_python = PathBuf::from(r"C:\Users\Alice\scoop\apps\python\current\python.exe");
+        let message = external_runtime_manual_action_message(&scoop_python, "Python");
+        assert!(message.contains("不会调用包管理器卸载"));
+        assert!(message.contains("scoop uninstall python"));
     }
 
     #[test]
