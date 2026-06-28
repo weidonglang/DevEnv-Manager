@@ -9,6 +9,7 @@ import {
   Database,
   Download,
   FileText,
+  FolderOpen,
   FolderSearch,
   Gauge,
   Hammer,
@@ -17,6 +18,7 @@ import {
   PackageCheck,
   Play,
   RefreshCw,
+  RotateCcw,
   Route,
   Search,
   Shield,
@@ -53,6 +55,8 @@ type ConfigView = {
     downloadTimeoutSeconds: number;
     theme: string;
     safetyDisclaimerAccepted: boolean;
+    safetyDisclaimerVersion: number;
+    safetyDisclaimerAcceptedAt?: string | null;
   };
   installed: {
     jdks: ManagedRuntime[];
@@ -289,7 +293,7 @@ type PortHistorySummary = {
   lastSeen: number;
 };
 
-type PortSortKey = "protocol" | "localAddress" | "localPort" | "state" | "pid" | "processName" | "risk";
+type PortSortKey = "localPort" | "state" | "identity" | "processName" | "pid" | "confidence" | "riskLevel";
 type SortDirection = "asc" | "desc";
 
 type ProjectHealth = {
@@ -394,11 +398,18 @@ type PythonAnalysis = {
   currentPip?: PythonToolState;
   launcherPath: string;
   launcherOutput: string;
+  firstPythonOnPath: string;
+  firstPipOnPath: string;
+  pythonMPipAvailable: boolean;
+  managedPythonAvailable: boolean;
   discoveredPythons: PythonEntry[];
   discoveredPips: PythonEntry[];
   userPathEntryCount: number;
   currentTerminalMatchesUserPath: boolean;
   storeAliasRisk: boolean;
+  repairBlockers: string[];
+  recoveryActions: string[];
+  diagnosticReport: string;
   risks: string[];
   recommendations: string[];
   pipRepairCommand: string;
@@ -548,6 +559,14 @@ type PlatformReport = {
     cargoConfigExists: boolean;
   };
   chsrc: ToolState;
+  chsrcRecovery: {
+    missing: boolean;
+    explanation: string[];
+    scoopCommand: string;
+    wingetCommand: string;
+    officialUrl: string;
+    fallbackFeatures: string[];
+  };
   generatedAt: string;
 };
 
@@ -595,9 +614,15 @@ type MySqlCandidate = {
   datadir: string;
   port: number;
   portOccupied: boolean;
+  portProcess: string;
   dataHealth: string;
   confidence: string;
   conclusionLevel: string;
+  staticFileCheck: string;
+  connectionCheck: string;
+  systemSchemaCheck: string;
+  reasoning: string[];
+  backupManifest?: MySqlBackupManifestStatus | null;
   evidence: string[];
   nextSteps: string[];
   systemSchemaMissing: boolean;
@@ -606,6 +631,21 @@ type MySqlCandidate = {
   suggestions: string[];
   registrationCommand: string;
   consoleCommand: string;
+};
+
+type MySqlBackupManifestStatus = {
+  valid: boolean;
+  reason: string;
+  createdAt: number;
+  expiresAt: number;
+  destination: string;
+  files: number;
+  bytes: number;
+  ibdata: boolean;
+  frm: boolean;
+  businessSchema: boolean;
+  systemSchema: boolean;
+  manifestPath: string;
 };
 
 type MySqlRepairReport = {
@@ -891,6 +931,7 @@ type MaintenanceOverview = {
 };
 
 const app = document.querySelector<HTMLDivElement>("#app");
+const SAFETY_DISCLAIMER_VERSION = 1;
 
 if (!app) {
   throw new Error("Missing app root");
@@ -933,6 +974,8 @@ app.innerHTML = `
         <button id="refresh-all" class="primary">${icon(RefreshCw)}<span>刷新</span></button>
       </header>
       <div id="toast" class="toast" hidden></div>
+      <div id="fatal-error" class="fatal-error" hidden></div>
+      <div id="safety-gate" class="safety-gate" hidden></div>
       <div id="task-progress" class="task-progress" hidden>
         <div><strong id="task-progress-title">任务</strong><span id="task-progress-message">等待中</span></div>
         <div class="progress-track"><span id="task-progress-bar"></span></div>
@@ -1037,56 +1080,58 @@ app.innerHTML = `
             <div class="panel-title">${icon(Network)}<h2>端口管理</h2></div>
             <button id="scan-ports">${icon(RefreshCw)}<span>扫描</span></button>
           </div>
+          <div id="port-summary" class="port-summary"></div>
           <div class="port-tools">
-            <div class="search-box">${icon(Search)}<input id="port-search" placeholder="输入 8080、java、web、mysql、pid、进程名..." /></div>
+            <div class="search-box">${icon(Search)}<input id="port-search" placeholder="搜索端口、进程、PID、服务名或识别结果" /></div>
             <label class="toggle-row port-monitor-toggle" title="每 5 秒检查新出现的常用监听端口">
               <input id="port-monitor-enabled" type="checkbox" />
               <span>占用提醒</span>
             </label>
             <div id="port-quick-filters" class="chip-row port-filter-row">
               <button class="filter-chip active" data-port-filter="all">全部</button>
-              <button class="filter-chip" data-port-filter="spring">Spring</button>
-              <button class="filter-chip" data-port-filter="tomcat">Tomcat</button>
+              <button class="filter-chip" data-port-filter="listening">监听中</button>
+              <button class="filter-chip" data-port-filter="development">开发服务</button>
               <button class="filter-chip" data-port-filter="frontend">前端</button>
+              <button class="filter-chip" data-port-filter="backend">后端</button>
+              <button class="filter-chip" data-port-filter="python">Python/AI</button>
               <button class="filter-chip" data-port-filter="database">数据库</button>
-              <button class="filter-chip" data-port-filter="sensitive">敏感</button>
+              <button class="filter-chip" data-port-filter="middleware">中间件</button>
+              <button class="filter-chip" data-port-filter="desktop">桌面应用</button>
+              <button class="filter-chip" data-port-filter="sensitive">系统/高风险</button>
+              <button class="filter-chip" data-port-filter="low-confidence">低置信度</button>
             </div>
           </div>
-          <div class="table-wrap">
-            <table>
-              <colgroup>
-                <col class="col-protocol" />
-                <col class="col-address" />
-                <col class="col-port" />
-                <col class="col-state" />
-                <col class="col-pid" />
-                <col class="col-process" />
-                <col class="col-risk" />
-                <col class="col-action" />
-              </colgroup>
-              <thead>
-                <tr>
-                  <th><button class="sort-head" data-sort="protocol">协议</button></th>
-                  <th><button class="sort-head" data-sort="localAddress">本地地址</button></th>
-                  <th><button class="sort-head" data-sort="localPort">端口</button></th>
-                  <th><button class="sort-head" data-sort="state">状态</button></th>
-                  <th><button class="sort-head" data-sort="pid">PID</button></th>
-                  <th><button class="sort-head" data-sort="processName">进程</button></th>
-                  <th><button class="sort-head" data-sort="risk">风险</button></th>
-                  <th>操作</th>
-                </tr>
-              </thead>
-              <tbody id="ports-body"></tbody>
-            </table>
+          <div class="port-workbench">
+            <div class="table-wrap">
+              <table class="ports-table">
+                <colgroup>
+                  <col class="col-port" />
+                  <col class="col-state" />
+                  <col class="col-identity" />
+                  <col class="col-process" />
+                  <col class="col-pid" />
+                  <col class="col-confidence" />
+                  <col class="col-risk" />
+                  <col class="col-action" />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th><button class="sort-head" data-sort="localPort">端口</button></th>
+                    <th><button class="sort-head" data-sort="state">状态</button></th>
+                    <th><button class="sort-head" data-sort="identity">识别结果</button></th>
+                    <th><button class="sort-head" data-sort="processName">进程</button></th>
+                    <th><button class="sort-head" data-sort="pid">PID</button></th>
+                    <th><button class="sort-head" data-sort="confidence">置信度</button></th>
+                    <th><button class="sort-head" data-sort="riskLevel">风险</button></th>
+                    <th>更多</th>
+                  </tr>
+                </thead>
+                <tbody id="ports-body"></tbody>
+              </table>
+            </div>
+            <aside id="port-detail" class="port-detail"><div class="empty">点击端口行查看详情</div></aside>
           </div>
           <div id="ports-pagination"></div>
-          <div class="grid two port-insights">
-            <section id="port-detail" class="port-detail"><div class="empty">点击详情按钮查看端口解释</div></section>
-            <section>
-              <div class="panel-title compact-title">${icon(Activity)}<h2>最近 7 天</h2></div>
-              <div id="port-history" class="runtime-list"><div class="empty">还没有端口历史</div></div>
-            </section>
-          </div>
         </section>
       </section>
 
@@ -1396,6 +1441,7 @@ app.innerHTML = `
             <button data-chsrc-action="set">使用源 ID</button>
             <button data-chsrc-action="reset">恢复官方源</button>
           </div>
+          <div id="chsrc-recovery" class="notice-panel"></div>
           <pre id="chsrc-output" class="command-output compact-output">安装提示：scoop install chsrc，或通过 WinGet 安装 RubyMetric/chsrc。</pre>
         </section>
       </section>
@@ -1498,12 +1544,12 @@ app.innerHTML = `
           <div id="downloads-usage"><div class="empty">尚未分析下载目录</div></div>
         </section>
         <section class="maintenance-panel" data-maintenance-panel="large-files">
-          <div class="panel-head"><div class="panel-title">${icon(Search)}<h2>大文件 Top 100</h2></div><button id="scan-large-files">开始只读扫描</button></div>
+          <div class="panel-head"><div class="panel-title">${icon(Search)}<h2>大文件 Top 100</h2></div><div class="row-actions"><button id="scan-large-files">开始只读扫描</button><button id="cancel-large-scan" disabled>取消扫描</button></div></div>
           <div class="form-row"><input id="large-file-root" placeholder="扫描目录；留空使用用户目录" /><button data-pick-directory="large-file-root">${icon(FolderSearch)}<span>选择文件夹</span></button><input id="large-file-min" type="number" min="1" value="100" title="最小 MB" /><span>MB 以上</span></div>
           <div id="large-file-result" class="runtime-list"><div class="empty">选择或填写扫描范围后开始</div></div>
         </section>
         <section class="maintenance-panel" data-maintenance-panel="duplicates">
-          <div class="panel-head"><div class="panel-title">${icon(Boxes)}<h2>重复文件</h2></div><button id="scan-duplicates">按大小与 SHA256 扫描</button></div>
+          <div class="panel-head"><div class="panel-title">${icon(Boxes)}<h2>重复文件</h2></div><div class="row-actions"><button id="scan-duplicates">按大小与 SHA256 扫描</button><button id="cancel-duplicate-scan" disabled>取消扫描</button></div></div>
           <div class="scan-only-banner">${icon(Shield)}<span>只扫描用户明确选择的目录；先按大小分组，再读取候选内容计算 SHA256。不提供删除。</span></div>
           <div class="form-row"><input id="duplicate-root" placeholder="扫描目录；留空使用用户目录" /><button data-pick-directory="duplicate-root">${icon(FolderSearch)}<span>选择文件夹</span></button><input id="duplicate-min" type="number" min="1" value="10" title="最小 MB" /><span>MB 以上</span></div>
           <div id="duplicate-result"><div class="empty">尚未扫描重复文件</div></div>
@@ -1746,6 +1792,8 @@ const state = {
   expansionResult: null as ExpansionResult | null,
   duplicateGroups: [] as DuplicateGroup[],
   appUsage: null as AppUsageReport | null,
+  safeMode: false,
+  fatalError: "",
 };
 
 type LargeFileItem = {
@@ -1996,7 +2044,7 @@ function renderRuntimes() {
             <article class="runtime">
               <div><strong>${escapeHtml(runtime.kind)}</strong><span>${escapeHtml(runtime.version)}</span></div>
               <small>${escapeHtml(runtime.source)} · ${escapeHtml(runtime.executable)}</small>
-              ${canUninstallExternal(runtime) ? `<div class="row-actions"><button data-action="uninstall-external-runtime" data-kind="${escapeHtml(runtime.kind)}" data-source="${escapeHtml(runtime.source)}" data-executable="${escapeHtml(runtime.executable)}">${icon(Trash2)}<span>${runtime.source === "Scoop" || runtime.source === "Chocolatey" ? "用包管理器卸载" : "系统卸载"}</span></button></div>` : ""}
+              ${runtimeSafeActions(runtime)}
             </article>
           `)
     : `<div class="empty">还没有发现开发工具</div>`;
@@ -2043,6 +2091,26 @@ function renderJavaEnvironment() {
       <div><span>Maven 使用环境</span><strong>${escapeHtml(report.mavenRuntime || "未安装/未读取")}</strong></div>
       <div><span>Gradle 使用 JVM</span><strong>${escapeHtml(report.gradleRuntime || "未安装/未读取")}</strong></div>
     </div>
+    <section class="notice-panel">
+      <h3>JDK 候选</h3>
+      <div class="runtime-list">
+        ${report.candidates.length ? report.candidates.map((candidate) => `
+          <article class="runtime">
+            <div><strong>${escapeHtml(candidate.version.split("\n")[0] || "Java")}</strong><span>${escapeHtml(candidate.source)}</span></div>
+            <small>${escapeHtml(candidate.executable)}</small>
+            <div class="row-actions">
+              <button data-action="open-analysis-path" data-path="${escapeHtml(candidate.executable)}">${icon(FolderSearch)}<span>打开目录</span></button>
+              <button data-action="copy-text" data-copy="${escapeHtml(candidate.executable)}">${icon(Clipboard)}<span>复制路径</span></button>
+              <button data-action="copy-text" data-copy="${escapeHtml(candidate.executable.replace(/\\bin\\java\.exe$/i, ""))}">${icon(Clipboard)}<span>复制 JAVA_HOME 候选</span></button>
+            </div>
+          </article>
+        `).join("") : `<div class="empty">没有发现 JDK 候选</div>`}
+      </div>
+      <ul>
+        <li>外部、IDE 内置、Scoop、Chocolatey、mise、asdf JDK 不会被 DevEnv Manager 卸载、删除或移入回收站。</li>
+        <li>如需接管，请先复制 JAVA_HOME 候选并在环境配置里预览用户级修复计划；不要自动改系统级 PATH。</li>
+      </ul>
+    </section>
     ${report.warnings.length ? `<ul class="warning-text">${report.warnings.map((warning) => `<li>${escapeHtml(warning)}</li>`).join("")}</ul>` : ""}
   `;
 }
@@ -2190,6 +2258,7 @@ function renderManagedGos() {
 function renderPorts() {
   const visible = sortedPorts(filteredPorts(state.ports));
   setText("metric-ports", visible.length);
+  renderPortSummary();
   const body = document.querySelector<HTMLElement>("#ports-body");
   if (!body) return;
   const pageSize = 10;
@@ -2200,17 +2269,18 @@ function renderPorts() {
     .slice((page - 1) * pageSize, page * pageSize)
     .map(
       (record) => {
-        const hint = portHint(record);
+        const conflict = record.conflictCount || record.conflictEvidence?.length || 0;
+        const selected = state.selectedPort?.pid === record.pid && state.selectedPort.localPort === record.localPort;
         return `
-        <tr>
-          <td>${escapeHtml(record.protocol)}</td>
-          <td>${escapeHtml(record.localAddress)}</td>
-          <td><strong>${record.localPort}</strong>${hint ? `<span class="port-hint">${escapeHtml(hint)}</span>` : ""}</td>
+        <tr class="${selected ? "selected" : ""}">
+          <td><strong>${record.localPort}</strong><span class="port-hint">${escapeHtml(record.protocol)} · ${escapeHtml(record.localAddress)}</span></td>
           <td>${escapeHtml(record.state)}</td>
+          <td><strong>${escapeHtml(record.identity || record.commonUsage || "Unknown")}</strong>${conflict ? `<span class="conflict-badge" title="${escapeHtml((record.conflictEvidence || []).join("；") || "存在冲突证据")}">${conflict}冲突</span>` : ""}</td>
+          <td>${escapeHtml(record.processName || "未读取")}</td>
           <td>${record.pid}</td>
-          <td>${escapeHtml(record.processName)}</td>
-          <td><span class="pill ${record.risk === "普通" ? "ok" : "warn"}">${escapeHtml(record.risk)}</span></td>
-          <td><div class="table-actions"><button class="icon-action" data-action="port-details" data-pid="${record.pid}" data-port="${record.localPort}" title="查看详情">${icon(Search)}</button><button class="icon-action" data-action="kill-port" data-pid="${record.pid}" title="结束进程">${icon(Trash2)}</button></div></td>
+          <td><span class="pill ${record.confidence >= 70 ? "ok" : record.confidence >= 40 ? "warn" : "muted"}">${confidenceLabel(record.confidence)}</span><small>${record.evidenceCount || record.evidence?.length || 0}证据</small></td>
+          <td><span class="risk-chip risk-${portRiskClass(record.riskLevel || record.risk)}">${escapeHtml(record.riskLevel || record.risk)}</span></td>
+          <td><button class="icon-action" data-action="port-details" data-pid="${record.pid}" data-port="${record.localPort}" title="详情">${icon(Search)}</button></td>
         </tr>
       `;
       },
@@ -2223,29 +2293,59 @@ function renderPorts() {
   renderPortHistory();
 }
 
+function renderPortSummary() {
+  const element = document.querySelector<HTMLElement>("#port-summary");
+  if (!element) return;
+  const records = state.ports;
+  const count = (predicate: (record: PortRecord) => boolean) => records.filter(predicate).length;
+  const items = [
+    ["listening", "监听端口", count((record) => record.state.toLowerCase() === "listening")],
+    ["development", "开发服务", count((record) => ["development", "frontend", "backend", "python"].includes(portCategory(record)))],
+    ["database", "数据库/中间件", count((record) => ["database", "middleware"].includes(portCategory(record)))],
+    ["desktop", "桌面应用", count((record) => portCategory(record) === "desktop")],
+    ["sensitive", "高风险/系统", count((record) => ["high", "critical", "blocked", "阻止", "高风险"].includes((record.riskLevel || record.risk).toLowerCase()))],
+    ["low-confidence", "低置信度", count((record) => record.confidence < 40 || (record.conflictCount || 0) > 0)],
+  ];
+  element.innerHTML = items
+    .map(([filter, label, value]) => `<button class="port-summary-card" data-port-filter="${filter}"><strong>${value}</strong><span>${label}</span></button>`)
+    .join("");
+}
+
 function renderPortDetails() {
   const element = document.querySelector<HTMLElement>("#port-detail");
   if (!element) return;
   const record = state.selectedPort;
   if (!record) {
-    element.innerHTML = `<div class="empty">点击详情按钮查看端口解释</div>`;
+    element.innerHTML = `<div class="empty">点击端口行查看详情</div>`;
     return;
   }
+  const history = state.portHistory
+    .filter((item) => item.port === record.localPort)
+    .slice(0, 6);
+  const isHttpLike = /\b(http|web|vite|spring|tomcat|next|nuxt|flask|django|fastapi|uvicorn)\b/i.test(`${record.identity} ${record.commonUsage}`);
+  const isDatabase = portCategory(record) === "database";
   element.innerHTML = `
-    <div class="panel-title compact-title">${icon(Network)}<h2>${record.localPort} · ${escapeHtml(record.commonUsage)}</h2></div>
-    <p class="port-explanation">${escapeHtml(record.explanation)}</p>
+    <div class="panel-title compact-title">${icon(Network)}<h2>${record.localPort} · ${escapeHtml(record.identity || record.commonUsage || "Unknown")}</h2></div>
+    <p class="port-explanation">${escapeHtml(record.recommendation || record.explanation)}</p>
     <div class="kv-list port-detail-kv">
-      <div><span>进程</span><strong>${escapeHtml(record.processName)} / PID ${record.pid}</strong></div>
+      <div><span>协议/地址</span><strong>${escapeHtml(record.protocol)} · ${escapeHtml(record.localAddress)} · ${escapeHtml(record.state)}</strong></div>
+      <div><span>进程</span><strong>${escapeHtml(record.processName || "未读取")} / PID ${record.pid}</strong></div>
       <div><span>进程路径</span><strong>${escapeHtml(record.processPath || "未读取")}</strong></div>
       <div><span>启动命令</span><strong>${escapeHtml(record.commandLine || "未读取")}</strong></div>
       <div><span>父进程</span><strong>${escapeHtml(record.parentProcessName || "未读取")}${record.parentPid ? ` / PID ${record.parentPid}` : ""}</strong></div>
       <div><span>Windows 服务</span><strong>${escapeHtml(record.serviceNames.join("、") || "未识别")}</strong></div>
-      <div><span>风险</span><strong>${escapeHtml(record.risk)}</strong></div>
+      <div><span>置信度</span><strong>${confidenceLabel(record.confidence)} · ${record.evidenceCount || record.evidence?.length || 0} 条证据</strong></div>
+      <div><span>风险</span><strong>${escapeHtml(record.riskLevel || record.risk)}</strong></div>
     </div>
+    <details open><summary>识别证据</summary><ul>${(record.evidence || []).map((item) => `<li>${escapeHtml(item)}</li>`).join("") || "<li>证据不足，不能只凭端口号判断服务类型。</li>"}</ul></details>
+    <details ${record.conflictEvidence?.length ? "open" : ""}><summary>冲突证据</summary><ul>${(record.conflictEvidence || []).map((item) => `<li>${escapeHtml(item)}</li>`).join("") || "<li>未发现明显冲突证据。</li>"}</ul></details>
+    <details><summary>最近 7 天历史</summary>${history.length ? `<ul>${history.map((item) => `<li>${escapeHtml(item.processName)} · ${item.observations} 次 · ${new Date(item.lastSeen * 1000).toLocaleString("zh-CN")}</li>`).join("")}</ul>` : "<p>还没有该端口历史。</p>"}</details>
     <div class="toolbar compact port-detail-actions">
       <button data-action="copy-text" data-copy="${escapeHtml(record.processPath)}">${icon(Clipboard)}<span>复制路径</span></button>
       ${record.processPath ? `<button data-action="open-process-location" data-pid="${record.pid}">${icon(FolderSearch)}<span>打开位置</span></button>` : ""}
-      <button data-action="copy-text" data-copy="taskkill /PID ${record.pid} /T">${icon(Clipboard)}<span>复制命令</span></button>
+      <button data-action="copy-text" data-copy="${escapeHtml(portDiagnosticSummary(record))}">${icon(Clipboard)}<span>复制摘要</span></button>
+      ${isHttpLike ? `<button data-action="copy-text" data-copy="curl -I http://127.0.0.1:${record.localPort}">${icon(Clipboard)}<span>复制 curl</span></button>` : ""}
+      ${isDatabase ? `<button data-action="copy-text" data-copy="${escapeHtml(databaseCommandHint(record))}">${icon(Database)}<span>复制连接命令</span></button>` : ""}
       <button class="danger-button" data-action="kill-port" data-pid="${record.pid}">${icon(Trash2)}<span>安全结束</span></button>
     </div>
   `;
@@ -2265,12 +2365,15 @@ function renderPortHistory() {
     : `<div class="empty">还没有端口历史</div>`;
 }
 
-function canUninstallExternal(runtime: RuntimeInfo) {
-  const source = runtime.source.toLowerCase();
-  return (
-    !source.includes("devenv") &&
-    ["Java", "Python", "Node.js", "Maven", "Gradle", "Go"].includes(runtime.kind)
-  );
+function runtimeSafeActions(runtime: RuntimeInfo) {
+  const external = !runtime.source.toLowerCase().includes("devenv");
+  if (!external) return "";
+  const canOpenApps = ["System", "Microsoft Store", "Scoop", "Chocolatey", "PATH"].includes(runtime.source);
+  return `<div class="row-actions">
+    <button data-action="open-analysis-path" data-path="${escapeHtml(runtime.executable)}">${icon(FolderSearch)}<span>打开位置</span></button>
+    <button data-action="copy-text" data-copy="${escapeHtml(runtime.executable)}">${icon(Clipboard)}<span>复制路径</span></button>
+    ${canOpenApps ? `<button data-action="open-apps-features">${icon(FolderOpen)}<span>系统卸载入口</span></button>` : ""}
+  </div>`;
 }
 
 function renderHealth() {
@@ -2428,14 +2531,23 @@ function renderPythonAnalysis() {
   element.innerHTML = `
     <div class="runtime-list">${currentPython}${currentPip}</div>
     <div class="kv-list toolchain-kv">
+      <div><span>PATH 首个 python</span><strong>${escapeHtml(analysis.firstPythonOnPath || "未发现")}</strong></div>
+      <div><span>PATH 首个 pip</span><strong>${escapeHtml(analysis.firstPipOnPath || "未发现")}</strong></div>
+      <div><span>python -m pip</span><strong>${analysis.pythonMPipAvailable ? "可用" : "不可用"}</strong></div>
       <div><span>Python Launcher</span><strong>${escapeHtml(analysis.launcherPath || "未发现")}</strong></div>
       <div><span>用户 PATH</span><strong>${analysis.userPathEntryCount} 项 · ${analysis.currentTerminalMatchesUserPath ? "当前进程已同步" : "当前进程仍是旧 PATH"}</strong></div>
       <div><span>Store 执行别名</span><strong>${analysis.storeAliasRisk ? "可能抢占" : "未发现抢占"}</strong></div>
+      <div><span>受管 Python</span><strong>${analysis.managedPythonAvailable ? "已安装，可生成切换/修复计划" : "未安装，请先安装受管 Python"}</strong></div>
     </div>
     <div class="chip-row">${analysis.risks.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}</div>
+    ${analysis.repairBlockers.length ? `<section class="notice-panel"><h3>阻断修复计划的原因</h3><ul>${analysis.repairBlockers.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul></section>` : ""}
+    <section class="notice-panel"><h3>下一步安全操作</h3><ul>${analysis.recoveryActions.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul></section>
     <div class="toolbar compact">
       <button data-action="copy-text" data-copy="${escapeHtml(analysis.pipRepairCommand)}">${icon(Clipboard)}<span>复制 pip 修复命令</span></button>
       <button data-action="copy-text" data-copy="${escapeHtml(analysis.aliasSettingsCommand)}">${icon(Clipboard)}<span>复制别名设置命令</span></button>
+      <button data-action="open-python-alias-settings">${icon(FolderOpen)}<span>打开执行别名设置</span></button>
+      <button data-action="export-python-diagnostic">${icon(FileText)}<span>导出只读诊断</span></button>
+      <button data-action="copy-text" data-copy="${escapeHtml(analysis.diagnosticReport)}">${icon(Clipboard)}<span>复制诊断报告</span></button>
     </div>
     <div class="grid two compact-grid">
       <section>
@@ -2610,11 +2722,26 @@ function renderPlatforms() {
   const dotnet = document.querySelector<HTMLElement>("#dotnet-platform");
   const mirrors = document.querySelector<HTMLElement>("#mirror-platform");
   const chsrc = document.querySelector<HTMLElement>("#chsrc-status");
+  const chsrcRecovery = document.querySelector<HTMLElement>("#chsrc-recovery");
   const report = state.platforms;
   if (!go || !rust || !dotnet || !mirrors || !report) return;
   if (chsrc) {
     chsrc.textContent = report.chsrc.installed ? `已安装 · ${report.chsrc.version}` : "未安装";
     chsrc.className = `risk-chip ${report.chsrc.installed ? "risk-low" : "risk-medium"}`;
+  }
+  if (chsrcRecovery) {
+    const recovery = report.chsrcRecovery;
+    chsrcRecovery.innerHTML = `
+      <h3>${recovery.missing ? "chsrc 缺失闭环" : "chsrc 安全边界"}</h3>
+      <ul>${recovery.explanation.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+      ${recovery.missing ? `<div class="toolbar compact">
+        <button data-action="copy-text" data-copy="${escapeHtml(recovery.scoopCommand)}">${icon(Clipboard)}<span>复制 Scoop 命令</span></button>
+        <button data-action="copy-text" data-copy="${escapeHtml(recovery.wingetCommand)}">${icon(Clipboard)}<span>复制 WinGet 命令</span></button>
+        <button data-action="copy-text" data-copy="${escapeHtml(recovery.officialUrl)}">${icon(Clipboard)}<span>复制官方项目</span></button>
+        <button data-action="refresh-platforms">${icon(RefreshCw)}<span>重新检测</span></button>
+      </div>` : ""}
+      <div class="chip-row">${recovery.fallbackFeatures.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}</div>
+    `;
   }
 
   go.innerHTML = `
@@ -2679,6 +2806,9 @@ async function runPlatformAction(action: string, value: string | null = null) {
 function filteredPorts(records: PortRecord[]) {
   const terms = expandPortQuery(portState.query);
   return records.filter((record) => {
+    const category = portCategory(record);
+    const riskClass = portRiskClass(record.riskLevel || record.risk);
+    const conflictCount = record.conflictCount || record.conflictEvidence?.length || 0;
     const hint = portHint(record).toLowerCase();
     const text = [
       record.protocol,
@@ -2694,20 +2824,45 @@ function filteredPorts(records: PortRecord[]) {
       record.commonUsage,
       record.explanation,
       record.risk,
+      record.identity,
+      record.riskLevel,
+      record.recommendation,
+      record.evidence.join(" "),
+      record.conflictEvidence.join(" "),
+      category,
       hint,
     ]
       .join(" ")
       .toLowerCase();
     const queryMatch = terms.length === 0 || terms.every((term) => text.includes(term));
-    const quickMatch =
-      portState.quickFilter === "all" ||
-      (portState.quickFilter === "sensitive" && record.risk !== "普通") ||
-      commonPorts.some(
-        (item) =>
-          item.key === portState.quickFilter &&
-          (item.ports.includes(record.localPort) ||
-            item.keywords.some((keyword) => record.processName.toLowerCase().includes(keyword))),
-      );
+    const quickMatch = (() => {
+      switch (portState.quickFilter) {
+        case "all":
+          return true;
+        case "listening":
+          return record.state.toLowerCase() === "listening";
+        case "development":
+          return ["development", "frontend", "backend", "python"].includes(category);
+        case "frontend":
+        case "backend":
+        case "python":
+        case "database":
+        case "middleware":
+        case "desktop":
+          return category === portState.quickFilter;
+        case "sensitive":
+          return ["high", "critical"].includes(riskClass) || record.risk !== "普通";
+        case "low-confidence":
+          return record.confidence < 40 || conflictCount > 0;
+        default:
+          return commonPorts.some(
+            (item) =>
+              item.key === portState.quickFilter &&
+              (item.ports.includes(record.localPort) ||
+                item.keywords.some((keyword) => record.processName.toLowerCase().includes(keyword))),
+          );
+      }
+    })();
     return queryMatch && quickMatch;
   });
 }
@@ -2733,10 +2888,74 @@ function sortedPorts(records: PortRecord[]) {
   });
 }
 
+function confidenceLabel(value: number) {
+  if (value >= 70) return `高 ${value}%`;
+  if (value >= 40) return `中 ${value}%`;
+  if (value > 0) return `低 ${value}%`;
+  return "未知";
+}
+
+function portRiskClass(value: string) {
+  const risk = (value || "").toLowerCase();
+  if (risk.includes("critical") || risk.includes("blocked") || risk.includes("阻止") || risk.includes("严重")) return "critical";
+  if (risk.includes("high") || risk.includes("高")) return "high";
+  if (risk.includes("medium") || risk.includes("warn") || risk.includes("谨慎") || risk.includes("中")) return "medium";
+  if (risk.includes("low") || risk.includes("普通") || risk.includes("低")) return "low";
+  return "medium";
+}
+
+function portCategory(record: PortRecord) {
+  const text = [
+    record.identity,
+    record.commonUsage,
+    record.processName,
+    record.processPath,
+    record.commandLine,
+    record.parentProcessName,
+    record.serviceNames.join(" "),
+    record.evidence.join(" "),
+  ]
+    .join(" ")
+    .toLowerCase();
+  if (/\b(mysql|mariadb|postgres|postgresql|psql|redis|mongodb|mongod|mongo|sqlite|sql server|mssql|oracle)\b/.test(text)) return "database";
+  if (/\b(rabbitmq|kafka|zookeeper|nacos|consul|etcd|minio|elasticsearch|opensearch|memcached)\b/.test(text)) return "middleware";
+  if (/\b(electron|tauri|wails|cef|webview|qt|wpf|winforms|javaw)\b/.test(text)) return "desktop";
+  if (/\b(vite|webpack|next|nuxt|react|vue|angular|svelte|astro|storybook|frontend)\b/.test(text)) return "frontend";
+  if (/\b(python|py\.exe|python\.exe|uvicorn|gunicorn|flask|django|fastapi|jupyter|streamlit|gradio)\b/.test(text)) return "python";
+  if (/\b(java|node|deno|bun|spring|tomcat|jetty|express|nestjs|koa|gin|go\.exe|cargo|backend|api)\b/.test(text)) return "backend";
+  if (record.localPort >= 3000 && record.localPort <= 9999) return "development";
+  return "unknown";
+}
+
+function portDiagnosticSummary(record: PortRecord) {
+  const parts = [
+    `端口 ${record.localPort}/${record.protocol} ${record.state}`,
+    `进程 ${record.processName || "未读取"} PID ${record.pid}`,
+    `识别 ${record.identity || record.commonUsage || "Unknown"}，置信度 ${confidenceLabel(record.confidence)}`,
+    `风险 ${record.riskLevel || record.risk}`,
+  ];
+  if (record.processPath) parts.push(`路径 ${record.processPath}`);
+  if (record.commandLine) parts.push(`命令 ${record.commandLine}`);
+  if (record.evidence.length) parts.push(`证据 ${record.evidence.join("；")}`);
+  if (record.conflictEvidence.length) parts.push(`冲突 ${record.conflictEvidence.join("；")}`);
+  return parts.join("\n");
+}
+
+function databaseCommandHint(record: PortRecord) {
+  const text = `${record.identity} ${record.commonUsage} ${record.processName} ${record.commandLine}`.toLowerCase();
+  if (text.includes("redis")) return `redis-cli -h 127.0.0.1 -p ${record.localPort}`;
+  if (text.includes("postgres") || text.includes("psql")) return `psql -h 127.0.0.1 -p ${record.localPort} -U postgres`;
+  if (text.includes("mongo")) return `mongosh "mongodb://127.0.0.1:${record.localPort}"`;
+  if (text.includes("mysql") || text.includes("mariadb")) return `mysql -h 127.0.0.1 -P ${record.localPort} -u root -p`;
+  if (text.includes("mssql") || text.includes("sql server")) return `sqlcmd -S 127.0.0.1,${record.localPort} -E`;
+  return `连接 127.0.0.1:${record.localPort}`;
+}
+
 function portHint(record: PortRecord) {
   const exact = commonPorts.filter((item) => item.ports.includes(record.localPort)).map((item) => item.label);
   if (record.commonUsage && record.commonUsage !== "未识别的本地服务") exact.push(record.commonUsage);
-  if (record.risk !== "普通") exact.push(record.risk);
+  if (record.identity) exact.push(record.identity);
+  if ((record.riskLevel || record.risk) !== "普通") exact.push(record.riskLevel || record.risk);
   return [...new Set(exact)].join(" / ");
 }
 
@@ -2919,6 +3138,8 @@ async function refreshBase() {
   renderJavaEnvironment();
   renderAgentTraces();
   renderUpdate();
+  renderSafetyGate();
+  renderFatalError();
   renderMaintenanceOverview();
   renderMaintenanceScan();
   renderCleanupPlan();
@@ -3128,6 +3349,78 @@ function showToast(message: string, isError = false) {
   toast.classList.toggle("error", isError);
 }
 
+function errorToText(error: unknown) {
+  if (error instanceof Error) return `${error.name}: ${error.message}${error.stack ? `\n${error.stack}` : ""}`;
+  return String(error);
+}
+
+function safetyDisclaimerAccepted() {
+  const settings = state.config?.settings;
+  return Boolean(
+    settings?.safetyDisclaimerAccepted &&
+      (settings.safetyDisclaimerVersion || 0) >= SAFETY_DISCLAIMER_VERSION,
+  );
+}
+
+function renderSafetyGate() {
+  const gate = document.querySelector<HTMLElement>("#safety-gate");
+  if (!gate) return;
+  if (safetyDisclaimerAccepted()) {
+    gate.hidden = true;
+    gate.innerHTML = "";
+    document.body.classList.remove("modal-locked");
+    return;
+  }
+  document.body.classList.add("modal-locked");
+  gate.hidden = false;
+  gate.innerHTML = `
+    <section class="safety-gate-card" role="dialog" aria-modal="true" aria-labelledby="safety-gate-title">
+      <div>
+        <h2 id="safety-gate-title">使用前请阅读安全声明</h2>
+        <p>DevEnv Manager 会展示诊断证据，并在你确认后执行环境变量、进程、服务、文件或数据库相关操作。确认前主界面不可操作。</p>
+      </div>
+      <pre>${escapeHtml(state.safetyDisclaimer || "修改环境、结束进程、清理文件或修复数据库前，请确认对象、备份重要数据，并理解失败后的恢复方式。")}</pre>
+      <div class="safety-gate-actions">
+        <button data-action="copy-safety-disclaimer">${icon(Clipboard)}<span>复制声明</span></button>
+        <button id="accept-safety-disclaimer" class="primary">${icon(Shield)}<span>我已阅读并知晓风险</span></button>
+      </div>
+    </section>
+  `;
+}
+
+function renderFatalError() {
+  const element = document.querySelector<HTMLElement>("#fatal-error");
+  if (!element) return;
+  if (!state.safeMode && !state.fatalError) {
+    element.hidden = true;
+    element.innerHTML = "";
+    return;
+  }
+  element.hidden = false;
+  element.innerHTML = `
+    <section class="fatal-error-card">
+      <div>
+        <h2>已进入安全模式</h2>
+        <p>初始化或运行时出现错误。安全模式不会自动扫描、修复、清理、安装、停止服务或写入环境变量。</p>
+      </div>
+      <pre>${escapeHtml(state.fatalError || "未知错误")}</pre>
+      <div class="fatal-error-actions">
+        <button data-action="retry-app-init">${icon(RefreshCw)}<span>重试</span></button>
+        <button data-action="reset-ui-config">${icon(RotateCcw)}<span>重置 UI 配置</span></button>
+        <button data-action="open-app-config-dir">${icon(FolderOpen)}<span>打开配置目录</span></button>
+        <button data-action="copy-diagnostics">${icon(Clipboard)}<span>复制诊断信息</span></button>
+      </div>
+    </section>
+  `;
+}
+
+function enterSafeMode(error: unknown, context = "运行时错误") {
+  state.safeMode = true;
+  state.fatalError = `${context}\n${errorToText(error)}`;
+  renderFatalError();
+  showToast("已进入安全模式", true);
+}
+
 function renderProgress(progress: TaskProgress) {
   showToast(`${progress.task}: ${progress.percent}% · ${progress.message}`);
   const box = document.querySelector<HTMLElement>("#task-progress");
@@ -3211,13 +3504,42 @@ function renderMySqlRepair() {
   element.innerHTML = `<div class="scan-only-banner">${icon(Shield)}<span>${escapeHtml(report.privacyNotice)}</span></div>
     ${report.warnings.map((item) => `<p class="small-note">${escapeHtml(item)}</p>`).join("")}
     <div class="runtime-list">${report.candidates.length ? report.candidates.map((candidate) => `
-      <article class="runtime mysql-candidate ${candidate.status === "Running" ? "ok" : "warn"}">
-        <div><strong>${escapeHtml(candidate.serviceName)} · MySQL ${escapeHtml(candidate.versionHint)}</strong><span>${escapeHtml(candidate.status)} / ${escapeHtml(candidate.serviceState)}</span></div>
-        <div class="kv-list toolchain-kv"><div><span>mysqld</span><strong>${escapeHtml(candidate.mysqldPath)}</strong></div><div><span>my.ini</span><strong>${escapeHtml(candidate.myIniPath)}</strong></div><div><span>Data</span><strong>${escapeHtml(candidate.datadir)}</strong></div><div><span>端口</span><strong>${candidate.port} · ${candidate.portOccupied ? "已占用" : "空闲"}</strong></div><div><span>Data 健康</span><strong>${escapeHtml(candidate.dataHealth)}</strong></div><div><span>业务库候选</span><strong>${escapeHtml(candidate.businessDatabases.join("、") || "未发现")}</strong></div></div>
-        <ul>${candidate.suggestions.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+      <article class="runtime mysql-candidate ${candidate.conclusionLevel === "Healthy" ? "ok" : "warn"}">
+        <div><strong>${escapeHtml(candidate.serviceName)} · MySQL ${escapeHtml(candidate.versionHint)}</strong><span>${escapeHtml(candidate.conclusionLevel)} / ${escapeHtml(candidate.serviceState)}</span></div>
+        <div class="mysql-sections">
+          <section><h3>概览</h3><div class="kv-list toolchain-kv"><div><span>服务名</span><strong>${escapeHtml(candidate.serviceName)}</strong></div><div><span>服务状态</span><strong>${escapeHtml(candidate.serviceState)}</strong></div><div><span>端口</span><strong>${candidate.port} · ${candidate.portOccupied ? "已占用" : "空闲"}</strong></div><div><span>端口占用进程</span><strong>${escapeHtml(candidate.portProcess)}</strong></div><div><span>结论可信度</span><strong>${escapeHtml(candidate.confidence)}</strong></div></div></section>
+          <section><h3>证据</h3><div class="kv-list toolchain-kv"><div><span>mysqld</span><strong>${escapeHtml(candidate.mysqldPath)}</strong></div><div><span>my.ini</span><strong>${escapeHtml(candidate.myIniPath)}</strong></div><div><span>basedir</span><strong>${escapeHtml(candidate.basedir)}</strong></div><div><span>datadir</span><strong>${escapeHtml(candidate.datadir)}</strong></div><div><span>静态文件检查</span><strong>${escapeHtml(candidate.staticFileCheck)}</strong></div><div><span>连接验证</span><strong>${escapeHtml(candidate.connectionCheck)}</strong></div><div><span>系统 schema</span><strong>${escapeHtml(candidate.systemSchemaCheck)}</strong></div><div><span>业务库候选</span><strong>${escapeHtml(candidate.businessDatabases.join("、") || "未发现")}</strong></div></div></section>
+          <section><h3>风险</h3><ul>${candidate.reasoning.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}${candidate.suggestions.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul></section>
+          <section><h3>备份</h3>${renderMySqlBackupManifest(candidate.backupManifest)}</section>
+        </div>
         ${candidate.lastError ? `<details><summary>最近错误摘要（最多 80 行）</summary><pre class="command-output compact-output">${escapeHtml(candidate.lastError)}</pre></details>` : ""}
-        <div class="row-actions"><button data-mysql-action="backup" data-candidate="${candidate.id}">备份 Data</button>${candidate.status === "NotInstalled" ? `<button data-mysql-action="register_service" data-candidate="${candidate.id}">预览注册服务</button>` : ""}${candidate.serviceState.toLowerCase() !== "running" && candidate.status !== "NotInstalled" ? `<button data-mysql-action="start_service" data-candidate="${candidate.id}">预览启动</button>` : ""}${candidate.systemSchemaMissing ? `<button data-mysql-action="repair_system_schema" data-candidate="${candidate.id}">预览补回系统库</button>` : ""}<button data-mysql-action="reset_root_guide" data-candidate="${candidate.id}">认证恢复向导</button>${candidate.businessDatabases.length ? `<button data-mysql-action="dump_guide" data-candidate="${candidate.id}">导出建议</button>` : ""}<button data-action="copy-text" data-copy="${escapeHtml(candidate.consoleCommand)}">复制控制台诊断命令</button></div>
+        <div class="row-actions"><button data-mysql-action="backup" data-candidate="${candidate.id}">备份 Data</button>${candidate.status === "NotInstalled" ? `<button data-mysql-action="register_service" data-candidate="${candidate.id}">预览注册服务</button>` : ""}${candidate.serviceState.toLowerCase() !== "running" && candidate.status !== "NotInstalled" ? `<button data-mysql-action="start_service" data-candidate="${candidate.id}">预览启动</button>` : ""}${canRepairMySqlSystemSchema(candidate) ? `<button data-mysql-action="repair_system_schema" data-candidate="${candidate.id}" class="danger-button">预览补回系统库</button>` : ""}<button data-mysql-action="reset_root_guide" data-candidate="${candidate.id}">认证恢复向导</button>${candidate.businessDatabases.length ? `<button data-mysql-action="dump_guide" data-candidate="${candidate.id}">导出建议</button>` : ""}<button data-action="copy-text" data-copy="${escapeHtml(candidate.consoleCommand)}">复制控制台诊断命令</button></div>
+        ${candidate.systemSchemaMissing && !canRepairMySqlSystemSchema(candidate) ? `<p class="small-note warning-text">系统库修复暂不可用：${escapeHtml(mysqlRepairBlockReason(candidate))}</p>` : ""}
       </article>`).join("") : `<div class="empty">常见安装位置没有发现 mysqld.exe；不会自动深扫整个磁盘</div>`}</div>`;
+}
+
+function renderMySqlBackupManifest(manifest?: MySqlBackupManifestStatus | null) {
+  if (!manifest) return `<div class="empty">还没有本程序登记的 backup manifest；高危修复前必须先备份 Data。</div>`;
+  return `<div class="kv-list toolchain-kv">
+    <div><span>状态</span><strong>${manifest.valid ? "有效" : "无效"} · ${escapeHtml(manifest.reason)}</strong></div>
+    <div><span>最近备份时间</span><strong>${new Date(manifest.createdAt * 1000).toLocaleString("zh-CN")}</strong></div>
+    <div><span>有效期至</span><strong>${new Date(manifest.expiresAt * 1000).toLocaleString("zh-CN")}</strong></div>
+    <div><span>备份目录</span><strong>${escapeHtml(manifest.destination)}</strong></div>
+    <div><span>文件/大小</span><strong>${manifest.files} 个 · ${formatBytes(manifest.bytes)}</strong></div>
+    <div><span>关键文件</span><strong>ibdata1 ${manifest.ibdata ? "存在" : "未见"} · 系统库 ${manifest.systemSchema ? "存在" : "未见"} · 业务库 ${manifest.businessSchema ? "存在" : "未见"}</strong></div>
+    <div><span>manifest</span><strong>${escapeHtml(manifest.manifestPath)}</strong></div>
+  </div>`;
+}
+
+function canRepairMySqlSystemSchema(candidate: MySqlCandidate) {
+  return candidate.systemSchemaMissing && Boolean(candidate.backupManifest?.valid) && ["LikelyBroken", "PotentialRisk"].includes(candidate.conclusionLevel);
+}
+
+function mysqlRepairBlockReason(candidate: MySqlCandidate) {
+  if (!["LikelyBroken", "PotentialRisk"].includes(candidate.conclusionLevel)) return `当前结论为 ${candidate.conclusionLevel}`;
+  if (!candidate.backupManifest) return "没有 backup manifest";
+  if (!candidate.backupManifest.valid) return candidate.backupManifest.reason;
+  return "请重新诊断后再试";
 }
 
 function renderMySqlPlan() {
@@ -3448,7 +3770,7 @@ async function processActionFingerprint(actionId: string, planId: string, riskLe
 function renderSafetyDisclaimer() {
   const slot = document.querySelector<HTMLElement>("#safety-disclaimer-slot");
   if (!slot) return;
-  const accepted = state.config?.settings.safetyDisclaimerAccepted;
+  const accepted = safetyDisclaimerAccepted();
   slot.innerHTML = accepted ? "" : disclaimerPanel(escapeHtml(state.safetyDisclaimer || "执行修改类操作前请先阅读风险说明，并备份重要数据。"));
 }
 
@@ -3804,7 +4126,31 @@ function renderFeatureHelp(view = document.querySelector(".nav-item.active")?.ge
       info.requiresAdmin ? "需要管理员权限时会明确提示。" : "不会静默请求管理员权限。",
     ].map(escapeHtml),
   );
-  slot.innerHTML = card;
+  const collapsed = featureHelpCollapsed(view);
+  slot.innerHTML = collapsed
+    ? `<button class="feature-help-strip" data-action="feature-help-expand" data-help-view="${escapeHtml(view)}">${icon(FileText)}<span>${escapeHtml(info.title)}</span><small>点击展开说明</small></button>`
+    : `<section class="feature-help-shell" data-help-view="${escapeHtml(view)}">
+        <div class="feature-help-controls">
+          <label class="toggle-row"><input type="checkbox" data-action="feature-help-collapse-next" data-help-view="${escapeHtml(view)}" ${collapsed ? "checked" : ""} /><span>下次进入此页面默认折叠</span></label>
+        </div>
+        ${card}
+      </section>`;
+}
+
+function featureHelpCollapsed(view: string) {
+  try {
+    return window.localStorage.getItem(`devenv.featureHelp.collapsed.${view}`) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function setFeatureHelpCollapsed(view: string, collapsed: boolean) {
+  try {
+    window.localStorage.setItem(`devenv.featureHelp.collapsed.${view}`, collapsed ? "true" : "false");
+  } catch {
+    // localStorage can be unavailable in recovery contexts; default-expanded remains safe.
+  }
 }
 
 function escapeHtml(value: string) {
@@ -4341,16 +4687,27 @@ document.querySelector("#inspect-downloads")?.addEventListener("click", async ()
     showToast(error instanceof Error ? error.message : String(error), true);
   }
 });
+
+function setScanBusy(scanSelector: string, cancelSelector: string, busy: boolean) {
+  const scanButton = document.querySelector<HTMLButtonElement>(scanSelector);
+  const cancelButton = document.querySelector<HTMLButtonElement>(cancelSelector);
+  if (scanButton) scanButton.disabled = busy;
+  if (cancelButton) cancelButton.disabled = !busy;
+}
+
 document.querySelector("#scan-large-files")?.addEventListener("click", async () => {
   const root = document.querySelector<HTMLInputElement>("#large-file-root")?.value.trim() || "";
   const minSizeMb = Number(document.querySelector<HTMLInputElement>("#large-file-min")?.value || "100");
   showToast("正在只读扫描大文件；不会读取文件内容");
+  setScanBusy("#scan-large-files", "#cancel-large-scan", true);
   try {
     state.largeFiles = await invoke<LargeFileItem[]>("scan_large_files", { root, minSizeMb, limit: 100 });
     renderLargeFiles();
     showToast(`大文件扫描完成：${state.largeFiles.length} 项`);
   } catch (error) {
     showToast(error instanceof Error ? error.message : String(error), true);
+  } finally {
+    setScanBusy("#scan-large-files", "#cancel-large-scan", false);
   }
 });
 document.querySelector("#scan-duplicates")?.addEventListener("click", async () => {
@@ -4358,13 +4715,24 @@ document.querySelector("#scan-duplicates")?.addEventListener("click", async () =
   const minSizeMb = Number(document.querySelector<HTMLInputElement>("#duplicate-min")?.value || "10");
   if (!window.confirm(`将只在“${root || "用户目录"}”内对 ${minSizeMb} MB 以上、大小相同的候选文件计算 SHA256。不会上传或删除文件，确定继续吗？`)) return;
   showToast("正在按大小分组并计算重复候选 SHA256");
+  setScanBusy("#scan-duplicates", "#cancel-duplicate-scan", true);
   try {
     state.duplicateGroups = await invoke<DuplicateGroup[]>("scan_duplicate_large_files", { root, minSizeMb });
     renderDuplicates();
     showToast(`重复文件扫描完成：${state.duplicateGroups.length} 组`);
   } catch (error) {
     showToast(error instanceof Error ? error.message : String(error), true);
+  } finally {
+    setScanBusy("#scan-duplicates", "#cancel-duplicate-scan", false);
   }
+});
+document.querySelector("#cancel-large-scan")?.addEventListener("click", async () => {
+  const result = await invoke<OperationResult>("cancel_maintenance_scan");
+  showToast(result.message);
+});
+document.querySelector("#cancel-duplicate-scan")?.addEventListener("click", async () => {
+  const result = await invoke<OperationResult>("cancel_maintenance_scan");
+  showToast(result.message);
 });
 document.querySelector("#inspect-app-usage")?.addEventListener("click", async () => {
   showToast("正在只读统计常见应用、游戏库与已安装软件");
@@ -4652,16 +5020,25 @@ document.querySelector("#port-monitor-enabled")?.addEventListener("change", (eve
 
 document.querySelector("#port-search")?.addEventListener("input", (event) => {
   portState.query = (event.target as HTMLInputElement).value;
+  paginationState.set("ports", 1);
   renderPorts();
 });
 
-
-document.querySelector("#port-quick-filters")?.addEventListener("click", (event) => {
-  const button = (event.target as HTMLElement).closest<HTMLButtonElement>("button[data-port-filter]");
-  if (!button) return;
-  portState.quickFilter = button.dataset.portFilter || "all";
-  document.querySelectorAll(".filter-chip").forEach((item) => item.classList.toggle("active", item === button));
+function setPortQuickFilter(filter: string) {
+  portState.quickFilter = filter || "all";
+  document.querySelectorAll<HTMLElement>("[data-port-filter]").forEach((item) => {
+    item.classList.toggle("active", item.dataset.portFilter === portState.quickFilter);
+  });
+  paginationState.set("ports", 1);
   renderPorts();
+}
+
+document.querySelectorAll("#port-quick-filters, #port-summary").forEach((element) => {
+  element.addEventListener("click", (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>("button[data-port-filter]");
+    if (!button) return;
+    setPortQuickFilter(button.dataset.portFilter || "all");
+  });
 });
 
 document.querySelectorAll<HTMLButtonElement>(".sort-head").forEach((button) => {
@@ -4834,8 +5211,13 @@ document.addEventListener("click", (event) => {
   }
   if (button.id === "accept-safety-disclaimer") {
     void runOperation(() => invoke<OperationResult>("accept_safety_disclaimer"), "正在记录安全说明已读状态").then(async () => {
-      if (state.config) state.config.settings.safetyDisclaimerAccepted = true;
+      if (state.config) {
+        state.config.settings.safetyDisclaimerAccepted = true;
+        state.config.settings.safetyDisclaimerVersion = SAFETY_DISCLAIMER_VERSION;
+        state.config.settings.safetyDisclaimerAcceptedAt = new Date().toISOString();
+      }
       renderSafetyDisclaimer();
+      renderSafetyGate();
     });
     return;
   }
@@ -4941,6 +5323,61 @@ document.addEventListener("click", (event) => {
     void invoke<OperationResult>("open_apps_features")
       .then((result) => showToast(result.message))
       .catch((error) => showToast(error instanceof Error ? error.message : String(error), true));
+    return;
+  }
+  if (action === "open-python-alias-settings") {
+    void invoke<OperationResult>("open_python_alias_settings")
+      .then((result) => showToast(result.message))
+      .catch((error) => showToast(error instanceof Error ? error.message : String(error), true));
+    return;
+  }
+  if (action === "export-python-diagnostic") {
+    void invoke<OperationResult>("export_python_diagnostic_report")
+      .then((result) => showToast(result.message))
+      .catch((error) => showToast(error instanceof Error ? error.message : String(error), true));
+    return;
+  }
+  if (action === "open-app-config-dir") {
+    void invoke<OperationResult>("open_app_config_dir")
+      .then((result) => showToast(result.message))
+      .catch((error) => showToast(error instanceof Error ? error.message : String(error), true));
+    return;
+  }
+  if (action === "reset-ui-config") {
+    void invoke<OperationResult>("reset_ui_config")
+      .then((result) => {
+        showToast(result.message);
+        state.safeMode = false;
+        state.fatalError = "";
+        renderFatalError();
+        return refreshAll(true);
+      })
+      .catch((error) => showToast(error instanceof Error ? error.message : String(error), true));
+    return;
+  }
+  if (action === "retry-app-init") {
+    state.safeMode = false;
+    state.fatalError = "";
+    renderFatalError();
+    void refreshAll(true).catch((error) => enterSafeMode(error, "重试初始化失败"));
+    return;
+  }
+  if (action === "copy-diagnostics") {
+    void copyText(`DevEnv Manager safe mode\n${state.fatalError}`);
+    return;
+  }
+  if (action === "copy-safety-disclaimer") {
+    void copyText(state.safetyDisclaimer || "DevEnv Manager safety disclaimer");
+    return;
+  }
+  if (action === "refresh-platforms") {
+    void inspectPlatforms();
+    return;
+  }
+  if (action === "feature-help-expand") {
+    const view = button.dataset.helpView || document.querySelector(".nav-item.active")?.getAttribute("data-view") || "overview";
+    setFeatureHelpCollapsed(view, false);
+    renderFeatureHelp(view);
     return;
   }
   if (action === "doctor-fix") {
@@ -5197,18 +5634,6 @@ document.addEventListener("click", (event) => {
       `正在卸载 ${kind} ${version}`,
     );
   }
-  if (action === "uninstall-external-runtime") {
-    const kind = button.dataset.kind || "";
-    const executable = button.dataset.executable || "";
-    const source = button.dataset.source || "未知来源";
-    const method = source === "Scoop" || source === "Chocolatey" ? `调用 ${source} 的卸载流程` : "启动匹配的 Windows 卸载器";
-    const ok = window.confirm(`来源：${source}\n将${method}卸载 ${kind}。不会直接删除包管理器目录。\n\n${executable}\n\n确定继续吗？`);
-    if (!ok) return;
-    void runOperation(
-      () => invoke<OperationResult>("uninstall_external_runtime", { kind, executable }),
-      `正在启动 ${kind} 的系统卸载程序`,
-    );
-  }
   if (action === "apply-profile") {
     const id = button.dataset.id || "";
     void runRuntimeOperation(
@@ -5250,10 +5675,39 @@ document.addEventListener("click", (event) => {
   }
 });
 
+window.addEventListener("error", (event) => {
+  enterSafeMode(event.error || event.message, "前端运行时错误");
+});
+
+window.addEventListener("unhandledrejection", (event) => {
+  enterSafeMode(event.reason, "未处理的异步错误");
+});
+
+document.addEventListener("change", (event) => {
+  const input = (event.target as HTMLElement).closest<HTMLInputElement>('input[data-action="feature-help-collapse-next"]');
+  if (!input) return;
+  const view = input.dataset.helpView || document.querySelector(".nav-item.active")?.getAttribute("data-view") || "overview";
+  setFeatureHelpCollapsed(view, input.checked);
+});
+
+window.addEventListener(
+  "keydown",
+  (event) => {
+    const gate = document.querySelector<HTMLElement>("#safety-gate");
+    if (gate && !gate.hidden && event.key === "Escape") {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }
+  },
+  true,
+);
+
 void listen<TaskProgress>("task-progress", (event) => renderProgress(event.payload));
 void refreshAll(false).then(() => {
+  if (state.safeMode) return;
   window.setTimeout(() => void refreshRuntimeAndPorts(true), 350);
   window.setInterval(async () => {
+    if (state.safeMode) return;
     try {
       state.runtimes = await invoke<RuntimeInfo[]>("discover_runtimes");
       renderRuntimes();
@@ -5278,7 +5732,7 @@ void refreshAll(false).then(() => {
       }, 1500);
     }
   }
-});
+}).catch((error) => enterSafeMode(error, "初始化失败"));
 document.querySelector("#inspect-java")?.addEventListener("click", () => void inspectJava());
 document.querySelector("#inspect-agent-traces")?.addEventListener("click", async () => {
   const projectPath = document.querySelector<HTMLInputElement>("#project-path")?.value.trim() || null;

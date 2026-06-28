@@ -39,9 +39,15 @@ pub struct MySqlCandidate {
     pub datadir: String,
     pub port: u16,
     pub port_occupied: bool,
+    pub port_process: String,
     pub data_health: String,
     pub confidence: String,
     pub conclusion_level: String,
+    pub static_file_check: String,
+    pub connection_check: String,
+    pub system_schema_check: String,
+    pub reasoning: Vec<String>,
+    pub backup_manifest: Option<MySqlBackupManifestStatus>,
     pub evidence: Vec<String>,
     pub next_steps: Vec<String>,
     pub system_schema_missing: bool,
@@ -50,6 +56,23 @@ pub struct MySqlCandidate {
     pub suggestions: Vec<String>,
     pub registration_command: String,
     pub console_command: String,
+}
+
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct MySqlBackupManifestStatus {
+    pub valid: bool,
+    pub reason: String,
+    pub created_at: u64,
+    pub expires_at: u64,
+    pub destination: String,
+    pub files: usize,
+    pub bytes: u64,
+    pub ibdata: bool,
+    pub frm: bool,
+    pub business_schema: bool,
+    pub system_schema: bool,
+    pub manifest_path: String,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -141,15 +164,18 @@ fn backup_registry_file() -> PathBuf {
 }
 
 fn load_persisted_backups() -> Vec<BackupReceipt> {
+    load_backup_registry_raw()
+        .into_iter()
+        .filter(|receipt| verify_backup_receipt(receipt).is_ok())
+        .collect()
+}
+
+fn load_backup_registry_raw() -> Vec<BackupReceipt> {
     let path = backup_registry_file();
     let Ok(text) = fs::read_to_string(path) else {
         return Vec::new();
     };
-    serde_json::from_str::<Vec<BackupReceipt>>(&text)
-        .unwrap_or_default()
-        .into_iter()
-        .filter(|receipt| verify_backup_receipt(receipt).is_ok())
-        .collect()
+    serde_json::from_str::<Vec<BackupReceipt>>(&text).unwrap_or_default()
 }
 
 fn save_persisted_backups(receipts: &[BackupReceipt]) -> Result<(), String> {
@@ -224,6 +250,37 @@ fn recent_valid_backup(datadir: &str) -> Option<BackupReceipt> {
     all.into_iter().find(|item| {
         item.datadir.eq_ignore_ascii_case(datadir) && verify_backup_receipt(item).is_ok()
     })
+}
+
+fn backup_manifest_status(datadir: &str) -> Option<MySqlBackupManifestStatus> {
+    let mut all = load_backup_registry_raw();
+    if let Ok(memory) = backups().lock() {
+        all.extend(memory.iter().cloned());
+    }
+    all.into_iter()
+        .filter(|item| item.datadir.eq_ignore_ascii_case(datadir))
+        .max_by_key(|item| item.created_at)
+        .map(|receipt| {
+            let (valid, reason) = match verify_backup_receipt(&receipt) {
+                Ok(()) => (true, "manifest 校验通过，仍在有效期内".to_string()),
+                Err(error) => (false, error),
+            };
+            let system_schema = Path::new(&receipt.destination).join("mysql").is_dir();
+            MySqlBackupManifestStatus {
+                valid,
+                reason,
+                created_at: receipt.created_at,
+                expires_at: receipt.expires_at,
+                destination: receipt.destination,
+                files: receipt.files,
+                bytes: receipt.bytes,
+                ibdata: receipt.ibdata,
+                frm: receipt.frm,
+                business_schema: receipt.business_schema,
+                system_schema,
+                manifest_path: receipt.manifest_path,
+            }
+        })
 }
 
 fn now() -> u64 {
@@ -452,6 +509,40 @@ fn database_directories(datadir: &Path) -> Vec<String> {
     result
 }
 
+#[derive(Debug, Clone, Copy, Default)]
+struct MySqlConclusionSignals {
+    unsupported_layout: bool,
+    permission_unknown: bool,
+    multiple_instances: bool,
+    service_running: bool,
+    port_occupied: bool,
+    system_schema_missing: bool,
+    business_database_count: usize,
+    connection_ok: bool,
+}
+
+fn mysql_conclusion_level(signals: MySqlConclusionSignals) -> &'static str {
+    if signals.unsupported_layout {
+        "UnsupportedLayout"
+    } else if signals.multiple_instances {
+        "MultipleInstancesAmbiguous"
+    } else if signals.permission_unknown {
+        "PermissionUnknown"
+    } else if signals.system_schema_missing && signals.connection_ok {
+        "FalsePositiveSuspected"
+    } else if signals.service_running && signals.port_occupied && !signals.system_schema_missing {
+        "Healthy"
+    } else if signals.service_running || signals.connection_ok || signals.port_occupied {
+        "UsableWithWarnings"
+    } else if signals.system_schema_missing && signals.business_database_count > 0 {
+        "LikelyBroken"
+    } else if signals.system_schema_missing {
+        "PotentialRisk"
+    } else {
+        "UsableWithWarnings"
+    }
+}
+
 fn candidate_id(mysqld: &Path, ini: &Path) -> String {
     let mut hasher = Sha256::new();
     hasher.update(display(mysqld).to_ascii_lowercase());
@@ -501,6 +592,7 @@ fn candidate_from(
         .unwrap_or_else(|| "NotInstalled".to_string());
     let mysql_schema = datadir.join("mysql");
     let legacy_required = ["host.frm", "user.frm", "db.frm", "plugin.frm"];
+    let datadir_readable = fs::read_dir(&datadir).is_ok();
     let system_schema_missing = !mysql_schema.is_dir()
         || (version.starts_with("5.")
             && legacy_required
@@ -523,23 +615,31 @@ fn candidate_from(
         .unwrap_or_default();
     let last_error = redact_error_log(&raw_error);
     let port_occupied = TcpListener::bind(SocketAddrV4::new(Ipv4Addr::LOCALHOST, port)).is_err();
-    let unsupported_layout = display(&mysqld).to_ascii_lowercase().contains("xampp")
-        || display(&mysqld).to_ascii_lowercase().contains("phpstudy")
-        || display(&mysqld).to_ascii_lowercase().contains("laragon")
+    let lower_mysqld = display(&mysqld).to_ascii_lowercase();
+    let unsupported_layout = lower_mysqld.contains("xampp")
+        || lower_mysqld.contains("phpstudy")
+        || lower_mysqld.contains("laragon")
+        || lower_mysqld.contains("\\docker\\")
+        || lower_mysqld.contains("\\wsl")
         || version == "MariaDB";
-    let conclusion_level = if unsupported_layout {
-        "UnsupportedLayout"
-    } else if service_state.eq_ignore_ascii_case("Running") && port_occupied {
-        "Healthy"
-    } else if system_schema_missing && !business_databases.is_empty() && !port_occupied {
-        "LikelyBroken"
-    } else if system_schema_missing && business_databases.is_empty() {
-        "PotentialRisk"
-    } else if service.is_none() || port_occupied {
-        "UsableWithWarnings"
-    } else {
-        "PermissionUnknown"
-    }
+    let matching_service_count = services
+        .iter()
+        .filter(|(_, _, path)| path.to_ascii_lowercase().contains(&lower_mysqld))
+        .count();
+    let multiple_instances = matching_service_count > 1;
+    let permission_unknown = !datadir_readable;
+    let service_running = service_state.eq_ignore_ascii_case("Running");
+    let connection_ok = service_running && port_occupied && !raw_error.contains("1045");
+    let conclusion_level = mysql_conclusion_level(MySqlConclusionSignals {
+        unsupported_layout,
+        permission_unknown,
+        multiple_instances,
+        service_running,
+        port_occupied,
+        system_schema_missing,
+        business_database_count: business_databases.len(),
+        connection_ok,
+    })
     .to_string();
     let status = if conclusion_level == "UnsupportedLayout" {
         "UnsupportedLayout"
@@ -565,12 +665,78 @@ fn candidate_from(
     if system_schema_missing {
         suggestions.push("业务库可能仍可恢复；必须完整备份 Data 后才能补回系统库".to_string());
     }
+    if conclusion_level == "FalsePositiveSuspected" {
+        suggestions.push(
+            "当前服务和端口可用，静态文件异常可能是版本差异或权限视角导致；不要执行系统库修复。"
+                .to_string(),
+        );
+    }
+    if conclusion_level == "PermissionUnknown" {
+        suggestions.push(
+            "Data 目录不可读或权限不足；请用管理员权限重新诊断，当前不得判断系统库缺失。"
+                .to_string(),
+        );
+    }
+    if conclusion_level == "MultipleInstancesAmbiguous" {
+        suggestions.push(
+            "检测到多个服务实例可能指向同一 mysqld；请先确认服务名和 datadir，再生成修复计划。"
+                .to_string(),
+        );
+    }
     if !business_databases.is_empty() {
         suggestions.push(format!(
             "检测到候选业务库：{}；服务恢复后应立即导出 SQL",
             business_databases.join("、")
         ));
     }
+    let static_file_check = if permission_unknown {
+        "Data 目录不可读，静态文件检查不可信".to_string()
+    } else if system_schema_missing {
+        "mysql 系统 schema 缺失或不完整".to_string()
+    } else {
+        "mysql 系统 schema 可读".to_string()
+    };
+    let connection_check = if connection_ok {
+        "服务运行且端口监听；未保存密码，未自动登录数据库".to_string()
+    } else if raw_error.contains("1045") {
+        "服务运行但错误日志包含 1045，疑似账号认证问题".to_string()
+    } else {
+        "未自动连接数据库；请使用控制台诊断命令人工验证".to_string()
+    };
+    let system_schema_check = if system_schema_missing && !permission_unknown {
+        "系统 schema 静态检查异常".to_string()
+    } else if permission_unknown {
+        "权限未知，不能下结论".to_string()
+    } else {
+        "系统 schema 静态检查通过".to_string()
+    };
+    let port_process = if port_occupied {
+        "端口已被占用；具体进程请在端口管理页交叉确认".to_string()
+    } else {
+        "本机 127.0.0.1 端口当前未监听".to_string()
+    };
+    let mut reasoning = Vec::new();
+    reasoning.push(match conclusion_level.as_str() {
+        "UnsupportedLayout" => {
+            "非标准发行版或容器/集成环境布局，DevEnv Manager 只提供只读建议".to_string()
+        }
+        "MultipleInstancesAmbiguous" => {
+            "存在多个候选服务或实例归属不清，自动修复容易选错 Data 目录".to_string()
+        }
+        "PermissionUnknown" => "Data 目录不可读，不能把权限问题误报为系统库缺失".to_string(),
+        "FalsePositiveSuspected" => {
+            "静态系统库疑似异常，但服务运行且端口监听，优先按可用实例处理".to_string()
+        }
+        "LikelyBroken" => {
+            "系统 schema 静态缺失且存在业务库候选，服务当前不可用，风险较高".to_string()
+        }
+        "PotentialRisk" => {
+            "系统 schema 静态异常，但业务库和运行证据不足，需要先备份和复核".to_string()
+        }
+        "Healthy" => "服务运行、端口监听且静态检查未发现系统库缺失".to_string(),
+        _ => "服务或配置存在警告，但当前证据不足以判定严重损坏".to_string(),
+    });
+    let backup_manifest = backup_manifest_status(&display(&datadir));
     let evidence = vec![
         format!("服务名：{service_name}"),
         format!("服务状态：{service_state}"),
@@ -578,38 +744,30 @@ fn candidate_from(
         format!("my.ini：{}", display(&ini)),
         format!("basedir：{}", display(&basedir)),
         format!("datadir：{}", display(&datadir)),
+        format!("端口占用进程：{port_process}"),
         format!(
             "端口 {port} 监听：{}",
             if port_occupied { "是" } else { "否" }
         ),
         format!(
-            "静态文件：mysql 系统库{}，业务库候选 {} 个",
-            if system_schema_missing {
-                "缺失或不完整"
-            } else {
-                "可读"
-            },
+            "静态文件检查：{static_file_check}，业务库候选 {} 个",
             business_databases.len()
         ),
-        "连接验证：未保存密码，默认不自动连接数据库".to_string(),
+        format!("连接验证：{connection_check}"),
+        format!("系统 schema 检查：{system_schema_check}"),
         format!(
             "结论可信度：{}",
             if unsupported_layout {
                 "低"
+            } else if permission_unknown || multiple_instances {
+                "低到中"
             } else if service.is_some() {
                 "中高"
             } else {
                 "中"
             }
         ),
-        format!(
-            "判断原因：{}",
-            if system_schema_missing {
-                "静态系统库检查异常，需结合服务状态/端口/连接验证确认"
-            } else {
-                "服务、配置和 Data 静态检查未发现系统库缺失"
-            }
-        ),
+        format!("判断原因：{}", reasoning.join("；")),
     ];
     let confidence = if unsupported_layout {
         "低：非标准发行版/布局，仅提示，不自动修复"
@@ -638,9 +796,24 @@ fn candidate_from(
         datadir: display(&datadir),
         port,
         port_occupied,
-        data_health: if system_schema_missing { "MySQL 系统库缺失或不完整" } else if datadir.is_dir() { "Data 目录可读" } else { "Data 目录不存在" }.to_string(),
+        port_process,
+        data_health: if permission_unknown {
+            "Data 目录不可读或权限未知"
+        } else if system_schema_missing {
+            "MySQL 系统库缺失或不完整"
+        } else if datadir.is_dir() {
+            "Data 目录可读"
+        } else {
+            "Data 目录不存在"
+        }
+        .to_string(),
         confidence,
         conclusion_level,
+        static_file_check,
+        connection_check,
+        system_schema_check,
+        reasoning,
+        backup_manifest,
         evidence,
         next_steps,
         system_schema_missing,
@@ -689,6 +862,9 @@ fn current_candidate(id: &str) -> Result<MySqlCandidate, String> {
 
 pub fn create_plan(candidate_id: String, action: String) -> Result<MySqlRepairPlan, String> {
     let candidate = current_candidate(&candidate_id)?;
+    if action == "repair_system_schema" {
+        validate_system_schema_repair_allowed(&candidate)?;
+    }
     let (title, steps, commands, requires_admin, requires_backup) = match action.as_str() {
         "backup" => (
             "备份完整 Data 目录",
@@ -804,6 +980,39 @@ pub fn create_plan(candidate_id: String, action: String) -> Result<MySqlRepairPl
     store.retain(|_, value| value.created_at.saturating_add(30 * 60) >= created);
     store.insert(plan_id, pending);
     Ok(public)
+}
+
+fn validate_system_schema_repair_allowed(candidate: &MySqlCandidate) -> Result<(), String> {
+    if !candidate.system_schema_missing {
+        return Err("系统 schema 未标记为缺失，禁止生成补回计划".to_string());
+    }
+    if matches!(
+        candidate.conclusion_level.as_str(),
+        "Healthy"
+            | "UsableWithWarnings"
+            | "FalsePositiveSuspected"
+            | "PermissionUnknown"
+            | "MultipleInstancesAmbiguous"
+            | "UnsupportedLayout"
+    ) {
+        return Err(format!(
+            "当前结论为 {}，禁止自动补回系统库；请先处理诊断原因并重新检查。",
+            candidate.conclusion_level
+        ));
+    }
+    let manifest = candidate
+        .backup_manifest
+        .as_ref()
+        .ok_or_else(|| "没有 backup manifest，禁止系统库修复；请先备份 Data。".to_string())?;
+    if !manifest.valid {
+        return Err(format!(
+            "backup manifest 无效，禁止系统库修复：{}。请重新备份 Data。",
+            manifest.reason
+        ));
+    }
+    recent_valid_backup(&candidate.datadir)
+        .ok_or_else(|| "没有近 24 小时内 manifest 校验通过的备份，禁止系统库修复".to_string())?;
+    Ok(())
 }
 
 fn mysql_action_risk(action: &str) -> &'static str {
@@ -1012,6 +1221,7 @@ pub fn execute(plan_id: String, backup_destination: Option<String>) -> Result<St
             Ok(format!("已请求启动服务 {}；请重新诊断确认状态和端口", current.service_name))
         }
         "repair_system_schema" => {
+            validate_system_schema_repair_allowed(&current)?;
             let receipt = recent_valid_backup(&current.datadir).ok_or_else(|| "没有找到近 24 小时内由本程序完成且 manifest 校验通过的 Data 备份，禁止修复系统库".to_string())?;
             let source = Path::new(&current.basedir).join("data").join("mysql");
             let target = Path::new(&current.datadir).join("mysql");
@@ -1088,5 +1298,197 @@ mod tests {
         let redacted = redact_error_log(text);
         assert!(!redacted.contains("hunter2"));
         assert!(redacted.contains("1045 using password: YES"));
+    }
+
+    #[test]
+    fn mysql_conclusion_suppresses_false_positive_when_service_is_usable() {
+        assert_eq!(
+            mysql_conclusion_level(MySqlConclusionSignals {
+                service_running: true,
+                port_occupied: true,
+                system_schema_missing: true,
+                business_database_count: 1,
+                connection_ok: true,
+                ..Default::default()
+            }),
+            "FalsePositiveSuspected"
+        );
+        assert_eq!(
+            mysql_conclusion_level(MySqlConclusionSignals {
+                permission_unknown: true,
+                system_schema_missing: true,
+                business_database_count: 1,
+                ..Default::default()
+            }),
+            "PermissionUnknown"
+        );
+        assert_eq!(
+            mysql_conclusion_level(MySqlConclusionSignals {
+                multiple_instances: true,
+                system_schema_missing: true,
+                business_database_count: 1,
+                ..Default::default()
+            }),
+            "MultipleInstancesAmbiguous"
+        );
+        assert_eq!(
+            mysql_conclusion_level(MySqlConclusionSignals {
+                unsupported_layout: true,
+                system_schema_missing: true,
+                business_database_count: 1,
+                ..Default::default()
+            }),
+            "UnsupportedLayout"
+        );
+    }
+
+    fn test_candidate(
+        datadir: &str,
+        manifest: Option<MySqlBackupManifestStatus>,
+    ) -> MySqlCandidate {
+        MySqlCandidate {
+            id: "candidate".to_string(),
+            status: "Stopped".to_string(),
+            version_hint: "8.0".to_string(),
+            service_name: "MySQL80".to_string(),
+            service_state: "Stopped".to_string(),
+            mysqld_path: r"C:\MySQL\bin\mysqld.exe".to_string(),
+            my_ini_path: r"C:\MySQL\my.ini".to_string(),
+            basedir: r"C:\MySQL".to_string(),
+            datadir: datadir.to_string(),
+            port: 3306,
+            port_occupied: false,
+            port_process: "未监听".to_string(),
+            data_health: "MySQL 系统库缺失或不完整".to_string(),
+            confidence: "中".to_string(),
+            conclusion_level: "LikelyBroken".to_string(),
+            static_file_check: "mysql 系统 schema 缺失或不完整".to_string(),
+            connection_check: "未自动连接数据库".to_string(),
+            system_schema_check: "系统 schema 静态检查异常".to_string(),
+            reasoning: vec![],
+            backup_manifest: manifest,
+            evidence: vec![],
+            next_steps: vec![],
+            system_schema_missing: true,
+            business_databases: vec!["app".to_string()],
+            last_error: String::new(),
+            suggestions: vec![],
+            registration_command: String::new(),
+            console_command: String::new(),
+        }
+    }
+
+    fn write_test_manifest(
+        datadir: &Path,
+        destination: &Path,
+        created_at: u64,
+        expires_at: u64,
+    ) -> BackupReceipt {
+        fs::create_dir_all(destination.join("mysql")).unwrap();
+        fs::write(destination.join("ibdata1"), b"x").unwrap();
+        let manifest = BackupManifest {
+            schema_version: 1,
+            datadir: display(datadir),
+            destination: display(destination),
+            created_at,
+            expires_at,
+            files: 1,
+            bytes: 1,
+            ibdata: true,
+            frm: false,
+            business_schema: true,
+        };
+        let (manifest_path, manifest_hash) = write_backup_manifest(&manifest).unwrap();
+        BackupReceipt {
+            datadir: display(datadir),
+            destination: display(destination),
+            created_at,
+            expires_at,
+            files: 1,
+            bytes: 1,
+            ibdata: true,
+            frm: false,
+            business_schema: true,
+            manifest_path,
+            manifest_hash,
+        }
+    }
+
+    #[test]
+    fn system_schema_repair_requires_backup_manifest() {
+        let candidate = test_candidate(r"C:\Data", None);
+        assert!(validate_system_schema_repair_allowed(&candidate)
+            .unwrap_err()
+            .contains("没有 backup manifest"));
+
+        let mut invalid = test_candidate(
+            r"C:\Data",
+            Some(MySqlBackupManifestStatus {
+                valid: false,
+                reason: "备份 manifest 已损坏".to_string(),
+                created_at: now(),
+                expires_at: now() + 60,
+                destination: r"C:\Backup".to_string(),
+                files: 0,
+                bytes: 0,
+                ibdata: false,
+                frm: false,
+                business_schema: false,
+                system_schema: false,
+                manifest_path: r"C:\Backup\devenv-mysql-backup-manifest.json".to_string(),
+            }),
+        );
+        assert!(validate_system_schema_repair_allowed(&invalid)
+            .unwrap_err()
+            .contains("无效"));
+        invalid.conclusion_level = "FalsePositiveSuspected".to_string();
+        assert!(validate_system_schema_repair_allowed(&invalid)
+            .unwrap_err()
+            .contains("FalsePositiveSuspected"));
+    }
+
+    #[test]
+    fn backup_manifest_expired_or_damaged_is_rejected() {
+        let temp = tempfile::tempdir().unwrap();
+        let datadir = temp.path().join("data");
+        let destination = temp.path().join("backup");
+        fs::create_dir_all(&datadir).unwrap();
+        let expired = write_test_manifest(&datadir, &destination, 1, 2);
+        assert!(verify_backup_receipt(&expired)
+            .unwrap_err()
+            .contains("超过有效期"));
+
+        let fresh_destination = temp.path().join("fresh");
+        let fresh = write_test_manifest(&datadir, &fresh_destination, now(), now() + 3600);
+        fs::write(&fresh.manifest_path, "{broken json").unwrap();
+        assert!(verify_backup_receipt(&fresh).unwrap_err().contains("损坏"));
+    }
+
+    #[test]
+    fn valid_manifest_allows_repair_guard() {
+        let temp = tempfile::tempdir().unwrap();
+        let datadir = temp.path().join("data");
+        let destination = temp.path().join("backup");
+        fs::create_dir_all(&datadir).unwrap();
+        let receipt = write_test_manifest(&datadir, &destination, now(), now() + 3600);
+        backups().lock().unwrap().push(receipt.clone());
+        let candidate = test_candidate(
+            &display(&datadir),
+            Some(MySqlBackupManifestStatus {
+                valid: true,
+                reason: "manifest 校验通过，仍在有效期内".to_string(),
+                created_at: receipt.created_at,
+                expires_at: receipt.expires_at,
+                destination: receipt.destination,
+                files: receipt.files,
+                bytes: receipt.bytes,
+                ibdata: receipt.ibdata,
+                frm: receipt.frm,
+                business_schema: receipt.business_schema,
+                system_schema: true,
+                manifest_path: receipt.manifest_path,
+            }),
+        );
+        assert!(validate_system_schema_repair_allowed(&candidate).is_ok());
     }
 }

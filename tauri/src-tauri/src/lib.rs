@@ -16,7 +16,7 @@ use std::net::{IpAddr, Ipv4Addr};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::{
-    atomic::{AtomicU64, Ordering},
+    atomic::{AtomicBool, AtomicU64, Ordering},
     Mutex, OnceLock,
 };
 use std::time::Instant;
@@ -30,7 +30,9 @@ use std::os::windows::process::CommandExt;
 use winreg::{enums::*, RegKey};
 
 const APP_NAME: &str = "DevEnvManager";
+const SAFETY_DISCLAIMER_VERSION: u32 = 1;
 static SAVE_JSON_COUNTER: AtomicU64 = AtomicU64::new(0);
+static MAINTENANCE_SCAN_CANCELLED: AtomicBool = AtomicBool::new(false);
 const MANAGED_PATHS: [&str; 8] = [
     r"%DEVENV_HOME%\current\jdk\bin",
     r"%DEVENV_HOME%\current\python",
@@ -98,6 +100,10 @@ struct Settings {
     port_process_exclusions: Vec<String>,
     #[serde(default)]
     safety_disclaimer_accepted: bool,
+    #[serde(default)]
+    safety_disclaimer_version: u32,
+    #[serde(default)]
+    safety_disclaimer_accepted_at: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -521,11 +527,18 @@ struct PythonAnalysis {
     current_pip: Option<PythonToolState>,
     launcher_path: String,
     launcher_output: String,
+    first_python_on_path: String,
+    first_pip_on_path: String,
+    python_m_pip_available: bool,
+    managed_python_available: bool,
     discovered_pythons: Vec<PythonEntry>,
     discovered_pips: Vec<PythonEntry>,
     user_path_entry_count: usize,
     current_terminal_matches_user_path: bool,
     store_alias_risk: bool,
+    repair_blockers: Vec<String>,
+    recovery_actions: Vec<String>,
+    diagnostic_report: String,
     risks: Vec<String>,
     recommendations: Vec<String>,
     pip_repair_command: String,
@@ -812,7 +825,19 @@ struct PlatformReport {
     dotnet: DotnetEnvironment,
     mirrors: MirrorCenter,
     chsrc: ToolState,
+    chsrc_recovery: ChsrcRecovery,
     generated_at: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ChsrcRecovery {
+    missing: bool,
+    explanation: Vec<String>,
+    scoop_command: String,
+    winget_command: String,
+    official_url: String,
+    fallback_features: Vec<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -1245,19 +1270,157 @@ fn export_cleanup_report(format: String) -> Result<String, String> {
 
 #[tauri::command]
 async fn scan_large_files(
+    app: tauri::AppHandle,
     root: String,
     min_size_mb: u64,
     limit: usize,
 ) -> Result<Vec<cleanup::LargeFileItem>, String> {
-    run_blocking(move || cleanup::scan_large_files(root, min_size_mb, limit)).await?
+    MAINTENANCE_SCAN_CANCELLED.store(false, Ordering::SeqCst);
+    let started = Instant::now();
+    emit_task_progress(
+        &app,
+        "大文件扫描",
+        2,
+        "正在预估扫描范围，上限 250000 个条目",
+    );
+    let progress_app = app.clone();
+    let result = run_blocking(move || {
+        cleanup::scan_large_files_with_progress(
+            root,
+            min_size_mb,
+            limit,
+            move |update| {
+                let percent =
+                    8 + ((update.visited_entries.min(50_000) as u64 * 82 / 50_000) as u8).min(82);
+                let truncated = if update.truncated {
+                    "；已达到扫描上限"
+                } else {
+                    ""
+                };
+                emit_task_progress(
+                    &progress_app,
+                    "大文件扫描",
+                    percent.min(95),
+                    &format!(
+                        "已访问 {} 项，候选 {} 个{}",
+                        update.visited_entries, update.candidate_count, truncated
+                    ),
+                );
+            },
+            || MAINTENANCE_SCAN_CANCELLED.load(Ordering::SeqCst),
+        )
+    })
+    .await?;
+    match result {
+        Ok(items) => {
+            MAINTENANCE_SCAN_CANCELLED.store(false, Ordering::SeqCst);
+            emit_task_progress(
+                &app,
+                "大文件扫描",
+                100,
+                &format!(
+                    "完成：{} 个候选，耗时 {} 秒",
+                    items.len(),
+                    started.elapsed().as_secs()
+                ),
+            );
+            Ok(items)
+        }
+        Err(err) => {
+            let percent = if err.contains("取消") { 100 } else { 0 };
+            emit_task_progress(&app, "大文件扫描", percent, &err);
+            Err(err)
+        }
+    }
 }
 
 #[tauri::command]
 async fn scan_duplicate_large_files(
+    app: tauri::AppHandle,
     root: String,
     min_size_mb: u64,
 ) -> Result<Vec<cleanup::DuplicateGroup>, String> {
-    run_blocking(move || cleanup::scan_duplicate_large_files(root, min_size_mb)).await?
+    MAINTENANCE_SCAN_CANCELLED.store(false, Ordering::SeqCst);
+    let started = Instant::now();
+    emit_task_progress(&app, "重复文件扫描", 2, "正在按大小收集候选文件");
+    let progress_app = app.clone();
+    let result = run_blocking(move || {
+        cleanup::scan_duplicate_large_files_with_progress(
+            root,
+            min_size_mb,
+            move |update| {
+                let (base, span, label) = match update.stage {
+                    "collect" => (5_u8, 30_u8, "收集候选"),
+                    "quick_hash" => (36_u8, 29_u8, "quick hash"),
+                    "full_hash" => (66_u8, 28_u8, "full hash"),
+                    _ => (95_u8, 0_u8, "整理结果"),
+                };
+                let work_units = match update.stage {
+                    "collect" => update.visited_entries.min(50_000),
+                    "quick_hash" => update.quick_hashed.min(update.candidate_count.max(1)),
+                    "full_hash" => update.full_hashed.min(update.candidate_count.max(1)),
+                    _ => update.candidate_count,
+                };
+                let total = if update.stage == "collect" {
+                    50_000
+                } else {
+                    update.candidate_count.max(1)
+                };
+                let percent = base + ((work_units as u64 * span as u64 / total as u64) as u8);
+                let truncated = if update.truncated {
+                    "；已达到扫描上限"
+                } else {
+                    ""
+                };
+                emit_task_progress(
+                    &progress_app,
+                    "重复文件扫描",
+                    percent.min(96),
+                    &format!(
+                        "{}：访问 {} 项，候选 {} 个，quick {}，full {}{}",
+                        label,
+                        update.visited_entries,
+                        update.candidate_count,
+                        update.quick_hashed,
+                        update.full_hashed,
+                        truncated
+                    ),
+                );
+            },
+            || MAINTENANCE_SCAN_CANCELLED.load(Ordering::SeqCst),
+        )
+    })
+    .await?;
+    match result {
+        Ok(groups) => {
+            MAINTENANCE_SCAN_CANCELLED.store(false, Ordering::SeqCst);
+            emit_task_progress(
+                &app,
+                "重复文件扫描",
+                100,
+                &format!(
+                    "完成：{} 组重复文件，耗时 {} 秒",
+                    groups.len(),
+                    started.elapsed().as_secs()
+                ),
+            );
+            Ok(groups)
+        }
+        Err(err) => {
+            let percent = if err.contains("取消") { 100 } else { 0 };
+            emit_task_progress(&app, "重复文件扫描", percent, &err);
+            Err(err)
+        }
+    }
+}
+
+#[tauri::command]
+fn cancel_maintenance_scan() -> Result<OperationResult, String> {
+    MAINTENANCE_SCAN_CANCELLED.store(true, Ordering::SeqCst);
+    Ok(OperationResult {
+        success: true,
+        message: "已请求取消当前扫描；正在等待后台任务安全退出。".to_string(),
+    })
 }
 
 #[tauri::command]
@@ -1444,10 +1607,39 @@ fn get_feature_risk(feature_id: String) -> Option<safety::FeatureRiskInfo> {
 fn accept_safety_disclaimer() -> Result<OperationResult, String> {
     let mut settings = load_settings()?;
     settings.safety_disclaimer_accepted = true;
+    settings.safety_disclaimer_version = SAFETY_DISCLAIMER_VERSION;
+    settings.safety_disclaimer_accepted_at = Some(current_timestamp());
     save_json(&settings_file(), &settings)?;
     Ok(OperationResult {
         success: true,
         message: "已记录安全说明已读状态；不会上传任何数据。".to_string(),
+    })
+}
+
+#[tauri::command]
+fn reset_ui_config() -> Result<OperationResult, String> {
+    let mut settings = load_settings()?;
+    settings.theme = "system".to_string();
+    settings.last_page = "home".to_string();
+    settings.port_process_exclusions.clear();
+    save_json(&settings_file(), &settings)?;
+    Ok(OperationResult {
+        success: true,
+        message: "已重置 UI 状态；根目录、版本记录和安全声明状态已保留。".to_string(),
+    })
+}
+
+#[tauri::command]
+fn open_app_config_dir() -> Result<OperationResult, String> {
+    let dir = app_config_dir();
+    fs::create_dir_all(&dir).map_err(|err| format!("创建配置目录失败：{err}"))?;
+    hidden_command("explorer.exe")
+        .arg(&dir)
+        .spawn()
+        .map_err(|error| format!("打开配置目录失败：{error}"))?;
+    Ok(OperationResult {
+        success: true,
+        message: format!("已打开配置目录：{}", display_path(dir)),
     })
 }
 
@@ -1555,6 +1747,20 @@ async fn execute_c_drive_expansion(
 #[tauri::command]
 fn open_analysis_path(path: String) -> Result<OperationResult, String> {
     let path = PathBuf::from(path.trim());
+    if path.is_file() {
+        hidden_command("explorer.exe")
+            .arg("/select,")
+            .arg(&path)
+            .spawn()
+            .map_err(|error| format!("打开并选中文件失败：{error}"))?;
+        return Ok(OperationResult {
+            success: true,
+            message: format!("已打开并选中：{}", display_path(path)),
+        });
+    }
+    if !path.exists() {
+        return Err("路径不存在，可能已移动或删除；请重新扫描后再打开。".to_string());
+    }
     let target = if path.is_dir() {
         path
     } else {
@@ -1563,7 +1769,7 @@ fn open_analysis_path(path: String) -> Result<OperationResult, String> {
             .ok_or_else(|| "无法识别所在目录".to_string())?
     };
     if !target.is_dir() {
-        return Err("目录不存在".to_string());
+        return Err("目录不存在，可能已移动或删除；请重新扫描后再打开。".to_string());
     }
     hidden_command("explorer.exe")
         .arg(&target)
@@ -1584,6 +1790,20 @@ fn open_apps_features() -> Result<OperationResult, String> {
     Ok(OperationResult {
         success: true,
         message: "已打开 Windows 已安装的应用；请通过系统卸载入口操作".to_string(),
+    })
+}
+
+#[tauri::command]
+fn open_python_alias_settings() -> Result<OperationResult, String> {
+    hidden_command("explorer.exe")
+        .arg("ms-settings:appsfeatures-app")
+        .spawn()
+        .map_err(|error| format!("打开应用执行别名设置失败：{error}"))?;
+    Ok(OperationResult {
+        success: true,
+        message:
+            "已打开 Windows 应用执行别名设置；请手动关闭 python.exe / python3.exe Store Alias。"
+                .to_string(),
     })
 }
 
@@ -3181,7 +3401,7 @@ fn scan_ports_blocking() -> Result<Vec<PortRecord>, String> {
             &command_line,
             &service_names,
         );
-        let command_line = redact_report_text(&command_line);
+        let command_line = redact_command_line(&command_line);
         let common_usage = signature.identity.clone();
         let explanation = signature.explanation.clone();
         let risk = signature.risk.clone();
@@ -4577,10 +4797,12 @@ fn export_doctor_report_json_blocking(report: DoctorReport) -> Result<OperationR
     let target = paths
         .logs()
         .join(format!("doctor-report-{}.json", filename_timestamp()));
-    let text = serde_json::to_string_pretty(&report)
-        .map_err(|err| format!("生成 JSON 报告失败：{err}"))?;
-    fs::write(&target, redact_report_text(&text))
-        .map_err(|err| format!("写入 JSON 报告失败：{err}"))?;
+    let mut value =
+        serde_json::to_value(&report).map_err(|err| format!("生成 JSON 报告失败：{err}"))?;
+    redact_json_value(&mut value);
+    let text =
+        serde_json::to_string_pretty(&value).map_err(|err| format!("生成 JSON 报告失败：{err}"))?;
+    fs::write(&target, text).map_err(|err| format!("写入 JSON 报告失败：{err}"))?;
     Ok(OperationResult {
         success: true,
         message: format!("已导出 JSON 诊断报告：{}", display_path(target)),
@@ -4591,8 +4813,13 @@ fn export_doctor_report_json_blocking(report: DoctorReport) -> Result<OperationR
 fn doctor_report_text(report: DoctorReport, format: String) -> Result<String, String> {
     let text = match format.as_str() {
         "markdown" => doctor_report_markdown(&report),
-        "json" => serde_json::to_string_pretty(&report)
-            .map_err(|err| format!("生成 JSON 报告失败：{err}"))?,
+        "json" => {
+            let mut value = serde_json::to_value(&report)
+                .map_err(|err| format!("生成 JSON 报告失败：{err}"))?;
+            redact_json_value(&mut value);
+            serde_json::to_string_pretty(&value)
+                .map_err(|err| format!("生成 JSON 报告失败：{err}"))?
+        }
         _ => return Err("不支持的报告格式".to_string()),
     };
     Ok(redact_report_text(&text))
@@ -4604,6 +4831,8 @@ async fn analyze_python_environment() -> Result<PythonAnalysis, String> {
 }
 
 fn analyze_python_environment_blocking() -> PythonAnalysis {
+    let first_python_on_path = find_on_path("python").unwrap_or_default();
+    let first_pip_on_path = find_on_path("pip").unwrap_or_default();
     let current_python = detect_runtime("Python", "python", &["--version"]).map(|runtime| {
         let status = if runtime
             .executable
@@ -4625,6 +4854,7 @@ fn analyze_python_environment_blocking() -> PythonAnalysis {
     let python_m_pip = current_python.as_ref().and_then(|python| {
         run_command_output(PathBuf::from(&python.path), &["-m", "pip", "--version"], 30).ok()
     });
+    let python_m_pip_available = python_m_pip.is_some();
     let pip_runtime = detect_runtime("pip", "pip", &["--version"]);
     let current_pip = pip_runtime.map(|runtime| {
         let pip_output = runtime.version.clone();
@@ -4704,6 +4934,11 @@ fn analyze_python_environment_blocking() -> PythonAnalysis {
         item.source == "Microsoft Store"
             || item.path.to_ascii_lowercase().contains("\\windowsapps\\")
     });
+    let managed_python_available = load_paths()
+        .ok()
+        .and_then(|paths| load_installed(&paths).ok())
+        .map(|installed| !installed.pythons.is_empty())
+        .unwrap_or(false);
 
     let mut risks = Vec::new();
     if discovered_pythons.len() > 1 {
@@ -4722,6 +4957,22 @@ fn analyze_python_environment_blocking() -> PythonAnalysis {
     if current_pip.as_ref().map(|item| item.status.as_str()) != Some("正常") {
         risks.push("pip 与当前 python -m pip 不一致或当前 Python 缺少 pip".to_string());
     }
+    let mut repair_blockers = Vec::new();
+    if store_alias_risk {
+        repair_blockers.push("命中 WindowsApps Store Alias 时，DevEnv Manager 不会自动关闭别名或删除 WindowsApps PATH。".to_string());
+    }
+    if current_python.is_none() {
+        repair_blockers
+            .push("当前 PATH 没有可执行 python，不能对未知 Python 执行 ensurepip。".to_string());
+    }
+    if !python_m_pip_available {
+        repair_blockers.push(
+            "当前 python -m pip 不可用；只有受管 Python 才允许生成 pip 修复计划。".to_string(),
+        );
+    }
+    if !managed_python_available {
+        repair_blockers.push("尚未安装受管 Python；无法直接切换到 DevEnv 管理版本。".to_string());
+    }
     if risks.is_empty() {
         risks.push("未发现明显 Python 冲突".to_string());
     }
@@ -4735,23 +4986,108 @@ fn analyze_python_environment_blocking() -> PythonAnalysis {
                 .to_string(),
         );
     }
+    let mut recovery_actions = vec![
+        "打开 Windows 应用执行别名设置，人工关闭 python.exe / python3.exe Store Alias。"
+            .to_string(),
+        "重新检测 Python 环境，确认新终端和 IDE 已继承最新 PATH。".to_string(),
+        "导出只读 Python 诊断报告，发给自己或 issue 复盘。".to_string(),
+    ];
+    if managed_python_available {
+        recovery_actions
+            .push("切换到已安装的受管 Python，并生成用户级 PATH 修复计划。".to_string());
+    } else {
+        recovery_actions
+            .push("安装受管 Python，再用预览计划切换；不会删除系统 Python。".to_string());
+    }
+    let diagnostic_report = python_diagnostic_report(PythonDiagnosticInput {
+        current_python: current_python.as_ref(),
+        current_pip: current_pip.as_ref(),
+        launcher_path: &launcher_path,
+        launcher_output: &launcher_output,
+        first_python_on_path: &first_python_on_path,
+        first_pip_on_path: &first_pip_on_path,
+        python_m_pip_available,
+        store_alias_risk,
+        managed_python_available,
+        risks: &risks,
+        repair_blockers: &repair_blockers,
+        recovery_actions: &recovery_actions,
+    });
 
     PythonAnalysis {
         current_python,
         current_pip,
         launcher_path,
         launcher_output,
+        first_python_on_path,
+        first_pip_on_path,
+        python_m_pip_available,
+        managed_python_available,
         discovered_pythons,
         discovered_pips,
         user_path_entry_count,
         current_terminal_matches_user_path,
         store_alias_risk,
+        repair_blockers,
+        recovery_actions,
+        diagnostic_report,
         risks,
         recommendations,
         pip_repair_command: "python -m ensurepip --upgrade; python -m pip install --upgrade pip"
             .to_string(),
         alias_settings_command: "start ms-settings:appsfeatures-app".to_string(),
     }
+}
+
+struct PythonDiagnosticInput<'a> {
+    current_python: Option<&'a PythonToolState>,
+    current_pip: Option<&'a PythonToolState>,
+    launcher_path: &'a str,
+    launcher_output: &'a str,
+    first_python_on_path: &'a str,
+    first_pip_on_path: &'a str,
+    python_m_pip_available: bool,
+    store_alias_risk: bool,
+    managed_python_available: bool,
+    risks: &'a [String],
+    repair_blockers: &'a [String],
+    recovery_actions: &'a [String],
+}
+
+fn python_diagnostic_report(input: PythonDiagnosticInput<'_>) -> String {
+    redact_report_text(&format!(
+        "# Python diagnostic\n\n默认 python: {}\n默认 pip: {}\nPATH 首个 python: {}\nPATH 首个 pip: {}\npy launcher: {}\npython -m pip: {}\nWindowsApps Alias: {}\n受管 Python: {}\n\n## py -0p\n{}\n\n## 风险\n{}\n\n## 阻断原因\n{}\n\n## 下一步\n{}\n",
+        input.current_python
+            .map(|item| format!("{} · {} · {}", item.status, item.version, item.path))
+            .unwrap_or_else(|| "未发现".to_string()),
+        input.current_pip
+            .map(|item| format!("{} · {} · {}", item.status, item.version, item.path))
+            .unwrap_or_else(|| "未发现".to_string()),
+        if input.first_python_on_path.is_empty() { "未发现" } else { input.first_python_on_path },
+        if input.first_pip_on_path.is_empty() { "未发现" } else { input.first_pip_on_path },
+        if input.launcher_path.is_empty() { "未发现" } else { input.launcher_path },
+        if input.python_m_pip_available { "可用" } else { "不可用" },
+        if input.store_alias_risk { "可能命中" } else { "未发现" },
+        if input.managed_python_available { "存在" } else { "不存在" },
+        input.launcher_output,
+        input.risks.iter().map(|item| format!("- {item}")).collect::<Vec<_>>().join("\n"),
+        input.repair_blockers.iter().map(|item| format!("- {item}")).collect::<Vec<_>>().join("\n"),
+        input.recovery_actions.iter().map(|item| format!("- {item}")).collect::<Vec<_>>().join("\n"),
+    ))
+}
+
+#[tauri::command]
+fn export_python_diagnostic_report() -> Result<OperationResult, String> {
+    let analysis = analyze_python_environment_blocking();
+    let reports = app_config_dir().join("reports");
+    fs::create_dir_all(&reports).map_err(|err| format!("创建报告目录失败：{err}"))?;
+    let target = reports.join(format!("python-diagnostic-{}.md", filename_timestamp()));
+    fs::write(&target, analysis.diagnostic_report)
+        .map_err(|err| format!("写入 Python 诊断报告失败：{err}"))?;
+    Ok(OperationResult {
+        success: true,
+        message: format!("已导出 Python 只读诊断报告：{}", display_path(target)),
+    })
 }
 
 fn learning_command_allowed(parts: &[String]) -> bool {
@@ -5539,6 +5875,7 @@ fn inspect_platform_toolchains_blocking() -> Result<PlatformReport, String> {
     let maven_settings_path = home.join(".m2/settings.xml");
     let gradle_init_path = home.join(".gradle/init.gradle");
     let chsrc = probe_tool("chsrc", resolve_tool(&paths, "chsrc"), &["--version"]);
+    let chsrc_recovery = chsrc_recovery(!chsrc.installed);
 
     Ok(PlatformReport {
         go: GoEnvironment {
@@ -5580,8 +5917,35 @@ fn inspect_platform_toolchains_blocking() -> Result<PlatformReport, String> {
             cargo_config_exists: cargo_config_path.is_file(),
         },
         chsrc,
+        chsrc_recovery,
         generated_at: current_timestamp(),
     })
+}
+
+fn chsrc_recovery(missing: bool) -> ChsrcRecovery {
+    ChsrcRecovery {
+        missing,
+        explanation: if missing {
+            vec![
+                "chsrc 是 RubyMetric 提供的多生态换源工具，用于查看、测速和切换软件源。".to_string(),
+                "当前未检测到 chsrc，因此统一换源按钮不可用；DevEnv Manager 不会静默安装第三方工具。".to_string(),
+                "不安装 chsrc 时，仍可使用 npm、pip、GOPROXY、Maven、Gradle、Cargo 的单项检测和配置。".to_string(),
+            ]
+        } else {
+            vec!["chsrc 已安装，统一换源操作仍会经过固定目标和源 ID 白名单。".to_string()]
+        },
+        scoop_command: "scoop install chsrc".to_string(),
+        winget_command: "winget install RubyMetric.chsrc".to_string(),
+        official_url: "https://github.com/RubyMetric/chsrc".to_string(),
+        fallback_features: vec![
+            "npm registry".to_string(),
+            "pip index-url".to_string(),
+            "GOPROXY".to_string(),
+            "Maven settings.xml".to_string(),
+            "Gradle init.gradle".to_string(),
+            "Cargo config.toml".to_string(),
+        ],
+    }
 }
 
 #[tauri::command]
@@ -7478,77 +7842,44 @@ fn uninstall_external_runtime_blocking(
     if !executable_path.exists() {
         return Err("运行时路径不存在，无法定位卸载器".to_string());
     }
-    if find_uninstall_entry_for_path(&executable_path, &kind).is_none() {
-        return uninstall_unregistered_runtime(&executable_path, &kind);
-    }
-    let entry = find_uninstall_entry_for_path(&executable_path, &kind)
-        .ok_or_else(|| {
-            format!(
-                "没有在 Windows 卸载注册表中找到匹配的卸载入口。{} 可能是绿色版、IDE 内置运行时，或没有单独卸载器；可以先用“配置”切换到 DevEnv 管理的版本，再手动删除原软件目录。",
-                display_path(&executable_path)
-            )
-        })?;
-    launch_uninstall_string(&entry.uninstall_string)?;
-    Ok(OperationResult {
-        success: true,
-        message: format!("已启动 {} 的系统卸载程序", entry.display_name),
-    })
+    Err(external_runtime_manual_action_message(
+        &executable_path,
+        &kind,
+    ))
 }
 
-fn uninstall_unregistered_runtime(
-    executable: &Path,
-    kind: &str,
-) -> Result<OperationResult, String> {
+fn external_runtime_manual_action_message(executable: &Path, kind: &str) -> String {
     let normalized = executable.to_string_lossy().to_ascii_lowercase();
     if normalized.contains("\\jetbrains\\") || normalized.contains("\\jbr\\") {
-        return Err("这是 IDE 内置运行时。直接删除会破坏 IDE；请先切换到 DevEnv 管理版本，并从 IDE 设置中取消使用该 JBR。".to_string());
+        return "这是 IDE 内置运行时。DevEnv Manager 不会卸载或删除它；请先切换到 DevEnv 管理版本，并从 IDE 设置中取消使用该 JBR。".to_string();
     }
     if let Some(app) = package_name_from_path(executable, "scoop", "apps") {
-        let scoop = find_on_path("scoop.cmd")
-            .or_else(|| find_on_path("scoop"))
-            .ok_or_else(|| "路径属于 Scoop，但当前找不到 scoop 命令".to_string())?;
-        return run_package_uninstall(
-            scoop,
-            &["uninstall", app.as_str()],
-            &format!("Scoop 卸载 {app}"),
+        return format!(
+            "路径属于 Scoop 应用 {app}。DevEnv Manager 不会调用包管理器卸载；请在终端自行运行 scoop uninstall {app}，或打开系统卸载入口。"
         );
     }
     if let Some(package) = package_name_from_path(executable, "chocolatey", "lib") {
-        let choco = find_on_path("choco.exe")
-            .ok_or_else(|| "路径属于 Chocolatey，但当前找不到 choco.exe".to_string())?;
-        return run_package_uninstall(
-            choco,
-            &["uninstall", package.as_str(), "-y"],
-            &format!("Chocolatey 卸载 {package}"),
+        return format!(
+            "路径属于 Chocolatey 包 {package}。DevEnv Manager 不会调用包管理器卸载；请在管理员终端自行运行 choco uninstall {package}，或打开系统卸载入口。"
         );
     }
-    let root = portable_runtime_root(executable, kind)?;
-    trash::delete(&root).map_err(|err| format!("将便携运行时移入回收站失败：{err}"))?;
-    Ok(OperationResult {
-        success: true,
-        message: format!("已将便携运行时移入 Windows 回收站：{}", display_path(root)),
-    })
-}
-
-fn run_package_uninstall(
-    executable: String,
-    args: &[&str],
-    title: &str,
-) -> Result<OperationResult, String> {
-    let output = hidden_command(executable)
-        .args(args)
-        .output()
-        .map_err(|err| format!("{title}失败：{err}"))?;
-    if !output.status.success() {
-        return Err(format!(
-            "{title}失败：{}",
-            command_text(&output.stdout, &output.stderr)
-        ));
+    if let Some(entry) = find_uninstall_entry_for_path(executable, kind) {
+        return format!(
+            "已找到 Windows 卸载入口：{}。DevEnv Manager 不会直接启动卸载器；请点击“系统卸载入口”后由用户手动卸载。",
+            entry.display_name
+        );
     }
-    Ok(OperationResult {
-        success: true,
-        message: format!("已完成 {title}"),
-    })
+    if let Ok(root) = portable_runtime_root(executable, kind) {
+        return format!(
+            "疑似便携运行时：{}。DevEnv Manager 不会删除外部目录；请确认不再使用后由用户手动处理。",
+            display_path(root)
+        );
+    }
+    format!(
+        "未识别到可由 DevEnv Manager 安全管理的 {} 卸载方式。请先切换到受管版本，再通过系统设置、原安装器或包管理器手动处理：{}",
+        kind,
+        display_path(executable)
+    )
 }
 
 fn package_name_from_path(path: &Path, manager: &str, collection: &str) -> Option<String> {
@@ -7870,6 +8201,7 @@ pub fn run() {
             export_cleanup_report,
             scan_large_files,
             scan_duplicate_large_files,
+            cancel_maintenance_scan,
             inspect_downloads,
             inspect_desktop,
             inspect_app_usage,
@@ -7902,6 +8234,8 @@ pub fn run() {
             get_feature_risk,
             create_confirmation_token,
             accept_safety_disclaimer,
+            reset_ui_config,
+            open_app_config_dir,
             create_move_plan,
             execute_move_plan,
             list_rollback_records,
@@ -7916,6 +8250,7 @@ pub fn run() {
             execute_c_drive_expansion,
             open_analysis_path,
             open_apps_features,
+            open_python_alias_settings,
             jdk_distributions,
             check_for_updates,
             download_update,
@@ -7952,6 +8287,7 @@ pub fn run() {
             export_doctor_report_json,
             doctor_report_text,
             analyze_python_environment,
+            export_python_diagnostic_report,
             preview_python_repair,
             apply_python_repair,
             inspect_toolchains,
@@ -8491,6 +8827,8 @@ fn default_settings() -> Settings {
                 .to_string(),
         port_process_exclusions: Vec::new(),
         safety_disclaimer_accepted: false,
+        safety_disclaimer_version: 0,
+        safety_disclaimer_accepted_at: None,
     }
 }
 
@@ -8891,6 +9229,10 @@ fn inspect_java_environment_blocking() -> Result<JavaEnvironmentReport, String> 
     let candidates = discover_runtimes_blocking()
         .into_iter()
         .filter(|item| item.kind == "Java")
+        .map(|mut item| {
+            item.source = classify_jdk_candidate_source(&item.executable);
+            item
+        })
         .collect::<Vec<_>>();
     let effective_source = path_java
         .as_deref()
@@ -8931,6 +9273,29 @@ fn inspect_java_environment_blocking() -> Result<JavaEnvironmentReport, String> 
         warnings,
         candidates,
     })
+}
+
+fn classify_jdk_candidate_source(path: &str) -> String {
+    let lower = path.to_ascii_lowercase();
+    if lower.contains("\\devenvmanager\\") {
+        "Managed".to_string()
+    } else if lower.contains("\\jetbrains\\") || lower.contains("\\jbr\\") {
+        "IdeBundled".to_string()
+    } else if lower.contains("\\scoop\\") {
+        "Scoop".to_string()
+    } else if lower.contains("\\chocolatey\\") {
+        "Chocolatey".to_string()
+    } else if lower.contains("\\mise\\") {
+        "Mise".to_string()
+    } else if lower.contains("\\asdf\\") {
+        "Asdf".to_string()
+    } else if lower.contains("\\program files\\") || lower.contains("\\program files (x86)\\") {
+        "SystemInstaller".to_string()
+    } else if lower.contains("\\java\\") || lower.contains("\\jdk") {
+        "External".to_string()
+    } else {
+        "Unknown".to_string()
+    }
 }
 
 fn is_valid_java_home(value: &str, paths: &AppPaths) -> bool {
@@ -10374,7 +10739,12 @@ fn analyze_port_signature(
     let signatures: &[(&str, &[&str], &str)] = &[
         (
             "Spring Boot",
-            &["spring-boot", "org.springframework.boot", "bootrun"],
+            &[
+                "spring-boot",
+                "org.springframework.boot",
+                "bootrun",
+                "springapplication",
+            ],
             "Java / JVM",
         ),
         (
@@ -10382,6 +10752,15 @@ fn analyze_port_signature(
             &["tomcat", "catalina", "org.apache.catalina"],
             "Java / JVM",
         ),
+        ("Jetty", &["jetty", "org.eclipse.jetty"], "Java / JVM"),
+        ("Undertow", &["undertow", "io.undertow"], "Java / JVM"),
+        ("Nacos", &["nacos", "com.alibaba.nacos"], "Java / JVM"),
+        ("Sentinel", &["sentinel", "csp.sentinel"], "Java / JVM"),
+        ("Seata", &["seata"], "Java / JVM"),
+        ("Eureka", &["eureka"], "Java / JVM"),
+        ("Jenkins", &["jenkins"], "Java / JVM"),
+        ("Nexus", &["nexus", "sonatype"], "Java / JVM"),
+        ("SonarQube", &["sonarqube", "sonar"], "Java / JVM"),
         (
             "Java / JVM",
             &["java.exe", "\\jdk", "\\jre", "java -jar"],
@@ -10391,11 +10770,24 @@ fn analyze_port_signature(
         ("Gradle", &["gradle", "gradlew"], "Java / JVM"),
         (
             "Node.js",
-            &["node.exe", "\\nodejs\\", "npm", "pnpm", "yarn"],
+            &["node.exe", "\\nodejs\\", "npm", "pnpm", "yarn", "bun"],
             "Node / 前端",
         ),
         ("Vite", &["vite", "vite.config"], "Node / 前端"),
+        (
+            "Webpack Dev Server",
+            &["webpack-dev-server", "webpack serve"],
+            "Node / 前端",
+        ),
         ("Next.js", &["next dev", "next-server"], "Node / 前端"),
+        ("Nuxt", &["nuxt", "nuxi"], "Node / 前端"),
+        ("React Scripts", &["react-scripts"], "Node / 前端"),
+        ("Vue CLI", &["vue-cli-service"], "Node / 前端"),
+        ("Angular", &["ng serve", "@angular/cli"], "Node / 前端"),
+        ("Storybook", &["storybook"], "Node / 前端"),
+        ("NestJS", &["nestjs", "@nestjs"], "Node / 前端"),
+        ("Electron Dev", &["electron", "electron.exe"], "Node / 前端"),
+        ("Tauri Dev", &["tauri dev", "tauri-cli"], "Node / 前端"),
         (
             "Python",
             &[
@@ -10408,11 +10800,23 @@ fn analyze_port_signature(
             ],
             "Python / AI",
         ),
+        ("FastAPI / Uvicorn", &["fastapi", "uvicorn"], "Python / AI"),
         (
             "Jupyter",
             &["jupyter", "ipykernel", "notebook"],
             "Python / AI",
         ),
+        ("Streamlit", &["streamlit"], "Python / AI"),
+        ("Gradio", &["gradio"], "Python / AI"),
+        ("ComfyUI", &["comfyui"], "Python / AI"),
+        (
+            "Stable Diffusion WebUI",
+            &["stable-diffusion-webui", "webui-user"],
+            "Python / AI",
+        ),
+        ("Ollama", &["ollama"], "Python / AI"),
+        ("LM Studio", &["lm studio", "lmstudio"], "Python / AI"),
+        ("vLLM", &["vllm"], "Python / AI"),
         ("Go", &["go.exe", "\\go\\bin", ".go"], "Go / Rust / .NET"),
         (
             "Rust",
@@ -10431,40 +10835,86 @@ fn analyze_port_signature(
         ("Redis", &["redis-server"], "数据库"),
         ("MongoDB", &["mongod"], "数据库"),
         ("Elasticsearch", &["elasticsearch"], "数据库"),
+        ("OpenSearch", &["opensearch"], "数据库"),
         ("SQL Server", &["sqlservr", "mssql"], "数据库"),
+        ("Oracle", &["oracle", "tnslsnr"], "数据库"),
         ("Nginx", &["nginx.exe", "\\nginx\\"], "Web 服务器"),
         ("Apache HTTPD", &["httpd.exe", "apache"], "Web 服务器"),
         ("RabbitMQ", &["rabbitmq", "beam.smp"], "中间件"),
-        ("Kafka", &["kafka", "zookeeper"], "中间件"),
+        ("Kafka", &["kafka"], "中间件"),
+        ("ZooKeeper", &["zookeeper"], "中间件"),
+        ("MinIO", &["minio"], "中间件"),
+        ("Prometheus", &["prometheus"], "中间件"),
+        ("Grafana", &["grafana"], "中间件"),
         (
             "Docker / Container",
-            &["docker", "com.docker", "containerd"],
+            &["docker", "com.docker", "com.docker.backend", "containerd"],
             "Docker / WSL",
         ),
-        ("WSL", &["wsl", "\\wsl$"], "Docker / WSL"),
+        (
+            "WSL",
+            &["wsl", "wslhost", "vmmem", "\\wsl$"],
+            "Docker / WSL",
+        ),
         (
             "本地代理",
-            &["clash", "v2ray", "sing-box", "mihomo", "privoxy"],
+            &[
+                "clash", "mihomo", "v2ray", "xray", "sing-box", "privoxy", "fiddler", "charles",
+            ],
             "本地代理",
         ),
         (
+            "Node Inspector",
+            &["--inspect", "inspector"],
             "IDE / 调试器",
-            &["idea64", "pycharm", "webstorm", "code.exe", "debug"],
+        ),
+        ("Java JDWP", &["jdwp", "address=*:"], "IDE / 调试器"),
+        ("Python debugpy", &["debugpy"], "IDE / 调试器"),
+        (
+            "IDE / 调试器",
+            &[
+                "idea64",
+                "pycharm",
+                "webstorm",
+                "code.exe",
+                "cursor.exe",
+                "trae.exe",
+                "debug",
+            ],
             "IDE / 调试器",
         ),
         (
             "桌面应用",
             &[
                 "steam.exe",
+                "steamwebhelper.exe",
                 "qq.exe",
-                "wechat.exe",
+                "wechat",
+                "weixin",
+                "wxwork",
                 "chrome.exe",
                 "msedge.exe",
+                "firefox.exe",
+                "discord.exe",
+                "telegram.exe",
+                "onedrive.exe",
+                "baidunetdisk",
+                "baiduyunguanjia",
+                "cursor.exe",
+                "trae.exe",
+                "code.exe",
+                "wechat.exe",
                 "webview",
             ],
             "桌面应用",
         ),
     ];
+    let is_generic_signature = |label: &str| {
+        matches!(
+            label,
+            "Java / JVM" | "Node.js" | "Python" | "Go" | "Rust" | ".NET"
+        )
+    };
     for (label, markers, group) in signatures {
         let hits = markers
             .iter()
@@ -10472,7 +10922,12 @@ fn analyze_port_signature(
             .count();
         if hits > 0 {
             score += (hits as i32) * 25;
-            identity = (*label).to_string();
+            if identity == "未识别的本地服务"
+                || (!is_generic_signature(label) && is_generic_signature(&identity))
+                || matches!(*label, "桌面应用" | "IDE / 调试器")
+            {
+                identity = (*label).to_string();
+            }
             evidence.push(format!(
                 "{group} 强证据：{label} 命中 {hits} 个进程/路径/命令行标记"
             ));
@@ -10483,17 +10938,40 @@ fn analyze_port_signature(
         conflict.push(format!("{state} 不是本地监听状态，不能当作正在提供服务"));
         score -= 25;
     }
+    if matches!(
+        lower_name.as_str(),
+        "chrome.exe" | "msedge.exe" | "firefox.exe"
+    ) && (port == 9222 || haystack.contains("remote-debugging-port"))
+    {
+        let browser = match lower_name.as_str() {
+            "msedge.exe" => "Edge 调试端口",
+            "firefox.exe" => "Firefox 调试端口",
+            _ => "Chrome 调试端口",
+        };
+        identity = browser.to_string();
+        score += 60;
+        evidence.push(format!("{browser} 强证据：浏览器进程使用远程调试端口"));
+    }
+
     if [
         "steam.exe",
+        "steamwebhelper.exe",
         "qq.exe",
         "wechat.exe",
+        "weixin.exe",
+        "wxwork.exe",
         "chrome.exe",
         "msedge.exe",
+        "firefox.exe",
+        "code.exe",
+        "cursor.exe",
+        "trae.exe",
     ]
     .iter()
     .any(|name| lower_name == *name)
     {
-        conflict.push("桌面/浏览器进程只按实际进程识别，不按端口号猜测为 Web 框架".to_string());
+        conflict
+            .push("桌面/浏览器/IDE 进程只按实际进程识别，不按端口号猜测为 Web 框架".to_string());
         score -= 20;
     }
     let port_hint = match port {
@@ -10515,17 +10993,24 @@ fn analyze_port_signature(
     };
     if let Some(hint) = port_hint {
         evidence.push(format!("弱证据：端口 {port} 常见于 {hint}"));
-        if identity == "未识别的本地服务" && state.eq_ignore_ascii_case("LISTENING") {
+        let ambiguous_web_port = matches!(port, 80 | 443 | 8000 | 8080..=8082 | 8888);
+        if identity == "未识别的本地服务"
+            && state.eq_ignore_ascii_case("LISTENING")
+            && !ambiguous_web_port
+        {
             identity = format!("{hint}（仅端口弱证据）");
         }
         score += 8;
     }
 
     let confidence = score.clamp(0, 100) as u8;
+    let unknown_or_weak = identity == "未识别的本地服务" || identity.contains("仅端口弱证据");
     let risk_level = if !state.eq_ignore_ascii_case("LISTENING") {
         "low"
     } else if matches!(port, 3306 | 5432 | 6379 | 27017 | 9200 | 1433) {
         "high"
+    } else if unknown_or_weak && matches!(port, 80 | 443 | 8000 | 8080..=8082 | 8888) {
+        "low"
     } else if matches!(port, 80 | 443 | 8080..=8082 | 8000 | 8888) {
         "medium"
     } else {
@@ -11603,21 +12088,45 @@ fn doctor_report_markdown(report: &DoctorReport) -> String {
 }
 
 fn redact_report_text(text: &str) -> String {
+    redact_sensitive_text(text)
+}
+
+fn redact_sensitive_text(text: &str) -> String {
     let mut result = text.to_string();
     for key in ["USERPROFILE", "HOME"] {
         if let Ok(value) = env::var(key) {
             if !value.trim().is_empty() {
-                result = result.replace(&value, "%USER_HOME%");
+                result = result.replace(&value, "%USERPROFILE%");
             }
         }
     }
+    result = redact_path(&result);
     result
         .lines()
         .map(|line| {
+            let line = redact_bearer_token(line);
             line.split(' ')
                 .map(|part| {
                     let lower = part.to_ascii_lowercase();
-                    for marker in ["token=", "password=", "secret=", "access_key="] {
+                    if lower == "bearer" {
+                        return "Bearer".to_string();
+                    }
+                    if lower.starts_with("bearer ") || lower.starts_with("authorization:bearer") {
+                        return "Bearer <redacted>".to_string();
+                    }
+                    for marker in [
+                        "token=",
+                        "password=",
+                        "passwd=",
+                        "pwd=",
+                        "secret=",
+                        "apikey=",
+                        "api_key=",
+                        "access_key=",
+                        "private_key=",
+                        "--token=",
+                        "--password=",
+                    ] {
                         if lower.starts_with(marker) {
                             return format!("{marker}<redacted>");
                         }
@@ -11629,6 +12138,84 @@ fn redact_report_text(text: &str) -> String {
         })
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+fn redact_bearer_token(line: &str) -> String {
+    let lower = line.to_ascii_lowercase();
+    let Some(index) = lower.find("bearer ") else {
+        return line.to_string();
+    };
+    let token_start = index + "bearer ".len();
+    let token_tail = &line[token_start..];
+    let token_end = token_tail
+        .find([' ', '\t', '\r', '\n', '"', '\''])
+        .unwrap_or(token_tail.len());
+    format!(
+        "{}Bearer <redacted>{}",
+        &line[..index],
+        &token_tail[token_end..]
+    )
+}
+
+fn redact_path(path: &str) -> String {
+    redact_windows_user_paths(path)
+}
+
+fn redact_command_line(command_line: &str) -> String {
+    redact_sensitive_text(command_line)
+}
+
+fn redact_json_value(value: &mut Value) {
+    match value {
+        Value::String(text) => *text = redact_sensitive_text(text),
+        Value::Array(items) => items.iter_mut().for_each(redact_json_value),
+        Value::Object(map) => {
+            for (key, value) in map.iter_mut() {
+                let lower = key.to_ascii_lowercase();
+                if [
+                    "password",
+                    "passwd",
+                    "pwd",
+                    "token",
+                    "secret",
+                    "apikey",
+                    "api_key",
+                    "access_key",
+                    "private_key",
+                    "authorization",
+                ]
+                .iter()
+                .any(|marker| lower.contains(marker))
+                {
+                    *value = Value::String("<redacted>".to_string());
+                } else {
+                    redact_json_value(value);
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
+fn redact_windows_user_paths(text: &str) -> String {
+    let mut result = String::new();
+    let mut rest = text;
+    loop {
+        let lower = rest.to_ascii_lowercase();
+        let Some(index) = lower.find("c:\\users\\") else {
+            result.push_str(rest);
+            break;
+        };
+        result.push_str(&rest[..index]);
+        let after_prefix = index + "c:\\users\\".len();
+        let tail = &rest[after_prefix..];
+        let end = tail
+            .find(['\\', '/', '\n', '\r', ' ', '\t', '"', '\''])
+            .unwrap_or(tail.len());
+        result.push_str("%USERPROFILE%");
+        rest = &tail[end..];
+    }
+    result
 }
 
 fn filename_timestamp() -> String {
@@ -12157,6 +12744,92 @@ mod tests {
     }
 
     #[test]
+    fn python_diagnostic_report_explains_store_alias_without_dangerous_fix() {
+        let python = PythonToolState {
+            path: r"C:\Users\Alice\AppData\Local\Microsoft\WindowsApps\python.exe".to_string(),
+            version: "Python 3.12".to_string(),
+            status: "风险".to_string(),
+            detail: "Microsoft Store".to_string(),
+        };
+        let risks = ["Microsoft Store Python 执行别名可能抢占 python 命令".to_string()];
+        let repair_blockers =
+            ["命中 WindowsApps Store Alias 时，DevEnv Manager 不会自动关闭别名或删除 WindowsApps PATH。".to_string()];
+        let recovery_actions = [
+            "打开 Windows 应用执行别名设置，人工关闭 python.exe / python3.exe Store Alias。"
+                .to_string(),
+        ];
+        let report = python_diagnostic_report(PythonDiagnosticInput {
+            current_python: Some(&python),
+            current_pip: None,
+            launcher_path: r"C:\Windows\py.exe",
+            launcher_output: r"-V:3.12 C:\Python312\python.exe",
+            first_python_on_path: &python.path,
+            first_pip_on_path: "",
+            python_m_pip_available: false,
+            store_alias_risk: true,
+            managed_python_available: false,
+            risks: &risks,
+            repair_blockers: &repair_blockers,
+            recovery_actions: &recovery_actions,
+        });
+        assert!(report.contains("WindowsApps"));
+        assert!(report.contains("不会自动关闭别名"));
+        assert!(report.contains("%USERPROFILE%"));
+        assert!(!report.contains(r"C:\Users\Alice"));
+    }
+
+    #[test]
+    fn jdk_candidate_source_distinguishes_managers_and_ide_bundled() {
+        assert_eq!(
+            classify_jdk_candidate_source(r"D:\DevEnvManager\current\jdk\bin\java.exe"),
+            "Managed"
+        );
+        assert_eq!(
+            classify_jdk_candidate_source(
+                r"C:\Users\Alice\scoop\apps\openjdk\current\bin\java.exe"
+            ),
+            "Scoop"
+        );
+        assert_eq!(
+            classify_jdk_candidate_source(
+                r"C:\Program Files\JetBrains\IntelliJ IDEA\jbr\bin\java.exe"
+            ),
+            "IdeBundled"
+        );
+        assert_eq!(
+            classify_jdk_candidate_source(r"C:\Program Files\Eclipse Adoptium\jdk-21\bin\java.exe"),
+            "SystemInstaller"
+        );
+    }
+
+    #[test]
+    fn open_analysis_path_reports_missing_path_as_rescan_needed() {
+        let missing = tempfile::tempdir()
+            .unwrap()
+            .path()
+            .join("missing-file.zip")
+            .to_string_lossy()
+            .to_string();
+        let error = open_analysis_path(missing).unwrap_err();
+        assert!(error.contains("重新扫描"));
+    }
+
+    #[test]
+    fn chsrc_missing_keeps_single_mirror_fallbacks() {
+        let recovery = chsrc_recovery(true);
+        assert!(recovery.missing);
+        assert!(recovery
+            .explanation
+            .iter()
+            .any(|item| item.contains("不会静默安装")));
+        assert!(recovery
+            .fallback_features
+            .contains(&"pip index-url".to_string()));
+        assert!(recovery.fallback_features.contains(&"GOPROXY".to_string()));
+        assert_eq!(recovery.scoop_command, "scoop install chsrc");
+    }
+
+    #[test]
     fn report_redaction_masks_home_and_sensitive_pairs() {
         let text = format!(
             "path={} token=abc123 password=hunter2",
@@ -12165,6 +12838,34 @@ mod tests {
         let redacted = redact_report_text(&text);
         assert!(!redacted.contains("abc123"));
         assert!(!redacted.contains("hunter2"));
+    }
+
+    #[test]
+    fn redaction_masks_bearer_cli_flags_paths_and_json() {
+        let command = r#"server.exe --token=abc --password=hunter2 Authorization: Bearer secret C:\Users\Alice\project"#;
+        let redacted = redact_command_line(command);
+        assert!(!redacted.contains("abc"));
+        assert!(!redacted.contains("hunter2"));
+        assert!(!redacted.contains("secret"));
+        assert!(!redacted.contains(r"C:\Users\Alice"));
+        assert!(redacted.contains("%USERPROFILE%"));
+        assert_eq!(
+            redact_path(r"C:\Users\Alice\Desktop"),
+            r"%USERPROFILE%\Desktop"
+        );
+
+        let mut value = json!({
+            "nested": {
+                "api_key": "abc123",
+                "path": "C:\\Users\\Alice\\Downloads\\tool.zip",
+                "mysql": "ERROR 1045 (28000)"
+            }
+        });
+        redact_json_value(&mut value);
+        let text = serde_json::to_string(&value).unwrap();
+        assert!(!text.contains("abc123"));
+        assert!(!text.contains(r"C:\\Users\\Alice"));
+        assert!(text.contains("ERROR 1045"));
     }
 
     #[test]
@@ -12237,17 +12938,120 @@ mod tests {
         let signature = analyze_port_signature(
             8080,
             "LISTENING",
-            "steam.exe",
-            r"C:\Program Files (x86)\Steam\steam.exe",
-            r#""C:\Program Files (x86)\Steam\steam.exe""#,
+            "steamwebhelper.exe",
+            r"C:\Program Files (x86)\Steam\bin\cef\steamwebhelper.exe",
+            r#""C:\Program Files (x86)\Steam\bin\cef\steamwebhelper.exe""#,
             &[],
         );
         assert_eq!(signature.identity, "桌面应用");
         assert!(signature
             .conflict_evidence
             .iter()
-            .any(|item| item.contains("桌面/浏览器")));
+            .any(|item| item.contains("桌面/浏览器/IDE")));
         assert!(!signature.identity.contains("Spring"));
+    }
+
+    #[test]
+    fn qq_on_8082_is_not_spring() {
+        let signature = analyze_port_signature(
+            8082,
+            "LISTENING",
+            "QQ.exe",
+            r"C:\Program Files\Tencent\QQNT\QQ.exe",
+            r#""C:\Program Files\Tencent\QQNT\QQ.exe""#,
+            &[],
+        );
+        assert_eq!(signature.identity, "桌面应用");
+        assert!(!signature.identity.contains("Spring"));
+        assert!(!signature.identity.contains("Tomcat"));
+    }
+
+    #[test]
+    fn chrome_debug_port_is_specific_not_generic_web() {
+        let signature = analyze_port_signature(
+            9222,
+            "LISTENING",
+            "chrome.exe",
+            r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+            r#""C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222"#,
+            &[],
+        );
+        assert_eq!(signature.identity, "Chrome 调试端口");
+        assert!(!signature.identity.contains("Web 服务"));
+    }
+
+    #[test]
+    fn code_process_is_not_user_project_service_by_port_only() {
+        let signature = analyze_port_signature(
+            5173,
+            "LISTENING",
+            "Code.exe",
+            r"C:\Users\Alice\AppData\Local\Programs\Microsoft VS Code\Code.exe",
+            r#""C:\Users\Alice\AppData\Local\Programs\Microsoft VS Code\Code.exe""#,
+            &[],
+        );
+        assert!(matches!(
+            signature.identity.as_str(),
+            "IDE / 调试器" | "桌面应用"
+        ));
+        assert!(!signature.identity.contains("Vite"));
+    }
+
+    #[test]
+    fn unknown_8080_stays_low_confidence_unknown() {
+        let signature = analyze_port_signature(
+            8080,
+            "LISTENING",
+            "unknown.exe",
+            r"C:\Tools\unknown.exe",
+            r#""C:\Tools\unknown.exe""#,
+            &[],
+        );
+        assert_eq!(signature.identity, "未识别的本地服务");
+        assert!(signature.confidence < 40);
+        assert_eq!(signature.risk_level, "low");
+    }
+
+    #[test]
+    fn established_connection_is_not_local_listening_service() {
+        let signature = analyze_port_signature(
+            8080,
+            "ESTABLISHED",
+            "java.exe",
+            r"C:\Program Files\Java\jdk-21\bin\java.exe",
+            r#""C:\Program Files\Java\jdk-21\bin\java.exe" -jar app.jar"#,
+            &[],
+        );
+        assert_eq!(signature.risk_level, "low");
+        assert!(signature
+            .conflict_evidence
+            .iter()
+            .any(|item| item.contains("不是本地监听状态")));
+    }
+
+    #[test]
+    fn vite_and_spring_have_strong_identity() {
+        let vite = analyze_port_signature(
+            5173,
+            "LISTENING",
+            "node.exe",
+            r"C:\Program Files\nodejs\node.exe",
+            r#""node.exe" "C:\app\node_modules\.bin\vite" --host 127.0.0.1"#,
+            &[],
+        );
+        assert_eq!(vite.identity, "Vite");
+        assert!(vite.confidence >= 40);
+
+        let spring = analyze_port_signature(
+            8080,
+            "LISTENING",
+            "java.exe",
+            r"C:\Program Files\Java\jdk-21\bin\java.exe",
+            r#""java.exe" -jar demo-spring-boot.jar"#,
+            &[],
+        );
+        assert_eq!(spring.identity, "Spring Boot");
+        assert!(spring.confidence >= 40);
     }
 
     #[test]
@@ -12544,6 +13348,27 @@ mod tests {
         let unrelated_exe = unrelated.join("python.exe");
         fs::write(&unrelated_exe, b"test").unwrap();
         assert!(portable_runtime_root(&unrelated_exe, "Python").is_err());
+    }
+
+    #[test]
+    fn external_runtime_manual_action_never_deletes_portable_go() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path().join("go1.22");
+        let bin = root.join("bin");
+        fs::create_dir_all(&bin).unwrap();
+        let executable = bin.join("go.exe");
+        fs::write(&executable, b"test").unwrap();
+        let message = external_runtime_manual_action_message(&executable, "Go");
+        assert!(message.contains("不会删除外部目录"));
+        assert!(root.exists());
+    }
+
+    #[test]
+    fn external_runtime_package_manager_paths_are_manual_only() {
+        let scoop_python = PathBuf::from(r"C:\Users\Alice\scoop\apps\python\current\python.exe");
+        let message = external_runtime_manual_action_message(&scoop_python, "Python");
+        assert!(message.contains("不会调用包管理器卸载"));
+        assert!(message.contains("scoop uninstall python"));
     }
 
     #[test]
