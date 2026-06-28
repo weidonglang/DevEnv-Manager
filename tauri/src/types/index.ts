@@ -897,10 +897,18 @@ export type MaintenanceOverview = {
 
 
 export type LargeFileItem = {
+  fileName: string;
   path: string;
+  directory: string;
+  extension: string;
   size: number;
   modifiedAt?: string;
   fileType: string;
+  sourceCategory: string;
+  exists: boolean;
+  canOpen: boolean;
+  canLocate: boolean;
+  openStatus: string;
   suggestion: string;
   risk: string;
 };
@@ -925,7 +933,15 @@ export type FolderUsageReport = {
   name: string;
   path: string;
   totalBytes: number;
-  categories: Array<{ name: string; path: string; size: number; category: string; suggestion: string }>;
+  categories: Array<{
+    name: string;
+    path: string;
+    size: number;
+    category: string;
+    suggestion: string;
+    details: LargeFileItem[];
+  }>;
+  topFiles: LargeFileItem[];
   suggestions: string[];
   warnings: string[];
 };

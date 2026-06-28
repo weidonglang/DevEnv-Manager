@@ -21,6 +21,55 @@ fn normalized(path: &Path) -> String {
         .to_ascii_lowercase()
 }
 
+fn large_file_item(path: &Path, size: u64, modified_at: Option<String>, file_type: String) -> LargeFileItem {
+    let directory = path
+        .parent()
+        .map(|value| value.to_string_lossy().to_string())
+        .unwrap_or_default();
+    let exists = path.exists();
+    let can_locate = !directory.is_empty() && Path::new(&directory).exists();
+    LargeFileItem {
+        file_name: path
+            .file_name()
+            .and_then(|value| value.to_str())
+            .unwrap_or("")
+            .to_string(),
+        path: path.to_string_lossy().to_string(),
+        directory,
+        extension: path
+            .extension()
+            .and_then(|value| value.to_str())
+            .unwrap_or("")
+            .to_string(),
+        size,
+        modified_at,
+        source_category: format!("大文件 / {file_type}"),
+        exists,
+        can_open: exists,
+        can_locate,
+        open_status: if exists {
+            "文件存在，可在资源管理器中定位".to_string()
+        } else if can_locate {
+            "文件已移动或删除，请重新扫描".to_string()
+        } else {
+            "所在目录不可访问，请检查权限、云盘同步或重新扫描".to_string()
+        },
+        suggestion: match file_type.as_str() {
+            "安装包" | "压缩包" | "ISO/磁盘镜像" => "确认不再需要后可加入归档计划",
+            "视频" => "建议移动到空间充足的数据盘或媒体库",
+            _ => "先打开所在目录确认用途；本阶段不删除",
+        }
+        .to_string(),
+        risk: if size >= 5 * 1024 * 1024 * 1024 {
+            "high"
+        } else {
+            "medium"
+        }
+        .to_string(),
+        file_type,
+    }
+}
+
 pub(crate) fn validate_analysis_root(root: &Path) -> Result<(), String> {
     if !root.is_dir() {
         return Err("扫描目录不存在".to_string());
@@ -89,26 +138,12 @@ where
         if metadata.is_file() {
             if metadata.len() >= min_bytes {
                 let file_type = classify_file_type(&path).to_string();
-                result.push(LargeFileItem {
-                    path: path.to_string_lossy().to_string(),
-                    size: metadata.len(),
-                    modified_at: metadata.modified().ok().and_then(system_time_string),
-                    suggestion: match file_type.as_str() {
-                        "安装包" | "压缩包" | "ISO/磁盘镜像" => {
-                            "确认不再需要后可在 Phase 4 加入归档计划"
-                        }
-                        "视频" => "建议移动到空间充足的数据盘或媒体库",
-                        _ => "先打开所在目录确认用途；本阶段不删除",
-                    }
-                    .to_string(),
-                    risk: if metadata.len() >= 5 * 1024 * 1024 * 1024 {
-                        "high"
-                    } else {
-                        "medium"
-                    }
-                    .to_string(),
+                result.push(large_file_item(
+                    &path,
+                    metadata.len(),
+                    metadata.modified().ok().and_then(system_time_string),
                     file_type,
-                });
+                ));
             }
         } else if let Ok(entries) = fs::read_dir(&path) {
             stack.extend(entries.flatten().map(|entry| entry.path()));

@@ -1511,6 +1511,11 @@ async fn create_java_stabilize_plan(jdk_path: String) -> Result<env_core::EnvRep
 }
 
 #[tauri::command]
+async fn verify_external_jdk(jdk_path: String) -> Result<Vec<ValidationCheck>, String> {
+    run_blocking(move || verify_external_jdk_blocking(jdk_path)).await?
+}
+
+#[tauri::command]
 async fn apply_java_stabilize_plan(
     plan: env_core::EnvRepairPlan,
 ) -> Result<env_core::EnvRepairResult, String> {
@@ -1524,6 +1529,79 @@ async fn verify_java_toolchain() -> Result<env_core::JavaVerificationReport, Str
         Ok(env_core::verify_java_toolchain(&paths.root))
     })
     .await?
+}
+
+fn verify_external_jdk_blocking(jdk_path: String) -> Result<Vec<ValidationCheck>, String> {
+    let root = PathBuf::from(jdk_path.trim());
+    if jdk_path.trim().is_empty() {
+        return Err("请先选择 JDK 根目录".to_string());
+    }
+    if root
+        .file_name()
+        .and_then(|value| value.to_str())
+        .is_some_and(|name| name.eq_ignore_ascii_case("bin"))
+    {
+        return Err("请填写 JDK 根目录，不能填写 bin 目录".to_string());
+    }
+    if !root.is_dir() {
+        return Err("JDK 根目录不存在".to_string());
+    }
+    let exe_suffix = if cfg!(windows) { ".exe" } else { "" };
+    Ok(vec![
+        verify_jdk_tool(
+            "java-version",
+            "java -version",
+            &root.join("bin").join(format!("java{exe_suffix}")),
+            &["-version"],
+        ),
+        verify_jdk_tool(
+            "javac-version",
+            "javac -version",
+            &root.join("bin").join(format!("javac{exe_suffix}")),
+            &["-version"],
+        ),
+        verify_jdk_tool(
+            "jar-version",
+            "jar --version",
+            &root.join("bin").join(format!("jar{exe_suffix}")),
+            &["--version"],
+        ),
+    ])
+}
+
+fn verify_jdk_tool(id: &str, title: &str, executable: &Path, args: &[&str]) -> ValidationCheck {
+    if !executable.is_file() {
+        return ValidationCheck {
+            id: id.to_string(),
+            title: title.to_string(),
+            success: false,
+            required: true,
+            detail: format!("未找到 {}", display_path(executable)),
+            stage: "external-jdk".to_string(),
+        };
+    }
+    match hidden_command(executable).args(args).output() {
+        Ok(output) => {
+            let detail = first_meaningful_output_line(&command_text(&output.stdout, &output.stderr))
+                .unwrap_or_else(|| "命令没有返回版本文本".to_string());
+            ValidationCheck {
+                id: id.to_string(),
+                title: title.to_string(),
+                success: output.status.success(),
+                required: true,
+                detail,
+                stage: "external-jdk".to_string(),
+            }
+        }
+        Err(error) => ValidationCheck {
+            id: id.to_string(),
+            title: title.to_string(),
+            success: false,
+            required: true,
+            detail: format!("执行失败：{error}"),
+            stage: "external-jdk".to_string(),
+        },
+    }
 }
 
 #[tauri::command]
@@ -3991,7 +4069,7 @@ fn add_archive_plan_item(path: String, source: String) -> Result<OperationResult
         size: metadata.len(),
         source: source.trim().chars().take(80).collect(),
         added_at: current_timestamp(),
-        suggestion: "Phase 4 执行移动前将重新校验路径、目标空间并生成回滚计划".to_string(),
+        suggestion: "执行移动前将重新校验路径、目标空间并生成回滚计划".to_string(),
     });
     save_json(&archive_plan_file(&paths), &plan)?;
     Ok(OperationResult {
@@ -8213,6 +8291,7 @@ pub fn run() {
             rollback_env_repair,
             export_env_reliability_report,
             create_java_stabilize_plan,
+            verify_external_jdk,
             apply_java_stabilize_plan,
             verify_java_toolchain,
             verify_nacos_java_environment,
@@ -10892,6 +10971,9 @@ fn analyze_port_signature(
                 "wechat",
                 "weixin",
                 "wxwork",
+                "bilibili",
+                "哔哩哔哩",
+                "uu",
                 "chrome.exe",
                 "msedge.exe",
                 "firefox.exe",
@@ -10905,8 +10987,25 @@ fn analyze_port_signature(
                 "code.exe",
                 "wechat.exe",
                 "webview",
+                "mumu",
+                "nemu",
+                "armourycrate",
+                "autodesk",
             ],
             "桌面应用",
+        ),
+        (
+            "系统/驱动服务",
+            &[
+                "system",
+                "svchost.exe",
+                "vmware-authd.exe",
+                "nvcontainer.exe",
+                "nvidia overlay.exe",
+                "avp.exe",
+                "kaspersky",
+            ],
+            "系统/驱动服务",
         ),
     ];
     let is_generic_signature = |label: &str| {

@@ -259,11 +259,17 @@ svg {
 .folder-usage-card {
   padding: 12px;
   border: 1px solid #d7dfe5;
-  border-radius: 10px;
+  border-radius: 8px;
   background: #ffffff;
 }
 
-.folder-usage-card > div:first-child {
+.folder-usage-card summary {
+  cursor: pointer;
+  list-style-position: outside;
+}
+
+.folder-usage-card > div:first-child,
+.folder-usage-card summary > div:first-child {
   display: flex;
   justify-content: space-between;
   gap: 12px;
@@ -273,6 +279,64 @@ svg {
   display: block;
   margin-top: 7px;
   color: #65727c;
+}
+
+.nested-panel {
+  margin-top: 12px;
+  border-radius: 8px;
+}
+
+.compact-file-list {
+  gap: 8px;
+}
+
+.file-detail-card {
+  overflow: hidden;
+}
+
+.file-detail-card strong,
+.file-detail-card small {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.file-detail-card.missing-file {
+  border-color: #f0c4bc;
+  background: #fffafa;
+}
+
+.file-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.file-facts span {
+  padding: 3px 7px;
+  border: 1px solid #dbe4ea;
+  border-radius: 999px;
+  background: #f6f8fa;
+  color: #50606d;
+  font-size: 12px;
+}
+
+.inline-archive-action {
+  margin: -6px 0 10px;
+}
+
+.copyable-kv {
+  display: grid;
+  grid-template-columns: minmax(72px, auto) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.copyable-kv strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .maintenance-panel .form-row > span {
@@ -333,6 +397,9 @@ svg {
   right: 24px;
   bottom: 24px;
   z-index: 1000;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
   width: min(430px, calc(100vw - 48px));
   margin: 0;
   padding: 10px 12px;
@@ -343,10 +410,62 @@ svg {
   box-shadow: 0 10px 32px rgba(20, 43, 35, 0.18);
 }
 
+.toast[hidden] {
+  display: none;
+}
+
+.toast-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.toast-message {
+  display: block;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+
+.toast details summary {
+  cursor: pointer;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+
+.toast pre {
+  max-height: 180px;
+  margin: 8px 0 0;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.toast-close,
+.fatal-error-heading > button {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  padding: 0;
+  border-radius: 50%;
+  border-color: transparent;
+  background: transparent;
+  color: inherit;
+}
+
+.toast-close:hover,
+.fatal-error-heading > button:hover {
+  background: rgba(15, 23, 42, 0.08);
+}
+
 .toast.error {
   border-color: #f0c4bc;
   background: #fff0ed;
   color: #9a321f;
+}
+
+.toast.warning {
+  border-color: #facc15;
+  background: #fef9c3;
+  color: #854d0e;
 }
 
 .fatal-error {
@@ -368,6 +487,13 @@ svg {
 
 .fatal-error-card {
   padding: 18px;
+}
+
+.fatal-error-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
 }
 
 .fatal-error-card h2,
@@ -399,6 +525,59 @@ svg {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+}
+
+.confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.58);
+}
+
+.confirm-dialog {
+  display: grid;
+  gap: 14px;
+  width: min(560px, calc(100vw - 48px));
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  padding: 20px;
+  border: 1px solid #d8e2ea;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #17212b;
+  box-shadow: 0 22px 64px rgba(15, 23, 42, 0.24);
+}
+
+.confirm-dialog h2,
+.confirm-dialog p {
+  margin: 0;
+}
+
+.confirm-dialog p,
+.confirm-dialog li,
+.confirm-dialog small {
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.confirm-required {
+  display: grid;
+  gap: 6px;
+}
+
+.confirm-required input.invalid {
+  border-color: #dc2626;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
+}
+
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .safety-gate {
@@ -825,11 +1004,17 @@ th {
   min-height: 20px;
   margin-top: 4px;
   padding: 0 7px;
+  border: 1px solid #f3c36c;
   border-radius: 999px;
   background: #fff0d5;
   color: #8a5a14;
+  cursor: pointer;
   font-size: 11px;
   font-weight: 700;
+}
+
+.conflict-badge:hover {
+  background: #ffe2a8;
 }
 
 .pill {
