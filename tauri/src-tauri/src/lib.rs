@@ -30,6 +30,7 @@ use std::os::windows::process::CommandExt;
 use winreg::{enums::*, RegKey};
 
 const APP_NAME: &str = "DevEnvManager";
+const SAFETY_DISCLAIMER_VERSION: u32 = 1;
 static SAVE_JSON_COUNTER: AtomicU64 = AtomicU64::new(0);
 const MANAGED_PATHS: [&str; 8] = [
     r"%DEVENV_HOME%\current\jdk\bin",
@@ -98,6 +99,10 @@ struct Settings {
     port_process_exclusions: Vec<String>,
     #[serde(default)]
     safety_disclaimer_accepted: bool,
+    #[serde(default)]
+    safety_disclaimer_version: u32,
+    #[serde(default)]
+    safety_disclaimer_accepted_at: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -1444,10 +1449,39 @@ fn get_feature_risk(feature_id: String) -> Option<safety::FeatureRiskInfo> {
 fn accept_safety_disclaimer() -> Result<OperationResult, String> {
     let mut settings = load_settings()?;
     settings.safety_disclaimer_accepted = true;
+    settings.safety_disclaimer_version = SAFETY_DISCLAIMER_VERSION;
+    settings.safety_disclaimer_accepted_at = Some(current_timestamp());
     save_json(&settings_file(), &settings)?;
     Ok(OperationResult {
         success: true,
         message: "已记录安全说明已读状态；不会上传任何数据。".to_string(),
+    })
+}
+
+#[tauri::command]
+fn reset_ui_config() -> Result<OperationResult, String> {
+    let mut settings = load_settings()?;
+    settings.theme = "system".to_string();
+    settings.last_page = "home".to_string();
+    settings.port_process_exclusions.clear();
+    save_json(&settings_file(), &settings)?;
+    Ok(OperationResult {
+        success: true,
+        message: "已重置 UI 状态；根目录、版本记录和安全声明状态已保留。".to_string(),
+    })
+}
+
+#[tauri::command]
+fn open_app_config_dir() -> Result<OperationResult, String> {
+    let dir = app_config_dir();
+    fs::create_dir_all(&dir).map_err(|err| format!("创建配置目录失败：{err}"))?;
+    hidden_command("explorer.exe")
+        .arg(&dir)
+        .spawn()
+        .map_err(|error| format!("打开配置目录失败：{error}"))?;
+    Ok(OperationResult {
+        success: true,
+        message: format!("已打开配置目录：{}", display_path(dir)),
     })
 }
 
@@ -7902,6 +7936,8 @@ pub fn run() {
             get_feature_risk,
             create_confirmation_token,
             accept_safety_disclaimer,
+            reset_ui_config,
+            open_app_config_dir,
             create_move_plan,
             execute_move_plan,
             list_rollback_records,
@@ -8491,6 +8527,8 @@ fn default_settings() -> Settings {
                 .to_string(),
         port_process_exclusions: Vec::new(),
         safety_disclaimer_accepted: false,
+        safety_disclaimer_version: 0,
+        safety_disclaimer_accepted_at: None,
     }
 }
 

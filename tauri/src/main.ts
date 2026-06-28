@@ -9,6 +9,7 @@ import {
   Database,
   Download,
   FileText,
+  FolderOpen,
   FolderSearch,
   Gauge,
   Hammer,
@@ -17,6 +18,7 @@ import {
   PackageCheck,
   Play,
   RefreshCw,
+  RotateCcw,
   Route,
   Search,
   Shield,
@@ -53,6 +55,8 @@ type ConfigView = {
     downloadTimeoutSeconds: number;
     theme: string;
     safetyDisclaimerAccepted: boolean;
+    safetyDisclaimerVersion: number;
+    safetyDisclaimerAcceptedAt?: string | null;
   };
   installed: {
     jdks: ManagedRuntime[];
@@ -289,7 +293,7 @@ type PortHistorySummary = {
   lastSeen: number;
 };
 
-type PortSortKey = "protocol" | "localAddress" | "localPort" | "state" | "pid" | "processName" | "risk";
+type PortSortKey = "localPort" | "state" | "identity" | "processName" | "pid" | "confidence" | "riskLevel";
 type SortDirection = "asc" | "desc";
 
 type ProjectHealth = {
@@ -891,6 +895,7 @@ type MaintenanceOverview = {
 };
 
 const app = document.querySelector<HTMLDivElement>("#app");
+const SAFETY_DISCLAIMER_VERSION = 1;
 
 if (!app) {
   throw new Error("Missing app root");
@@ -933,6 +938,8 @@ app.innerHTML = `
         <button id="refresh-all" class="primary">${icon(RefreshCw)}<span>刷新</span></button>
       </header>
       <div id="toast" class="toast" hidden></div>
+      <div id="fatal-error" class="fatal-error" hidden></div>
+      <div id="safety-gate" class="safety-gate" hidden></div>
       <div id="task-progress" class="task-progress" hidden>
         <div><strong id="task-progress-title">任务</strong><span id="task-progress-message">等待中</span></div>
         <div class="progress-track"><span id="task-progress-bar"></span></div>
@@ -1037,56 +1044,58 @@ app.innerHTML = `
             <div class="panel-title">${icon(Network)}<h2>端口管理</h2></div>
             <button id="scan-ports">${icon(RefreshCw)}<span>扫描</span></button>
           </div>
+          <div id="port-summary" class="port-summary"></div>
           <div class="port-tools">
-            <div class="search-box">${icon(Search)}<input id="port-search" placeholder="输入 8080、java、web、mysql、pid、进程名..." /></div>
+            <div class="search-box">${icon(Search)}<input id="port-search" placeholder="搜索端口、进程、PID、服务名或识别结果" /></div>
             <label class="toggle-row port-monitor-toggle" title="每 5 秒检查新出现的常用监听端口">
               <input id="port-monitor-enabled" type="checkbox" />
               <span>占用提醒</span>
             </label>
             <div id="port-quick-filters" class="chip-row port-filter-row">
               <button class="filter-chip active" data-port-filter="all">全部</button>
-              <button class="filter-chip" data-port-filter="spring">Spring</button>
-              <button class="filter-chip" data-port-filter="tomcat">Tomcat</button>
+              <button class="filter-chip" data-port-filter="listening">监听中</button>
+              <button class="filter-chip" data-port-filter="development">开发服务</button>
               <button class="filter-chip" data-port-filter="frontend">前端</button>
+              <button class="filter-chip" data-port-filter="backend">后端</button>
+              <button class="filter-chip" data-port-filter="python">Python/AI</button>
               <button class="filter-chip" data-port-filter="database">数据库</button>
-              <button class="filter-chip" data-port-filter="sensitive">敏感</button>
+              <button class="filter-chip" data-port-filter="middleware">中间件</button>
+              <button class="filter-chip" data-port-filter="desktop">桌面应用</button>
+              <button class="filter-chip" data-port-filter="sensitive">系统/高风险</button>
+              <button class="filter-chip" data-port-filter="low-confidence">低置信度</button>
             </div>
           </div>
-          <div class="table-wrap">
-            <table>
-              <colgroup>
-                <col class="col-protocol" />
-                <col class="col-address" />
-                <col class="col-port" />
-                <col class="col-state" />
-                <col class="col-pid" />
-                <col class="col-process" />
-                <col class="col-risk" />
-                <col class="col-action" />
-              </colgroup>
-              <thead>
-                <tr>
-                  <th><button class="sort-head" data-sort="protocol">协议</button></th>
-                  <th><button class="sort-head" data-sort="localAddress">本地地址</button></th>
-                  <th><button class="sort-head" data-sort="localPort">端口</button></th>
-                  <th><button class="sort-head" data-sort="state">状态</button></th>
-                  <th><button class="sort-head" data-sort="pid">PID</button></th>
-                  <th><button class="sort-head" data-sort="processName">进程</button></th>
-                  <th><button class="sort-head" data-sort="risk">风险</button></th>
-                  <th>操作</th>
-                </tr>
-              </thead>
-              <tbody id="ports-body"></tbody>
-            </table>
+          <div class="port-workbench">
+            <div class="table-wrap">
+              <table class="ports-table">
+                <colgroup>
+                  <col class="col-port" />
+                  <col class="col-state" />
+                  <col class="col-identity" />
+                  <col class="col-process" />
+                  <col class="col-pid" />
+                  <col class="col-confidence" />
+                  <col class="col-risk" />
+                  <col class="col-action" />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th><button class="sort-head" data-sort="localPort">端口</button></th>
+                    <th><button class="sort-head" data-sort="state">状态</button></th>
+                    <th><button class="sort-head" data-sort="identity">识别结果</button></th>
+                    <th><button class="sort-head" data-sort="processName">进程</button></th>
+                    <th><button class="sort-head" data-sort="pid">PID</button></th>
+                    <th><button class="sort-head" data-sort="confidence">置信度</button></th>
+                    <th><button class="sort-head" data-sort="riskLevel">风险</button></th>
+                    <th>更多</th>
+                  </tr>
+                </thead>
+                <tbody id="ports-body"></tbody>
+              </table>
+            </div>
+            <aside id="port-detail" class="port-detail"><div class="empty">点击端口行查看详情</div></aside>
           </div>
           <div id="ports-pagination"></div>
-          <div class="grid two port-insights">
-            <section id="port-detail" class="port-detail"><div class="empty">点击详情按钮查看端口解释</div></section>
-            <section>
-              <div class="panel-title compact-title">${icon(Activity)}<h2>最近 7 天</h2></div>
-              <div id="port-history" class="runtime-list"><div class="empty">还没有端口历史</div></div>
-            </section>
-          </div>
         </section>
       </section>
 
@@ -1746,6 +1755,8 @@ const state = {
   expansionResult: null as ExpansionResult | null,
   duplicateGroups: [] as DuplicateGroup[],
   appUsage: null as AppUsageReport | null,
+  safeMode: false,
+  fatalError: "",
 };
 
 type LargeFileItem = {
@@ -2190,6 +2201,7 @@ function renderManagedGos() {
 function renderPorts() {
   const visible = sortedPorts(filteredPorts(state.ports));
   setText("metric-ports", visible.length);
+  renderPortSummary();
   const body = document.querySelector<HTMLElement>("#ports-body");
   if (!body) return;
   const pageSize = 10;
@@ -2200,17 +2212,18 @@ function renderPorts() {
     .slice((page - 1) * pageSize, page * pageSize)
     .map(
       (record) => {
-        const hint = portHint(record);
+        const conflict = record.conflictCount || record.conflictEvidence?.length || 0;
+        const selected = state.selectedPort?.pid === record.pid && state.selectedPort.localPort === record.localPort;
         return `
-        <tr>
-          <td>${escapeHtml(record.protocol)}</td>
-          <td>${escapeHtml(record.localAddress)}</td>
-          <td><strong>${record.localPort}</strong>${hint ? `<span class="port-hint">${escapeHtml(hint)}</span>` : ""}</td>
+        <tr class="${selected ? "selected" : ""}">
+          <td><strong>${record.localPort}</strong><span class="port-hint">${escapeHtml(record.protocol)} · ${escapeHtml(record.localAddress)}</span></td>
           <td>${escapeHtml(record.state)}</td>
+          <td><strong>${escapeHtml(record.identity || record.commonUsage || "Unknown")}</strong>${conflict ? `<span class="conflict-badge" title="${escapeHtml((record.conflictEvidence || []).join("；") || "存在冲突证据")}">${conflict}冲突</span>` : ""}</td>
+          <td>${escapeHtml(record.processName || "未读取")}</td>
           <td>${record.pid}</td>
-          <td>${escapeHtml(record.processName)}</td>
-          <td><span class="pill ${record.risk === "普通" ? "ok" : "warn"}">${escapeHtml(record.risk)}</span></td>
-          <td><div class="table-actions"><button class="icon-action" data-action="port-details" data-pid="${record.pid}" data-port="${record.localPort}" title="查看详情">${icon(Search)}</button><button class="icon-action" data-action="kill-port" data-pid="${record.pid}" title="结束进程">${icon(Trash2)}</button></div></td>
+          <td><span class="pill ${record.confidence >= 70 ? "ok" : record.confidence >= 40 ? "warn" : "muted"}">${confidenceLabel(record.confidence)}</span><small>${record.evidenceCount || record.evidence?.length || 0}证据</small></td>
+          <td><span class="risk-chip risk-${portRiskClass(record.riskLevel || record.risk)}">${escapeHtml(record.riskLevel || record.risk)}</span></td>
+          <td><button class="icon-action" data-action="port-details" data-pid="${record.pid}" data-port="${record.localPort}" title="详情">${icon(Search)}</button></td>
         </tr>
       `;
       },
@@ -2223,29 +2236,59 @@ function renderPorts() {
   renderPortHistory();
 }
 
+function renderPortSummary() {
+  const element = document.querySelector<HTMLElement>("#port-summary");
+  if (!element) return;
+  const records = state.ports;
+  const count = (predicate: (record: PortRecord) => boolean) => records.filter(predicate).length;
+  const items = [
+    ["listening", "监听端口", count((record) => record.state.toLowerCase() === "listening")],
+    ["development", "开发服务", count((record) => ["development", "frontend", "backend", "python"].includes(portCategory(record)))],
+    ["database", "数据库/中间件", count((record) => ["database", "middleware"].includes(portCategory(record)))],
+    ["desktop", "桌面应用", count((record) => portCategory(record) === "desktop")],
+    ["sensitive", "高风险/系统", count((record) => ["high", "critical", "blocked", "阻止", "高风险"].includes((record.riskLevel || record.risk).toLowerCase()))],
+    ["low-confidence", "低置信度", count((record) => record.confidence < 40 || (record.conflictCount || 0) > 0)],
+  ];
+  element.innerHTML = items
+    .map(([filter, label, value]) => `<button class="port-summary-card" data-port-filter="${filter}"><strong>${value}</strong><span>${label}</span></button>`)
+    .join("");
+}
+
 function renderPortDetails() {
   const element = document.querySelector<HTMLElement>("#port-detail");
   if (!element) return;
   const record = state.selectedPort;
   if (!record) {
-    element.innerHTML = `<div class="empty">点击详情按钮查看端口解释</div>`;
+    element.innerHTML = `<div class="empty">点击端口行查看详情</div>`;
     return;
   }
+  const history = state.portHistory
+    .filter((item) => item.port === record.localPort)
+    .slice(0, 6);
+  const isHttpLike = /\b(http|web|vite|spring|tomcat|next|nuxt|flask|django|fastapi|uvicorn)\b/i.test(`${record.identity} ${record.commonUsage}`);
+  const isDatabase = portCategory(record) === "database";
   element.innerHTML = `
-    <div class="panel-title compact-title">${icon(Network)}<h2>${record.localPort} · ${escapeHtml(record.commonUsage)}</h2></div>
-    <p class="port-explanation">${escapeHtml(record.explanation)}</p>
+    <div class="panel-title compact-title">${icon(Network)}<h2>${record.localPort} · ${escapeHtml(record.identity || record.commonUsage || "Unknown")}</h2></div>
+    <p class="port-explanation">${escapeHtml(record.recommendation || record.explanation)}</p>
     <div class="kv-list port-detail-kv">
-      <div><span>进程</span><strong>${escapeHtml(record.processName)} / PID ${record.pid}</strong></div>
+      <div><span>协议/地址</span><strong>${escapeHtml(record.protocol)} · ${escapeHtml(record.localAddress)} · ${escapeHtml(record.state)}</strong></div>
+      <div><span>进程</span><strong>${escapeHtml(record.processName || "未读取")} / PID ${record.pid}</strong></div>
       <div><span>进程路径</span><strong>${escapeHtml(record.processPath || "未读取")}</strong></div>
       <div><span>启动命令</span><strong>${escapeHtml(record.commandLine || "未读取")}</strong></div>
       <div><span>父进程</span><strong>${escapeHtml(record.parentProcessName || "未读取")}${record.parentPid ? ` / PID ${record.parentPid}` : ""}</strong></div>
       <div><span>Windows 服务</span><strong>${escapeHtml(record.serviceNames.join("、") || "未识别")}</strong></div>
-      <div><span>风险</span><strong>${escapeHtml(record.risk)}</strong></div>
+      <div><span>置信度</span><strong>${confidenceLabel(record.confidence)} · ${record.evidenceCount || record.evidence?.length || 0} 条证据</strong></div>
+      <div><span>风险</span><strong>${escapeHtml(record.riskLevel || record.risk)}</strong></div>
     </div>
+    <details open><summary>识别证据</summary><ul>${(record.evidence || []).map((item) => `<li>${escapeHtml(item)}</li>`).join("") || "<li>证据不足，不能只凭端口号判断服务类型。</li>"}</ul></details>
+    <details ${record.conflictEvidence?.length ? "open" : ""}><summary>冲突证据</summary><ul>${(record.conflictEvidence || []).map((item) => `<li>${escapeHtml(item)}</li>`).join("") || "<li>未发现明显冲突证据。</li>"}</ul></details>
+    <details><summary>最近 7 天历史</summary>${history.length ? `<ul>${history.map((item) => `<li>${escapeHtml(item.processName)} · ${item.observations} 次 · ${new Date(item.lastSeen * 1000).toLocaleString("zh-CN")}</li>`).join("")}</ul>` : "<p>还没有该端口历史。</p>"}</details>
     <div class="toolbar compact port-detail-actions">
       <button data-action="copy-text" data-copy="${escapeHtml(record.processPath)}">${icon(Clipboard)}<span>复制路径</span></button>
       ${record.processPath ? `<button data-action="open-process-location" data-pid="${record.pid}">${icon(FolderSearch)}<span>打开位置</span></button>` : ""}
-      <button data-action="copy-text" data-copy="taskkill /PID ${record.pid} /T">${icon(Clipboard)}<span>复制命令</span></button>
+      <button data-action="copy-text" data-copy="${escapeHtml(portDiagnosticSummary(record))}">${icon(Clipboard)}<span>复制摘要</span></button>
+      ${isHttpLike ? `<button data-action="copy-text" data-copy="curl -I http://127.0.0.1:${record.localPort}">${icon(Clipboard)}<span>复制 curl</span></button>` : ""}
+      ${isDatabase ? `<button data-action="copy-text" data-copy="${escapeHtml(databaseCommandHint(record))}">${icon(Database)}<span>复制连接命令</span></button>` : ""}
       <button class="danger-button" data-action="kill-port" data-pid="${record.pid}">${icon(Trash2)}<span>安全结束</span></button>
     </div>
   `;
@@ -2679,6 +2722,9 @@ async function runPlatformAction(action: string, value: string | null = null) {
 function filteredPorts(records: PortRecord[]) {
   const terms = expandPortQuery(portState.query);
   return records.filter((record) => {
+    const category = portCategory(record);
+    const riskClass = portRiskClass(record.riskLevel || record.risk);
+    const conflictCount = record.conflictCount || record.conflictEvidence?.length || 0;
     const hint = portHint(record).toLowerCase();
     const text = [
       record.protocol,
@@ -2694,20 +2740,45 @@ function filteredPorts(records: PortRecord[]) {
       record.commonUsage,
       record.explanation,
       record.risk,
+      record.identity,
+      record.riskLevel,
+      record.recommendation,
+      record.evidence.join(" "),
+      record.conflictEvidence.join(" "),
+      category,
       hint,
     ]
       .join(" ")
       .toLowerCase();
     const queryMatch = terms.length === 0 || terms.every((term) => text.includes(term));
-    const quickMatch =
-      portState.quickFilter === "all" ||
-      (portState.quickFilter === "sensitive" && record.risk !== "普通") ||
-      commonPorts.some(
-        (item) =>
-          item.key === portState.quickFilter &&
-          (item.ports.includes(record.localPort) ||
-            item.keywords.some((keyword) => record.processName.toLowerCase().includes(keyword))),
-      );
+    const quickMatch = (() => {
+      switch (portState.quickFilter) {
+        case "all":
+          return true;
+        case "listening":
+          return record.state.toLowerCase() === "listening";
+        case "development":
+          return ["development", "frontend", "backend", "python"].includes(category);
+        case "frontend":
+        case "backend":
+        case "python":
+        case "database":
+        case "middleware":
+        case "desktop":
+          return category === portState.quickFilter;
+        case "sensitive":
+          return ["high", "critical"].includes(riskClass) || record.risk !== "普通";
+        case "low-confidence":
+          return record.confidence < 40 || conflictCount > 0;
+        default:
+          return commonPorts.some(
+            (item) =>
+              item.key === portState.quickFilter &&
+              (item.ports.includes(record.localPort) ||
+                item.keywords.some((keyword) => record.processName.toLowerCase().includes(keyword))),
+          );
+      }
+    })();
     return queryMatch && quickMatch;
   });
 }
@@ -2733,10 +2804,74 @@ function sortedPorts(records: PortRecord[]) {
   });
 }
 
+function confidenceLabel(value: number) {
+  if (value >= 70) return `高 ${value}%`;
+  if (value >= 40) return `中 ${value}%`;
+  if (value > 0) return `低 ${value}%`;
+  return "未知";
+}
+
+function portRiskClass(value: string) {
+  const risk = (value || "").toLowerCase();
+  if (risk.includes("critical") || risk.includes("blocked") || risk.includes("阻止") || risk.includes("严重")) return "critical";
+  if (risk.includes("high") || risk.includes("高")) return "high";
+  if (risk.includes("medium") || risk.includes("warn") || risk.includes("谨慎") || risk.includes("中")) return "medium";
+  if (risk.includes("low") || risk.includes("普通") || risk.includes("低")) return "low";
+  return "medium";
+}
+
+function portCategory(record: PortRecord) {
+  const text = [
+    record.identity,
+    record.commonUsage,
+    record.processName,
+    record.processPath,
+    record.commandLine,
+    record.parentProcessName,
+    record.serviceNames.join(" "),
+    record.evidence.join(" "),
+  ]
+    .join(" ")
+    .toLowerCase();
+  if (/\b(mysql|mariadb|postgres|postgresql|psql|redis|mongodb|mongod|mongo|sqlite|sql server|mssql|oracle)\b/.test(text)) return "database";
+  if (/\b(rabbitmq|kafka|zookeeper|nacos|consul|etcd|minio|elasticsearch|opensearch|memcached)\b/.test(text)) return "middleware";
+  if (/\b(electron|tauri|wails|cef|webview|qt|wpf|winforms|javaw)\b/.test(text)) return "desktop";
+  if (/\b(vite|webpack|next|nuxt|react|vue|angular|svelte|astro|storybook|frontend)\b/.test(text)) return "frontend";
+  if (/\b(python|py\.exe|python\.exe|uvicorn|gunicorn|flask|django|fastapi|jupyter|streamlit|gradio)\b/.test(text)) return "python";
+  if (/\b(java|node|deno|bun|spring|tomcat|jetty|express|nestjs|koa|gin|go\.exe|cargo|backend|api)\b/.test(text)) return "backend";
+  if (record.localPort >= 3000 && record.localPort <= 9999) return "development";
+  return "unknown";
+}
+
+function portDiagnosticSummary(record: PortRecord) {
+  const parts = [
+    `端口 ${record.localPort}/${record.protocol} ${record.state}`,
+    `进程 ${record.processName || "未读取"} PID ${record.pid}`,
+    `识别 ${record.identity || record.commonUsage || "Unknown"}，置信度 ${confidenceLabel(record.confidence)}`,
+    `风险 ${record.riskLevel || record.risk}`,
+  ];
+  if (record.processPath) parts.push(`路径 ${record.processPath}`);
+  if (record.commandLine) parts.push(`命令 ${record.commandLine}`);
+  if (record.evidence.length) parts.push(`证据 ${record.evidence.join("；")}`);
+  if (record.conflictEvidence.length) parts.push(`冲突 ${record.conflictEvidence.join("；")}`);
+  return parts.join("\n");
+}
+
+function databaseCommandHint(record: PortRecord) {
+  const text = `${record.identity} ${record.commonUsage} ${record.processName} ${record.commandLine}`.toLowerCase();
+  if (text.includes("redis")) return `redis-cli -h 127.0.0.1 -p ${record.localPort}`;
+  if (text.includes("postgres") || text.includes("psql")) return `psql -h 127.0.0.1 -p ${record.localPort} -U postgres`;
+  if (text.includes("mongo")) return `mongosh "mongodb://127.0.0.1:${record.localPort}"`;
+  if (text.includes("mysql") || text.includes("mariadb")) return `mysql -h 127.0.0.1 -P ${record.localPort} -u root -p`;
+  if (text.includes("mssql") || text.includes("sql server")) return `sqlcmd -S 127.0.0.1,${record.localPort} -E`;
+  return `连接 127.0.0.1:${record.localPort}`;
+}
+
 function portHint(record: PortRecord) {
   const exact = commonPorts.filter((item) => item.ports.includes(record.localPort)).map((item) => item.label);
   if (record.commonUsage && record.commonUsage !== "未识别的本地服务") exact.push(record.commonUsage);
-  if (record.risk !== "普通") exact.push(record.risk);
+  if (record.identity) exact.push(record.identity);
+  if ((record.riskLevel || record.risk) !== "普通") exact.push(record.riskLevel || record.risk);
   return [...new Set(exact)].join(" / ");
 }
 
@@ -2919,6 +3054,8 @@ async function refreshBase() {
   renderJavaEnvironment();
   renderAgentTraces();
   renderUpdate();
+  renderSafetyGate();
+  renderFatalError();
   renderMaintenanceOverview();
   renderMaintenanceScan();
   renderCleanupPlan();
@@ -3126,6 +3263,78 @@ function showToast(message: string, isError = false) {
   toast.textContent = message;
   toast.hidden = false;
   toast.classList.toggle("error", isError);
+}
+
+function errorToText(error: unknown) {
+  if (error instanceof Error) return `${error.name}: ${error.message}${error.stack ? `\n${error.stack}` : ""}`;
+  return String(error);
+}
+
+function safetyDisclaimerAccepted() {
+  const settings = state.config?.settings;
+  return Boolean(
+    settings?.safetyDisclaimerAccepted &&
+      (settings.safetyDisclaimerVersion || 0) >= SAFETY_DISCLAIMER_VERSION,
+  );
+}
+
+function renderSafetyGate() {
+  const gate = document.querySelector<HTMLElement>("#safety-gate");
+  if (!gate) return;
+  if (safetyDisclaimerAccepted()) {
+    gate.hidden = true;
+    gate.innerHTML = "";
+    document.body.classList.remove("modal-locked");
+    return;
+  }
+  document.body.classList.add("modal-locked");
+  gate.hidden = false;
+  gate.innerHTML = `
+    <section class="safety-gate-card" role="dialog" aria-modal="true" aria-labelledby="safety-gate-title">
+      <div>
+        <h2 id="safety-gate-title">使用前请阅读安全声明</h2>
+        <p>DevEnv Manager 会展示诊断证据，并在你确认后执行环境变量、进程、服务、文件或数据库相关操作。确认前主界面不可操作。</p>
+      </div>
+      <pre>${escapeHtml(state.safetyDisclaimer || "修改环境、结束进程、清理文件或修复数据库前，请确认对象、备份重要数据，并理解失败后的恢复方式。")}</pre>
+      <div class="safety-gate-actions">
+        <button data-action="copy-safety-disclaimer">${icon(Clipboard)}<span>复制声明</span></button>
+        <button id="accept-safety-disclaimer" class="primary">${icon(Shield)}<span>我已阅读并知晓风险</span></button>
+      </div>
+    </section>
+  `;
+}
+
+function renderFatalError() {
+  const element = document.querySelector<HTMLElement>("#fatal-error");
+  if (!element) return;
+  if (!state.safeMode && !state.fatalError) {
+    element.hidden = true;
+    element.innerHTML = "";
+    return;
+  }
+  element.hidden = false;
+  element.innerHTML = `
+    <section class="fatal-error-card">
+      <div>
+        <h2>已进入安全模式</h2>
+        <p>初始化或运行时出现错误。安全模式不会自动扫描、修复、清理、安装、停止服务或写入环境变量。</p>
+      </div>
+      <pre>${escapeHtml(state.fatalError || "未知错误")}</pre>
+      <div class="fatal-error-actions">
+        <button data-action="retry-app-init">${icon(RefreshCw)}<span>重试</span></button>
+        <button data-action="reset-ui-config">${icon(RotateCcw)}<span>重置 UI 配置</span></button>
+        <button data-action="open-app-config-dir">${icon(FolderOpen)}<span>打开配置目录</span></button>
+        <button data-action="copy-diagnostics">${icon(Clipboard)}<span>复制诊断信息</span></button>
+      </div>
+    </section>
+  `;
+}
+
+function enterSafeMode(error: unknown, context = "运行时错误") {
+  state.safeMode = true;
+  state.fatalError = `${context}\n${errorToText(error)}`;
+  renderFatalError();
+  showToast("已进入安全模式", true);
 }
 
 function renderProgress(progress: TaskProgress) {
@@ -3448,7 +3657,7 @@ async function processActionFingerprint(actionId: string, planId: string, riskLe
 function renderSafetyDisclaimer() {
   const slot = document.querySelector<HTMLElement>("#safety-disclaimer-slot");
   if (!slot) return;
-  const accepted = state.config?.settings.safetyDisclaimerAccepted;
+  const accepted = safetyDisclaimerAccepted();
   slot.innerHTML = accepted ? "" : disclaimerPanel(escapeHtml(state.safetyDisclaimer || "执行修改类操作前请先阅读风险说明，并备份重要数据。"));
 }
 
@@ -4652,16 +4861,25 @@ document.querySelector("#port-monitor-enabled")?.addEventListener("change", (eve
 
 document.querySelector("#port-search")?.addEventListener("input", (event) => {
   portState.query = (event.target as HTMLInputElement).value;
+  paginationState.set("ports", 1);
   renderPorts();
 });
 
-
-document.querySelector("#port-quick-filters")?.addEventListener("click", (event) => {
-  const button = (event.target as HTMLElement).closest<HTMLButtonElement>("button[data-port-filter]");
-  if (!button) return;
-  portState.quickFilter = button.dataset.portFilter || "all";
-  document.querySelectorAll(".filter-chip").forEach((item) => item.classList.toggle("active", item === button));
+function setPortQuickFilter(filter: string) {
+  portState.quickFilter = filter || "all";
+  document.querySelectorAll<HTMLElement>("[data-port-filter]").forEach((item) => {
+    item.classList.toggle("active", item.dataset.portFilter === portState.quickFilter);
+  });
+  paginationState.set("ports", 1);
   renderPorts();
+}
+
+document.querySelectorAll("#port-quick-filters, #port-summary").forEach((element) => {
+  element.addEventListener("click", (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>("button[data-port-filter]");
+    if (!button) return;
+    setPortQuickFilter(button.dataset.portFilter || "all");
+  });
 });
 
 document.querySelectorAll<HTMLButtonElement>(".sort-head").forEach((button) => {
@@ -4834,8 +5052,13 @@ document.addEventListener("click", (event) => {
   }
   if (button.id === "accept-safety-disclaimer") {
     void runOperation(() => invoke<OperationResult>("accept_safety_disclaimer"), "正在记录安全说明已读状态").then(async () => {
-      if (state.config) state.config.settings.safetyDisclaimerAccepted = true;
+      if (state.config) {
+        state.config.settings.safetyDisclaimerAccepted = true;
+        state.config.settings.safetyDisclaimerVersion = SAFETY_DISCLAIMER_VERSION;
+        state.config.settings.safetyDisclaimerAcceptedAt = new Date().toISOString();
+      }
       renderSafetyDisclaimer();
+      renderSafetyGate();
     });
     return;
   }
@@ -4941,6 +5164,39 @@ document.addEventListener("click", (event) => {
     void invoke<OperationResult>("open_apps_features")
       .then((result) => showToast(result.message))
       .catch((error) => showToast(error instanceof Error ? error.message : String(error), true));
+    return;
+  }
+  if (action === "open-app-config-dir") {
+    void invoke<OperationResult>("open_app_config_dir")
+      .then((result) => showToast(result.message))
+      .catch((error) => showToast(error instanceof Error ? error.message : String(error), true));
+    return;
+  }
+  if (action === "reset-ui-config") {
+    void invoke<OperationResult>("reset_ui_config")
+      .then((result) => {
+        showToast(result.message);
+        state.safeMode = false;
+        state.fatalError = "";
+        renderFatalError();
+        return refreshAll(true);
+      })
+      .catch((error) => showToast(error instanceof Error ? error.message : String(error), true));
+    return;
+  }
+  if (action === "retry-app-init") {
+    state.safeMode = false;
+    state.fatalError = "";
+    renderFatalError();
+    void refreshAll(true).catch((error) => enterSafeMode(error, "重试初始化失败"));
+    return;
+  }
+  if (action === "copy-diagnostics") {
+    void copyText(`DevEnv Manager safe mode\n${state.fatalError}`);
+    return;
+  }
+  if (action === "copy-safety-disclaimer") {
+    void copyText(state.safetyDisclaimer || "DevEnv Manager safety disclaimer");
     return;
   }
   if (action === "doctor-fix") {
@@ -5250,10 +5506,32 @@ document.addEventListener("click", (event) => {
   }
 });
 
+window.addEventListener("error", (event) => {
+  enterSafeMode(event.error || event.message, "前端运行时错误");
+});
+
+window.addEventListener("unhandledrejection", (event) => {
+  enterSafeMode(event.reason, "未处理的异步错误");
+});
+
+window.addEventListener(
+  "keydown",
+  (event) => {
+    const gate = document.querySelector<HTMLElement>("#safety-gate");
+    if (gate && !gate.hidden && event.key === "Escape") {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }
+  },
+  true,
+);
+
 void listen<TaskProgress>("task-progress", (event) => renderProgress(event.payload));
 void refreshAll(false).then(() => {
+  if (state.safeMode) return;
   window.setTimeout(() => void refreshRuntimeAndPorts(true), 350);
   window.setInterval(async () => {
+    if (state.safeMode) return;
     try {
       state.runtimes = await invoke<RuntimeInfo[]>("discover_runtimes");
       renderRuntimes();
@@ -5278,7 +5556,7 @@ void refreshAll(false).then(() => {
       }, 1500);
     }
   }
-});
+}).catch((error) => enterSafeMode(error, "初始化失败"));
 document.querySelector("#inspect-java")?.addEventListener("click", () => void inspectJava());
 document.querySelector("#inspect-agent-traces")?.addEventListener("click", async () => {
   const projectPath = document.querySelector<HTMLInputElement>("#project-path")?.value.trim() || null;
