@@ -1,10 +1,18 @@
 # DevEnv Manager
 
-[项目主页](https://github.com/weidonglang/DevEnv-Manager) · [Release 下载](https://github.com/weidonglang/DevEnv-Manager/releases) · [完整操作手册](docs/user-guide.md) · [环境可靠性设计](docs/env-reliability.md) · [安全说明](docs/safety-and-disclaimer.md) · [问题反馈](https://github.com/weidonglang/DevEnv-Manager/issues)
+[GitHub 主仓库](https://github.com/weidonglang/DevEnv-Manager) · [Gitee 国内镜像](https://gitee.com/weidonglang/DevEnv-Manager) · [GitHub Release](https://github.com/weidonglang/DevEnv-Manager/releases) · [Gitee Release](https://gitee.com/weidonglang/DevEnv-Manager/releases) · [完整操作手册](docs/user-guide.md) · [安全说明](docs/safety-and-disclaimer.md) · [问题反馈](https://github.com/weidonglang/DevEnv-Manager/issues)
 
-面向 Windows 的开发环境诊断器与安全操作面板。当前版本：**1.6.1 Stable**。
+面向 Windows 的开发环境诊断器与安全操作面板。当前版本：**1.7.0 Stable**。
 
-1.6.1 是 v1.6 实机验收后的收口版，继续完善页面指南模块化、发布链路和 issue 收尾状态；核心功能保持 v1.6 的高风险确认、桌面/下载分页明细、端口与服务安全保护和 MySQL 修复执行保护。
+1.7.0 新增文件打开方式管理器，并把更新链路升级为 GitHub + Gitee 双平台发布、多源 manifest fallback、镜像下载 fallback 和 SHA256 强校验。
+
+## 下载与镜像
+
+- GitHub 主仓库：https://github.com/weidonglang/DevEnv-Manager
+- Gitee 国内镜像：https://gitee.com/weidonglang/DevEnv-Manager
+- GitHub Release：https://github.com/weidonglang/DevEnv-Manager/releases
+- Gitee Release：https://gitee.com/weidonglang/DevEnv-Manager/releases
+- SHA256：`6b88d7ca812770ca032ff331c4f0916b1ec7282eb9cdf6cea0c32dc79d3ab711`
 
 适合：
 
@@ -36,6 +44,13 @@ DevEnv Manager 解决的是 Windows 上多个开发生态互相影响的问题�
 - 适合希望用图形界面查看诊断证据，同时保留 CLI 自动化入口的用户。
 - 不适合希望软件自动接管整台机器、清理任意个人文件或替代专业包管理器的场景。
 - 熟练使用 mise/asdf/Scoop/Chocolatey 且环境已经稳定的用户，可以只使用诊断能力。
+
+## 1.7.0 Stable
+
+1.7.0 完成两个功能闭环：
+
+- 文件打开方式管理器：扫描常见扩展名、展示默认应用与 ProgID、生成修改计划、执行前备份、回滚、UserChoice 保护项跳转系统设置、高风险类型默认只读。
+- 国内多源更新：manifest schema v2、Gitee/GitHub 更新源 fallback、下载 mirrors fallback、SHA256 校验、Gitee Release 自动化脚本和国内下载说明。
 
 ## 1.6.1 Stable
 

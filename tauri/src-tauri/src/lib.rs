@@ -1,6 +1,7 @@
 mod cleanup;
 mod diagnostics;
 mod env_core;
+mod file_assoc;
 mod mysql_repair;
 mod safety;
 
@@ -56,7 +57,7 @@ const BLOCKED_NAMES: [&str; 9] = [
     "lsass.exe",
 ];
 const CAUTION_NAMES: [&str; 1] = ["svchost.exe"];
-const ALLOWED_DOWNLOAD_HOSTS: [&str; 24] = [
+const ALLOWED_DOWNLOAD_HOSTS: [&str; 25] = [
     "api.adoptium.net",
     "github.com",
     "objects.githubusercontent.com",
@@ -81,6 +82,7 @@ const ALLOWED_DOWNLOAD_HOSTS: [&str; 24] = [
     "bootstrap.pypa.io",
     "api.nuget.org",
     "globalcdn.nuget.org",
+    "gitee.com",
 ];
 
 #[derive(Debug, Clone)]
@@ -96,6 +98,10 @@ struct Settings {
     download_timeout_seconds: u64,
     theme: String,
     last_page: String,
+    #[serde(default = "default_update_source_mode")]
+    update_source_mode: String,
+    #[serde(default = "default_update_sources")]
+    update_sources: Vec<UpdateSource>,
     update_manifest_url: String,
     port_process_exclusions: Vec<String>,
     #[serde(default)]
@@ -104,6 +110,16 @@ struct Settings {
     safety_disclaimer_version: u32,
     #[serde(default)]
     safety_disclaimer_accepted_at: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct UpdateSource {
+    name: String,
+    region: String,
+    manifest_url: String,
+    priority: u32,
+    enabled: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -900,16 +916,45 @@ struct JdkDistribution {
     description: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 struct UpdateManifest {
+    #[serde(default)]
+    schema_version: u32,
+    #[serde(default = "default_stable_channel")]
+    channel: String,
     version: String,
     date: String,
+    #[serde(default)]
     notes: Vec<String>,
     #[serde(alias = "download_url")]
+    #[serde(default)]
     download_url: String,
     #[serde(default)]
     sha256: String,
+    #[serde(default)]
+    assets: Vec<UpdateAsset>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct UpdateAsset {
+    platform: String,
+    file_name: String,
+    #[serde(default)]
+    size: u64,
+    sha256: String,
+    primary_url: String,
+    #[serde(default)]
+    mirrors: Vec<UpdateMirror>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct UpdateMirror {
+    name: String,
+    region: String,
+    url: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -922,6 +967,11 @@ struct UpdateCheckResult {
     notes: Vec<String>,
     download_url: String,
     sha256: String,
+    source_name: String,
+    source_url: String,
+    failed_sources: Vec<String>,
+    mirrors: Vec<UpdateMirror>,
+    file_name: String,
     checked_at: String,
 }
 
@@ -1083,6 +1133,22 @@ const RISK_OPERATION_REGISTRY: &[RiskOperationSpec] = &[
         requires_backup: true,
         requires_token: true,
         description: "执行 MySQL 高危修复计划",
+    },
+    RiskOperationSpec {
+        command: "apply_file_association_plan",
+        action_id: "apply_file_association_plan",
+        risk_level: "high",
+        requires_backup: true,
+        requires_token: true,
+        description: "执行文件默认打开方式修改计划",
+    },
+    RiskOperationSpec {
+        command: "rollback_file_association_backup",
+        action_id: "rollback_file_association_backup",
+        risk_level: "high",
+        requires_backup: true,
+        requires_token: true,
+        description: "回滚文件默认打开方式备份",
     },
 ];
 
@@ -2156,38 +2222,157 @@ async fn check_for_updates() -> Result<UpdateCheckResult, String> {
 
 fn check_for_updates_blocking() -> Result<UpdateCheckResult, String> {
     let settings = load_settings()?;
-    let url = if settings.update_manifest_url.trim().is_empty() {
-        "https://raw.githubusercontent.com/weidonglang/DevEnv-Manager/main/update-manifest.json"
-            .to_string()
-    } else {
-        settings.update_manifest_url
-    };
-    validate_download_url(&url)?;
+    let sources = update_sources_for_settings(&settings);
     let client = reqwest::blocking::Client::builder()
         .user_agent("DevEnvManager/2.0")
-        .timeout(std::time::Duration::from_secs(15))
+        .timeout(std::time::Duration::from_secs(5))
         .build()
         .map_err(|err| format!("创建更新检查客户端失败：{err}"))?;
-    let manifest: UpdateManifest = client
-        .get(&url)
-        .send()
-        .map_err(|err| format!("检查更新失败：{err}"))?
-        .error_for_status()
-        .map_err(|err| format!("检查更新失败：{err}"))?
-        .json()
-        .map_err(|err| format!("更新清单格式错误：{err}"))?;
-    validate_update_manifest(&manifest)?;
-    let current = env!("CARGO_PKG_VERSION").to_string();
-    Ok(UpdateCheckResult {
-        update_available: version_key(&manifest.version) > version_key(&current),
-        current_version: current,
-        latest_version: manifest.version,
-        date: manifest.date,
-        notes: manifest.notes,
-        download_url: manifest.download_url,
-        sha256: manifest.sha256,
-        checked_at: current_timestamp(),
+    let mut failed_sources = Vec::new();
+    for source in sources {
+        if let Err(error) = validate_download_url(&source.manifest_url) {
+            failed_sources.push(format!("{}：{error}", source.name));
+            continue;
+        }
+        let response = client
+            .get(&source.manifest_url)
+            .send()
+            .and_then(|item| item.error_for_status());
+        let manifest: UpdateManifest = match response {
+            Ok(response) => match response.json() {
+                Ok(manifest) => manifest,
+                Err(error) => {
+                    failed_sources.push(format!("{}：更新清单格式错误：{error}", source.name));
+                    continue;
+                }
+            },
+            Err(error) => {
+                failed_sources.push(format!("{}：{error}", source.name));
+                continue;
+            }
+        };
+        let asset = match normalize_update_manifest(&manifest) {
+            Ok(asset) => asset,
+            Err(error) => {
+                failed_sources.push(format!("{}：{error}", source.name));
+                continue;
+            }
+        };
+        let current = env!("CARGO_PKG_VERSION").to_string();
+        return Ok(UpdateCheckResult {
+            update_available: version_key(&manifest.version) > version_key(&current),
+            current_version: current,
+            latest_version: manifest.version,
+            date: manifest.date,
+            notes: manifest.notes,
+            download_url: asset.primary_url.clone(),
+            sha256: asset.sha256.clone(),
+            source_name: source.name,
+            source_url: source.manifest_url,
+            failed_sources,
+            mirrors: normalized_mirrors(&asset),
+            file_name: asset.file_name,
+            checked_at: current_timestamp(),
+        });
+    }
+    Err(if failed_sources.is_empty() {
+        "更新源不可用：没有启用的更新源".to_string()
+    } else {
+        format!("更新源不可用：{}", failed_sources.join("；"))
     })
+}
+
+fn update_sources_for_settings(settings: &Settings) -> Vec<UpdateSource> {
+    let mut sources = if settings.update_sources.is_empty() {
+        default_update_sources()
+    } else {
+        settings.update_sources.clone()
+    };
+    sources.retain(|item| item.enabled);
+    if settings.update_source_mode == "github" {
+        sources.retain(|item| item.region == "global");
+    } else if settings.update_source_mode == "china" {
+        sources.sort_by_key(|item| {
+            if item.region == "cn" {
+                item.priority
+            } else {
+                item.priority + 1000
+            }
+        });
+    } else {
+        sources.sort_by_key(|item| item.priority);
+    }
+    if sources.is_empty() && !settings.update_manifest_url.trim().is_empty() {
+        sources.push(UpdateSource {
+            name: "Custom Manifest".to_string(),
+            region: "custom".to_string(),
+            manifest_url: settings.update_manifest_url.clone(),
+            priority: 100,
+            enabled: true,
+        });
+    }
+    sources
+}
+
+fn normalize_update_manifest(manifest: &UpdateManifest) -> Result<UpdateAsset, String> {
+    if manifest.version.trim().is_empty() {
+        return Err("更新清单缺少 version".to_string());
+    }
+    if manifest.schema_version >= 2 || !manifest.assets.is_empty() {
+        let asset = manifest
+            .assets
+            .iter()
+            .find(|item| item.platform == "windows-x64")
+            .or_else(|| manifest.assets.first())
+            .ok_or_else(|| "更新清单缺少 windows-x64 asset".to_string())?
+            .clone();
+        validate_update_asset(&asset)?;
+        return Ok(asset);
+    }
+    validate_update_manifest(manifest)?;
+    let file_name = manifest
+        .download_url
+        .rsplit('/')
+        .next()
+        .filter(|item| !item.is_empty())
+        .unwrap_or("DevEnv.Manager_x64-setup.exe")
+        .to_string();
+    Ok(UpdateAsset {
+        platform: "windows-x64".to_string(),
+        file_name,
+        size: 0,
+        sha256: manifest.sha256.clone(),
+        primary_url: manifest.download_url.clone(),
+        mirrors: vec![UpdateMirror {
+            name: "Release".to_string(),
+            region: "global".to_string(),
+            url: manifest.download_url.clone(),
+        }],
+    })
+}
+
+fn validate_update_asset(asset: &UpdateAsset) -> Result<(), String> {
+    if asset.file_name.trim().is_empty() {
+        return Err("更新资产缺少 fileName".to_string());
+    }
+    validate_update_checksum(&asset.sha256)?;
+    validate_download_url(&asset.primary_url)?;
+    for mirror in &asset.mirrors {
+        validate_download_url(&mirror.url)?;
+    }
+    Ok(())
+}
+
+fn normalized_mirrors(asset: &UpdateAsset) -> Vec<UpdateMirror> {
+    if asset.mirrors.is_empty() {
+        vec![UpdateMirror {
+            name: "Primary".to_string(),
+            region: "global".to_string(),
+            url: asset.primary_url.clone(),
+        }]
+    } else {
+        asset.mirrors.clone()
+    }
 }
 
 #[tauri::command]
@@ -2205,17 +2390,36 @@ fn download_update_blocking(app: tauri::AppHandle) -> Result<OperationResult, St
     let target = update_installer_path(&paths, &update.latest_version);
     let task = format!("更新 {}", update.latest_version);
     emit_task_progress(&app, &task, 5, "正在准备下载安装包");
-    download_file_with_progress(
-        &update.download_url,
-        &target,
-        Some(&update.sha256),
-        Some((&app, &task, 8, 95)),
-    )?;
-    emit_task_progress(&app, &task, 100, "更新安装包已通过 SHA256 校验");
-    Ok(OperationResult {
-        success: true,
-        message: format!("更新安装包已就绪：{}", display_path(target)),
-    })
+    let mut failures = Vec::new();
+    let mirrors = if update.mirrors.is_empty() {
+        vec![UpdateMirror {
+            name: "Primary".to_string(),
+            region: "global".to_string(),
+            url: update.download_url.clone(),
+        }]
+    } else {
+        update.mirrors.clone()
+    };
+    for mirror in mirrors {
+        emit_task_progress(&app, &task, 8, &format!("正在尝试下载源：{}", mirror.name));
+        match download_file_with_progress(
+            &mirror.url,
+            &target,
+            Some(&update.sha256),
+            Some((&app, &task, 8, 95)),
+        ) {
+            Ok(()) => {
+                emit_task_progress(&app, &task, 100, "更新安装包已通过 SHA256 校验");
+                return Ok(OperationResult {
+                    success: true,
+                    message: format!("更新安装包已就绪：{}", display_path(target)),
+                });
+            }
+            Err(error) => failures.push(format!("{}：{error}", mirror.name)),
+        }
+    }
+    let _ = fs::remove_file(&target);
+    Err(format!("所有下载源均不可用：{}", failures.join("；")))
 }
 
 #[tauri::command]
@@ -8579,6 +8783,78 @@ fn generate_vscode_config(project_path: String) -> Result<OperationResult, Strin
     })
 }
 
+#[tauri::command]
+async fn scan_file_associations() -> Result<file_assoc::FileAssociationReport, String> {
+    run_blocking(file_assoc::scan_file_associations_blocking).await?
+}
+
+#[tauri::command]
+async fn create_file_association_plan(
+    request: file_assoc::FileAssociationPlanRequest,
+) -> Result<file_assoc::FileAssociationPlan, String> {
+    run_blocking(move || file_assoc::create_file_association_plan_blocking(request)).await?
+}
+
+#[tauri::command]
+async fn apply_file_association_plan(
+    plan: file_assoc::FileAssociationPlan,
+    confirmation_token: Option<String>,
+) -> Result<file_assoc::FileAssociationApplyResult, String> {
+    run_blocking(move || {
+        if plan.requires_confirmation_token {
+            require_risk_operation_token(
+                "apply_file_association_plan",
+                &plan.plan_id,
+                confirmation_token,
+            )?;
+        }
+        file_assoc::apply_file_association_plan_blocking(plan)
+    })
+    .await?
+}
+
+#[tauri::command]
+async fn rollback_file_association_backup(
+    backup_id: String,
+    confirmation_token: Option<String>,
+) -> Result<file_assoc::FileAssociationApplyResult, String> {
+    run_blocking(move || {
+        require_risk_operation_token(
+            "rollback_file_association_backup",
+            &backup_id,
+            confirmation_token,
+        )?;
+        file_assoc::rollback_file_association_backup_blocking(backup_id)
+    })
+    .await?
+}
+
+#[tauri::command]
+async fn list_file_association_backups(
+) -> Result<Vec<file_assoc::FileAssociationBackupSummary>, String> {
+    run_blocking(file_assoc::list_file_association_backups_blocking).await?
+}
+
+#[tauri::command]
+async fn open_default_apps_settings() -> Result<(), String> {
+    run_blocking(file_assoc::open_default_apps_settings_blocking).await?
+}
+
+#[tauri::command]
+async fn open_file_type_settings() -> Result<(), String> {
+    run_blocking(file_assoc::open_file_type_settings_blocking).await?
+}
+
+#[tauri::command]
+async fn open_file_association_backup_dir() -> Result<(), String> {
+    run_blocking(file_assoc::open_file_association_backup_dir_blocking).await?
+}
+
+#[tauri::command]
+async fn export_file_association_report() -> Result<String, String> {
+    run_blocking(file_assoc::export_file_association_report_blocking).await?
+}
+
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -8731,7 +9007,16 @@ pub fn run() {
             apply_project_configuration,
             uninstall_external_runtime,
             self_uninstall,
-            generate_vscode_config
+            generate_vscode_config,
+            scan_file_associations,
+            create_file_association_plan,
+            apply_file_association_plan,
+            rollback_file_association_backup,
+            list_file_association_backups,
+            open_default_apps_settings,
+            open_file_type_settings,
+            open_file_association_backup_dir,
+            export_file_association_report
         ])
         .run(tauri::generate_context!())
         .expect("error while running DevEnv Manager");
@@ -9218,14 +9503,43 @@ fn default_settings() -> Settings {
         download_timeout_seconds: 60,
         theme: "system".to_string(),
         last_page: "home".to_string(),
+        update_source_mode: default_update_source_mode(),
+        update_sources: default_update_sources(),
         update_manifest_url:
-            "https://raw.githubusercontent.com/weidonglang/DevEnv-Manager/main/update-manifest.json"
+            "https://github.com/weidonglang/DevEnv-Manager/releases/download/update/update-manifest.json"
                 .to_string(),
         port_process_exclusions: Vec::new(),
         safety_disclaimer_accepted: false,
         safety_disclaimer_version: 0,
         safety_disclaimer_accepted_at: None,
     }
+}
+
+fn default_stable_channel() -> String {
+    "stable".to_string()
+}
+
+fn default_update_source_mode() -> String {
+    "auto".to_string()
+}
+
+fn default_update_sources() -> Vec<UpdateSource> {
+    vec![
+        UpdateSource {
+            name: "Gitee Release".to_string(),
+            region: "cn".to_string(),
+            manifest_url: "https://gitee.com/weidonglang/DevEnv-Manager/releases/download/update/update-manifest.cn.json".to_string(),
+            priority: 10,
+            enabled: true,
+        },
+        UpdateSource {
+            name: "GitHub Release".to_string(),
+            region: "global".to_string(),
+            manifest_url: "https://github.com/weidonglang/DevEnv-Manager/releases/download/update/update-manifest.json".to_string(),
+            priority: 20,
+            enabled: true,
+        },
+    ]
 }
 
 fn default_installed() -> InstalledData {
@@ -13423,6 +13737,8 @@ mod tests {
             "clean_dev_cache",
             "kill_process",
             "execute_mysql_repair_plan",
+            "apply_file_association_plan",
+            "rollback_file_association_backup",
         ] {
             let spec = risk_operation_spec(command).unwrap_or_else(|| panic!("missing {command}"));
             assert!(spec.requires_token);

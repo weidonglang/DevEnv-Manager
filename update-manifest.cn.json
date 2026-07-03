@@ -4,7 +4,7 @@
   "version": "1.7.0",
   "date": "2026-07-03",
   "notes": [
-    "v1.7.0：新增文件打开方式管理器，支持 GitHub + Gitee 双平台发布、多源检查更新和国内下载 fallback。"
+    "v1.7.0：新增文件打开方式管理器，国内更新源优先使用 Gitee，并在失败时 fallback 到 GitHub。"
   ],
   "assets": [
     {
