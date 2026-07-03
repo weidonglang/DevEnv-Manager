@@ -2416,3 +2416,155 @@ select {
   background: #fee2e2;
   color: #991b1b;
 }
+
+.mirror-list,
+.file-assoc-tabs,
+.file-assoc-filters,
+.file-assoc-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mirror-list {
+  margin: 10px 0;
+}
+
+.file-assoc-panel {
+  margin: 16px 0;
+}
+
+.file-assoc-tabs {
+  margin: 14px 0;
+}
+
+.file-assoc-tabs button.active {
+  border-color: #176348;
+  background: #e7f5ef;
+  color: #176348;
+}
+
+.file-assoc-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.file-assoc-metrics article {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid #dbe3e8;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.file-assoc-metrics strong {
+  overflow-wrap: anywhere;
+}
+
+.file-assoc-filters {
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.file-assoc-filters input {
+  min-width: min(320px, 100%);
+}
+
+.file-assoc-table {
+  display: grid;
+  gap: 8px;
+  overflow-x: auto;
+}
+
+.file-assoc-row {
+  display: grid;
+  grid-template-columns: 56px 110px 120px 150px 170px minmax(240px, 1fr) 92px 180px;
+  gap: 10px;
+  align-items: start;
+  min-width: 1180px;
+  padding: 10px;
+  border: 1px solid #dbe3e8;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.file-assoc-row.head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  font-size: 12px;
+  font-weight: 700;
+  color: #52636e;
+  background: #f3f7f8;
+}
+
+.file-assoc-row span {
+  min-width: 0;
+}
+
+.file-assoc-row small,
+.file-assoc-notes span,
+.file-assoc-plan small {
+  display: block;
+  overflow-wrap: anywhere;
+  color: #60717c;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.file-assoc-notes {
+  display: grid;
+  gap: 4px;
+  min-width: 1180px;
+  padding: 0 10px 8px 176px;
+  color: #7a5a27;
+}
+
+.file-assoc-row mark {
+  display: inline-block;
+  padding: 3px 7px;
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+.risk-normal {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.risk-missingApp,
+.risk-protected,
+.risk-unknown {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.risk-highRisk {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.file-assoc-app-grid {
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) minmax(320px, 1.1fr);
+  gap: 16px;
+}
+
+.file-assoc-plan {
+  display: grid;
+  gap: 10px;
+}
+
+.safety-copy {
+  display: grid;
+  gap: 10px;
+  line-height: 1.75;
+}
+
+@media (max-width: 980px) {
+  .file-assoc-app-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -19,6 +19,14 @@ export type ConfigView = {
     autoCheckUpdate: boolean;
     downloadTimeoutSeconds: number;
     theme: string;
+    updateSourceMode?: string;
+    updateSources?: Array<{
+      name: string;
+      region: string;
+      manifestUrl: string;
+      priority: number;
+      enabled: boolean;
+    }>;
     safetyDisclaimerAccepted: boolean;
     safetyDisclaimerVersion: number;
     safetyDisclaimerAcceptedAt?: string | null;
@@ -668,7 +676,109 @@ export type UpdateCheckResult = {
   notes: string[];
   downloadUrl: string;
   sha256: string;
+  sourceName: string;
+  sourceUrl: string;
+  failedSources: string[];
+  mirrors: Array<{
+    name: string;
+    region: string;
+    url: string;
+  }>;
+  fileName: string;
   checkedAt: string;
+};
+
+export type FileAssociationSource = "userChoice" | "hkcu" | "hklm" | "unknown";
+export type FileAssociationRisk = "normal" | "missingApp" | "protected" | "highRisk" | "unknown";
+export type FileAssociationApplyMode = "userLevelRegistry" | "openSystemSettings" | "blocked";
+
+export type FileAssociationRecord = {
+  extension: string;
+  category: string;
+  description: string;
+  currentProgId?: string | null;
+  currentAppName?: string | null;
+  currentCommand?: string | null;
+  executablePath?: string | null;
+  executableExists: boolean;
+  source: FileAssociationSource;
+  risk: FileAssociationRisk;
+  canInspect: boolean;
+  canSuggestChange: boolean;
+  canApplyAutomatically: boolean;
+  requiresSystemSettings: boolean;
+  notes: string[];
+};
+
+export type FileAssociationReport = {
+  scannedAt: string;
+  currentUser: string;
+  windowsVersion: string;
+  totalExtensions: number;
+  manageableExtensions: number;
+  requiresSystemSettings: number;
+  abnormalCount: number;
+  missingAppCount: number;
+  highRiskCount: number;
+  records: FileAssociationRecord[];
+};
+
+export type FileAssociationPlanRequest = {
+  targetAppName: string;
+  targetExecutable: string;
+  extensions: string[];
+  advancedHighRisk: boolean;
+};
+
+export type FileAssociationTarget = {
+  progId: string;
+  appName: string;
+  executable: string;
+  command: string;
+};
+
+export type FileAssociationChange = {
+  extension: string;
+  before: FileAssociationRecord;
+  after: FileAssociationTarget;
+  applyMode: FileAssociationApplyMode;
+  risk: FileAssociationRisk;
+  warnings: string[];
+};
+
+export type FileAssociationPlan = {
+  planId: string;
+  createdAt: string;
+  targetAppName: string;
+  targetExecutable: string;
+  changes: FileAssociationChange[];
+  backupPath: string;
+  warnings: string[];
+  requiresConfirmationToken: boolean;
+  planFingerprint: string;
+};
+
+export type FileAssociationApplyResult = {
+  success: boolean;
+  message: string;
+  backupId?: string | null;
+  backupPath?: string | null;
+  items: Array<{
+    extension: string;
+    success: boolean;
+    message: string;
+    requiresSystemSettings: boolean;
+  }>;
+};
+
+export type FileAssociationBackupSummary = {
+  backupId: string;
+  createdAt: string;
+  changeCount: number;
+  extensions: string[];
+  targetAppName: string;
+  backupPath: string;
+  rollbackAvailable: boolean;
 };
 
 export type CleanupArchitecture = {

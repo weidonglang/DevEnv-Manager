@@ -28,6 +28,10 @@ import { envReliabilityIntro } from "./envReliability";
 import { askForConfirmation, confirmRisk, disclaimerPanel } from "./features/safety";
 import { fileDirectory } from "./features/cleanup";
 import { clearFeatureHelp, renderViewGuide } from "./features/help";
+import {
+  renderFileAssociationPanel,
+  type FileAssociationUiState,
+} from "./features/fileAssociations";
 import { projectConfigurationPlanId } from "./features/jdk";
 import { MYSQL_PERMISSION_UNKNOWN_HELP, mysqlPathValue } from "./features/mysql";
 import { canShowKillPortAction } from "./features/ports";
@@ -119,6 +123,11 @@ import type {
   AppUsageReport,
   EnvironmentConfigPreview,
   EnvironmentBackupInfo,
+  FileAssociationApplyResult,
+  FileAssociationBackupSummary,
+  FileAssociationPlan,
+  FileAssociationPlanRequest,
+  FileAssociationReport,
 } from "./types";
 import "./styles.css";
 
@@ -817,6 +826,7 @@ app.innerHTML = `
           <div id="mysql-repair-result"><div class="empty">检查服务丢失、1067 线索、my.ini、Data 系统库和候选业务库</div></div>
           <section id="mysql-plan-preview" class="repair-plan"><div class="empty">选择候选与动作后显示一次性修复计划</div></section>
         </section>
+        <div id="file-association-manager"></div>
         <div class="grid two">
           <section class="panel">
             <div class="panel-head">
@@ -968,6 +978,20 @@ const state = {
   expansionResult: null as ExpansionResult | null,
   duplicateGroups: [] as DuplicateGroup[],
   appUsage: null as AppUsageReport | null,
+  fileAssociations: {
+    report: null,
+    backups: [],
+    plan: null,
+    activeTab: "overview",
+    filter: {
+      keyword: "",
+      risk: "",
+      category: "",
+      onlyMissingApp: false,
+    },
+    selectedExtensions: new Set<string>(),
+    applyResultMessage: "",
+  } as FileAssociationUiState,
   safeMode: false,
   fatalError: "",
   safeModeNoticeCollapsed: false,
@@ -2270,6 +2294,7 @@ async function refreshBase() {
   renderLargeFiles();
   renderDuplicates();
   renderAppUsage();
+  renderFileAssociations();
   renderPorts();
   renderViewGuide(undefined, state.featureRisks, escapeHtml);
   clearFeatureHelp();
@@ -2718,17 +2743,145 @@ function renderUpdate() {
     <div class="project-summary">
       <strong>当前 ${escapeHtml(update.currentVersion)} · 最新 ${escapeHtml(update.latestVersion)}</strong>
       <span>${update.updateAvailable ? "发现新版本" : "当前已是最新版本"} · 发布 ${escapeHtml(update.date)} · 检查 ${escapeHtml(update.checkedAt)}</span>
+      <span>更新源：${escapeHtml(update.sourceName || "未知")} · ${escapeHtml(update.sourceUrl || "")}</span>
     </div>
     ${update.notes.length ? `<ul>${update.notes.map((note) => `<li>${escapeHtml(note)}</li>`).join("")}</ul>` : ""}
+    ${update.failedSources.length ? `<div class="small-note warning-text">失败源：${update.failedSources.map(escapeHtml).join("；")}</div>` : ""}
+    ${update.mirrors.length ? `<div class="mirror-list">${update.mirrors.map((mirror) => `<button data-action="copy-text" data-copy="${escapeHtml(mirror.url)}">${icon(Clipboard)}<span>${escapeHtml(mirror.name)} · ${escapeHtml(mirror.region)}</span></button>`).join("")}</div>` : ""}
     <div class="toolbar compact">
       ${update.updateAvailable ? `<button data-action="download-update">${icon(Download)}<span>${state.updateDownloaded ? "重新校验下载" : "下载更新"}</span></button>` : ""}
       ${update.updateAvailable && state.updateDownloaded ? `<button class="primary" data-action="install-update">${icon(Play)}<span>安装并重启</span></button>` : ""}
-      <button data-action="copy-text" data-copy="${escapeHtml(update.downloadUrl)}">${icon(Clipboard)}<span>复制 Releases 地址</span></button>
+      <button data-action="copy-text" data-copy="${escapeHtml(update.downloadUrl)}">${icon(Clipboard)}<span>复制主下载链接</span></button>
+      <button data-action="copy-text" data-copy="${escapeHtml(update.sha256)}">${icon(Clipboard)}<span>复制 SHA256</span></button>
     </div>
   `;
   elements.forEach((element) => {
     element.innerHTML = html;
   });
+}
+
+function renderFileAssociations() {
+  const element = document.querySelector<HTMLElement>("#file-association-manager");
+  if (!element) return;
+  element.innerHTML = renderFileAssociationPanel(state.fileAssociations, { escapeHtml });
+}
+
+async function scanFileAssociations() {
+  showToast("正在只读扫描文件打开方式");
+  try {
+    state.fileAssociations.report = await invoke<FileAssociationReport>("scan_file_associations");
+    state.fileAssociations.activeTab = "overview";
+    renderFileAssociations();
+    showToast(`文件关联扫描完成：${state.fileAssociations.report.totalExtensions} 个扩展名`);
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), true);
+  }
+}
+
+async function loadFileAssociationBackups() {
+  try {
+    state.fileAssociations.backups = await invoke<FileAssociationBackupSummary[]>("list_file_association_backups");
+    renderFileAssociations();
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), true);
+  }
+}
+
+async function pickFileAssociationTarget() {
+  try {
+    const selected = await open({
+      directory: false,
+      multiple: false,
+      title: "选择目标应用程序",
+      filters: [{ name: "Windows 应用程序", extensions: ["exe"] }],
+    });
+    if (!selected || Array.isArray(selected)) return;
+    const input = document.querySelector<HTMLInputElement>("#file-assoc-target-exe");
+    if (input) input.value = selected;
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), true);
+  }
+}
+
+async function createFileAssociationPlan(extensionsOverride?: string[]) {
+  const targetAppName = document.querySelector<HTMLInputElement>("#file-assoc-target-name")?.value.trim() || "";
+  const targetExecutable = document.querySelector<HTMLInputElement>("#file-assoc-target-exe")?.value.trim() || "";
+  const extensionText = document.querySelector<HTMLInputElement>("#file-assoc-extension-input")?.value || "";
+  const advancedHighRisk = document.querySelector<HTMLInputElement>("#file-assoc-advanced-risk")?.checked || false;
+  const extensions = extensionsOverride?.length
+    ? extensionsOverride
+    : extensionText
+        .split(/[,\s]+/)
+        .map((item) => item.trim())
+        .filter(Boolean);
+  const request: FileAssociationPlanRequest = {
+    targetAppName,
+    targetExecutable,
+    extensions,
+    advancedHighRisk,
+  };
+  showToast("正在生成文件关联修改计划");
+  try {
+    state.fileAssociations.plan = await invoke<FileAssociationPlan>("create_file_association_plan", { request });
+    state.fileAssociations.activeTab = "apps";
+    state.fileAssociations.applyResultMessage = "";
+    renderFileAssociations();
+    showToast("文件关联计划已生成，请核对 before / after 和备份路径");
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), true);
+  }
+}
+
+async function applyFileAssociationPlan() {
+  const plan = state.fileAssociations.plan;
+  if (!plan) return;
+  if (!(await askForConfirmation(`将处理 ${plan.changes.length} 项文件关联，并在执行前写入备份。受保护项只会提示进入 Windows 设置。确定继续吗？`))) return;
+  let confirmationToken: string | null = null;
+  if (plan.requiresConfirmationToken) {
+    for (const prompt of [
+      "第一次确认：我理解高风险扩展名可能影响脚本、安装包或可执行文件启动。",
+      "第二次确认：我已经核对目标应用路径和计划预览。",
+      "第三次确认：输入指定文本后继续。",
+    ]) {
+      if (
+        !(await askForConfirmation(prompt, {
+          title: "确认文件关联高风险计划",
+          danger: true,
+          requiredText: prompt.startsWith("第三次") ? "确认修改文件关联" : undefined,
+        }))
+      ) {
+        return;
+      }
+    }
+    const token = await riskOperationToken("apply_file_association_plan", plan.planId, "high", true, "file-association-backup");
+    confirmationToken = token.token;
+  }
+  showToast("正在备份并执行文件关联计划");
+  try {
+    const result = await invoke<FileAssociationApplyResult>("apply_file_association_plan", { plan, confirmationToken });
+    state.fileAssociations.applyResultMessage = result.message;
+    state.fileAssociations.plan = null;
+    state.fileAssociations.backups = await invoke<FileAssociationBackupSummary[]>("list_file_association_backups");
+    state.fileAssociations.report = await invoke<FileAssociationReport>("scan_file_associations");
+    renderFileAssociations();
+    showToast(result.message, !result.success);
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), true);
+  }
+}
+
+async function rollbackFileAssociationBackup(backupId: string) {
+  if (!(await askForConfirmation(`将回滚文件关联备份 ${backupId}。UserChoice 保护项仍会要求你到 Windows 设置确认。确定继续吗？`, { title: "确认文件关联回滚", danger: true }))) return;
+  const token = await riskOperationToken("rollback_file_association_backup", backupId, "high", true, "file-association-backup");
+  try {
+    const result = await invoke<FileAssociationApplyResult>("rollback_file_association_backup", { backupId, confirmationToken: token.token });
+    state.fileAssociations.applyResultMessage = result.message;
+    state.fileAssociations.report = await invoke<FileAssociationReport>("scan_file_associations");
+    renderFileAssociations();
+    showToast(result.message, !result.success);
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), true);
+  }
 }
 
 function riskText(risk: string) {
@@ -3766,6 +3919,24 @@ document.querySelector("#preview-cleanup-plan")?.addEventListener("click", async
 });
 
 document.addEventListener("change", (event) => {
+  const fileAssociationSelect = (event.target as HTMLElement).closest<HTMLInputElement>("input[data-file-assoc-select]");
+  if (fileAssociationSelect) {
+    const extension = fileAssociationSelect.dataset.fileAssocSelect || "";
+    if (fileAssociationSelect.checked) state.fileAssociations.selectedExtensions.add(extension);
+    else state.fileAssociations.selectedExtensions.delete(extension);
+    return;
+  }
+  const fileAssociationFilter = (event.target as HTMLElement).closest<HTMLInputElement | HTMLSelectElement>(
+    "#file-assoc-filter-keyword, #file-assoc-filter-risk, #file-assoc-filter-category, #file-assoc-filter-missing",
+  );
+  if (fileAssociationFilter) {
+    state.fileAssociations.filter.keyword = document.querySelector<HTMLInputElement>("#file-assoc-filter-keyword")?.value || "";
+    state.fileAssociations.filter.risk = document.querySelector<HTMLSelectElement>("#file-assoc-filter-risk")?.value || "";
+    state.fileAssociations.filter.category = document.querySelector<HTMLSelectElement>("#file-assoc-filter-category")?.value || "";
+    state.fileAssociations.filter.onlyMissingApp = document.querySelector<HTMLInputElement>("#file-assoc-filter-missing")?.checked || false;
+    renderFileAssociations();
+    return;
+  }
   const checkbox = (event.target as HTMLElement).closest<HTMLInputElement>("input[data-cleanup-item]");
   if (!checkbox) return;
   const id = checkbox.dataset.cleanupItem || "";
@@ -4176,9 +4347,84 @@ document.querySelectorAll<HTMLButtonElement>(".sort-head").forEach((button) => {
 
 document.addEventListener("click", async (event) => {
   const button = (event.target as HTMLElement).closest<HTMLButtonElement>(
-    "button[data-action], button[data-toolchain-action], button[data-python-tool], button[data-page-key], button[data-dev-cache], button[data-chsrc-action], button[data-cleanup-report-action], button[data-restore-env-backup], button[data-mysql-action], #apply-project-config, #apply-environment-preview, #apply-python-repair, #create-managed-python-pip-plan, #execute-mysql-plan, #accept-safety-disclaimer",
+    "button[data-action], button[data-toolchain-action], button[data-python-tool], button[data-page-key], button[data-dev-cache], button[data-chsrc-action], button[data-cleanup-report-action], button[data-restore-env-backup], button[data-mysql-action], button[data-file-assoc-tab], button[data-file-assoc-plan-one], button[data-file-assoc-rollback], #scan-file-associations, #open-default-apps-settings, #export-file-association-report, #pick-file-assoc-target, #create-file-assoc-plan, #apply-file-assoc-plan, #open-file-type-settings, #load-file-assoc-backups, #open-file-assoc-backup-dir, #apply-project-config, #apply-environment-preview, #apply-python-repair, #create-managed-python-pip-plan, #execute-mysql-plan, #accept-safety-disclaimer",
   );
   if (!button) return;
+  const fileAssocTab = button.dataset.fileAssocTab as FileAssociationUiState["activeTab"] | undefined;
+  if (fileAssocTab) {
+    state.fileAssociations.activeTab = fileAssocTab;
+    if (fileAssocTab === "backups") void loadFileAssociationBackups();
+    renderFileAssociations();
+    return;
+  }
+  if (button.id === "scan-file-associations") {
+    await scanFileAssociations();
+    return;
+  }
+  if (button.id === "open-default-apps-settings") {
+    try {
+      await invoke("open_default_apps_settings");
+      showToast("已打开 Windows 默认应用设置");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : String(error), true);
+    }
+    return;
+  }
+  if (button.id === "export-file-association-report") {
+    try {
+      const path = await invoke<string>("export_file_association_report");
+      showToast(`文件关联报告已导出：${path}`);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : String(error), true);
+    }
+    return;
+  }
+  if (button.id === "pick-file-assoc-target") {
+    await pickFileAssociationTarget();
+    return;
+  }
+  const planOne = button.dataset.fileAssocPlanOne;
+  if (planOne) {
+    state.fileAssociations.selectedExtensions = new Set([planOne]);
+    state.fileAssociations.activeTab = "apps";
+    renderFileAssociations();
+    return;
+  }
+  if (button.id === "create-file-assoc-plan") {
+    await createFileAssociationPlan();
+    return;
+  }
+  if (button.id === "apply-file-assoc-plan") {
+    await applyFileAssociationPlan();
+    return;
+  }
+  if (button.id === "open-file-type-settings") {
+    try {
+      await invoke("open_file_type_settings");
+      showToast("已打开 Windows 文件类型设置");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : String(error), true);
+    }
+    return;
+  }
+  if (button.id === "load-file-assoc-backups") {
+    await loadFileAssociationBackups();
+    return;
+  }
+  if (button.id === "open-file-assoc-backup-dir") {
+    try {
+      await invoke("open_file_association_backup_dir");
+      showToast("已打开文件关联备份目录");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : String(error), true);
+    }
+    return;
+  }
+  const rollbackBackupId = button.dataset.fileAssocRollback;
+  if (rollbackBackupId) {
+    await rollbackFileAssociationBackup(rollbackBackupId);
+    return;
+  }
   const mysqlAction = button.dataset.mysqlAction;
   if (mysqlAction) {
     const candidateId = button.dataset.candidate || "";
