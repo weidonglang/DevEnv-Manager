@@ -1,28 +1,28 @@
 {
   "schemaVersion": 2,
   "channel": "stable",
-  "version": "1.7.0",
-  "date": "2026-07-03",
+  "version": "1.8.0",
+  "date": "2026-07-06",
   "notes": [
-    "v1.7.0：新增文件打开方式管理器，支持 GitHub + Gitee 双平台发布、多源检查更新和国内下载 fallback。"
+    "v1.8.0: includes #116, #117, and #118 stabilization work: plan-token-execute safety flows, runtime/JDK/Python/port reliability hardening, file association safety gates, Fluent workbench frontend, Command Palette, unified Risk UX, and Light/Dark/System/High Contrast themes."
   ],
   "assets": [
     {
       "platform": "windows-x64",
-      "fileName": "DevEnv.Manager_1.7.0_x64-setup.exe",
-      "size": 2614596,
-      "sha256": "6b88d7ca812770ca032ff331c4f0916b1ec7282eb9cdf6cea0c32dc79d3ab711",
-      "primaryUrl": "https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.7.0/DevEnv.Manager_1.7.0_x64-setup.exe",
+      "fileName": "DevEnv.Manager_1.8.0_x64-setup.exe",
+      "size": 2614000,
+      "sha256": "e827d5bcaaf4ea7d250d687011629253420e1ec9f92930c0af571d7998e6a51a",
+      "primaryUrl": "https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.8.0/DevEnv.Manager_1.8.0_x64-setup.exe",
       "mirrors": [
         {
           "name": "Gitee Release",
           "region": "cn",
-          "url": "https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.7.0/DevEnv.Manager_1.7.0_x64-setup.exe"
+          "url": "https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.8.0/DevEnv.Manager_1.8.0_x64-setup.exe"
         },
         {
           "name": "GitHub Release",
           "region": "global",
-          "url": "https://github.com/weidonglang/DevEnv-Manager/releases/download/v1.7.0/DevEnv.Manager_1.7.0_x64-setup.exe"
+          "url": "https://github.com/weidonglang/DevEnv-Manager/releases/download/v1.8.0/DevEnv.Manager_1.8.0_x64-setup.exe"
         }
       ]
     }

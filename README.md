@@ -2,9 +2,9 @@
 
 [GitHub 主仓库](https://github.com/weidonglang/DevEnv-Manager) · [Gitee 国内镜像](https://gitee.com/weidonglang/DevEnv-Manager) · [GitHub Release](https://github.com/weidonglang/DevEnv-Manager/releases) · [Gitee Release](https://gitee.com/weidonglang/DevEnv-Manager/releases) · [完整操作手册](docs/user-guide.md) · [安全说明](docs/safety-and-disclaimer.md) · [问题反馈](https://github.com/weidonglang/DevEnv-Manager/issues)
 
-面向 Windows 的开发环境诊断器与安全操作面板。当前版本：**1.7.0 Stable**。
+面向 Windows 的开发环境诊断器与安全操作面板。当前版本：**1.8.0 Stable**。
 
-1.7.0 新增文件打开方式管理器，并把更新链路升级为 GitHub + Gitee 双平台发布、多源 manifest fallback、镜像下载 fallback 和 SHA256 强校验。
+1.8.0 完成 Runtime/JDK/Python/port reliability hardening、Profile/Doctor plan-token-execute safety model、file association safety gates、Fluent workbench frontend、Command Palette、unified Risk UX，以及 Light/Dark/System/High Contrast themes。
 
 ## 下载与镜像
 
@@ -12,7 +12,7 @@
 - Gitee 国内镜像：https://gitee.com/weidonglang/DevEnv-Manager
 - GitHub Release：https://github.com/weidonglang/DevEnv-Manager/releases
 - Gitee Release：https://gitee.com/weidonglang/DevEnv-Manager/releases
-- SHA256：`6b88d7ca812770ca032ff331c4f0916b1ec7282eb9cdf6cea0c32dc79d3ab711`
+- SHA256：`e827d5bcaaf4ea7d250d687011629253420e1ec9f92930c0af571d7998e6a51a`
 
 适合：
 
@@ -44,6 +44,23 @@ DevEnv Manager 解决的是 Windows 上多个开发生态互相影响的问题�
 - 适合希望用图形界面查看诊断证据，同时保留 CLI 自动化入口的用户。
 - 不适合希望软件自动接管整台机器、清理任意个人文件或替代专业包管理器的场景。
 - 熟练使用 mise/asdf/Scoop/Chocolatey 且环境已经稳定的用户，可以只使用诊断能力。
+
+## 1.8.0 Stable
+
+v1.8.0 includes the #116, #117, and #118 stabilization work:
+
+- Runtime/JDK/Python/port reliability hardening.
+- Profile and Doctor repair operations use plan -> token -> execute.
+- File association safety gates and app search.
+- Fluent workbench frontend with real IA routes.
+- Command Palette.
+- Unified Risk UX with preview, backup/receipt, token progress, result, and recovery guidance.
+- Light/Dark/System/High Contrast themes.
+- Stronger CI command contracts and frontend architecture checks.
+
+Installer: `DevEnv.Manager_1.8.0_x64-setup.exe`
+
+SHA256: `e827d5bcaaf4ea7d250d687011629253420e1ec9f92930c0af571d7998e6a51a`
 
 ## 1.7.0 Stable
 
