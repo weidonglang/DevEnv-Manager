@@ -2898,7 +2898,6 @@ async function applyFileAssociationPlan() {
   const plan = state.fileAssociations.plan;
   if (!plan) return;
   if (!(await askForConfirmation(`将处理 ${plan.changes.length} 项文件关联，并在执行前写入备份。受保护项只会提示进入 Windows 设置。确定继续吗？`))) return;
-  let confirmationToken: string | null = null;
   if (plan.requiresConfirmationToken) {
     for (const prompt of [
       "第一次确认：我理解高风险扩展名可能影响脚本、安装包或可执行文件启动。",
@@ -2915,9 +2914,15 @@ async function applyFileAssociationPlan() {
         return;
       }
     }
-    const token = await riskOperationToken("apply_file_association_plan", plan.planId, "high", true, "file-association-backup");
-    confirmationToken = token.token;
   }
+  const token = await riskOperationToken(
+    "apply_file_association_plan",
+    plan.planId,
+    "high",
+    plan.requiresConfirmationToken,
+    "file-association-backup",
+  );
+  const confirmationToken = token.token;
   showToast("正在备份并执行文件关联计划");
   try {
     const result = await invoke<FileAssociationApplyResult>("apply_file_association_plan", { plan, confirmationToken });

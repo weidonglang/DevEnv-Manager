@@ -1889,15 +1889,23 @@ fn verify_jdk_tool(id: &str, title: &str, executable: &Path, args: &[&str]) -> V
             stage: "external-jdk".to_string(),
         };
     }
-    match hidden_command(executable).args(args).output() {
+    match powershell_runner::run_native_command_with_timeout(executable, args, 10) {
         Ok(output) => {
             let detail =
-                first_meaningful_output_line(&command_text(&output.stdout, &output.stderr))
+                first_meaningful_output_line(&command_text(
+                    output.stdout.as_bytes(),
+                    output.stderr.as_bytes(),
+                ))
                     .unwrap_or_else(|| "命令没有返回版本文本".to_string());
+            let detail = if output.timed_out {
+                "命令超时（10 秒）".to_string()
+            } else {
+                detail
+            };
             ValidationCheck {
                 id: id.to_string(),
                 title: title.to_string(),
-                success: output.status.success(),
+                success: output.success,
                 required: true,
                 detail,
                 stage: "external-jdk".to_string(),
@@ -8864,13 +8872,11 @@ async fn apply_file_association_plan(
     confirmation_token: Option<String>,
 ) -> Result<file_assoc::FileAssociationApplyResult, String> {
     run_blocking(move || {
-        if plan.requires_confirmation_token {
-            require_risk_operation_token(
-                "apply_file_association_plan",
-                &plan.plan_id,
-                confirmation_token,
-            )?;
-        }
+        require_risk_operation_token(
+            "apply_file_association_plan",
+            &plan.plan_id,
+            confirmation_token,
+        )?;
         file_assoc::apply_file_association_plan_blocking(plan)
     })
     .await?
@@ -13821,6 +13827,14 @@ mod tests {
             assert!(spec.requires_token);
             assert!(matches!(spec.risk_level, "medium" | "high" | "critical"));
         }
+    }
+
+    #[test]
+    fn file_association_apply_requires_backend_token_even_for_normal_plans() {
+        assert!(
+            require_risk_operation_token("apply_file_association_plan", "normal-plan", None)
+                .is_err()
+        );
     }
 
     #[test]

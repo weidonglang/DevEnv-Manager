@@ -34,6 +34,18 @@ pub struct PowerShellResult {
     pub killed_process_tree: bool,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NativeCommandResult {
+    pub success: bool,
+    pub exit_code: Option<i32>,
+    pub stdout: String,
+    pub stderr: String,
+    pub elapsed_ms: u128,
+    pub timed_out: bool,
+    pub executable: String,
+}
+
 impl PowerShellRequest {
     pub fn read_only(script: impl Into<String>, timeout_seconds: u64) -> Self {
         Self {
@@ -148,22 +160,70 @@ pub fn run_powershell(request: PowerShellRequest) -> Result<PowerShellResult, St
 
 pub fn powershell_executable() -> String {
     for executable in ["pwsh.exe", "powershell.exe"] {
-        let probe = Command::new(executable)
-            .args([
+        let probe = run_native_command_with_timeout(
+            executable,
+            &[
                 "-NoLogo",
                 "-NoProfile",
                 "-NonInteractive",
                 "-Command",
                 "$PSVersionTable.PSVersion.ToString()",
-            ])
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status();
-        if probe.is_ok_and(|status| status.success()) {
+            ],
+            3,
+        );
+        if probe.is_ok_and(|result| result.success) {
             return executable.to_string();
         }
     }
     "powershell.exe".to_string()
+}
+
+pub fn run_native_command_with_timeout(
+    executable: impl AsRef<OsStr>,
+    args: &[&str],
+    timeout_seconds: u64,
+) -> Result<NativeCommandResult, String> {
+    let timeout_seconds = timeout_seconds.clamp(1, 300);
+    let executable_ref = executable.as_ref();
+    let executable_label = executable_ref.to_string_lossy().to_string();
+    let mut command = Command::new(executable_ref);
+    hide_command_window(&mut command);
+    command
+        .args(args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    let start = Instant::now();
+    let mut child = command
+        .spawn()
+        .map_err(|err| format!("Failed to start {executable_label}: {err}"))?;
+    let mut timed_out = false;
+    loop {
+        if child
+            .try_wait()
+            .map_err(|err| format!("Failed to wait for {executable_label}: {err}"))?
+            .is_some()
+        {
+            break;
+        }
+        if start.elapsed() >= Duration::from_secs(timeout_seconds) {
+            timed_out = true;
+            let _ = child.kill();
+            break;
+        }
+        thread::sleep(Duration::from_millis(50));
+    }
+    let output = child
+        .wait_with_output()
+        .map_err(|err| format!("Failed to read {executable_label} output: {err}"))?;
+    Ok(NativeCommandResult {
+        success: output.status.success() && !timed_out,
+        exit_code: output.status.code(),
+        stdout: decode_output(&output.stdout),
+        stderr: decode_output(&output.stderr),
+        elapsed_ms: start.elapsed().as_millis(),
+        timed_out,
+        executable: executable_label,
+    })
 }
 
 pub fn decode_output(bytes: &[u8]) -> String {
@@ -184,12 +244,9 @@ pub fn decode_output(bytes: &[u8]) -> String {
 }
 
 fn kill_process_tree(pid: u32) -> bool {
-    Command::new("taskkill")
-        .args(["/PID", &pid.to_string(), "/T", "/F"])
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .is_ok_and(|status| status.success())
+    let pid = pid.to_string();
+    run_native_command_with_timeout("taskkill", &["/PID", &pid, "/T", "/F"], 5)
+        .is_ok_and(|result| result.success)
 }
 
 fn is_elevated() -> bool {

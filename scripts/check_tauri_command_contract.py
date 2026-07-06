@@ -17,6 +17,7 @@ COMMAND_RE = re.compile(
 HANDLER_RE = re.compile(r"generate_handler!\s*\[(?P<body>.*?)\]\s*\)", re.DOTALL)
 IDENT_RE = re.compile(r"\b[A-Za-z_][A-Za-z0-9_]*\b")
 REGISTRY_COMMAND_RE = re.compile(r'command:\s*"([A-Za-z0-9_]+)"')
+REGISTRY_SPEC_RE = re.compile(r"RiskOperationSpec\s*\{(?P<body>.*?)\},", re.DOTALL)
 DIRECT_POWERSHELL_RE = re.compile(
     r'(?:hidden_command|Command::new)\s*\(\s*["\'](?:powershell|powershell\.exe|pwsh|pwsh\.exe)["\']'
 )
@@ -79,7 +80,18 @@ def registered_handlers() -> set[str]:
 
 
 def risk_registry_commands() -> set[str]:
-    return set(REGISTRY_COMMAND_RE.findall(read_text(RUST_SRC / "lib.rs")))
+    return set(risk_registry_entries())
+
+
+def risk_registry_entries() -> dict[str, bool]:
+    entries: dict[str, bool] = {}
+    for match in REGISTRY_SPEC_RE.finditer(read_text(RUST_SRC / "lib.rs")):
+        body = match.group("body")
+        command = REGISTRY_COMMAND_RE.search(body)
+        if not command:
+            continue
+        entries[command.group(1)] = bool(re.search(r"\brequires_token:\s*true\b", body))
+    return entries
 
 
 def command_body(command: str) -> str:
@@ -97,7 +109,8 @@ def main() -> int:
     invokes = frontend_invokes()
     command_defs = rust_command_defs()
     handlers = registered_handlers()
-    registry = risk_registry_commands()
+    registry_entries = risk_registry_entries()
+    registry = set(registry_entries)
 
     missing_handlers = sorted(invokes - handlers)
     if missing_handlers:
@@ -118,13 +131,17 @@ def main() -> int:
         if command in handlers:
             errors.append(f"Forbidden registered command {command}: {reason}")
 
-    for command in sorted(REQUIRED_TOKEN_GATED_COMMANDS):
+    token_gated_commands = set(REQUIRED_TOKEN_GATED_COMMANDS)
+    token_gated_commands.update(
+        command for command, requires_token in registry_entries.items() if requires_token
+    )
+    for command in sorted(token_gated_commands):
         if command in handlers:
             body = command_body(command)
             if "require_risk_operation_token" not in body and "require_confirmation_token" not in body:
-                errors.append(f"High-risk command {command} is registered without a backend token gate")
+                errors.append(f"Token-required command {command} is registered without a backend token gate")
             if command not in registry:
-                errors.append(f"High-risk command {command} is missing from risk operation registry")
+                errors.append(f"Token-required command {command} is missing from risk operation registry")
 
     for path in rust_files():
         relative = path.relative_to(ROOT).as_posix()
