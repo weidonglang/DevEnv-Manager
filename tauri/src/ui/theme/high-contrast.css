@@ -1,0 +1,15 @@
+:root[data-theme="high-contrast"] {
+  color-scheme: dark;
+  --surface: #000000;
+  --panel: #050505;
+  --panel-muted: #111111;
+  --text: #ffffff;
+  --muted: #e6e6e6;
+  --border: #ffffff;
+  --accent: #00e5ff;
+  --accent-strong: #7df9ff;
+  --hover: #1f1f1f;
+  --danger: #ff6b6b;
+  --warning: #ffe66d;
+  --success: #8aff80;
+}
