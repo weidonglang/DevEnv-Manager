@@ -10,6 +10,8 @@ use std::process::Command;
 use std::sync::{Mutex, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use crate::powershell_runner;
+
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
 
@@ -350,13 +352,13 @@ fn service_inventory() -> Vec<(String, String, String)> {
     #[cfg(windows)]
     {
         let script = "[Console]::OutputEncoding=[System.Text.UTF8Encoding]::new(); @(Get-CimInstance Win32_Service | Where-Object { $_.Name -match 'mysql|maria' -or $_.PathName -match 'mysqld' } | Select-Object Name,State,PathName) | ConvertTo-Json -Compress";
-        let Ok(output) = hidden_command("powershell.exe")
-            .args(["-NoProfile", "-NonInteractive", "-Command", script])
-            .output()
-        else {
+        let Ok(output) = powershell_runner::run_powershell_script(script, Vec::new(), 20) else {
             return Vec::new();
         };
-        let text = String::from_utf8_lossy(&output.stdout);
+        if !output.success {
+            return Vec::new();
+        }
+        let text = output.stdout;
         let Ok(value) = serde_json::from_str::<serde_json::Value>(&text) else {
             return Vec::new();
         };

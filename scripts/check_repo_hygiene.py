@@ -3,6 +3,9 @@ from __future__ import annotations
 import subprocess
 import sys
 
+from check_tauri_command_contract import main as check_tauri_command_contract
+from check_release_consistency import main as check_release_consistency
+
 
 BLOCKED_PARTS = {
     ".idea",
@@ -48,6 +51,12 @@ def main() -> int:
         if len(blocked) > 200:
             print(f"... and {len(blocked) - 200} more")
         return 1
+    contract_result = check_tauri_command_contract()
+    if contract_result != 0:
+        return contract_result
+    release_result = check_release_consistency()
+    if release_result != 0:
+        return release_result
     print("Repository hygiene check passed.")
     return 0
 

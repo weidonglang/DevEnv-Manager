@@ -36,6 +36,8 @@ use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+
+use crate::powershell_runner;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[cfg(windows)]
@@ -162,15 +164,7 @@ Add-Type -Namespace Win32 -Name Native -MemberDefinition '[DllImport("user32.dll
 $result = [UIntPtr]::Zero
 [Win32.Native]::SendMessageTimeout([IntPtr]0xffff, 0x1a, [UIntPtr]::Zero, 'Environment', 0x2, 5000, [ref]$result) | Out-Null
 "#;
-        let _ = hidden_command("powershell.exe")
-            .args([
-                "-NoProfile",
-                "-ExecutionPolicy",
-                "Bypass",
-                "-Command",
-                script,
-            ])
-            .output();
+        let _ = powershell_runner::run_powershell_script(script, Vec::new(), 10);
     }
 }
 

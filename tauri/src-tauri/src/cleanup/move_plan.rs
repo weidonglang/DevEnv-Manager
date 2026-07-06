@@ -50,15 +50,10 @@ pub fn create_move_plan(
     plan_for_source(&source, target, &mode)
 }
 
-pub fn create_junction_bridge(
-    managed_root: &Path,
-    source: String,
-    target: String,
-) -> Result<MoveResult, String> {
+pub fn create_junction_bridge_plan(source: String, target: String) -> Result<MovePlan, String> {
     let source_path = PathBuf::from(source);
     let target_path = PathBuf::from(target);
-    let plan = plan_for_source(&source_path, target_path, "junction_bridge")?;
-    Ok(execute_move_plan(managed_root, plan))
+    plan_for_source(&source_path, target_path, "junction_bridge")
 }
 
 pub fn create_desktop_archive_plan(target_drive: String) -> Result<MovePlan, String> {
