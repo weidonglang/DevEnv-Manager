@@ -374,6 +374,44 @@ struct PortRecord {
     conflict_evidence: Vec<String>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct PortResolutionPlan {
+    plan_id: String,
+    pid: u32,
+    port: u16,
+    process_name: String,
+    process_path: String,
+    command_line: String,
+    parent_pid: Option<u32>,
+    parent_process_name: Option<String>,
+    child_processes: Vec<ChildProcessSummary>,
+    service_names: Vec<String>,
+    related_ports: Vec<u16>,
+    project_root: Option<String>,
+    risk_level: String,
+    warnings: Vec<String>,
+    recommended_actions: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct ChildProcessSummary {
+    pid: u32,
+    name: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PortResolutionResult {
+    success: bool,
+    message: String,
+    pid_exited: bool,
+    port_released: bool,
+    release_checked_at: String,
+    remaining_owners: Vec<PortRecord>,
+}
+
 #[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 struct ProjectPortConfig {
@@ -383,6 +421,9 @@ struct ProjectPortConfig {
     current_port: u16,
     line: usize,
     description: String,
+    mode: String,
+    will_overwrite_existing_file: bool,
+    backup_path: Option<String>,
 }
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -1001,9 +1042,15 @@ struct RuntimeMeta {
 }
 
 static CONFIRMATION_TOKENS: OnceLock<Mutex<HashMap<String, ConfirmationToken>>> = OnceLock::new();
+static PORT_RESOLUTION_PLANS: OnceLock<Mutex<HashMap<String, PortResolutionPlan>>> =
+    OnceLock::new();
 
 fn confirmation_tokens() -> &'static Mutex<HashMap<String, ConfirmationToken>> {
     CONFIRMATION_TOKENS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn port_resolution_plans() -> &'static Mutex<HashMap<String, PortResolutionPlan>> {
+    PORT_RESOLUTION_PLANS.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
 const RISK_OPERATION_REGISTRY: &[RiskOperationSpec] = &[
@@ -1062,6 +1109,30 @@ const RISK_OPERATION_REGISTRY: &[RiskOperationSpec] = &[
         requires_backup: true,
         requires_token: true,
         description: "写入用户级 DEVENV_HOME/JAVA_HOME/PATH 配置",
+    },
+    RiskOperationSpec {
+        command: "apply_python_repair",
+        action_id: "apply_python_repair",
+        risk_level: "high",
+        requires_backup: true,
+        requires_token: true,
+        description: "Execute Python pip/PATH repair plan",
+    },
+    RiskOperationSpec {
+        command: "switch_runtime",
+        action_id: "switch_runtime",
+        risk_level: "medium",
+        requires_backup: true,
+        requires_token: true,
+        description: "Switch managed runtime current pointer and environment",
+    },
+    RiskOperationSpec {
+        command: "uninstall_runtime",
+        action_id: "uninstall_runtime",
+        risk_level: "high",
+        requires_backup: false,
+        requires_token: true,
+        description: "Uninstall managed runtime and delete its directory",
     },
     RiskOperationSpec {
         command: "manage_system_platform",
@@ -1150,6 +1221,14 @@ const RISK_OPERATION_REGISTRY: &[RiskOperationSpec] = &[
         requires_backup: false,
         requires_token: true,
         description: "结束进程及子进程",
+    },
+    RiskOperationSpec {
+        command: "execute_port_resolution_plan",
+        action_id: "execute_port_resolution_plan",
+        risk_level: "high",
+        requires_backup: false,
+        requires_token: true,
+        description: "Execute port resolution plan",
     },
     RiskOperationSpec {
         command: "execute_mysql_repair_plan",
@@ -1891,12 +1970,11 @@ fn verify_jdk_tool(id: &str, title: &str, executable: &Path, args: &[&str]) -> V
     }
     match powershell_runner::run_native_command_with_timeout(executable, args, 10) {
         Ok(output) => {
-            let detail =
-                first_meaningful_output_line(&command_text(
-                    output.stdout.as_bytes(),
-                    output.stderr.as_bytes(),
-                ))
-                    .unwrap_or_else(|| "命令没有返回版本文本".to_string());
+            let detail = first_meaningful_output_line(&command_text(
+                output.stdout.as_bytes(),
+                output.stderr.as_bytes(),
+            ))
+            .unwrap_or_else(|| "命令没有返回版本文本".to_string());
             let detail = if output.timed_out {
                 "命令超时（10 秒）".to_string()
             } else {
@@ -3273,14 +3351,27 @@ async fn install_jdk(
     app: tauri::AppHandle,
     version: String,
     distribution: Option<String>,
+    switch_after_install: Option<bool>,
+    confirmation_token: Option<String>,
 ) -> Result<OperationResult, String> {
-    run_blocking(move || install_jdk_blocking(app, version, distribution)).await?
+    run_blocking(move || {
+        install_jdk_blocking(
+            app,
+            version,
+            distribution,
+            switch_after_install.unwrap_or(false),
+            confirmation_token,
+        )
+    })
+    .await?
 }
 
 fn install_jdk_blocking(
     app: tauri::AppHandle,
     version: String,
     distribution: Option<String>,
+    switch_after_install: bool,
+    confirmation_token: Option<String>,
 ) -> Result<OperationResult, String> {
     let version = version.trim();
     let distribution = distribution.as_deref().unwrap_or("temurin");
@@ -3337,12 +3428,16 @@ fn install_jdk_blocking(
             "detail": output.lines().next().unwrap_or(""),
         }),
     )?;
-    switch_runtime_blocking(
-        "jdk".to_string(),
-        installed_version,
-        Some(display_path(&target)),
-    )?;
-    refresh_user_java_home(&paths)?;
+    if switch_after_install {
+        let plan_id = runtime_plan_id("jdk", &installed_version, None);
+        require_risk_operation_token("switch_runtime", &plan_id, confirmation_token)?;
+        switch_runtime_blocking(
+            "jdk".to_string(),
+            installed_version,
+            Some(display_path(&target)),
+        )?;
+        refresh_user_java_home(&paths)?;
+    }
     emit_task_progress(&app, &task, 100, "安装完成");
     Ok(OperationResult {
         success: true,
@@ -3687,8 +3782,23 @@ async fn switch_runtime(
     kind: String,
     version: String,
     path: Option<String>,
+    confirmation_token: Option<String>,
 ) -> Result<OperationResult, String> {
-    run_blocking(move || switch_runtime_blocking(kind, version, path)).await?
+    run_blocking(move || {
+        let plan_id = runtime_plan_id(&kind, &version, path.as_deref());
+        require_risk_operation_token("switch_runtime", &plan_id, confirmation_token)?;
+        switch_runtime_blocking(kind, version, path)
+    })
+    .await?
+}
+
+fn runtime_plan_id(kind: &str, version: &str, path: Option<&str>) -> String {
+    format!(
+        "{}:{}:{}",
+        kind.trim(),
+        version.trim(),
+        path.unwrap_or("").trim()
+    )
 }
 
 fn switch_runtime_blocking(
@@ -3786,8 +3896,14 @@ async fn uninstall_runtime(
     kind: String,
     version: String,
     path: Option<String>,
+    confirmation_token: Option<String>,
 ) -> Result<OperationResult, String> {
-    run_blocking(move || uninstall_runtime_blocking(kind, version, path)).await?
+    run_blocking(move || {
+        let plan_id = runtime_plan_id(&kind, &version, path.as_deref());
+        require_risk_operation_token("uninstall_runtime", &plan_id, confirmation_token)?;
+        uninstall_runtime_blocking(kind, version, path)
+    })
+    .await?
 }
 
 fn uninstall_runtime_blocking(
@@ -3901,9 +4017,10 @@ fn kill_process(
     if force {
         args.push("/F".to_string());
     }
-    let output = hidden_command("taskkill").args(&args).output();
+    let arg_refs = args.iter().map(String::as_str).collect::<Vec<_>>();
+    let output = powershell_runner::run_probe_command("taskkill", &arg_refs, 10);
     match output {
-        Ok(done) if done.status.success() => KillResult {
+        Ok(done) if done.success => KillResult {
             success: true,
             message: if force {
                 format!("已强制结束 PID {pid} / {name}")
@@ -3914,7 +4031,7 @@ fn kill_process(
             blocked: false,
         },
         Ok(done) => {
-            let text = command_text(&done.stdout, &done.stderr);
+            let text = powershell_runner::native_command_message(&done);
             KillResult {
                 success: false,
                 message: if force {
@@ -3951,12 +4068,16 @@ async fn scan_ports() -> Result<Vec<PortRecord>, String> {
 }
 
 fn scan_ports_blocking() -> Result<Vec<PortRecord>, String> {
-    let output = hidden_command("netstat")
-        .args(["-ano"])
-        .output()
+    let output = powershell_runner::run_probe_command("netstat", &["-ano"], 5)
         .map_err(|err| format!("无法执行 netstat: {err}"))?;
+    if !output.success {
+        return Err(format!(
+            "netstat failed: {}",
+            powershell_runner::native_command_message(&output)
+        ));
+    }
 
-    let text = String::from_utf8_lossy(&output.stdout);
+    let text = output.stdout;
     let system = sysinfo::System::new_all();
     let services = windows_service_map();
     let mut records = Vec::new();
@@ -4035,6 +4156,150 @@ fn scan_ports_blocking() -> Result<Vec<PortRecord>, String> {
     });
     let _ = update_port_history(&records);
     Ok(records)
+}
+
+#[tauri::command]
+async fn create_port_resolution_plan(pid: u32, port: u16) -> Result<PortResolutionPlan, String> {
+    run_blocking(move || create_port_resolution_plan_blocking(pid, port)).await?
+}
+
+fn create_port_resolution_plan_blocking(pid: u32, port: u16) -> Result<PortResolutionPlan, String> {
+    if BLOCKED_PIDS.contains(&pid) {
+        return Err(format!("PID {pid} is protected"));
+    }
+    let records = scan_ports_blocking()?;
+    let record = records
+        .iter()
+        .find(|item| {
+            item.pid == pid
+                && item.local_port == port
+                && item.state.eq_ignore_ascii_case("LISTENING")
+        })
+        .ok_or_else(|| "Port owner changed; rescan before creating a plan".to_string())?;
+    let system = sysinfo::System::new_all();
+    let child_processes = system
+        .processes()
+        .iter()
+        .filter(|(_, process)| process.parent().map(|value| value.as_u32()) == Some(pid))
+        .map(|(child_pid, process)| ChildProcessSummary {
+            pid: child_pid.as_u32(),
+            name: process.name().to_string_lossy().to_string(),
+        })
+        .collect::<Vec<_>>();
+    let related_ports = records
+        .iter()
+        .filter(|item| item.pid == pid)
+        .map(|item| item.local_port)
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect::<Vec<_>>();
+    let mut warnings = Vec::new();
+    if !record.service_names.is_empty() {
+        warnings
+            .push("Windows service owns this port; prefer stopping the service first".to_string());
+    }
+    if matches!(port, 3306 | 5432 | 6379 | 27017 | 9200 | 1433) || record.risk_level == "high" {
+        warnings.push("Sensitive database or middleware port".to_string());
+    }
+    let plan_id = port_resolution_plan_id(record);
+    let plan = PortResolutionPlan {
+        plan_id: plan_id.clone(),
+        pid,
+        port,
+        process_name: record.process_name.clone(),
+        process_path: record.process_path.clone(),
+        command_line: record.command_line.clone(),
+        parent_pid: (record.parent_pid != 0).then_some(record.parent_pid),
+        parent_process_name: (!record.parent_process_name.is_empty())
+            .then(|| record.parent_process_name.clone()),
+        child_processes,
+        service_names: record.service_names.clone(),
+        related_ports,
+        project_root: project_root_from_command_line(&record.command_line),
+        risk_level: record.risk_level.clone(),
+        warnings,
+        recommended_actions: vec![
+            "Open the project directory".to_string(),
+            "Change the project port".to_string(),
+            "Stop the owning service when applicable".to_string(),
+            "Terminate the process and verify port release".to_string(),
+        ],
+    };
+    port_resolution_plans()
+        .lock()
+        .map_err(|_| "Port resolution plan store is unavailable".to_string())?
+        .insert(plan_id, plan.clone());
+    Ok(plan)
+}
+
+#[tauri::command]
+async fn execute_port_resolution_plan(
+    plan_id: String,
+    confirmation_token: Option<String>,
+) -> Result<PortResolutionResult, String> {
+    run_blocking(move || execute_port_resolution_plan_blocking(plan_id, confirmation_token)).await?
+}
+
+fn execute_port_resolution_plan_blocking(
+    plan_id: String,
+    confirmation_token: Option<String>,
+) -> Result<PortResolutionResult, String> {
+    require_risk_operation_token("execute_port_resolution_plan", &plan_id, confirmation_token)?;
+    let plan = port_resolution_plans()
+        .lock()
+        .map_err(|_| "Port resolution plan store is unavailable".to_string())?
+        .remove(&plan_id)
+        .ok_or_else(|| "Port resolution plan does not exist or was already used".to_string())?;
+    let before = scan_ports_blocking()?;
+    if !before.iter().any(|item| {
+        item.pid == plan.pid
+            && item.local_port == plan.port
+            && item.state.eq_ignore_ascii_case("LISTENING")
+    }) {
+        return Err("Port owner changed; execution refused".to_string());
+    }
+    let pid = plan.pid.to_string();
+    let kill = powershell_runner::run_probe_command("taskkill", &["/PID", &pid, "/T"], 10)
+        .map_err(|err| format!("Failed to run taskkill: {err}"))?;
+    let remaining = scan_ports_blocking().unwrap_or_default();
+    let remaining_owners = remaining
+        .into_iter()
+        .filter(|item| item.local_port == plan.port && item.state.eq_ignore_ascii_case("LISTENING"))
+        .collect::<Vec<_>>();
+    let pid_exited = process_name(&sysinfo::System::new_all(), plan.pid).is_empty();
+    let port_released = remaining_owners.is_empty();
+    Ok(PortResolutionResult {
+        success: kill.success && port_released,
+        message: if kill.success {
+            format!("Port {} resolution executed", plan.port)
+        } else {
+            format!(
+                "taskkill failed: {}",
+                powershell_runner::native_command_message(&kill)
+            )
+        },
+        pid_exited,
+        port_released,
+        release_checked_at: unix_timestamp().to_string(),
+        remaining_owners,
+    })
+}
+
+fn port_resolution_plan_id(record: &PortRecord) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(record.pid.to_le_bytes());
+    hasher.update(record.local_port.to_le_bytes());
+    hasher.update(record.process_name.as_bytes());
+    hasher.update(record.process_path.as_bytes());
+    hasher.update(unix_timestamp().to_le_bytes());
+    format!("port-{:x}", hasher.finalize())
+}
+
+fn project_root_from_command_line(command_line: &str) -> Option<String> {
+    command_line
+        .split_whitespace()
+        .find(|item| item.contains("pom.xml") || item.contains("build.gradle"))
+        .map(|item| item.trim_matches('"').to_string())
 }
 
 #[tauri::command]
@@ -4207,10 +4472,13 @@ fn inspect_project_port_configs_blocking(root: &Path) -> Result<Vec<ProjectPortC
         configs.push(ProjectPortConfig {
             id: project_port_config_id(&file, "spring-properties-new", 0),
             kind: "spring-properties-new".to_string(),
-            file: display_path(file),
+            file: display_path(&file),
             current_port: 8080,
             line: 0,
             description: "Spring Boot 默认端口（将创建 server.port）".to_string(),
+            mode: if file.exists() { "append" } else { "create" }.to_string(),
+            will_overwrite_existing_file: false,
+            backup_path: None,
         });
     }
     configs.sort_by(|left, right| left.file.cmp(&right.file).then(left.line.cmp(&right.line)));
@@ -4323,6 +4591,9 @@ fn push_project_port(
             current_port: port,
             line,
             description: description.to_string(),
+            mode: "replace".to_string(),
+            will_overwrite_existing_file: false,
+            backup_path: None,
         });
     }
 }
@@ -4362,8 +4633,27 @@ fn update_project_port_blocking(
         if let Some(parent) = file.parent() {
             fs::create_dir_all(parent).map_err(|err| format!("创建资源目录失败：{err}"))?;
         }
-        fs::write(&file, format!("server.port={new_port}\n"))
-            .map_err(|err| format!("创建 Spring Boot 端口配置失败：{err}"))?;
+        if file.exists() {
+            let text =
+                fs::read_to_string(&file).map_err(|err| format!("读取端口配置失败：{err}"))?;
+            let backup = file.with_file_name(format!(
+                "{}.devenv-backup-{}",
+                file.file_name()
+                    .and_then(OsStr::to_str)
+                    .unwrap_or("port-config"),
+                filename_timestamp()
+            ));
+            fs::copy(&file, &backup).map_err(|err| format!("备份端口配置失败：{err}"))?;
+            let mut updated = text;
+            if !updated.is_empty() && !updated.ends_with('\n') {
+                updated.push('\n');
+            }
+            updated.push_str(&format!("server.port={new_port}\n"));
+            fs::write(&file, updated).map_err(|err| format!("写入端口配置失败：{err}"))?;
+        } else {
+            fs::write(&file, format!("server.port={new_port}\n"))
+                .map_err(|err| format!("创建 Spring Boot 端口配置失败：{err}"))?;
+        }
     } else {
         let text = fs::read_to_string(&file).map_err(|err| format!("读取端口配置失败：{err}"))?;
         let mut lines = text.lines().map(str::to_string).collect::<Vec<_>>();
@@ -5990,8 +6280,11 @@ fn create_managed_python_pip_repair_plan(python_path: String) -> Result<PythonRe
 }
 
 #[tauri::command]
-async fn apply_managed_python_pip_repair(plan_id: String) -> Result<OperationResult, String> {
-    apply_python_repair(plan_id).await
+async fn apply_managed_python_pip_repair(
+    plan_id: String,
+    confirmation_token: Option<String>,
+) -> Result<OperationResult, String> {
+    apply_python_repair(plan_id, confirmation_token).await
 }
 
 fn prepend_path_entries(existing: &str, additions: &[String]) -> (String, Vec<String>) {
@@ -6057,6 +6350,12 @@ fn preview_python_repair(repair_pip: bool, repair_path: bool) -> Result<PythonRe
     hasher.update(python.path.as_bytes());
     hasher.update(created.to_le_bytes());
     hasher.update([repair_pip as u8, repair_path as u8]);
+    hasher.update(std::process::id().to_le_bytes());
+    hasher.update(
+        SAVE_JSON_COUNTER
+            .fetch_add(1, Ordering::Relaxed)
+            .to_le_bytes(),
+    );
     let plan_id = format!("python-{:x}", hasher.finalize());
     let mut actions = Vec::new();
     let mut commands = Vec::new();
@@ -6108,8 +6407,12 @@ fn preview_python_repair(repair_pip: bool, repair_path: bool) -> Result<PythonRe
 }
 
 #[tauri::command]
-async fn apply_python_repair(plan_id: String) -> Result<OperationResult, String> {
+async fn apply_python_repair(
+    plan_id: String,
+    confirmation_token: Option<String>,
+) -> Result<OperationResult, String> {
     run_blocking(move || {
+        require_risk_operation_token("apply_python_repair", &plan_id, confirmation_token)?;
         let pending = python_repair_store()
             .lock()
             .map_err(|_| "Python 修复预览暂时不可用".to_string())?
@@ -8154,7 +8457,7 @@ fn install_profile_missing_blocking(
                     .filter(|value| ["temurin", "zulu", "liberica", "microsoft"].contains(value))
                     .unwrap_or("temurin")
                     .to_string();
-                install_jdk_blocking(app.clone(), major, Some(distribution))
+                install_jdk_blocking(app.clone(), major, Some(distribution), false, None)
             }
             "python" => install_python_blocking(app.clone(), requirement.version.clone()),
             "node" => install_node_blocking(app.clone(), requirement.version.clone()),
@@ -9031,6 +9334,8 @@ pub fn run() {
             uninstall_runtime,
             kill_process,
             scan_ports,
+            create_port_resolution_plan,
+            execute_port_resolution_plan,
             port_history,
             open_process_location,
             run_doctor,
@@ -11409,15 +11714,15 @@ fn run_command_output(
     args: &[&str],
     timeout_seconds: u64,
 ) -> Result<String, String> {
-    let output = hidden_command(executable)
-        .args(args)
-        .output()
+    let output = powershell_runner::run_probe_command(executable, args, timeout_seconds)
         .map_err(|err| format!("执行命令失败：{err}"))?;
-    let _ = timeout_seconds;
-    if !output.status.success() {
-        return Err(command_text(&output.stdout, &output.stderr));
+    if !output.success {
+        return Err(powershell_runner::native_command_message(&output));
     }
-    Ok(command_text(&output.stdout, &output.stderr))
+    Ok(command_text(
+        output.stdout.as_bytes(),
+        output.stderr.as_bytes(),
+    ))
 }
 
 fn process_details(system: &sysinfo::System, pid: u32) -> (String, String, u32, String) {
@@ -12709,21 +13014,21 @@ fn probe_tool(name: &str, executable: Option<PathBuf>, args: &[&str]) -> ToolSta
             detail: "没有在受管目录、当前 PATH 或用户 PATH 中找到".to_string(),
         };
     };
-    let output = hidden_command(&executable).args(args).output();
+    let output = powershell_runner::run_probe_command(&executable, args, probe_timeout(name, args));
     match output {
         Ok(output) => {
-            let detail = command_text(&output.stdout, &output.stderr);
+            let detail = command_text(output.stdout.as_bytes(), output.stderr.as_bytes());
             let version =
                 first_meaningful_output_line(&detail).unwrap_or_else(|| "未返回版本".to_string());
             ToolState {
                 name: name.to_string(),
-                installed: output.status.success(),
+                installed: output.success,
                 version,
                 path: display_path(&executable),
-                detail: if output.status.success() {
+                detail: if output.success {
                     classify_source(&display_path(&executable))
                 } else {
-                    detail
+                    powershell_runner::native_command_message(&output)
                 },
             }
         }
@@ -12734,6 +13039,17 @@ fn probe_tool(name: &str, executable: Option<PathBuf>, args: &[&str]) -> ToolSta
             path: display_path(executable),
             detail: format!("执行失败：{err}"),
         },
+    }
+}
+
+fn probe_timeout(name: &str, args: &[&str]) -> u64 {
+    let lower = name.to_ascii_lowercase();
+    if lower.contains("gradle") {
+        30
+    } else if lower.contains("maven") || args.contains(&"-T") {
+        20
+    } else {
+        10
     }
 }
 
@@ -13808,6 +14124,9 @@ mod tests {
             "restore_environment_backup",
             "cleanup_path_entries",
             "apply_user_environment_configuration",
+            "apply_python_repair",
+            "switch_runtime",
+            "uninstall_runtime",
             "manage_system_platform",
             "manage_local_service",
             "stop_local_service",
@@ -13819,6 +14138,7 @@ mod tests {
             "clear_download_cache",
             "clean_dev_cache",
             "kill_process",
+            "execute_port_resolution_plan",
             "execute_mysql_repair_plan",
             "apply_file_association_plan",
             "rollback_file_association_backup",
@@ -14244,6 +14564,31 @@ mod tests {
             })
             .count();
         assert_eq!(backups, 1);
+    }
+
+    #[test]
+    fn spring_port_update_appends_without_overwriting_existing_properties() {
+        let temp = tempfile::tempdir().unwrap();
+        let resources = temp.path().join("src").join("main").join("resources");
+        fs::create_dir_all(&resources).unwrap();
+        fs::write(
+            temp.path().join("pom.xml"),
+            "<project><artifactId>spring-boot-starter-web</artifactId></project>",
+        )
+        .unwrap();
+        let file = resources.join("application.properties");
+        fs::write(&file, "spring.application.name=demo\n# keep this\n").unwrap();
+        let configs = inspect_project_port_configs_blocking(temp.path()).unwrap();
+        let config = configs
+            .iter()
+            .find(|item| item.kind == "spring-properties-new")
+            .unwrap();
+        assert_eq!(config.mode, "append");
+        update_project_port_blocking(temp.path(), &config.id, 9091).unwrap();
+        let updated = fs::read_to_string(&file).unwrap();
+        assert!(updated.contains("spring.application.name=demo"));
+        assert!(updated.contains("# keep this"));
+        assert!(updated.contains("server.port=9091"));
     }
 
     #[test]

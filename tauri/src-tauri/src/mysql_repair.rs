@@ -7,7 +7,10 @@ use std::io::{Read, Seek, SeekFrom};
 use std::net::{Ipv4Addr, SocketAddrV4, TcpListener};
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::{Mutex, OnceLock};
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    Mutex, OnceLock,
+};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::powershell_runner;
@@ -145,6 +148,7 @@ pub struct MySqlPendingExecutionGuard {
 
 static PLANS: OnceLock<Mutex<HashMap<String, PendingPlan>>> = OnceLock::new();
 static BACKUPS: OnceLock<Mutex<Vec<BackupReceipt>>> = OnceLock::new();
+static PLAN_ID_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 fn plans() -> &'static Mutex<HashMap<String, PendingPlan>> {
     PLANS.get_or_init(|| Mutex::new(HashMap::new()))
@@ -954,6 +958,12 @@ pub fn create_plan(candidate_id: String, action: String) -> Result<MySqlRepairPl
     hasher.update(candidate.id.as_bytes());
     hasher.update(action.as_bytes());
     hasher.update(created.to_le_bytes());
+    hasher.update(std::process::id().to_le_bytes());
+    hasher.update(
+        PLAN_ID_COUNTER
+            .fetch_add(1, Ordering::Relaxed)
+            .to_le_bytes(),
+    );
     let plan_id = format!("mysql-{:x}", hasher.finalize());
     let risk_level = mysql_action_risk(&action).to_string();
     let plan_fingerprint = plan_fingerprint(&candidate, &action);

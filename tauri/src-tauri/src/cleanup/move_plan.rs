@@ -1,6 +1,6 @@
 use super::migration::{ensure_movable_source, execute_move_plan, target_root_for_drive};
 use super::model::{MovePlan, MoveResult};
-use super::utils::{directory_size_filtered, generated_at, path_id};
+use super::utils::{directory_size_filtered, generated_at, unique_id};
 use std::path::{Path, PathBuf};
 
 fn plan_for_source(source: &Path, target: PathBuf, mode: &str) -> Result<MovePlan, String> {
@@ -18,7 +18,7 @@ fn plan_for_source(source: &Path, target: PathBuf, mode: &str) -> Result<MovePla
         warnings.push("Junction 会把原路径桥接到目标盘；执行前请关闭相关程序。".to_string());
     }
     Ok(MovePlan {
-        plan_id: format!("move-{}-{}", generated_at(), &path_id(mode, source)[..12]),
+        plan_id: unique_id("move"),
         created_at: generated_at(),
         source: source.to_string_lossy().to_string(),
         target: target.to_string_lossy().to_string(),

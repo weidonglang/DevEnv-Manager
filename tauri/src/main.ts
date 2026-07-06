@@ -61,6 +61,8 @@ import type {
   RuntimeInfo,
   JavaEnvironmentReport,
   PortRecord,
+  PortResolutionPlan,
+  PortResolutionResult,
   PortHistorySummary,
   PortSortKey,
   SortDirection,
@@ -347,6 +349,7 @@ app.innerHTML = `
               <option value="21" selected>JDK 21</option>
               <option value="25">JDK 25</option>
             </select>
+            <label class="inline-check"><input type="checkbox" id="jdk-switch-after-install" />安装后设为当前 JDK</label>
             <button id="install-jdk">${icon(Download)}<span>安装</span></button>
           </div>
           <div id="java-environment" class="java-environment"><div class="empty">点击“检查当前 JDK”核对 JAVA_HOME、PATH、java、javac、Maven 和 Gradle</div></div>
@@ -2389,25 +2392,16 @@ async function runRuntimeOperation(
 async function terminatePortProcess(pid: number) {
   const record = state.ports.find((item) => item.pid === pid);
   const label = record ? `${record.processName} / PID ${pid}` : `PID ${pid}`;
-  if (!(await askForConfirmation(`将结束 ${label} 及其子进程。确定继续吗？`))) return;
+  if (!record) {
+    showToast("请先重新扫描端口后再生成诊断计划", true);
+    return;
+  }
   try {
-    const planId = `pid-${pid}-force-false-allow-false`;
-    const fingerprint = await processActionFingerprint("kill_process", planId, "high");
-    const token = await createBackendConfirmation("kill_process", planId, "high", fingerprint, false);
-    let result = await invoke<KillResult>("kill_process", { pid, force: false, allowCaution: false, confirmationToken: token.token });
-    if (result.needsForce) {
-      const force = await askForConfirmation(`${result.message}\n\n是否改为强制结束？`);
-      if (!force) {
-        showToast("已取消强制结束");
-        return;
-      }
-      if (!(await askForConfirmation("强制结束是极高风险操作。第一次确认：我已保存相关工作。"))) return;
-      if (!(await askForConfirmation("第二次确认：我理解这可能导致数据未保存或服务中断。"))) return;
-      const forcePlanId = `pid-${pid}-force-true-allow-false`;
-      const forceFingerprint = await processActionFingerprint("kill_process", forcePlanId, "critical");
-      const forceToken = await createBackendConfirmation("kill_process", forcePlanId, "critical", forceFingerprint, true);
-      result = await invoke<KillResult>("kill_process", { pid, force: true, allowCaution: false, confirmationToken: forceToken.token });
-    }
+    const plan = await invoke<PortResolutionPlan>("create_port_resolution_plan", { pid, port: record.localPort });
+    const warningText = plan.warnings.length ? `\n\n风险：\n${plan.warnings.join("\n")}` : "";
+    if (!(await askForConfirmation(`将按诊断计划处理 ${label} 占用的端口 ${plan.port}。执行前会再次确认端口 owner 未变化。${warningText}\n\n确定继续吗？`))) return;
+    const token = await riskOperationToken("execute_port_resolution_plan", plan.planId, "high", false);
+    const result = await invoke<PortResolutionResult>("execute_port_resolution_plan", { planId: plan.planId, confirmationToken: token.token });
     showToast(result.message, !result.success);
     state.ports = await invoke<PortRecord[]>("scan_ports");
     state.portHistory = await invoke<PortHistorySummary[]>("port_history");
@@ -3118,6 +3112,20 @@ async function riskOperationToken(
   return createBackendConfirmation(actionId, planId, riskLevel, fingerprint, tripleConfirmed, backupReceipt, command);
 }
 
+function runtimePlanId(kind: string, version: string, path: string | null) {
+  return `${kind.trim()}:${version.trim()}:${(path || "").trim()}`;
+}
+
+async function invokeSwitchRuntime(kind: string, version: string, path: string | null) {
+  const token = await riskOperationToken("switch_runtime", runtimePlanId(kind, version, path), "medium", false, "environment-backup");
+  return invoke<OperationResult>("switch_runtime", { kind, version, path, confirmationToken: token.token });
+}
+
+async function invokeUninstallRuntime(kind: string, version: string, path: string | null) {
+  const token = await riskOperationToken("uninstall_runtime", runtimePlanId(kind, version, path), "high", true);
+  return invoke<OperationResult>("uninstall_runtime", { kind, version, path, confirmationToken: token.token });
+}
+
 function renderSafetyDisclaimer() {
   const slot = document.querySelector<HTMLElement>("#safety-disclaimer-slot");
   if (!slot) return;
@@ -3590,9 +3598,15 @@ document.querySelector("#discover-runtimes")?.addEventListener("click", async ()
 document.querySelector("#install-jdk")?.addEventListener("click", () => {
   const select = document.querySelector<HTMLSelectElement>("#jdk-version");
   const distribution = document.querySelector<HTMLSelectElement>("#jdk-distribution");
+  const switchAfterInstall = document.querySelector<HTMLInputElement>("#jdk-switch-after-install")?.checked ?? false;
   if (!select || !distribution) return;
   void runRuntimeOperation(
-    () => invoke<OperationResult>("install_jdk", { version: select.value, distribution: distribution.value }),
+    async () => {
+      const confirmationToken = switchAfterInstall
+        ? (await riskOperationToken("switch_runtime", runtimePlanId("jdk", `${select.value}-${distribution.value}`, ""), "medium", false, "environment-backup")).token
+        : null;
+      return invoke<OperationResult>("install_jdk", { version: select.value, distribution: distribution.value, switchAfterInstall, confirmationToken });
+    },
     `正在安装 JDK ${select.value}`,
     "JDK",
   );
@@ -4530,7 +4544,10 @@ document.addEventListener("click", async (event) => {
     const plan = state.pythonRepairPlan;
     if (!plan) return;
     if (!(await askForConfirmation(`将执行 ${plan.actions.length} 项 Python 修复，并先保存用户环境备份。pip 升级可能联网，确定继续吗？`))) return;
-    void runOperation(() => invoke<OperationResult>("apply_python_repair", { planId: plan.planId }), "正在执行并验证 Python 修复").then(async () => {
+    void runOperation(async () => {
+      const token = await riskOperationToken("apply_python_repair", plan.planId, "high", false, plan.backupName || "environment-backup");
+      return invoke<OperationResult>("apply_python_repair", { planId: plan.planId, confirmationToken: token.token });
+    }, "正在执行并验证 Python 修复").then(async () => {
       state.pythonRepairPlan = null;
       state.python = await invoke<PythonAnalysis>("analyze_python_environment");
       renderPythonAnalysis();
@@ -5095,7 +5112,7 @@ document.addEventListener("click", async (event) => {
     const targetHome = path || `%DEVENV_HOME%\\current\\jdk（JDK ${version}）`;
     if (!(await askForConfirmation(`将修改当前用户的 JDK 生效链：\n\nJAVA_HOME：${currentHome}\n→ ${targetHome}\n\n受管 PATH 中的 JDK 会保持在首位；切换后将自动验证 java、javac、Maven 与 Gradle。确定继续吗？`))) return;
     void runRuntimeOperation(
-      () => invoke<OperationResult>("switch_runtime", { kind: "jdk", version, path }),
+      () => invokeSwitchRuntime("jdk", version, path),
       `正在切换 JDK ${version}`,
       "JDK",
     );
@@ -5104,7 +5121,7 @@ document.addEventListener("click", async (event) => {
     const version = button.dataset.version || "";
     const path = button.dataset.path || null;
     void runOperation(
-      () => invoke<OperationResult>("uninstall_runtime", { kind: "jdk", version, path }),
+      () => invokeUninstallRuntime("jdk", version, path),
       `正在卸载 JDK ${version}`,
     );
   }
@@ -5112,7 +5129,7 @@ document.addEventListener("click", async (event) => {
     const version = button.dataset.version || "";
     const path = button.dataset.path || null;
     void runRuntimeOperation(
-      () => invoke<OperationResult>("switch_runtime", { kind: "node", version, path }),
+      () => invokeSwitchRuntime("node", version, path),
       `正在切换 Node.js ${version}`,
       "Node.js",
     );
@@ -5121,7 +5138,7 @@ document.addEventListener("click", async (event) => {
     const version = button.dataset.version || "";
     const path = button.dataset.path || null;
     void runOperation(
-      () => invoke<OperationResult>("uninstall_runtime", { kind: "node", version, path }),
+      () => invokeUninstallRuntime("node", version, path),
       `正在卸载 Node.js ${version}`,
     );
   }
@@ -5129,7 +5146,7 @@ document.addEventListener("click", async (event) => {
     const version = button.dataset.version || "";
     const path = button.dataset.path || null;
     void runRuntimeOperation(
-      () => invoke<OperationResult>("switch_runtime", { kind: "go", version, path }),
+      () => invokeSwitchRuntime("go", version, path),
       `正在切换 Go ${version}`,
       "Go",
     );
@@ -5138,7 +5155,7 @@ document.addEventListener("click", async (event) => {
     const version = button.dataset.version || "";
     const path = button.dataset.path || null;
     void runOperation(
-      () => invoke<OperationResult>("uninstall_runtime", { kind: "go", version, path }),
+      () => invokeUninstallRuntime("go", version, path),
       `正在卸载 Go ${version}`,
     );
   }
@@ -5146,7 +5163,7 @@ document.addEventListener("click", async (event) => {
     const version = button.dataset.version || "";
     const path = button.dataset.path || null;
     void runRuntimeOperation(
-      () => invoke<OperationResult>("switch_runtime", { kind: "python", version, path }),
+      () => invokeSwitchRuntime("python", version, path),
       `正在切换 Python ${version}`,
       "Python",
     );
@@ -5155,7 +5172,7 @@ document.addEventListener("click", async (event) => {
     const version = button.dataset.version || "";
     const path = button.dataset.path || null;
     void runOperation(
-      () => invoke<OperationResult>("uninstall_runtime", { kind: "python", version, path }),
+      () => invokeUninstallRuntime("python", version, path),
       `正在卸载 Python ${version}`,
     );
   }
@@ -5164,7 +5181,7 @@ document.addEventListener("click", async (event) => {
     const version = button.dataset.version || "";
     const path = button.dataset.path || null;
     void runRuntimeOperation(
-      () => invoke<OperationResult>("switch_runtime", { kind, version, path }),
+      () => invokeSwitchRuntime(kind, version, path),
       `正在切换 ${kind} ${version}`,
       kind === "maven" ? "Maven" : "Gradle",
     );
@@ -5174,7 +5191,7 @@ document.addEventListener("click", async (event) => {
     const version = button.dataset.version || "";
     const path = button.dataset.path || null;
     void runOperation(
-      () => invoke<OperationResult>("uninstall_runtime", { kind, version, path }),
+      () => invokeUninstallRuntime(kind, version, path),
       `正在卸载 ${kind} ${version}`,
     );
   }
