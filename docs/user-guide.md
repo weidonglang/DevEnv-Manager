@@ -1,6 +1,31 @@
-# DevEnv Manager 1.5.1 Final Stable 操作手册
+# DevEnv Manager 1.8.0 Stable 操作手册
 
-本手册适用于 Windows 10/11 上的 DevEnv Manager 1.5.1。程序定位是开发环境诊断器与安全操作面板，不替代 npm、pnpm、pip、uv、Maven、Gradle、Cargo、chsrc、Scoop、Chocolatey、WSL 等成熟工具。
+本手册覆盖 v1.8.0 的 Fluent workbench、Command Palette、统一 Risk UX、运行时管理、环境修复、Ports & Services、File Associations、Profiles、Reports、Settings，以及更新/发布校验流程。
+
+## 0. v1.8.0 Workbench overview
+
+- Dashboard：查看 JDK/Python/PATH/Ports/File Associations、PowerShell runner、更新状态和快捷入口。
+- Runtimes：发现 JDK、Node.js、Python、Go、Maven、Gradle，安装/切换/卸载高风险动作均走 token gate。
+- Environment：查看 JAVA_HOME raw/expanded、PATH first java/javac/jar、Maven/Gradle Java、备份和修复计划。
+- Ports & Services：扫描端口、过滤、诊断 owner/service、生成并执行 port resolution plan。
+- File Associations：扫描扩展名、搜索 app candidate、生成 plan、apply/rollback 均走确认 token。
+- Profiles：保存、列出、预览导入、导出、删除 profile，apply 使用 plan -> token -> execute。
+- Reports：导出 Doctor、Environment、Python diagnostic、File Association、Cleanup 报告，并查看 Port/Project 报告入口。
+- Settings：管理 root directory、auto update、theme、安全说明、app config、PowerShell runner 和 update source。
+
+### Command Palette
+
+按 `Ctrl+Shift+P` 打开 Command Palette。可以搜索 Run Doctor、Inspect Environment、Scan Ports、Export reports、主题切换和 `Go to ...` 页面跳转。高风险命令不会直接执行，只会进入对应页面的 plan/preview 流程。
+
+### Unified Risk UX
+
+高风险操作统一展示 What will change、Why this is gated、Backup or receipt、Recovery expectation、Token gate、Execution progress、Result、Verification and rollback。环境变量变更后，已经打开的终端、IDE 或服务可能需要重新打开才能读取新环境。
+
+### Update / release verification
+
+正式发布包为 `DevEnv.Manager_1.8.0_x64-setup.exe`。安装或更新前请核对 GitHub/Gitee Release notes 中的 SHA256；应用内 Check Update 应显示 latest version `1.8.0`，下载 URL 指向 v1.8.0 asset，checksum 与 manifest 一致。
+
+本手册适用于 Windows 10/11 上的 DevEnv Manager 1.8.0。程序定位是开发环境诊断器与安全操作面板，不替代 npm、pnpm、pip、uv、Maven、Gradle、Cargo、chsrc、Scoop、Chocolatey、WSL 等成熟工具。
 
 ## 1. 下载、安装与校验
 
