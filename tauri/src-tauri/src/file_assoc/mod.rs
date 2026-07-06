@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
+use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -166,11 +167,45 @@ pub struct FileAssociationBackupRecord {
     pub before: FileAssociationRecord,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileAssociationAppCandidate {
+    pub app_id: String,
+    pub display_name: String,
+    pub executable_path: String,
+    pub source: String,
+    pub confidence: u8,
+    pub exists: bool,
+    pub recommended_command_template: String,
+    pub notes: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileAssociationAppSearchResult {
+    pub query: String,
+    pub normalized_query: String,
+    pub matched_app_id: Option<String>,
+    pub matched_display_name: Option<String>,
+    pub auto_selected: Option<FileAssociationAppCandidate>,
+    pub candidates: Vec<FileAssociationAppCandidate>,
+    pub manual_selection_required: bool,
+    pub message: String,
+}
+
 #[derive(Debug, Clone)]
 struct ExtensionDefinition {
     extension: &'static str,
     category: &'static str,
     description: &'static str,
+}
+
+#[derive(Debug, Clone)]
+struct KnownApp {
+    app_id: &'static str,
+    display_name: &'static str,
+    aliases: &'static [&'static str],
+    exe_names: &'static [&'static str],
 }
 
 pub fn scan_file_associations_blocking() -> Result<FileAssociationReport, String> {
@@ -328,6 +363,77 @@ pub fn create_file_association_plan_blocking(
     };
     plan.plan_fingerprint = plan_fingerprint(&plan);
     Ok(plan)
+}
+
+pub fn search_file_association_app_blocking(
+    query: String,
+    extension: Option<String>,
+) -> Result<FileAssociationAppSearchResult, String> {
+    let query = query.trim().to_string();
+    if query.is_empty() {
+        return Err("请输入目标应用名称".to_string());
+    }
+    let normalized_query = normalize_app_query(&query);
+    if normalized_query.len() < 2 {
+        return Err("应用名称过短，请输入更明确的名称".to_string());
+    }
+    let app = known_apps()
+        .into_iter()
+        .find(|candidate| app_matches_query(candidate, &normalized_query));
+    let Some(app) = app else {
+        return Ok(FileAssociationAppSearchResult {
+            query,
+            normalized_query,
+            matched_app_id: None,
+            matched_display_name: None,
+            auto_selected: None,
+            candidates: Vec::new(),
+            manual_selection_required: true,
+            message: "没有识别到内置应用别名，请手动选择 exe。".to_string(),
+        });
+    };
+
+    let mut candidates = Vec::new();
+    collect_known_location_candidates(&app, &mut candidates);
+    collect_path_candidates(&app, &mut candidates);
+    collect_package_manager_candidates(&app, &mut candidates);
+    collect_app_paths_candidates(&app, &mut candidates);
+    candidates.sort_by(|left, right| {
+        right
+            .confidence
+            .cmp(&left.confidence)
+            .then_with(|| left.executable_path.cmp(&right.executable_path))
+    });
+    deduplicate_candidates(&mut candidates);
+
+    let auto_selected = candidates.iter().find(|item| item.exists).cloned();
+    let message = match &auto_selected {
+        Some(candidate) => format!(
+            "已找到 {}：{}",
+            candidate.display_name, candidate.executable_path
+        ),
+        None => format!("没有自动找到 {}，请手动选择 exe。", app.display_name),
+    };
+    let notes = extension
+        .and_then(|value| normalize_extension(&value).ok())
+        .map(|value| format!("将用于 {value} 的默认打开方式计划"))
+        .into_iter()
+        .collect::<Vec<_>>();
+    if !notes.is_empty() && auto_selected.is_some() {
+        if let Some(first) = candidates.first_mut() {
+            first.notes.extend(notes);
+        }
+    }
+    Ok(FileAssociationAppSearchResult {
+        query,
+        normalized_query,
+        matched_app_id: Some(app.app_id.to_string()),
+        matched_display_name: Some(app.display_name.to_string()),
+        manual_selection_required: auto_selected.is_none(),
+        auto_selected,
+        candidates,
+        message,
+    })
 }
 
 pub fn apply_file_association_plan_blocking(
@@ -926,6 +1032,365 @@ fn extension_definitions() -> Vec<ExtensionDefinition> {
     .collect()
 }
 
+fn known_apps() -> Vec<KnownApp> {
+    vec![
+        KnownApp {
+            app_id: "vscode",
+            display_name: "Visual Studio Code",
+            aliases: &["vscode", "vs code", "code", "visual studio code"],
+            exe_names: &["Code.exe", "code.exe", "code.cmd"],
+        },
+        KnownApp {
+            app_id: "intellij-idea",
+            display_name: "IntelliJ IDEA",
+            aliases: &[
+                "idea",
+                "intellij",
+                "intellij idea",
+                "jetbrains idea",
+                "idea64",
+            ],
+            exe_names: &["idea64.exe", "idea.exe", "idea.bat"],
+        },
+        KnownApp {
+            app_id: "notepad-plus-plus",
+            display_name: "Notepad++",
+            aliases: &["notepad++", "npp", "notepad plus plus"],
+            exe_names: &["notepad++.exe"],
+        },
+        KnownApp {
+            app_id: "7zip",
+            display_name: "7-Zip",
+            aliases: &["7zip", "7-zip", "7z"],
+            exe_names: &["7zFM.exe", "7z.exe"],
+        },
+        KnownApp {
+            app_id: "vlc",
+            display_name: "VLC media player",
+            aliases: &["vlc", "vlc media player"],
+            exe_names: &["vlc.exe"],
+        },
+        KnownApp {
+            app_id: "potplayer",
+            display_name: "PotPlayer",
+            aliases: &["potplayer", "pot player"],
+            exe_names: &["PotPlayerMini64.exe", "PotPlayerMini.exe"],
+        },
+        KnownApp {
+            app_id: "edge",
+            display_name: "Microsoft Edge",
+            aliases: &["edge", "microsoft edge", "msedge"],
+            exe_names: &["msedge.exe"],
+        },
+        KnownApp {
+            app_id: "chrome",
+            display_name: "Google Chrome",
+            aliases: &["chrome", "google chrome"],
+            exe_names: &["chrome.exe"],
+        },
+        KnownApp {
+            app_id: "acrobat",
+            display_name: "Adobe Reader",
+            aliases: &["acrobat", "adobe reader", "adobe acrobat"],
+            exe_names: &["AcroRd32.exe", "Acrobat.exe"],
+        },
+        KnownApp {
+            app_id: "notepad",
+            display_name: "Windows 记事本",
+            aliases: &["notepad", "记事本"],
+            exe_names: &["notepad.exe"],
+        },
+    ]
+}
+
+fn normalize_app_query(value: &str) -> String {
+    value
+        .chars()
+        .filter(|ch| ch.is_ascii_alphanumeric() || ('\u{4e00}'..='\u{9fff}').contains(ch))
+        .flat_map(char::to_lowercase)
+        .collect()
+}
+
+fn app_matches_query(app: &KnownApp, normalized_query: &str) -> bool {
+    app.aliases.iter().any(|alias| {
+        let normalized_alias = normalize_app_query(alias);
+        normalized_alias == normalized_query
+            || normalized_alias.contains(normalized_query)
+            || normalized_query.contains(&normalized_alias)
+    })
+}
+
+fn collect_known_location_candidates(
+    app: &KnownApp,
+    candidates: &mut Vec<FileAssociationAppCandidate>,
+) {
+    let mut paths = Vec::new();
+    let local = env::var_os("LOCALAPPDATA").map(PathBuf::from);
+    let program_files = env::var_os("ProgramFiles").map(PathBuf::from);
+    let program_files_x86 = env::var_os("ProgramFiles(x86)").map(PathBuf::from);
+    match app.app_id {
+        "vscode" => {
+            if let Some(root) = &local {
+                paths.push(
+                    root.join("Programs")
+                        .join("Microsoft VS Code")
+                        .join("Code.exe"),
+                );
+            }
+            for root in [&program_files, &program_files_x86].into_iter().flatten() {
+                paths.push(root.join("Microsoft VS Code").join("Code.exe"));
+            }
+        }
+        "intellij-idea" => {
+            if let Some(root) = &local {
+                collect_jetbrains_idea_dirs(&root.join("Programs").join("JetBrains"), &mut paths);
+                collect_jetbrains_idea_dirs(
+                    &root.join("JetBrains").join("Toolbox").join("apps"),
+                    &mut paths,
+                );
+            }
+            for root in [&program_files, &program_files_x86].into_iter().flatten() {
+                collect_jetbrains_idea_dirs(&root.join("JetBrains"), &mut paths);
+            }
+        }
+        "notepad-plus-plus" => {
+            for root in [&program_files, &program_files_x86].into_iter().flatten() {
+                paths.push(root.join("Notepad++").join("notepad++.exe"));
+            }
+        }
+        "7zip" => {
+            for root in [&program_files, &program_files_x86].into_iter().flatten() {
+                paths.push(root.join("7-Zip").join("7zFM.exe"));
+            }
+        }
+        "vlc" => {
+            for root in [&program_files, &program_files_x86].into_iter().flatten() {
+                paths.push(root.join("VideoLAN").join("VLC").join("vlc.exe"));
+            }
+        }
+        "potplayer" => {
+            for root in [&program_files, &program_files_x86].into_iter().flatten() {
+                paths.push(
+                    root.join("DAUM")
+                        .join("PotPlayer")
+                        .join("PotPlayerMini64.exe"),
+                );
+            }
+        }
+        "edge" => {
+            for root in [&program_files, &program_files_x86].into_iter().flatten() {
+                paths.push(
+                    root.join("Microsoft")
+                        .join("Edge")
+                        .join("Application")
+                        .join("msedge.exe"),
+                );
+            }
+        }
+        "chrome" => {
+            if let Some(root) = &local {
+                paths.push(
+                    root.join("Google")
+                        .join("Chrome")
+                        .join("Application")
+                        .join("chrome.exe"),
+                );
+            }
+            for root in [&program_files, &program_files_x86].into_iter().flatten() {
+                paths.push(
+                    root.join("Google")
+                        .join("Chrome")
+                        .join("Application")
+                        .join("chrome.exe"),
+                );
+            }
+        }
+        "acrobat" => {
+            for root in [&program_files, &program_files_x86].into_iter().flatten() {
+                paths.push(
+                    root.join("Adobe")
+                        .join("Acrobat Reader DC")
+                        .join("Reader")
+                        .join("AcroRd32.exe"),
+                );
+                paths.push(
+                    root.join("Adobe")
+                        .join("Acrobat DC")
+                        .join("Acrobat")
+                        .join("Acrobat.exe"),
+                );
+            }
+        }
+        "notepad" => {
+            if let Some(system_root) = env::var_os("SystemRoot").map(PathBuf::from) {
+                paths.push(system_root.join("System32").join("notepad.exe"));
+            }
+        }
+        _ => {}
+    }
+    for path in paths {
+        push_app_candidate(candidates, app, path, "knownLocation", 95, Vec::new());
+    }
+}
+
+fn collect_jetbrains_idea_dirs(root: &Path, paths: &mut Vec<PathBuf>) {
+    let Ok(entries) = fs::read_dir(root) else {
+        return;
+    };
+    for entry in entries.flatten().take(80) {
+        let path = entry.path();
+        let name = entry.file_name().to_string_lossy().to_ascii_lowercase();
+        if name.contains("intellij idea") || name == "idea" {
+            paths.push(path.join("bin").join("idea64.exe"));
+            paths.push(path.join("bin").join("idea.exe"));
+        }
+        collect_jetbrains_idea_dirs(&path, paths);
+    }
+}
+
+fn collect_path_candidates(app: &KnownApp, candidates: &mut Vec<FileAssociationAppCandidate>) {
+    let Some(path_value) = env::var_os("PATH") else {
+        return;
+    };
+    for directory in env::split_paths(&path_value).take(256) {
+        for exe_name in app.exe_names {
+            let candidate = directory.join(exe_name);
+            if !candidate.is_file() {
+                continue;
+            }
+            let path = if app.app_id == "vscode" && exe_name.ends_with(".cmd") {
+                directory
+                    .parent()
+                    .map(|parent| parent.join("Code.exe"))
+                    .filter(|path| path.is_file())
+                    .unwrap_or(candidate)
+            } else {
+                candidate
+            };
+            push_app_candidate(candidates, app, path, "path", 75, Vec::new());
+        }
+    }
+}
+
+fn collect_package_manager_candidates(
+    app: &KnownApp,
+    candidates: &mut Vec<FileAssociationAppCandidate>,
+) {
+    if let Some(scoop) = env::var_os("SCOOP").map(PathBuf::from) {
+        for exe_name in app.exe_names {
+            push_app_candidate(
+                candidates,
+                app,
+                scoop
+                    .join("apps")
+                    .join(app.app_id)
+                    .join("current")
+                    .join(exe_name),
+                "scoop",
+                80,
+                Vec::new(),
+            );
+        }
+    }
+    if let Some(choco) = env::var_os("ChocolateyInstall").map(PathBuf::from) {
+        for exe_name in app.exe_names {
+            push_app_candidate(
+                candidates,
+                app,
+                choco
+                    .join("lib")
+                    .join(app.app_id)
+                    .join("tools")
+                    .join(exe_name),
+                "chocolatey",
+                78,
+                Vec::new(),
+            );
+        }
+    }
+}
+
+fn collect_app_paths_candidates(app: &KnownApp, candidates: &mut Vec<FileAssociationAppCandidate>) {
+    for path in app_paths_for_exe_names(app.exe_names) {
+        push_app_candidate(candidates, app, path, "appPaths", 90, Vec::new());
+    }
+}
+
+#[cfg(windows)]
+fn app_paths_for_exe_names(exe_names: &[&str]) -> Vec<PathBuf> {
+    use winreg::enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE};
+    use winreg::RegKey;
+
+    let mut result = Vec::new();
+    for hive in [HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE] {
+        let root = RegKey::predef(hive);
+        for exe_name in exe_names {
+            let subkey = format!(
+                r"Software\Microsoft\Windows\CurrentVersion\App Paths\{}",
+                exe_name
+            );
+            let Ok(key) = root.open_subkey(subkey) else {
+                continue;
+            };
+            if let Ok(value) = key.get_value::<String, _>("") {
+                result.push(PathBuf::from(value));
+            }
+        }
+    }
+    result
+}
+
+#[cfg(not(windows))]
+fn app_paths_for_exe_names(_exe_names: &[&str]) -> Vec<PathBuf> {
+    Vec::new()
+}
+
+fn push_app_candidate(
+    candidates: &mut Vec<FileAssociationAppCandidate>,
+    app: &KnownApp,
+    path: PathBuf,
+    source: &str,
+    confidence: u8,
+    notes: Vec<String>,
+) {
+    let exists = path.is_file();
+    if !exists && source != "knownLocation" {
+        return;
+    }
+    let executable_path = path.to_string_lossy().to_string();
+    candidates.push(FileAssociationAppCandidate {
+        app_id: app.app_id.to_string(),
+        display_name: app.display_name.to_string(),
+        recommended_command_template: format!("\"{}\" \"%1\"", executable_path),
+        executable_path,
+        source: source.to_string(),
+        confidence: if exists {
+            confidence
+        } else {
+            confidence.saturating_sub(30)
+        },
+        exists,
+        notes,
+    });
+}
+
+fn deduplicate_candidates(candidates: &mut Vec<FileAssociationAppCandidate>) {
+    let mut seen = BTreeMap::<String, usize>::new();
+    let mut deduped: Vec<FileAssociationAppCandidate> = Vec::new();
+    for candidate in candidates.drain(..) {
+        let key = candidate.executable_path.to_ascii_lowercase();
+        if let Some(index) = seen.get(&key).copied() {
+            if candidate.confidence > deduped[index].confidence {
+                deduped[index] = candidate;
+            }
+            continue;
+        }
+        seen.insert(key, deduped.len());
+        deduped.push(candidate);
+    }
+    *candidates = deduped;
+}
+
 fn backup_root() -> PathBuf {
     dirs::data_dir()
         .or_else(dirs::home_dir)
@@ -994,6 +1459,29 @@ mod tests {
         assert!(is_high_risk_extension(".ps1"));
         assert!(is_high_risk_extension(".exe"));
         assert!(!is_high_risk_extension(".txt"));
+    }
+
+    #[test]
+    fn app_search_matches_common_aliases() {
+        let vscode = known_apps()
+            .into_iter()
+            .find(|app| app_matches_query(app, &normalize_app_query("vs code")))
+            .unwrap();
+        assert_eq!(vscode.app_id, "vscode");
+        let idea = known_apps()
+            .into_iter()
+            .find(|app| app_matches_query(app, &normalize_app_query("jetbrains idea")))
+            .unwrap();
+        assert_eq!(idea.app_id, "intellij-idea");
+    }
+
+    #[test]
+    fn app_search_unknown_query_requires_manual_selection() {
+        let result =
+            search_file_association_app_blocking("definitely unknown editor".to_string(), None)
+                .unwrap();
+        assert!(result.manual_selection_required);
+        assert!(result.candidates.is_empty());
     }
 
     #[test]

@@ -810,6 +810,10 @@ svg {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 }
 
+.grid.three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .panel {
   padding: 16px;
 }
@@ -1589,6 +1593,7 @@ select {
   }
 
   .metrics,
+  .grid.three,
   .grid.two {
     grid-template-columns: 1fr 1fr;
   }

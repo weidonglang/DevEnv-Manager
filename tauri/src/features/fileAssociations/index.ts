@@ -1,5 +1,6 @@
 import type {
   FileAssociationBackupSummary,
+  FileAssociationAppSearchResult,
   FileAssociationPlan,
   FileAssociationRecord,
   FileAssociationReport,
@@ -18,6 +19,9 @@ export type FileAssociationUiState = {
     onlyMissingApp: boolean;
   };
   selectedExtensions: Set<string>;
+  targetAppName: string;
+  targetExecutable: string;
+  appSearch: FileAssociationAppSearchResult | null;
   applyResultMessage: string;
 };
 
@@ -166,11 +170,13 @@ function renderApps(state: FileAssociationUiState, escapeHtml: (value: string) =
         <h3>按应用批量生成计划</h3>
         <div class="small-note">选择目标应用和扩展名后只生成计划；不会立即修改。受保护项会标记为“打开系统设置确认”。</div>
         <div class="form-row">
-          <input id="file-assoc-target-name" list="file-assoc-app-list" placeholder="目标应用名称，例如 VS Code" />
+          <input id="file-assoc-target-name" list="file-assoc-app-list" value="${escapeHtml(state.targetAppName)}" placeholder="目标应用名称，例如 VS Code" />
           <datalist id="file-assoc-app-list">${suggestedFileAssociationApps.map((name) => `<option value="${escapeHtml(name)}"></option>`).join("")}</datalist>
-          <input id="file-assoc-target-exe" placeholder="目标 exe 完整路径" />
+          <button id="search-file-assoc-app">搜索本机应用</button>
+          <input id="file-assoc-target-exe" value="${escapeHtml(state.targetExecutable)}" placeholder="目标 exe 完整路径" />
           <button id="pick-file-assoc-target">选择 exe</button>
         </div>
+        ${renderAppSearchResult(state, escapeHtml)}
         <div class="form-row">
           <input id="file-assoc-extension-input" value="${escapeHtml(selected.join(", "))}" placeholder=".txt, .md, .json" />
           <label class="toggle-row"><input id="file-assoc-advanced-risk" type="checkbox" /><span>高级高风险单项计划</span></label>
@@ -183,6 +189,23 @@ function renderApps(state: FileAssociationUiState, escapeHtml: (value: string) =
       </section>
     </div>
     ${state.applyResultMessage ? `<div class="operation-result">${escapeHtml(state.applyResultMessage)}</div>` : ""}
+  `;
+}
+
+function renderAppSearchResult(state: FileAssociationUiState, escapeHtml: (value: string) => string) {
+  const result = state.appSearch;
+  if (!result) return "";
+  if (!result.candidates.length) {
+    return `<div class="empty">${escapeHtml(result.message)}</div>`;
+  }
+  return `
+    <div class="runtime-list compact-list">
+      ${result.candidates
+        .slice(0, 6)
+        .map((candidate) => `<article class="runtime"><div><strong>${escapeHtml(candidate.displayName)}</strong><span>${candidate.confidence}% · ${escapeHtml(candidate.source)}</span></div><small>${escapeHtml(candidate.executablePath)}</small><small>${escapeHtml(candidate.recommendedCommandTemplate)}</small><button data-file-assoc-use-candidate="${escapeHtml(candidate.executablePath)}" data-file-assoc-candidate-name="${escapeHtml(candidate.displayName)}" ${candidate.exists ? "" : "disabled"}>使用此 exe</button></article>`)
+        .join("")}
+    </div>
+    <div class="small-note">${escapeHtml(result.message)}</div>
   `;
 }
 

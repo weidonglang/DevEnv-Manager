@@ -3,6 +3,7 @@ mod diagnostics;
 mod env_core;
 mod file_assoc;
 mod mysql_repair;
+mod powershell_runner;
 mod safety;
 
 use serde::{Deserialize, Serialize};
@@ -1023,6 +1024,30 @@ const RISK_OPERATION_REGISTRY: &[RiskOperationSpec] = &[
         description: "恢复用户环境变量备份",
     },
     RiskOperationSpec {
+        command: "restore_env_backup",
+        action_id: "restore_env_backup",
+        risk_level: "high",
+        requires_backup: true,
+        requires_token: true,
+        description: "恢复环境可靠性备份",
+    },
+    RiskOperationSpec {
+        command: "rollback_env_repair",
+        action_id: "rollback_env_repair",
+        risk_level: "high",
+        requires_backup: true,
+        requires_token: true,
+        description: "回滚环境修复备份",
+    },
+    RiskOperationSpec {
+        command: "restore_environment_backup",
+        action_id: "restore_environment_backup",
+        risk_level: "high",
+        requires_backup: true,
+        requires_token: true,
+        description: "恢复指定环境变量历史备份",
+    },
+    RiskOperationSpec {
         command: "cleanup_path_entries",
         action_id: "cleanup_path_entries",
         risk_level: "medium",
@@ -1396,11 +1421,6 @@ fn env_snapshot() -> EnvSnapshot {
 }
 
 #[tauri::command]
-async fn configure_user_environment() -> Result<OperationResult, String> {
-    run_blocking(configure_user_environment_blocking).await?
-}
-
-#[tauri::command]
 fn storage_cleanup_architecture() -> cleanup::CleanupArchitecture {
     cleanup::architecture()
 }
@@ -1748,8 +1768,15 @@ async fn verify_env_after_apply(
 }
 
 #[tauri::command]
-async fn rollback_env_repair(backup_name: String) -> Result<env_core::EnvRepairResult, String> {
-    run_blocking(move || env_core::restore_env_backup(backup_name)).await?
+async fn rollback_env_repair(
+    backup_name: String,
+    confirmation_token: Option<String>,
+) -> Result<env_core::EnvRepairResult, String> {
+    run_blocking(move || {
+        require_risk_operation_token("rollback_env_repair", &backup_name, confirmation_token)?;
+        env_core::restore_env_backup(backup_name)
+    })
+    .await?
 }
 
 #[tauri::command]
@@ -1818,26 +1845,37 @@ fn verify_external_jdk_blocking(jdk_path: String) -> Result<Vec<ValidationCheck>
         return Err("JDK 根目录不存在".to_string());
     }
     let exe_suffix = if cfg!(windows) { ".exe" } else { "" };
+    let (java_title, java_args) = external_jdk_tool_probe("java");
+    let (javac_title, javac_args) = external_jdk_tool_probe("javac");
+    let (jar_title, jar_args) = external_jdk_tool_probe("jar");
     Ok(vec![
         verify_jdk_tool(
             "java-version",
-            "java -version",
+            java_title,
             &root.join("bin").join(format!("java{exe_suffix}")),
-            &["-version"],
+            java_args,
         ),
         verify_jdk_tool(
             "javac-version",
-            "javac -version",
+            javac_title,
             &root.join("bin").join(format!("javac{exe_suffix}")),
-            &["-version"],
+            javac_args,
         ),
         verify_jdk_tool(
             "jar-version",
-            "jar --version",
+            jar_title,
             &root.join("bin").join(format!("jar{exe_suffix}")),
-            &["--version"],
+            jar_args,
         ),
     ])
+}
+
+fn external_jdk_tool_probe(tool: &str) -> (&'static str, &'static [&'static str]) {
+    match tool {
+        "jar" => ("jar --help", &["--help"]),
+        "javac" => ("javac -version", &["-version"]),
+        _ => ("java -version", &["-version"]),
+    }
 }
 
 fn verify_jdk_tool(id: &str, title: &str, executable: &Path, args: &[&str]) -> ValidationCheck {
@@ -1934,8 +1972,15 @@ async fn inspect_env_backup(backup_name: String) -> Result<env_core::EnvBackupDi
 }
 
 #[tauri::command]
-async fn restore_env_backup(backup_name: String) -> Result<env_core::EnvRepairResult, String> {
-    run_blocking(move || env_core::restore_env_backup(backup_name)).await?
+async fn restore_env_backup(
+    backup_name: String,
+    confirmation_token: Option<String>,
+) -> Result<env_core::EnvRepairResult, String> {
+    run_blocking(move || {
+        require_risk_operation_token("restore_env_backup", &backup_name, confirmation_token)?;
+        env_core::restore_env_backup(backup_name)
+    })
+    .await?
 }
 
 #[tauri::command]
@@ -2042,15 +2087,11 @@ async fn rollback_move(
 }
 
 #[tauri::command]
-async fn create_junction_bridge(
+async fn create_junction_bridge_plan(
     source: String,
     target: String,
-) -> Result<cleanup::MoveResult, String> {
-    run_blocking(move || {
-        let paths = load_paths()?;
-        cleanup::create_junction_bridge(&paths.root, source, target)
-    })
-    .await?
+) -> Result<cleanup::MovePlan, String> {
+    run_blocking(move || cleanup::create_junction_bridge_plan(source, target)).await?
 }
 
 #[tauri::command]
@@ -2870,7 +2911,10 @@ fn restore_user_environment_blocking() -> Result<OperationResult, String> {
 }
 
 #[tauri::command]
-fn restore_environment_backup(file_name: String) -> Result<OperationResult, String> {
+fn restore_environment_backup(
+    file_name: String,
+    confirmation_token: Option<String>,
+) -> Result<OperationResult, String> {
     if !file_name.starts_with("env-backup-")
         || !file_name.ends_with(".json")
         || file_name
@@ -2879,6 +2923,7 @@ fn restore_environment_backup(file_name: String) -> Result<OperationResult, Stri
     {
         return Err("环境备份文件名无效".to_string());
     }
+    require_risk_operation_token("restore_environment_backup", &file_name, confirmation_token)?;
     let paths = load_paths()?;
     let source = paths.config().join("env_backups").join(&file_name);
     let backup: Value = read_json(&source)?;
@@ -6884,19 +6929,23 @@ fn launch_elevated_wsl(distro: Option<&str>, mode: &str) -> Result<(), String> {
         }
         _ => return Err("不支持的 WSL 授权操作".to_string()),
     };
-    let mut command = hidden_command("powershell.exe");
-    command.args(["-NoProfile", "-NonInteractive", "-Command", script]);
-    if let Some(distro) = distro {
-        command.env("DEVENV_WSL_DISTRO", distro);
-    }
-    let output = command
-        .output()
-        .map_err(|err| format!("启动 WSL 授权操作失败：{err}"))?;
-    if !output.status.success() {
-        return Err(format!(
-            "启动 WSL 授权操作失败：{}",
-            command_text(&output.stdout, &output.stderr)
-        ));
+    let script = if let Some(distro) = distro {
+        format!("$env:DEVENV_WSL_DISTRO={:?}; {script}", distro)
+    } else {
+        script.to_string()
+    };
+    let output = powershell_runner::run_powershell(powershell_runner::PowerShellRequest {
+        script,
+        args: Vec::new(),
+        cwd: None,
+        timeout_seconds: 30,
+        risk_level: "low".to_string(),
+        requires_admin: false,
+        allow_network: false,
+        confirmation_token: None,
+    })?;
+    if !output.success {
+        return Err(format!("启动 WSL 授权操作失败：{}", output.stderr.trim()));
     }
     Ok(())
 }
@@ -7023,16 +7072,17 @@ fn windows_service_inventory() -> Vec<WindowsServiceInfo> {
     #[cfg(windows)]
     {
         let script = "$ErrorActionPreference='Stop'; @(Get-CimInstance Win32_Service | Select-Object Name,State,PathName) | ConvertTo-Json -Compress";
-        let Ok(output) = hidden_command("powershell.exe")
-            .args(["-NoProfile", "-NonInteractive", "-Command", script])
-            .output()
-        else {
+        let Ok(output) = powershell_runner::run_powershell_script(script, Vec::new(), 20) else {
             return Vec::new();
         };
-        if !output.status.success() {
+        if !output.success {
             return Vec::new();
         }
-        let text = command_text(&output.stdout, &output.stderr);
+        let text = if output.stdout.trim().is_empty() {
+            output.stderr
+        } else {
+            output.stdout
+        };
         let Ok(value) = serde_json::from_str::<Value>(&text) else {
             return Vec::new();
         };
@@ -7129,19 +7179,24 @@ fn manage_local_service_blocking(
 async fn local_service_logs(service_name: String) -> Result<String, String> {
     run_blocking(move || {
         let (service, _) = validated_database_service(&service_name)?;
-        let script = "$needle=$env:DEVENV_SERVICE_NAME; Get-WinEvent -FilterHashtable @{LogName='Application'; StartTime=(Get-Date).AddDays(-7)} -MaxEvents 500 -ErrorAction SilentlyContinue | Where-Object { $_.ProviderName -like ('*'+$needle+'*') -or $_.Message -like ('*'+$needle+'*') } | Select-Object -First 50 TimeCreated,LevelDisplayName,ProviderName,Message | Format-List | Out-String -Width 240";
-        let output = hidden_command("powershell.exe")
-            .args(["-NoProfile", "-NonInteractive", "-Command", script])
-            .env("DEVENV_SERVICE_NAME", &service.name)
-            .output()
-            .map_err(|err| format!("读取 Windows 事件日志失败：{err}"))?;
-        if !output.status.success() {
+        let script = "$needle=$args[0]; Get-WinEvent -FilterHashtable @{LogName='Application'; StartTime=(Get-Date).AddDays(-7)} -MaxEvents 500 -ErrorAction SilentlyContinue | Where-Object { $_.ProviderName -like ('*'+$needle+'*') -or $_.Message -like ('*'+$needle+'*') } | Select-Object -First 50 TimeCreated,LevelDisplayName,ProviderName,Message | Format-List | Out-String -Width 240";
+        let output = powershell_runner::run_powershell_script(
+            script,
+            vec![service.name.clone()],
+            20,
+        )
+        .map_err(|err| format!("读取 Windows 事件日志失败：{err}"))?;
+        if !output.success {
             return Err(format!(
                 "读取 Windows 事件日志失败：{}",
-                command_text(&output.stdout, &output.stderr)
+                output.stderr
             ));
         }
-        let text = command_text(&output.stdout, &output.stderr);
+        let text = if output.stdout.trim().is_empty() {
+            output.stderr
+        } else {
+            output.stdout
+        };
         Ok(if text.trim().is_empty() {
             format!("最近 7 天没有找到与 {} 匹配的应用程序事件", service.name)
         } else {
@@ -8796,6 +8851,14 @@ async fn create_file_association_plan(
 }
 
 #[tauri::command]
+async fn search_file_association_app(
+    query: String,
+    extension: Option<String>,
+) -> Result<file_assoc::FileAssociationAppSearchResult, String> {
+    run_blocking(move || file_assoc::search_file_association_app_blocking(query, extension)).await?
+}
+
+#[tauri::command]
 async fn apply_file_association_plan(
     plan: file_assoc::FileAssociationPlan,
     confirmation_token: Option<String>,
@@ -8855,6 +8918,18 @@ async fn export_file_association_report() -> Result<String, String> {
     run_blocking(file_assoc::export_file_association_report_blocking).await?
 }
 
+#[tauri::command]
+async fn powershell_runner_status() -> Result<powershell_runner::PowerShellResult, String> {
+    run_blocking(|| {
+        powershell_runner::run_powershell_script(
+            "$PSVersionTable.PSVersion.ToString()".to_string(),
+            Vec::new(),
+            5,
+        )
+    })
+    .await?
+}
+
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -8912,7 +8987,7 @@ pub fn run() {
             execute_move_plan,
             list_rollback_records,
             rollback_move,
-            create_junction_bridge,
+            create_junction_bridge_plan,
             create_desktop_archive_plan,
             execute_desktop_archive_plan,
             create_downloads_archive_plan,
@@ -8933,7 +9008,6 @@ pub fn run() {
             env_snapshot,
             inspect_java_environment,
             inspect_agent_traces,
-            configure_user_environment,
             preview_user_environment_configuration,
             apply_user_environment_configuration,
             list_environment_backups,
@@ -9010,13 +9084,15 @@ pub fn run() {
             generate_vscode_config,
             scan_file_associations,
             create_file_association_plan,
+            search_file_association_app,
             apply_file_association_plan,
             rollback_file_association_backup,
             list_file_association_backups,
             open_default_apps_settings,
             open_file_type_settings,
             open_file_association_backup_dir,
-            export_file_association_report
+            export_file_association_report,
+            powershell_runner_status
         ])
         .run(tauri::generate_context!())
         .expect("error while running DevEnv Manager");
@@ -9769,17 +9845,15 @@ fn restore_environment_values(
 fn broadcast_environment_change() {
     #[cfg(windows)]
     {
-        let _ = hidden_command("powershell")
-            .args([
-                "-NoProfile",
-                "-Command",
-                r#"
+        let _ = powershell_runner::run_powershell_script(
+            r#"
 Add-Type -Namespace Win32 -Name Native -MemberDefinition '[DllImport("user32.dll", SetLastError=true, CharSet=CharSet.Auto)] public static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg, UIntPtr wParam, string lParam, uint fuFlags, uint uTimeout, out UIntPtr lpdwResult);';
 $result = [UIntPtr]::Zero
 [Win32.Native]::SendMessageTimeout([IntPtr]0xffff, 0x1a, [UIntPtr]::Zero, 'Environment', 0x2, 5000, [ref]$result) | Out-Null
 "#,
-            ])
-            .output();
+            Vec::new(),
+            10,
+        );
     }
 }
 
@@ -13723,6 +13797,9 @@ mod tests {
         for command in [
             "apply_env_repair_plan",
             "restore_user_environment",
+            "restore_env_backup",
+            "rollback_env_repair",
+            "restore_environment_backup",
             "cleanup_path_entries",
             "apply_user_environment_configuration",
             "manage_system_platform",
@@ -13744,6 +13821,13 @@ mod tests {
             assert!(spec.requires_token);
             assert!(matches!(spec.risk_level, "medium" | "high" | "critical"));
         }
+    }
+
+    #[test]
+    fn external_jdk_jar_probe_is_jdk8_compatible() {
+        let (title, args) = external_jdk_tool_probe("jar");
+        assert_eq!(title, "jar --help");
+        assert_eq!(args, &["--help"]);
     }
 
     #[test]

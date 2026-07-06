@@ -307,6 +307,17 @@ export type CommandRunResult = {
   elapsedMs: number;
 };
 
+export type PowerShellResult = {
+  success: boolean;
+  exitCode?: number | null;
+  stdout: string;
+  stderr: string;
+  elapsedMs: number;
+  timedOut: boolean;
+  executable: string;
+  killedProcessTree: boolean;
+};
+
 export type CommandSafetyAssessment = {
   allowed: boolean;
   risk: string;
@@ -728,6 +739,37 @@ export type FileAssociationPlanRequest = {
   targetExecutable: string;
   extensions: string[];
   advancedHighRisk: boolean;
+};
+
+export type FileAssociationAppCandidate = {
+  appId: string;
+  displayName: string;
+  executablePath: string;
+  source:
+    | "knownLocation"
+    | "appPaths"
+    | "registry"
+    | "path"
+    | "scoop"
+    | "chocolatey"
+    | "winget"
+    | "jetbrainsToolbox"
+    | "manualCache";
+  confidence: number;
+  exists: boolean;
+  recommendedCommandTemplate: string;
+  notes: string[];
+};
+
+export type FileAssociationAppSearchResult = {
+  query: string;
+  normalizedQuery: string;
+  matchedAppId?: string | null;
+  matchedDisplayName?: string | null;
+  autoSelected?: FileAssociationAppCandidate | null;
+  candidates: FileAssociationAppCandidate[];
+  manualSelectionRequired: boolean;
+  message: string;
 };
 
 export type FileAssociationTarget = {

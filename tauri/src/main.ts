@@ -69,6 +69,7 @@ import type {
   NetworkDiagnostics,
   CacheEntry,
   CommandRunResult,
+  PowerShellResult,
   CommandSafetyAssessment,
   AgentTraceReport,
   EnvHealthCheck,
@@ -123,6 +124,7 @@ import type {
   AppUsageReport,
   EnvironmentConfigPreview,
   EnvironmentBackupInfo,
+  FileAssociationAppSearchResult,
   FileAssociationApplyResult,
   FileAssociationBackupSummary,
   FileAssociationPlan,
@@ -213,7 +215,7 @@ app.innerHTML = `
           </div>
           <div id="effective-runtime-list" class="effective-runtime-list"><div class="empty">正在读取当前工具版本</div></div>
         </section>
-        <div class="grid two">
+        <div class="grid three">
           <section class="panel">
             <div class="panel-title">${icon(Activity)}<h2>系统快照</h2></div>
             <div id="snapshot-list" class="kv-list"></div>
@@ -845,6 +847,13 @@ app.innerHTML = `
             </div>
             <div id="cache-list" class="runtime-list"></div>
           </section>
+          <section class="panel">
+            <div class="panel-head">
+              <div class="panel-title">${icon(Terminal)}<h2>PowerShell Runner</h2></div>
+              <button id="run-powershell-status">${icon(RefreshCw)}<span>测试</span></button>
+            </div>
+            <div id="powershell-runner-status" class="runtime-list"><div class="empty">尚未运行测试命令</div></div>
+          </section>
         </div>
         <section class="panel runtime-manager">
           <div class="panel-title">${icon(Terminal)}<h2>命令面板</h2></div>
@@ -936,6 +945,7 @@ const state = {
   selectedPort: null as PortRecord | null,
   network: null as NetworkDiagnostics | null,
   cache: [] as CacheEntry[],
+  powershell: null as PowerShellResult | null,
   health: [] as EnvHealthCheck[],
   profiles: [] as ConfigProfile[],
   profileImportPreview: null as ConfigProfileImportPreview | null,
@@ -990,6 +1000,9 @@ const state = {
       onlyMissingApp: false,
     },
     selectedExtensions: new Set<string>(),
+    targetAppName: "",
+    targetExecutable: "",
+    appSearch: null,
     applyResultMessage: "",
   } as FileAssociationUiState,
   safeMode: false,
@@ -2423,7 +2436,15 @@ async function runDoctorAction(action: string) {
     return;
   }
   if (action === "configure_env") {
-    await runOperation(() => invoke<OperationResult>("configure_user_environment"), "正在配置用户环境变量");
+    await runOperation(async () => {
+      state.environmentPreview = await invoke<EnvironmentConfigPreview>("preview_user_environment_configuration");
+      activateView("environment");
+      renderEnvironmentPreview();
+      return {
+        success: true,
+        message: "环境配置预览已生成；确认差异后再写入。",
+      };
+    }, "正在计算环境配置差异");
     return;
   }
   if (action === "discover_runtimes") {
@@ -2719,6 +2740,21 @@ function renderNetwork() {
     : `<div class="empty">还没有网络诊断结果</div>`;
 }
 
+function renderPowerShellRunnerStatus() {
+  const element = document.querySelector<HTMLElement>("#powershell-runner-status");
+  if (!element) return;
+  const result = state.powershell;
+  if (!result) {
+    element.innerHTML = `<div class="empty">尚未运行测试命令</div>`;
+    return;
+  }
+  element.innerHTML = `<article class="runtime">
+    <div><strong>${escapeHtml(result.executable)}</strong><span>${result.timedOut ? "已超时并终止" : result.success ? "可用" : "执行失败"}</span></div>
+    <small>耗时：${result.elapsedMs} ms · 退出码：${result.exitCode ?? "无"} · 终止进程树：${result.killedProcessTree ? "是" : "否"}</small>
+    <small>${escapeHtml((result.stdout || result.stderr || "没有输出").trim())}</small>
+  </article>`;
+}
+
 function renderCache() {
   const element = document.querySelector<HTMLElement>("#cache-list");
   if (!element) return;
@@ -2796,8 +2832,32 @@ async function pickFileAssociationTarget() {
       filters: [{ name: "Windows 应用程序", extensions: ["exe"] }],
     });
     if (!selected || Array.isArray(selected)) return;
+    state.fileAssociations.targetExecutable = selected;
     const input = document.querySelector<HTMLInputElement>("#file-assoc-target-exe");
     if (input) input.value = selected;
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), true);
+  }
+}
+
+async function searchFileAssociationApp() {
+  const query = document.querySelector<HTMLInputElement>("#file-assoc-target-name")?.value.trim() || "";
+  const extensionText = document.querySelector<HTMLInputElement>("#file-assoc-extension-input")?.value.trim() || "";
+  const extension = extensionText.split(/[,\s]+/).find(Boolean) || null;
+  if (!query) {
+    showToast("请输入目标应用名称", true);
+    return;
+  }
+  showToast("正在搜索本机应用");
+  try {
+    const result = await invoke<FileAssociationAppSearchResult>("search_file_association_app", { query, extension });
+    state.fileAssociations.targetAppName = result.matchedDisplayName || query;
+    state.fileAssociations.appSearch = result;
+    if (result.autoSelected?.exists) {
+      state.fileAssociations.targetExecutable = result.autoSelected.executablePath;
+    }
+    renderFileAssociations();
+    showToast(result.message, result.manualSelectionRequired);
   } catch (error) {
     showToast(error instanceof Error ? error.message : String(error), true);
   }
@@ -2820,6 +2880,8 @@ async function createFileAssociationPlan(extensionsOverride?: string[]) {
     extensions,
     advancedHighRisk,
   };
+  state.fileAssociations.targetAppName = targetAppName;
+  state.fileAssociations.targetExecutable = targetExecutable;
   showToast("正在生成文件关联修改计划");
   try {
     state.fileAssociations.plan = await invoke<FileAssociationPlan>("create_file_association_plan", { request });
@@ -3876,6 +3938,16 @@ document.querySelector("#run-network")?.addEventListener("click", async () => {
     showToast(error instanceof Error ? error.message : String(error), true);
   }
 });
+document.querySelector("#run-powershell-status")?.addEventListener("click", async () => {
+  showToast("正在运行 PowerShell runner 测试");
+  try {
+    state.powershell = await invoke<PowerShellResult>("powershell_runner_status");
+    renderPowerShellRunnerStatus();
+    showToast(state.powershell.timedOut ? "已超时并终止" : "PowerShell runner 测试完成", state.powershell.timedOut || !state.powershell.success);
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), true);
+  }
+});
 document.querySelector("#load-cache")?.addEventListener("click", async () => {
   state.cache = await invoke<CacheEntry[]>("cache_entries", { calculateHash: false });
   renderCache();
@@ -4347,7 +4419,7 @@ document.querySelectorAll<HTMLButtonElement>(".sort-head").forEach((button) => {
 
 document.addEventListener("click", async (event) => {
   const button = (event.target as HTMLElement).closest<HTMLButtonElement>(
-    "button[data-action], button[data-toolchain-action], button[data-python-tool], button[data-page-key], button[data-dev-cache], button[data-chsrc-action], button[data-cleanup-report-action], button[data-restore-env-backup], button[data-mysql-action], button[data-file-assoc-tab], button[data-file-assoc-plan-one], button[data-file-assoc-rollback], #scan-file-associations, #open-default-apps-settings, #export-file-association-report, #pick-file-assoc-target, #create-file-assoc-plan, #apply-file-assoc-plan, #open-file-type-settings, #load-file-assoc-backups, #open-file-assoc-backup-dir, #apply-project-config, #apply-environment-preview, #apply-python-repair, #create-managed-python-pip-plan, #execute-mysql-plan, #accept-safety-disclaimer",
+    "button[data-action], button[data-toolchain-action], button[data-python-tool], button[data-page-key], button[data-dev-cache], button[data-chsrc-action], button[data-cleanup-report-action], button[data-restore-env-backup], button[data-mysql-action], button[data-file-assoc-tab], button[data-file-assoc-plan-one], button[data-file-assoc-rollback], button[data-file-assoc-use-candidate], #scan-file-associations, #open-default-apps-settings, #export-file-association-report, #search-file-assoc-app, #pick-file-assoc-target, #create-file-assoc-plan, #apply-file-assoc-plan, #open-file-type-settings, #load-file-assoc-backups, #open-file-assoc-backup-dir, #apply-project-config, #apply-environment-preview, #apply-python-repair, #create-managed-python-pip-plan, #execute-mysql-plan, #accept-safety-disclaimer",
   );
   if (!button) return;
   const fileAssocTab = button.dataset.fileAssocTab as FileAssociationUiState["activeTab"] | undefined;
@@ -4381,6 +4453,18 @@ document.addEventListener("click", async (event) => {
   }
   if (button.id === "pick-file-assoc-target") {
     await pickFileAssociationTarget();
+    return;
+  }
+  if (button.id === "search-file-assoc-app") {
+    await searchFileAssociationApp();
+    return;
+  }
+  const candidateExe = button.dataset.fileAssocUseCandidate;
+  if (candidateExe) {
+    state.fileAssociations.targetExecutable = candidateExe;
+    state.fileAssociations.targetAppName = button.dataset.fileAssocCandidateName || state.fileAssociations.targetAppName;
+    renderFileAssociations();
+    showToast("已选中候选 exe");
     return;
   }
   const planOne = button.dataset.fileAssocPlanOne;
@@ -4600,7 +4684,8 @@ document.addEventListener("click", async (event) => {
   if (button.dataset.action === "restore-env-record") {
     const backupName = button.dataset.backupName || "";
     if (!(await confirmRisk(`将恢复用户级环境变量备份：${backupName}\n恢复前会先备份当前状态。`, "medium"))) return;
-    void invoke<EnvRepairResult>("restore_env_backup", { backupName })
+    const token = await riskOperationToken("restore_env_backup", backupName, "high", false, "environment-backup");
+    void invoke<EnvRepairResult>("restore_env_backup", { backupName, confirmationToken: token.token })
       .then(async (result) => {
         state.envRepairResult = result;
         state.envReliability = await invoke<EnvReliabilitySnapshot>("inspect_env_reliability");
@@ -4668,7 +4753,10 @@ document.addEventListener("click", async (event) => {
   if (restoreBackup) {
     if (!(await askForConfirmation(`将恢复环境备份 ${restoreBackup}；恢复前会再保存当前状态。确定继续吗？`))) return;
     void runOperation(
-      () => invoke<OperationResult>("restore_environment_backup", { fileName: restoreBackup }),
+      async () => {
+        const token = await riskOperationToken("restore_environment_backup", restoreBackup, "high", false, "environment-backup");
+        return invoke<OperationResult>("restore_environment_backup", { fileName: restoreBackup, confirmationToken: token.token });
+      },
       "正在恢复指定环境备份",
     ).then(async () => {
       await loadEnvironmentBackups();

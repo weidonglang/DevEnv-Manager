@@ -1,6 +1,6 @@
 use super::model::{PartitionInfo, PartitionLayoutReport};
+use crate::powershell_runner;
 use serde::Deserialize;
-use std::process::Command;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
@@ -157,20 +157,12 @@ $parts = Get-Partition | ForEach-Object {
 }
 $parts | ConvertTo-Json -Depth 4
 "#;
-        let output = Command::new("powershell.exe")
-            .args([
-                "-NoProfile",
-                "-ExecutionPolicy",
-                "Bypass",
-                "-Command",
-                script,
-            ])
-            .output()
+        let output = powershell_runner::run_powershell_script(script, Vec::new(), 20)
             .map_err(|err| format!("读取分区布局失败：{err}"))?;
-        if !output.status.success() {
-            return Err(String::from_utf8_lossy(&output.stderr).to_string());
+        if !output.success {
+            return Err(output.stderr);
         }
-        parse_partition_layout_json(&String::from_utf8_lossy(&output.stdout))
+        parse_partition_layout_json(&output.stdout)
     }
     #[cfg(not(windows))]
     {
