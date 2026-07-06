@@ -1,17 +1,20 @@
 import type { FeatureContext } from "../app/featureContext";
+import { t } from "../core/i18n";
+
+export type SafeResult<T> = { ok: true; value: T } | { ok: false; error: string };
 
 export function escapeHtml(value: unknown): string {
   return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char] || char);
 }
 
-export function valueOf(source: unknown, path: string, fallback: unknown = "Not available"): string {
+export function valueOf(source: unknown, path: string, fallback: unknown = t("state.notAvailable")): string {
   const value = path.split(".").reduce<unknown>((current, part) => {
     if (current && typeof current === "object" && part in current) return (current as Record<string, unknown>)[part];
     return undefined;
   }, source);
   if (Array.isArray(value)) return String(value.length);
   if (value === null || value === undefined || value === "") return String(fallback);
-  if (typeof value === "object") return Object.keys(value).length ? "Available" : String(fallback);
+  if (typeof value === "object") return Object.keys(value).length ? t("state.available") : String(fallback);
   return String(value);
 }
 
@@ -32,7 +35,7 @@ export function renderLoadingState(label: string): string {
 }
 
 export function renderErrorState(title: string, detail: string, retryAction: string): string {
-  return `<section class="error-state" role="alert"><strong>${escapeHtml(title)}</strong><p>${escapeHtml(detail)}</p>${renderActionButton(retryAction, "Retry", "primary")}</section>`;
+  return `<section class="error-state" role="alert"><strong>${escapeHtml(title)}</strong><p>${escapeHtml(detail)}</p>${renderActionButton(retryAction, t("state.retry"), "primary")}</section>`;
 }
 
 export function renderObjectTable(data: unknown, keys: string[]): string {
@@ -60,5 +63,13 @@ export async function runLoad<T>(context: FeatureContext, label: string, loader:
   } catch (error) {
     context.progress.fail(error instanceof Error ? error.message : String(error));
     return null;
+  }
+}
+
+export async function loadSafe<T>(loader: () => Promise<T>): Promise<SafeResult<T>> {
+  try {
+    return { ok: true, value: await loader() };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) };
   }
 }

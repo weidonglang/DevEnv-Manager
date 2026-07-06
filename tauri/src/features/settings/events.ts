@@ -1,4 +1,6 @@
 import type { FeatureContext } from "../../app/featureContext";
+import { showSafetyNoticeDialog } from "../../components/disclaimerPanel";
+import { localeModeLabel, setLocale, t, type LocaleMode } from "../../core/i18n";
 import { applyTheme, readTheme, type ThemeMode } from "../../ui/theme/controller";
 import { bindAction, valueOf } from "../sharedView";
 import { checkForUpdates, loadSettingsWorkbench, openAppConfigDir, powershellRunnerStatus, resetUiConfig, setAutoCheckUpdate, setRootDir } from "./api";
@@ -14,9 +16,16 @@ export function bindSettingsEvents(context: FeatureContext, state: SettingsWorkb
       bindSettingsEvents(context, state);
     });
   });
+  context.root.querySelectorAll<HTMLButtonElement>("[data-locale-mode]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const mode = button.dataset.localeMode as LocaleMode;
+      setLocale(mode);
+      context.toast(t("settings.languageSaved", { language: localeModeLabel(mode) }));
+    });
+  });
   bindAction(context.root, "save-root-dir", async () => {
     state.config = await setRootDir(context.root.querySelector<HTMLInputElement>("#settings-root")?.value.trim() ?? "");
-    context.toast("Root directory saved.");
+    context.toast(t("settings.rootSaved"));
   });
   bindAction(context.root, "toggle-auto-update", async () => {
     state.config = await setAutoCheckUpdate(valueOf(state.config, "autoCheckUpdate") !== "true");
@@ -29,6 +38,7 @@ export function bindSettingsEvents(context: FeatureContext, state: SettingsWorkb
     bindSettingsEvents(context, state);
   });
   bindAction(context.root, "open-config-dir", openAppConfigDir);
+  bindAction(context.root, "show-safety-notice", () => showSafetyNoticeDialog());
   bindAction(context.root, "reset-ui-config", resetUiConfig);
 }
 

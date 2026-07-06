@@ -1,25 +1,28 @@
 import { escapeHtml, renderActionButton, renderMetric, renderObjectTable, valueOf } from "../sharedView";
+import { t } from "../../core/i18n";
+import { renderFeatureGuide } from "../../components/featureGuide";
 import type { ProfilesState } from "./state";
 
 export function renderProfilesWorkbench(state: ProfilesState): string {
   return `
     <div class="feature-layout">
       <section class="panel">
-        <div class="panel-head"><div><h2>Profiles</h2><p>Save, inspect, plan, apply, import, export, and delete configuration profiles.</p></div></div>
-        <div class="metrics">${renderMetric("Profiles", state.profiles.length)}${renderMetric("Selected", state.selectedProfileId ?? "None")}${renderMetric("Plan", valueOf(state.plan, "planId"))}</div>
-        <div class="form-grid"><input id="profile-name" placeholder="New profile name" /><input id="profile-import-path" placeholder="Import file path" /></div>
+        <div class="panel-head"><div><h2>${t("route.profiles.label")}</h2><p>${t("feature.profiles.description")}</p></div></div>
+        ${renderFeatureGuide("profiles")}
+        <div class="metrics">${renderMetric(t("feature.profiles.profiles"), state.profiles.length)}${renderMetric(t("feature.profiles.selected"), state.selectedProfileId ?? t("feature.ports.none"))}${renderMetric(t("feature.profiles.plan"), valueOf(state.plan, "planId"))}</div>
+        <div class="form-grid"><input id="profile-name" placeholder="${t("feature.profiles.newName")}" /><input id="profile-import-path" placeholder="${t("feature.profiles.importPath")}" /></div>
         <div class="toolbar">
-          ${renderActionButton("refresh-profiles", "List profiles", "primary")}
-          ${renderActionButton("save-profile", "Save current profile")}
-          ${renderActionButton("create-profile-plan", "Create profile apply plan")}
-          ${renderActionButton("execute-profile-plan", "Execute profile apply plan", "danger")}
-          ${renderActionButton("preview-profile-import", "Preview profile import")}
-          ${renderActionButton("export-profiles", "Export profiles")}
-          ${renderActionButton("delete-profile", "Delete profile")}
+          ${renderActionButton("refresh-profiles", t("feature.profiles.list"), "primary")}
+          ${renderActionButton("save-profile", t("feature.profiles.save"))}
+          ${renderActionButton("create-profile-plan", t("feature.profiles.createPlan"))}
+          ${renderActionButton("execute-profile-plan", t("feature.profiles.executePlan"), "danger")}
+          ${renderActionButton("preview-profile-import", t("feature.profiles.previewImport"))}
+          ${renderActionButton("export-profiles", t("feature.profiles.export"))}
+          ${renderActionButton("delete-profile", t("feature.profiles.delete"))}
         </div>
       </section>
-      <section class="panel"><h2>Profiles</h2><div class="data-table">${state.profiles.map((profile) => `<button class="data-row" data-profile-id="${escapeHtml(profile.id)}"><span>${escapeHtml(profile.name)}</span><span>${escapeHtml(profile.path)}</span><span>${escapeHtml(profile.createdAt)}</span></button>`).join("") || `<div class="empty">No profiles saved.</div>`}</div></section>
-      <section class="panel"><h2>Profile apply plan</h2>${state.plan ? renderObjectTable(state.plan, ["profileName", "profileId", "runtimeSwitches", "missingRequirements", "willInstall", "willWriteEnvironment", "backupName", "warnings", "planId"]) : `<div class="empty">No apply plan.</div>`}</section>
+      <section class="panel"><h2>${t("feature.profiles.profiles")}</h2><div class="data-table">${state.profiles.map((profile) => `<button class="data-row" data-profile-id="${escapeHtml(profile.id)}"><span>${escapeHtml(profile.name)}</span><span>${escapeHtml(profile.path)}</span><span>${escapeHtml(profile.createdAt)}</span></button>`).join("") || `<div class="empty">${t("feature.profiles.empty")}</div>`}</div></section>
+      <section class="panel"><h2>${t("feature.profiles.applyPlan")}</h2>${state.plan ? renderObjectTable(state.plan, ["profileName", "profileId", "runtimeSwitches", "missingRequirements", "willInstall", "willWriteEnvironment", "backupName", "warnings", "planId"]) : `<div class="empty">${t("feature.profiles.noApplyPlan")}</div>`}</section>
     </div>
   `;
 }

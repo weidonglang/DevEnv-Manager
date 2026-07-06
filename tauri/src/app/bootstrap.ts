@@ -1,6 +1,9 @@
 import { invoke } from "../core/invoke";
+import { disclaimerPanel } from "../components/disclaimerPanel";
+import { subscribeLocaleChange, t } from "../core/i18n";
 import { runRiskOperation } from "../core/risk";
-import { navigateTo, workbenchRoutes } from "./router";
+import type { ConfigView, OperationResult } from "../types";
+import { navigateTo, routeDescription, routeLabel, workbenchRoutes } from "./router";
 import { readActiveView, writeActiveView, type WorkbenchView } from "./state";
 import { createFeatureContext, type FeatureModule } from "./featureContext";
 import { renderErrorState, renderLoadingState } from "../features/sharedView";
@@ -18,6 +21,7 @@ import { mountReportsFeature } from "../features/reports";
 import { mountSettingsFeature } from "../features/settings";
 
 const app = document.querySelector<HTMLDivElement>("#app");
+let workbenchStarted = false;
 
 const modules: Record<WorkbenchView, FeatureModule> = {
   dashboard: mountDashboardFeature,
@@ -48,7 +52,7 @@ function renderShell() {
       <aside class="sidebar fluent-sidebar">
         <div class="brand">
           <div class="brand-mark">${icon()}</div>
-          <div><strong>DevEnv Manager</strong><span>Workbench</span></div>
+          <div><strong>DevEnv Manager</strong><span>${t("app.brandWorkbench")}</span></div>
         </div>
         <nav class="nav" aria-label="Workbench">
           ${workbenchRoutes
@@ -56,7 +60,7 @@ function renderShell() {
               (route) => `
                 <button class="nav-item" data-view="${route.id}">
                   <span class="nav-icon" aria-hidden="true">${route.icon}</span>
-                  <span>${route.label}</span>
+                  <span>${routeLabel(route)}</span>
                 </button>
               `,
             )
@@ -66,14 +70,14 @@ function renderShell() {
       <section class="workspace fluent-workspace">
         <header class="topbar">
           <div>
-            <p class="eyebrow">Local environment workbench</p>
-            <h1 id="view-title">Dashboard</h1>
-            <p id="view-description">Health summary and safe shortcuts.</p>
+            <p class="eyebrow">${t("app.localWorkbench")}</p>
+            <h1 id="view-title">${t("route.dashboard.label")}</h1>
+            <p id="view-description">${t("route.dashboard.description")}</p>
           </div>
           <div class="toolbar compact">
-            <button id="open-command-palette" class="button button--primary primary" type="button">Command Palette</button>
-            <button id="refresh-active-view" class="button button--secondary" type="button">Refresh</button>
-            <div class="theme-switcher" aria-label="Theme">
+            <button id="open-command-palette" class="button button--primary primary" type="button">${t("app.commandPalette")}</button>
+            <button id="refresh-active-view" class="button button--secondary" type="button">${t("app.refresh")}</button>
+            <div class="theme-switcher" aria-label="${t("app.theme")}">
               ${(["light", "dark", "system", "high-contrast"] as const)
                 .map((mode) => `<button class="icon-button" data-theme-quick="${mode}" type="button" aria-label="Theme ${mode}">${themeLabel(mode)}</button>`)
                 .join("")}
@@ -82,14 +86,35 @@ function renderShell() {
         </header>
         <section id="feature-root" class="view active" aria-live="polite"></section>
         <footer class="workbench-statusbar">
-          <span id="workbench-status-view">Dashboard</span>
-          <span>Draft PR #118</span>
-          <span>Risk actions require plan and token</span>
+          <span id="workbench-status-view">${t("route.dashboard.label")}</span>
+          <span>${t("app.statusRelease")}</span>
+          <span>${t("app.riskStatus")}</span>
         </footer>
       </section>
     </main>
     <div id="toast" class="toast" role="status"></div>
   `;
+}
+
+function renderSafetyGate(message = "") {
+  if (!app) return;
+  app.innerHTML = `
+    <main class="shell safety-shell">
+      <section class="workspace fluent-workspace">
+        <section class="view active">
+          ${message ? renderErrorState(t("state.unableToLoad", { view: t("settings.safetyNotice") }), message, "retry-safety-gate") : ""}
+          ${disclaimerPanel(true)}
+        </section>
+      </section>
+    </main>
+    <div id="toast" class="toast" role="status"></div>
+  `;
+  document.querySelector("#accept-safety-disclaimer")?.addEventListener("click", () => {
+    void acceptSafetyGate();
+  });
+  document.querySelector("[data-action='retry-safety-gate']")?.addEventListener("click", () => {
+    void startApp();
+  });
 }
 
 function themeLabel(mode: ThemeMode) {
@@ -114,13 +139,13 @@ function setActiveNav(view: WorkbenchView) {
   const status = document.querySelector<HTMLElement>("#workbench-status-view");
   const route = workbenchRoutes.find((item) => item.id === view);
   if (title && route) {
-    title.textContent = route.label;
+    title.textContent = routeLabel(route);
   }
   if (description && route) {
-    description.textContent = route.description;
+    description.textContent = routeDescription(route);
   }
   if (status && route) {
-    status.textContent = route.label;
+    status.textContent = routeLabel(route);
   }
 }
 
@@ -131,7 +156,7 @@ async function mount(view: WorkbenchView) {
   setActiveNav(view);
   writeActiveView(view);
   const route = workbenchRoutes.find((item) => item.id === view);
-  root.innerHTML = renderLoadingState(`Loading ${route?.label ?? view}`);
+  root.innerHTML = renderLoadingState(t("state.loadingView", { view: route ? routeLabel(route) : view }));
   const context = createFeatureContext({
     root,
     invoke,
@@ -147,7 +172,7 @@ async function mount(view: WorkbenchView) {
   try {
     await module(context);
   } catch (error) {
-    root.innerHTML = renderErrorState(`Unable to load ${route?.label ?? view}`, error instanceof Error ? error.message : String(error), "retry-active-view");
+    root.innerHTML = renderErrorState(t("state.unableToLoad", { view: route ? routeLabel(route) : view }), error instanceof Error ? error.message : String(error), "retry-active-view");
     root.querySelector("[data-action='retry-active-view']")?.addEventListener("click", () => void mount(view));
     toast(error instanceof Error ? error.message : String(error), true);
   }
@@ -174,7 +199,7 @@ function bindShellEvents() {
     button.addEventListener("click", () => {
       applyTheme(button.dataset.themeQuick as ThemeMode);
       document.querySelectorAll<HTMLButtonElement>("[data-theme-quick]").forEach((item) => item.classList.toggle("active", item === button));
-      toast(`Theme switched to ${button.dataset.themeQuick}`);
+      toast(`${t("settings.theme")}: ${button.dataset.themeQuick}`);
     });
   });
   window.addEventListener("devenv:navigate", (event) => {
@@ -183,6 +208,40 @@ function bindShellEvents() {
   });
 }
 
-renderShell();
-bindShellEvents();
-void mount(readActiveView());
+subscribeLocaleChange(() => {
+  if (workbenchStarted) {
+    startWorkbench();
+  } else {
+    renderSafetyGate();
+  }
+});
+void startApp();
+
+async function startApp() {
+  try {
+    const config = await invoke<ConfigView>("load_config");
+    if (!config.settings.safetyDisclaimerAccepted) {
+      renderSafetyGate();
+      return;
+    }
+    startWorkbench();
+  } catch (error) {
+    renderSafetyGate(error instanceof Error ? error.message : String(error));
+  }
+}
+
+function startWorkbench() {
+  workbenchStarted = true;
+  renderShell();
+  bindShellEvents();
+  void mount(readActiveView());
+}
+
+async function acceptSafetyGate() {
+  try {
+    await invoke<OperationResult>("accept_safety_disclaimer");
+    startWorkbench();
+  } catch (error) {
+    toast(error instanceof Error ? error.message : String(error), true);
+  }
+}

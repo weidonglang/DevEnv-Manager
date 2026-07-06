@@ -1,4 +1,5 @@
-import { navigateTo, workbenchRoutes } from "./router";
+import { setLocale, t, type TranslationKey } from "../core/i18n";
+import { navigateTo, routeLabel, workbenchRoutes } from "./router";
 import { applyTheme, type ThemeMode } from "../ui/theme/controller";
 import type { WorkbenchView } from "./state";
 
@@ -11,38 +12,41 @@ type PaletteCommand = {
   safe: boolean;
 };
 
-const actionCommands: PaletteCommand[] = [
-  { id: "doctor:run", title: "Run Doctor", view: "reports", action: "run-doctor-report", safe: true },
-  { id: "doctor:repair-plan", title: "Create Doctor Repair Plan", view: "reports", safe: true },
-  { id: "environment:inspect", title: "Inspect Environment", view: "environment", action: "inspect-environment", safe: true },
-  { id: "environment:java-plan", title: "Create Java Stabilize Plan", view: "environment", action: "create-java-plan", safe: true },
-  { id: "ports:scan", title: "Scan Ports", view: "ports", action: "scan-ports", safe: true },
-  { id: "ports:diagnose", title: "Diagnose Selected Port", view: "ports", action: "create-port-plan", safe: true },
-  { id: "assoc:search", title: "Search File Association App", view: "fileAssociations", action: "search-association-app", safe: true },
-  { id: "assoc:plan", title: "Create File Association Plan", view: "fileAssociations", action: "create-association-plan", safe: true },
-  { id: "profiles:apply", title: "Apply Config Profile", view: "profiles", action: "create-profile-plan", safe: false },
-  { id: "profiles:plan", title: "Create Profile Apply Plan", view: "profiles", action: "create-profile-plan", safe: true },
-  { id: "reports:doctor", title: "Export Doctor Report", view: "reports", action: "export-doctor-markdown", safe: true },
-  { id: "reports:environment", title: "Export Environment Report", view: "reports", action: "export-environment-report", safe: true },
-  { id: "reports:assoc", title: "Export File Association Report", view: "reports", action: "export-file-association-report", safe: true },
-  { id: "settings:update", title: "Check Update", view: "settings", action: "check-update", safe: true },
-  { id: "theme:light", title: "Switch Theme: Light", safe: true, run: () => applyTheme("light") },
-  { id: "theme:dark", title: "Switch Theme: Dark", safe: true, run: () => applyTheme("dark") },
-  { id: "theme:system", title: "Switch Theme: System", safe: true, run: () => applyTheme("system") },
-  { id: "theme:contrast", title: "Switch Theme: High Contrast", safe: true, run: () => applyTheme("high-contrast" as ThemeMode) },
-  { id: "cleanup:backups", title: "Open Backup Directory", view: "cleanup", safe: true },
-  { id: "settings:config-dir", title: "Open App Config Directory", view: "settings", action: "open-config-dir", safe: true },
+const actionCommandSpecs: Array<Omit<PaletteCommand, "title"> & { titleKey: TranslationKey }> = [
+  { id: "doctor:run", titleKey: "palette.doctorRun", view: "reports", action: "run-doctor-report", safe: true },
+  { id: "doctor:repair-plan", titleKey: "palette.doctorRepairPlan", view: "reports", safe: true },
+  { id: "environment:inspect", titleKey: "palette.environmentInspect", view: "environment", action: "inspect-environment", safe: true },
+  { id: "environment:java-plan", titleKey: "palette.environmentJavaPlan", view: "environment", action: "create-java-plan", safe: true },
+  { id: "ports:scan", titleKey: "palette.portsScan", view: "ports", action: "scan-ports", safe: true },
+  { id: "ports:diagnose", titleKey: "palette.portsDiagnose", view: "ports", action: "create-port-plan", safe: true },
+  { id: "assoc:search", titleKey: "palette.assocSearch", view: "fileAssociations", action: "search-association-app", safe: true },
+  { id: "assoc:plan", titleKey: "palette.assocPlan", view: "fileAssociations", action: "create-association-plan", safe: true },
+  { id: "profiles:apply", titleKey: "palette.profilesApply", view: "profiles", action: "create-profile-plan", safe: false },
+  { id: "profiles:plan", titleKey: "palette.profilesPlan", view: "profiles", action: "create-profile-plan", safe: true },
+  { id: "reports:doctor", titleKey: "palette.reportsDoctor", view: "reports", action: "export-doctor-markdown", safe: true },
+  { id: "reports:environment", titleKey: "palette.reportsEnvironment", view: "reports", action: "export-environment-report", safe: true },
+  { id: "reports:assoc", titleKey: "palette.reportsAssoc", view: "reports", action: "export-file-association-report", safe: true },
+  { id: "settings:update", titleKey: "palette.settingsUpdate", view: "settings", action: "check-update", safe: true },
+  { id: "theme:light", titleKey: "palette.themeLight", safe: true, run: () => applyTheme("light") },
+  { id: "theme:dark", titleKey: "palette.themeDark", safe: true, run: () => applyTheme("dark") },
+  { id: "theme:system", titleKey: "palette.themeSystem", safe: true, run: () => applyTheme("system") },
+  { id: "theme:contrast", titleKey: "palette.themeHighContrast", safe: true, run: () => applyTheme("high-contrast" as ThemeMode) },
+  { id: "cleanup:backups", titleKey: "palette.cleanupBackups", view: "cleanup", safe: true },
+  { id: "settings:config-dir", titleKey: "palette.settingsConfigDir", view: "settings", action: "open-config-dir", safe: true },
+  { id: "language:auto", titleKey: "palette.languageAuto", safe: true, run: () => setLocale("auto") },
+  { id: "language:zh", titleKey: "palette.languageChinese", safe: true, run: () => setLocale("zh-CN") },
+  { id: "language:en", titleKey: "palette.languageEnglish", safe: true, run: () => setLocale("en-US") },
 ];
 
 function commands(): PaletteCommand[] {
   return [
     ...workbenchRoutes.map((route) => ({
       id: `view:${route.id}`,
-      title: `Go to ${route.label}`,
+      title: t("palette.goTo", { view: routeLabel(route) }),
       view: route.id,
       safe: true,
     })),
-    ...actionCommands,
+    ...actionCommandSpecs.map(({ titleKey, ...command }) => ({ ...command, title: t(titleKey) })),
   ];
 }
 
@@ -76,8 +80,8 @@ export function registerCommandPalette(): void {
     palette = document.createElement("div");
     palette.className = "command-palette";
     palette.innerHTML = `
-      <div class="command-palette__panel" role="dialog" aria-modal="true" aria-label="Command palette">
-        <input class="command-palette__search" type="search" placeholder="Search commands" aria-label="Search commands" autofocus />
+      <div class="command-palette__panel" role="dialog" aria-modal="true" aria-label="${t("app.commandPalette")}">
+        <input class="command-palette__search" type="search" placeholder="${t("palette.search")}" aria-label="${t("palette.search")}" autofocus />
         <div class="command-palette__list" role="listbox"></div>
       </div>
     `;
@@ -97,10 +101,10 @@ export function registerCommandPalette(): void {
           ? visible
               .map(
                 (command, index) =>
-                  `<button class="command-palette__item ${index === selected ? "active" : ""}" data-command="${command.id}" role="option" aria-selected="${index === selected ? "true" : "false"}"><span>${command.title}</span><small>${command.safe ? "safe" : "plan only"}</small></button>`,
+                  `<button class="command-palette__item ${index === selected ? "active" : ""}" data-command="${command.id}" role="option" aria-selected="${index === selected ? "true" : "false"}"><span>${command.title}</span><small>${command.safe ? t("state.safe") : t("state.planOnly")}</small></button>`,
               )
               .join("")
-          : `<div class="command-palette__empty" role="status">No matching commands</div>`;
+          : `<div class="command-palette__empty" role="status">${t("state.noMatchingCommands")}</div>`;
       }
     };
 

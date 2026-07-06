@@ -1,4 +1,5 @@
 import type { RiskOperationView } from "../../core/risk";
+import { t } from "../../core/i18n";
 
 function rows(items: Array<{ label: string; value: string }> = []) {
   return items.length
@@ -7,11 +8,11 @@ function rows(items: Array<{ label: string; value: string }> = []) {
 }
 
 export function planPreview(operation: RiskOperationView): string {
-  return `<section class="risk-section"><h3>What will change</h3><p>${operation.summary}</p>${rows(operation.before)}${rows(operation.after)}</section>`;
+  return `<section class="risk-section"><h3>${t("risk.whatWillChange")}</h3><p>${operation.summary}</p>${rows(operation.before)}${rows(operation.after)}</section>`;
 }
 
 export function riskExplanation(operation: RiskOperationView): string {
-  return `<section class="risk-section"><h3>Why this is gated</h3><p>${RiskBadge(operation.riskLevel)} operation bound to <code>${operation.command}</code>.</p>${
+  return `<section class="risk-section"><h3>${t("risk.whyGated")}</h3><p>${t("risk.boundOperation", { riskLevel: RiskBadge(operation.riskLevel), command: `<code>${operation.command}</code>` })}</p>${
     operation.warnings.length ? `<ul>${operation.warnings.map((warning) => `<li>${warning}</li>`).join("")}</ul>` : ""
   }</section>`;
 }
@@ -22,26 +23,26 @@ export function RiskBadge(riskLevel: string): string {
 }
 
 export function backupReceipt(operation: RiskOperationView): string {
-  return `<section class="risk-section"><h3>Backup or receipt</h3><p>${operation.backupReceipt || "No backup receipt supplied by this plan. Continue only if the plan explains why backup is not required."}</p></section>`;
+  return `<section class="risk-section"><h3>${t("risk.backupReceipt")}</h3><p>${operation.backupReceipt || t("risk.noBackupReceipt")}</p></section>`;
 }
 
 export function confirmationDialog(operation: RiskOperationView): string {
-  return `<section class="risk-section"><h3>Recovery expectation</h3><p>Review the plan, backup, and command binding before execution. If the command fails, use the related backup or rollback panel for this feature.</p><p>${operation.title}</p></section>`;
+  return `<section class="risk-section"><h3>${t("risk.recoveryExpectation")}</h3><p>${t("risk.recoveryDetail")}</p><p>${operation.title}</p></section>`;
 }
 
 export function tokenGate(operation: RiskOperationView): string {
-  return `<section class="risk-section"><h3>Token gate</h3><p>The confirmation token is single-use and bound to plan <code>${operation.planId}</code>.</p></section>`;
+  return `<section class="risk-section"><h3>${t("risk.tokenGate")}</h3><p>${t("risk.tokenGateDetail", { planId: `<code>${operation.planId}</code>` })}</p></section>`;
 }
 
 export function executionProgress(message: string): string {
-  return `<section class="risk-section"><h3>Execution progress</h3><p>${message}</p></section>`;
+  return `<section class="risk-section"><h3>${t("risk.executionProgress")}</h3><p>${message}</p></section>`;
 }
 
 export function resultReport(result: unknown): string {
   const value = result && typeof result === "object" && "message" in result ? String((result as { message: unknown }).message) : String(result);
-  return `<section class="risk-section"><h3>Result</h3><p>${value}</p></section>`;
+  return `<section class="risk-section"><h3>${t("risk.result")}</h3><p>${value}</p></section>`;
 }
 
 export function rollbackPanel(operation: RiskOperationView): string {
-  return `<section class="risk-section"><h3>Verification and rollback</h3><p>Verify the affected environment, runtime, port, file association, or profile after execution. Use the related rollback or backup entry if the result is not correct.</p><small>${operation.command}</small></section>`;
+  return `<section class="risk-section"><h3>${t("risk.verificationRollback")}</h3><p>${t("risk.rollbackDetail")}</p><small>${operation.command}</small></section>`;
 }

@@ -82,11 +82,23 @@ REQUIRED_FEATURE_FILES = ["index.ts", "api.ts", "render.ts", "events.ts", "state
 
 REQUIRED_CORE_FILES = [
     "invoke.ts",
+    "i18n.ts",
     "risk.ts",
     "format.ts",
     "events.ts",
     "storage.ts",
     "validation.ts",
+]
+
+REQUIRED_I18N_FILES = [
+    "tauri/src/core/i18n.ts",
+    "tauri/src/core/locales/zh-CN.ts",
+    "tauri/src/core/locales/en-US.ts",
+]
+
+REQUIRED_SAFETY_UI_FILES = [
+    "tauri/src/components/disclaimerPanel.ts",
+    "tauri/src/components/featureGuide.ts",
 ]
 
 REQUIRED_UI_COMPONENTS = [
@@ -134,6 +146,14 @@ def main() -> int:
         if not (SRC / "core" / name).is_file():
             return fail(f"missing core file tauri/src/core/{name}")
 
+    for name in REQUIRED_I18N_FILES:
+        if not (ROOT / name).is_file():
+            return fail(f"missing i18n file {name}")
+
+    for name in REQUIRED_SAFETY_UI_FILES:
+        if not (ROOT / name).is_file():
+            return fail(f"missing safety UI file {name}")
+
     for name in REQUIRED_UI_COMPONENTS:
         if not (SRC / "ui" / "components" / name).is_file():
             return fail(f"missing UI component tauri/src/ui/components/{name}")
@@ -176,11 +196,15 @@ def main() -> int:
         if rel == "tauri/src/app/commandPalette.ts":
             if text.count("id:") < 18:
                 return fail("Command Palette must contain at least 18 commands")
-            if "Go to ${route.label}" not in text:
-                return fail("Command Palette route commands must use Go to route labels")
-            missing_titles = sorted(title for title in REQUIRED_PALETTE_ACTION_TITLES if title not in text)
-            if missing_titles:
-                return fail("Command Palette missing required commands: " + ", ".join(missing_titles))
+            if 't("palette.goTo"' not in text or "routeLabel(route)" not in text:
+                return fail("Command Palette route commands must use translated route labels")
+            missing_locale_commands = sorted(
+                key
+                for key in ["palette.languageAuto", "palette.languageChinese", "palette.languageEnglish"]
+                if key not in text
+            )
+            if missing_locale_commands:
+                return fail("Command Palette missing language commands: " + ", ".join(missing_locale_commands))
             for command in HIGH_RISK_EXECUTE_COMMANDS:
                 if f'invoke<{command}' in text or (f'"{command}"' in text and "execute:" in text):
                     return fail(f"Command Palette must not directly execute high-risk command: {command}")
@@ -188,6 +212,64 @@ def main() -> int:
         return fail("direct @tauri-apps/api/core imports outside core/invoke.ts: " + ", ".join(direct_core_imports))
     if scattered_token_calls:
         return fail("create_confirmation_token must be centralized in tauri/src/core/risk.ts: " + ", ".join(scattered_token_calls))
+
+    settings_render = (SRC / "features" / "settings" / "render.ts").read_text(encoding="utf-8")
+    if "data-locale-mode" not in settings_render or "localeModeLabel" not in settings_render:
+        return fail("Settings must include language mode controls")
+    if "renderRiskLevelGuide" not in settings_render or "show-safety-notice" not in settings_render:
+        return fail("Settings must include risk levels and safety notice entry")
+
+    bootstrap_text = (SRC / "app" / "bootstrap.ts").read_text(encoding="utf-8")
+    if "accept_safety_disclaimer" not in bootstrap_text or "safetyDisclaimerAccepted" not in bootstrap_text:
+        return fail("Workbench startup must gate first launch on safety disclaimer acceptance")
+
+    feature_guide = (SRC / "components" / "featureGuide.ts").read_text(encoding="utf-8")
+    for required_phrase in [
+        "guide.whatDoes",
+        "guide.whatNot",
+        "guide.how",
+        "guide.changes",
+        "guide.noChanges",
+        "guide.admin",
+        "guide.backup",
+        "guide.recovery",
+        "guide.riskCritical",
+    ]:
+        if required_phrase not in feature_guide:
+            return fail(f"Feature guide missing required section {required_phrase}")
+    for feature in REQUIRED_FEATURES:
+        if feature == "safeMode":
+            continue
+        render_path = SRC / "features" / feature / "render.ts"
+        if render_path.exists():
+            render_text = render_path.read_text(encoding="utf-8")
+            if feature != "settings" and "renderFeatureGuide" not in render_text:
+                return fail(f"feature render missing usage/risk guide: tauri/src/features/{feature}/render.ts")
+
+    dashboard_events = (SRC / "features" / "dashboard" / "events.ts").read_text(encoding="utf-8")
+    refresh_body = dashboard_events.split("export async function refreshDashboard", 1)[-1].split("context.root.innerHTML", 1)[0]
+    if "getPortSummary" in refresh_body or "scan_ports" in refresh_body:
+        return fail("Dashboard default refresh must not run port scan")
+
+    risk_text = (SRC / "ui" / "components" / "riskUx.ts").read_text(encoding="utf-8") + (
+        SRC / "core" / "risk.ts"
+    ).read_text(encoding="utf-8")
+    for key in [
+        "risk.whatWillChange",
+        "risk.whyGated",
+        "risk.backupReceipt",
+        "risk.recoveryExpectation",
+        "risk.tokenGate",
+        "risk.result",
+        "risk.verificationRollback",
+        "risk.createTokenAndExecute",
+    ]:
+        if key not in risk_text:
+            return fail(f"Risk UX missing i18n key {key}")
+
+    shared_view = (SRC / "features" / "sharedView.ts").read_text(encoding="utf-8")
+    if 't("state.retry")' not in shared_view or "loadSafe" not in shared_view:
+        return fail("Shared loading/error helpers must use i18n and safe loader")
 
     print("Frontend architecture check passed.")
     return 0
