@@ -875,6 +875,16 @@ export type DoctorRepairResult = {
   report: DoctorReport;
 };
 
+export type DoctorRepairPlan = {
+  planId: string;
+  beforeScore: number;
+  actions: string[];
+  willCleanupPath: boolean;
+  willConfigureEnvironment: boolean;
+  backupName: string;
+  warnings: string[];
+};
+
 export type ConfigProfileImportPreview = {
   source: string;
   exportedAt: string;
@@ -891,6 +901,18 @@ export type ProfileRequirement = {
   version: string;
   installed: boolean;
   autoInstallSupported: boolean;
+};
+
+export type ProfileApplyPlan = {
+  planId: string;
+  profileId: string;
+  profileName: string;
+  missingRequirements: ProfileRequirement[];
+  runtimeSwitches: string[];
+  willInstall: boolean;
+  willWriteEnvironment: boolean;
+  backupName: string;
+  warnings: string[];
 };
 
 export type CleanupCandidate = {

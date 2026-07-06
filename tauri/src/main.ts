@@ -101,8 +101,9 @@ import type {
   UpdateCheckResult,
   CleanupArchitecture,
   DoctorRepairResult,
+  DoctorRepairPlan,
   ConfigProfileImportPreview,
-  ProfileRequirement,
+  ProfileApplyPlan,
   CleanupCandidate,
   CleanupCategoryScan,
   CleanupScanReport,
@@ -3116,6 +3117,10 @@ function runtimePlanId(kind: string, version: string, path: string | null) {
   return `${kind.trim()}:${version.trim()}:${(path || "").trim()}`;
 }
 
+function installRuntimePlanId(command: string, version: string) {
+  return `${command.trim()}:${version.trim()}`;
+}
+
 async function invokeSwitchRuntime(kind: string, version: string, path: string | null) {
   const token = await riskOperationToken("switch_runtime", runtimePlanId(kind, version, path), "medium", false, "environment-backup");
   return invoke<OperationResult>("switch_runtime", { kind, version, path, confirmationToken: token.token });
@@ -3124,6 +3129,12 @@ async function invokeSwitchRuntime(kind: string, version: string, path: string |
 async function invokeUninstallRuntime(kind: string, version: string, path: string | null) {
   const token = await riskOperationToken("uninstall_runtime", runtimePlanId(kind, version, path), "high", true);
   return invoke<OperationResult>("uninstall_runtime", { kind, version, path, confirmationToken: token.token });
+}
+
+async function invokeApplyConfigProfile(id: string) {
+  const planId = await invoke<string>("config_profile_plan_id", { id });
+  const token = await riskOperationToken("apply_config_profile", planId, "high", false, "environment-backup");
+  return invoke<OperationResult>("apply_config_profile", { id, confirmationToken: token.token });
 }
 
 function renderSafetyDisclaimer() {
@@ -3602,9 +3613,7 @@ document.querySelector("#install-jdk")?.addEventListener("click", () => {
   if (!select || !distribution) return;
   void runRuntimeOperation(
     async () => {
-      const confirmationToken = switchAfterInstall
-        ? (await riskOperationToken("switch_runtime", runtimePlanId("jdk", `${select.value}-${distribution.value}`, ""), "medium", false, "environment-backup")).token
-        : null;
+      const confirmationToken = (await riskOperationToken("install_jdk", installRuntimePlanId("install_jdk", `${select.value}:${distribution.value}`), "high", false, "environment-backup")).token;
       return invoke<OperationResult>("install_jdk", { version: select.value, distribution: distribution.value, switchAfterInstall, confirmationToken });
     },
     `正在安装 JDK ${select.value}`,
@@ -3615,7 +3624,10 @@ document.querySelector("#install-node")?.addEventListener("click", () => {
   const select = document.querySelector<HTMLSelectElement>("#node-version");
   if (!select) return;
   void runRuntimeOperation(
-    () => invoke<OperationResult>("install_node", { version: select.value }),
+    async () => {
+      const token = await riskOperationToken("install_node", installRuntimePlanId("install_node", select.value), "high", false, "environment-backup");
+      return invoke<OperationResult>("install_node", { version: select.value, confirmationToken: token.token });
+    },
     `正在安装 Node.js ${select.value}`,
     "Node.js",
   );
@@ -3624,7 +3636,10 @@ document.querySelector("#install-go")?.addEventListener("click", () => {
   const select = document.querySelector<HTMLSelectElement>("#go-version");
   if (!select) return;
   void runRuntimeOperation(
-    () => invoke<OperationResult>("install_go", { version: select.value }),
+    async () => {
+      const token = await riskOperationToken("install_go", installRuntimePlanId("install_go", select.value), "high", false, "environment-backup");
+      return invoke<OperationResult>("install_go", { version: select.value, confirmationToken: token.token });
+    },
     `正在安装 Go ${select.value}`,
     "Go",
   );
@@ -3633,16 +3648,25 @@ document.querySelector("#install-python")?.addEventListener("click", () => {
   const select = document.querySelector<HTMLSelectElement>("#python-version");
   if (!select) return;
   void runRuntimeOperation(
-    () => invoke<OperationResult>("install_python", { version: select.value }),
+    async () => {
+      const token = await riskOperationToken("install_python", installRuntimePlanId("install_python", select.value), "high", false, "environment-backup");
+      return invoke<OperationResult>("install_python", { version: select.value, confirmationToken: token.token });
+    },
     `正在安装 Python ${select.value}`,
     "Python",
   );
 });
 document.querySelector("#install-maven")?.addEventListener("click", () => {
-  void runRuntimeOperation(() => invoke<OperationResult>("install_maven_latest"), "正在安装 Maven 最新版", "Maven");
+  void runRuntimeOperation(async () => {
+    const token = await riskOperationToken("install_maven_latest", installRuntimePlanId("install_maven_latest", "latest"), "high", false, "environment-backup");
+    return invoke<OperationResult>("install_maven_latest", { confirmationToken: token.token });
+  }, "正在安装 Maven 最新版", "Maven");
 });
 document.querySelector("#install-gradle")?.addEventListener("click", () => {
-  void runRuntimeOperation(() => invoke<OperationResult>("install_gradle_latest"), "正在安装 Gradle 最新版", "Gradle");
+  void runRuntimeOperation(async () => {
+    const token = await riskOperationToken("install_gradle_latest", installRuntimePlanId("install_gradle_latest", "latest"), "high", false, "environment-backup");
+    return invoke<OperationResult>("install_gradle_latest", { confirmationToken: token.token });
+  }, "正在安装 Gradle 最新版", "Gradle");
 });
 document.querySelector("#analyze-python")?.addEventListener("click", async () => {
   showToast("正在分析 Python 环境");
@@ -3892,10 +3916,12 @@ document.querySelector("#export-profiles")?.addEventListener("click", () => {
   void runOperation(() => invoke<OperationResult>("export_config_profiles"), "正在导出配置模板");
 });
 document.querySelector("#repair-doctor-safe")?.addEventListener("click", async () => {
-  if (!(await askForConfirmation("将自动清理真实失效/重复 PATH，并修复 DevEnv 管理的用户级环境变量。不会安装软件、结束进程或修改系统级变量。确定继续吗？"))) return;
-  showToast("正在执行安全修复并重新诊断");
   try {
-    const result = await invoke<DoctorRepairResult>("repair_doctor_safe");
+    const plan = await invoke<DoctorRepairPlan>("create_doctor_repair_plan");
+    if (!(await askForConfirmation(`This will execute ${plan.actions.length} Doctor repair actions and write user environment values. Continue?`))) return;
+    showToast("Executing Doctor repair plan");
+    const token = await riskOperationToken("execute_doctor_repair_plan", plan.planId, "high", false, plan.backupName);
+    const result = await invoke<DoctorRepairResult>("execute_doctor_repair_plan", { planId: plan.planId, confirmationToken: token.token });
     state.doctor = result.report;
     renderDoctor();
     const detail = result.applied.length ? result.applied.join("\n") : "没有可自动修复的安全项目";
@@ -5198,7 +5224,7 @@ document.addEventListener("click", async (event) => {
   if (action === "apply-profile") {
     const id = button.dataset.id || "";
     void runRuntimeOperation(
-      () => invoke<OperationResult>("apply_config_profile", { id }),
+      () => invokeApplyConfigProfile(id),
       "正在应用配置模板",
       "PATH",
     );
@@ -5207,15 +5233,18 @@ document.addEventListener("click", async (event) => {
     const id = button.dataset.id || "";
     void (async () => {
       try {
-        const requirements = await invoke<ProfileRequirement[]>("config_profile_requirements", { id });
-        const missing = requirements.filter((item) => !item.installed);
+        const plan = await invoke<ProfileApplyPlan>("create_profile_apply_plan", { id });
+        const missing = plan.missingRequirements;
         const message = missing.length
-          ? `将联网安装：${missing.map((item) => `${item.kind} ${item.version}`).join("、")}，安装完成后应用模板。确定继续吗？`
-          : "所需运行时均已安装，将直接应用模板。确定继续吗？";
+          ? `This will install: ${missing.map((item) => `${item.kind} ${item.version}`).join(", ")}, then apply profile ${plan.profileName}. Continue?`
+          : `This will apply profile ${plan.profileName} and write user environment values. Continue?`;
         if (!(await askForConfirmation(message))) return;
         await runRuntimeOperation(
-          () => invoke<OperationResult>("install_profile_missing", { id }),
-          missing.length ? "正在补齐模板所需运行时" : "正在应用配置模板",
+          async () => {
+            const token = await riskOperationToken("execute_profile_apply_plan", plan.planId, "high", false, plan.backupName);
+            return invoke<OperationResult>("execute_profile_apply_plan", { planId: plan.planId, confirmationToken: token.token });
+          },
+          missing.length ? "Applying profile plan with installs" : "Applying profile plan",
           "PATH",
         );
       } catch (error) {

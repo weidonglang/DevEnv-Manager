@@ -16,6 +16,7 @@ COMMAND_RE = re.compile(
 )
 HANDLER_RE = re.compile(r"generate_handler!\s*\[(?P<body>.*?)\]\s*\)", re.DOTALL)
 IDENT_RE = re.compile(r"\b[A-Za-z_][A-Za-z0-9_]*\b")
+CALL_RE = re.compile(r"\b([A-Za-z_][A-Za-z0-9_]*)\s*\(")
 REGISTRY_COMMAND_RE = re.compile(r'command:\s*"([A-Za-z0-9_]+)"')
 REGISTRY_SPEC_RE = re.compile(r"RiskOperationSpec\s*\{(?P<body>.*?)\},", re.DOTALL)
 DIRECT_POWERSHELL_RE = re.compile(
@@ -42,6 +43,18 @@ FORBIDDEN_REGISTERED_COMMANDS = {
 
 REQUIRED_TOKEN_GATED_COMMANDS = {
     "restore_environment_backup",
+}
+
+SENSITIVE_INTERNAL_PATTERNS = {
+    "switch_runtime_blocking": "switches active managed runtime",
+    "uninstall_runtime_blocking": "uninstalls managed runtime",
+    "restore_environment_values": "writes user environment values",
+    "configure_user_environment_blocking": "writes managed user environment values",
+    "cleanup_path_entries_blocking": "writes user PATH",
+    "restore_env_backup": "restores environment backup",
+    "fs::remove_dir_all": "recursively deletes files",
+    "taskkill": "terminates processes",
+    "sc.exe": "starts or stops Windows services",
 }
 
 
@@ -94,14 +107,60 @@ def risk_registry_entries() -> dict[str, bool]:
     return entries
 
 
-def command_body(command: str) -> str:
+def function_body(name: str) -> str:
     lib_rs = read_text(RUST_SRC / "lib.rs")
     match = re.search(
-        rf"#\s*\[\s*tauri::command\s*\]\s*(?:async\s+)?fn\s+{re.escape(command)}\s*\([^)]*\).*?(?=\n#\s*\[\s*tauri::command\s*\]|\npub fn run\(|\Z)",
+        rf"(?:#\s*\[\s*tauri::command\s*\]\s*)?(?:async\s+)?fn\s+{re.escape(name)}\s*\(",
         lib_rs,
-        re.DOTALL,
     )
-    return match.group(0) if match else ""
+    if not match:
+        return ""
+    brace_start = lib_rs.find("{", match.end())
+    if brace_start == -1:
+        return ""
+    depth = 0
+    for index in range(brace_start, len(lib_rs)):
+        char = lib_rs[index]
+        if char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return lib_rs[match.start() : index + 1]
+    return ""
+
+
+def command_body(command: str) -> str:
+    body = function_body(command)
+    direct_calls = set(CALL_RE.findall(body))
+    for called in sorted(direct_calls):
+        if called != command and (
+            called.endswith("_blocking")
+            or called.endswith("_with_token")
+            or called.startswith("execute_")
+        ):
+            body += "\n" + function_body(called)
+    return body
+
+
+def frontend_invoke_has_confirmation_token(command: str) -> bool:
+    for path in ts_files():
+        text = read_text(path)
+        for match in re.finditer(
+            rf"\binvoke(?:<[^>]+>)?\s*\(\s*[\"'`]{re.escape(command)}[\"'`]",
+            text,
+        ):
+            if "confirmationToken" in text[match.start() : match.start() + 500]:
+                return True
+    return False
+
+
+def sensitive_reasons(body: str) -> list[str]:
+    return [
+        reason
+        for pattern, reason in SENSITIVE_INTERNAL_PATTERNS.items()
+        if pattern in body
+    ]
 
 
 def main() -> int:
@@ -142,6 +201,28 @@ def main() -> int:
                 errors.append(f"Token-required command {command} is registered without a backend token gate")
             if command not in registry:
                 errors.append(f"Token-required command {command} is missing from risk operation registry")
+            if command in invokes and not frontend_invoke_has_confirmation_token(command):
+                errors.append(f"Frontend invoke for token-required command {command} does not pass confirmationToken")
+
+    for command in sorted(handlers):
+        body = command_body(command)
+        reasons = sensitive_reasons(body)
+        if not reasons:
+            continue
+        if not registry_entries.get(command, False):
+            errors.append(
+                f"Registered command {command} reaches sensitive internals without requires_token=true: "
+                + ", ".join(sorted(set(reasons)))
+            )
+        if "require_risk_operation_token" not in body and "require_confirmation_token" not in body:
+            errors.append(
+                f"Registered command {command} reaches sensitive internals without a backend token gate: "
+                + ", ".join(sorted(set(reasons)))
+            )
+        if command in invokes and not frontend_invoke_has_confirmation_token(command):
+            errors.append(
+                f"Frontend invoke for sensitive command {command} does not pass confirmationToken"
+            )
 
     for path in rust_files():
         relative = path.relative_to(ROOT).as_posix()
