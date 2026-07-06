@@ -55,6 +55,29 @@ HIGH_RISK_EXECUTE_COMMANDS = {
     "rollback_file_association_backup",
 }
 
+REQUIRED_PALETTE_ACTION_TITLES = {
+    "Run Doctor",
+    "Create Doctor Repair Plan",
+    "Inspect Environment",
+    "Create Java Stabilize Plan",
+    "Scan Ports",
+    "Diagnose Selected Port",
+    "Search File Association App",
+    "Create File Association Plan",
+    "Apply Config Profile",
+    "Create Profile Apply Plan",
+    "Export Doctor Report",
+    "Export Environment Report",
+    "Export File Association Report",
+    "Check Update",
+    "Switch Theme: Light",
+    "Switch Theme: Dark",
+    "Switch Theme: System",
+    "Switch Theme: High Contrast",
+    "Open Backup Directory",
+    "Open App Config Directory",
+}
+
 REQUIRED_FEATURE_FILES = ["index.ts", "api.ts", "render.ts", "events.ts", "state.ts", "types.ts"]
 
 REQUIRED_CORE_FILES = [
@@ -153,8 +176,13 @@ def main() -> int:
         if rel == "tauri/src/app/commandPalette.ts":
             if text.count("id:") < 18:
                 return fail("Command Palette must contain at least 18 commands")
+            if "Go to ${route.label}" not in text:
+                return fail("Command Palette route commands must use Go to route labels")
+            missing_titles = sorted(title for title in REQUIRED_PALETTE_ACTION_TITLES if title not in text)
+            if missing_titles:
+                return fail("Command Palette missing required commands: " + ", ".join(missing_titles))
             for command in HIGH_RISK_EXECUTE_COMMANDS:
-                if f'invoke<{command}' in text or f'"{command}"' in text and "execute:" in text:
+                if f'invoke<{command}' in text or (f'"{command}"' in text and "execute:" in text):
                     return fail(f"Command Palette must not directly execute high-risk command: {command}")
     if direct_core_imports:
         return fail("direct @tauri-apps/api/core imports outside core/invoke.ts: " + ", ".join(direct_core_imports))

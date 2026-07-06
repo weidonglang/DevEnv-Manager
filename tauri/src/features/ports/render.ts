@@ -2,7 +2,9 @@ import { escapeHtml, renderActionButton, renderMetric, renderObjectTable, valueO
 import type { PortsWorkbenchState } from "./state";
 
 export function renderPortsWorkbench(state: PortsWorkbenchState): string {
-  const rows = state.records.filter((record) => `${valueOf(record, "localPort")} ${valueOf(record, "processName")} ${valueOf(record, "identity")}`.toLowerCase().includes(state.filter.toLowerCase()));
+  const rows = state.records.filter((record) =>
+    `${valueOf(record, "localPort")} ${valueOf(record, "processName")} ${valueOf(record, "identity")}`.toLowerCase().includes(state.filter.toLowerCase()),
+  );
   return `
     <div class="feature-layout">
       <section class="panel">
@@ -16,10 +18,10 @@ export function renderPortsWorkbench(state: PortsWorkbenchState): string {
         <input id="port-filter" value="${escapeHtml(state.filter)}" placeholder="Filter by port, process, service, or identity" />
         <div class="toolbar">
           ${renderActionButton("scan-ports", "Scan Ports", "primary")}
-          ${renderActionButton("create-port-plan", "生成处理计划")}
-          ${renderActionButton("execute-port-plan", "执行处理计划", "danger")}
+          ${renderActionButton("create-port-plan", "Create Resolution Plan")}
+          ${renderActionButton("execute-port-plan", "Execute Resolution Plan", "danger")}
           ${renderActionButton("inspect-local-services", "Inspect Local Services")}
-          ${renderActionButton("stop-local-service", "停止服务", "danger")}
+          ${renderActionButton("stop-local-service", "Stop Local Service", "danger")}
         </div>
       </section>
       <section class="panel">

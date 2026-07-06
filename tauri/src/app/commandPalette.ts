@@ -38,7 +38,7 @@ function commands(): PaletteCommand[] {
   return [
     ...workbenchRoutes.map((route) => ({
       id: `view:${route.id}`,
-      title: route.label,
+      title: `Go to ${route.label}`,
       view: route.id,
       safe: true,
     })),

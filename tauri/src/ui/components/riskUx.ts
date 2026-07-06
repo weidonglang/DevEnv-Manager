@@ -11,9 +11,14 @@ export function planPreview(operation: RiskOperationView): string {
 }
 
 export function riskExplanation(operation: RiskOperationView): string {
-  return `<section class="risk-section"><h3>Why this is gated</h3><p><strong>${operation.riskLevel}</strong> risk operation bound to <code>${operation.command}</code>.</p>${
+  return `<section class="risk-section"><h3>Why this is gated</h3><p>${RiskBadge(operation.riskLevel)} operation bound to <code>${operation.command}</code>.</p>${
     operation.warnings.length ? `<ul>${operation.warnings.map((warning) => `<li>${warning}</li>`).join("")}</ul>` : ""
   }</section>`;
+}
+
+export function RiskBadge(riskLevel: string): string {
+  const tone = riskLevel === "critical" ? "danger" : riskLevel === "high" ? "warning" : "neutral";
+  return `<span class="status-badge status-badge--${tone}">${riskLevel}</span>`;
 }
 
 export function backupReceipt(operation: RiskOperationView): string {

@@ -21,6 +21,10 @@ export function exportEnvReliabilityReport(format: "markdown" | "json"): Promise
   return invoke<string>("export_env_reliability_report", { format });
 }
 
+export function exportPythonDiagnosticReport(): Promise<OperationResult> {
+  return invoke<OperationResult>("export_python_diagnostic_report");
+}
+
 export function exportFileAssociationReport(): Promise<string> {
   return invoke<string>("export_file_association_report");
 }
