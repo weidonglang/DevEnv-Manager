@@ -1,11 +1,15 @@
-import type { RuntimeWorkbenchSnapshot } from "./types";
+import type { JdkDistribution, RuntimeInfo, RuntimeStrongVerificationReport } from "../../types";
 
 export type RuntimeWorkbenchState = {
-  snapshot: RuntimeWorkbenchSnapshot | null;
+  runtimes: RuntimeInfo[];
+  distributions: JdkDistribution[];
+  strongVerification: RuntimeStrongVerificationReport | null;
   selectedRuntimeId: string | null;
 };
 
 export const runtimeWorkbenchInitialState: RuntimeWorkbenchState = {
-  snapshot: null,
+  runtimes: [],
+  distributions: [],
+  strongVerification: null,
   selectedRuntimeId: null,
 };

@@ -6,23 +6,20 @@ export type RouteTarget = {
 };
 
 export const workbenchRoutes: RouteTarget[] = [
-  { id: "overview", label: "Dashboard" },
+  { id: "dashboard", label: "Dashboard" },
   { id: "runtimes", label: "Runtimes" },
   { id: "environment", label: "Environment" },
-  { id: "project", label: "Projects" },
+  { id: "projects", label: "Projects" },
   { id: "ports", label: "Ports & Services" },
-  { id: "toolbox", label: "File Associations" },
-  { id: "maintenance", label: "Cleanup" },
+  { id: "fileAssociations", label: "File Associations" },
+  { id: "cleanup", label: "Cleanup" },
   { id: "toolchains", label: "Toolchains" },
-  { id: "platforms", label: "Profiles" },
-  { id: "learning", label: "Reports" },
-  { id: "doctor", label: "Settings" },
+  { id: "profiles", label: "Profiles" },
+  { id: "reports", label: "Reports" },
+  { id: "settings", label: "Settings" },
 ];
 
 export function navigateTo(view: WorkbenchView): void {
-  const button = document.querySelector<HTMLButtonElement>(`[data-view="${view}"]`);
-  if (button) {
-    button.click();
-    writeActiveView(view);
-  }
+  writeActiveView(view);
+  window.dispatchEvent(new CustomEvent("devenv:navigate", { detail: view }));
 }

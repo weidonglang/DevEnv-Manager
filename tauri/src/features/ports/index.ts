@@ -8,3 +8,20 @@ export function canShowKillPortAction(record: PortRecord) {
   if (identity.includes("system") || identity.includes("系统关键") || identity.includes("critical")) return false;
   return true;
 }
+
+export * from "./api";
+export * from "./events";
+export * from "./render";
+export * from "./state";
+export * from "./types";
+import type { FeatureContext } from "../../app/featureContext";
+import { bindPortEvents, refreshPorts } from "./events";
+import { renderPortsWorkbench } from "./render";
+import { portsWorkbenchInitialState } from "./state";
+
+export async function mountPortsFeature(context: FeatureContext): Promise<void> {
+  const state = { ...portsWorkbenchInitialState };
+  context.root.innerHTML = renderPortsWorkbench(state);
+  bindPortEvents(context, state);
+  await refreshPorts(context, state);
+}

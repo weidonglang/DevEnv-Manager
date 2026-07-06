@@ -1,9 +1,19 @@
-import type { EnvironmentWorkbenchSnapshot } from "./types";
+import type { EnvBackupRecord, EnvHealthCheck, EnvReliabilitySnapshot, EnvRepairPlan, EnvironmentBackupInfo, EnvironmentConfigPreview } from "../../types";
 
 export type EnvironmentWorkbenchState = {
-  snapshot: EnvironmentWorkbenchSnapshot | null;
+  reliability: EnvReliabilitySnapshot | null;
+  health: EnvHealthCheck[];
+  preview: EnvironmentConfigPreview | null;
+  envBackups: EnvBackupRecord[];
+  environmentBackups: EnvironmentBackupInfo[];
+  plan: EnvRepairPlan | null;
 };
 
 export const environmentWorkbenchInitialState: EnvironmentWorkbenchState = {
-  snapshot: null,
+  reliability: null,
+  health: [],
+  preview: null,
+  envBackups: [],
+  environmentBackups: [],
+  plan: null,
 };

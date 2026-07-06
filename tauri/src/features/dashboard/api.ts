@@ -1,5 +1,19 @@
-import type { DashboardSnapshot } from "./types";
+import { invoke } from "../../core/invoke";
+import type { AppSnapshot, EnvHealthCheck, PortRecord, PowerShellResult, UpdateCheckResult } from "../../types";
 
-export function loadDashboardSnapshot(): Promise<DashboardSnapshot> {
-  return Promise.reject(new Error("Dashboard API is provided by the legacy bootstrap during this refactor."));
+export async function getAppSnapshot(): Promise<AppSnapshot> {
+  return invoke<AppSnapshot>("app_snapshot");
+}
+
+export async function getEffectiveRuntimeSummary(): Promise<{ health: EnvHealthCheck[]; ports: PortRecord[]; powershell: PowerShellResult }> {
+  const [health, ports, powershell] = await Promise.all([
+    invoke<EnvHealthCheck[]>("environment_health"),
+    invoke<PortRecord[]>("scan_ports"),
+    invoke<PowerShellResult>("powershell_runner_status"),
+  ]);
+  return { health, ports, powershell };
+}
+
+export function getUpdateStatus(): Promise<UpdateCheckResult> {
+  return invoke<UpdateCheckResult>("check_for_updates");
 }

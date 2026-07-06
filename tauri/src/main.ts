@@ -7,6 +7,8 @@ import "./styles.css";
 import "./app/bootstrap";
 import { registerCommandPalette } from "./app/commandPalette";
 import { registerWorkbenchLifecycle } from "./app/lifecycle";
+import { registerThemeSync } from "./ui/theme/controller";
 
+registerThemeSync();
 registerWorkbenchLifecycle();
 registerCommandPalette();

@@ -1,9 +1,11 @@
-import type { ReportWorkbenchSnapshot } from "./types";
+import type { DoctorReport } from "../../types";
 
 export type ReportsWorkbenchState = {
-  snapshot: ReportWorkbenchSnapshot | null;
+  doctor: DoctorReport | null;
+  text: string;
 };
 
 export const reportsWorkbenchInitialState: ReportsWorkbenchState = {
-  snapshot: null,
+  doctor: null,
+  text: "",
 };
