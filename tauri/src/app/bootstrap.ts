@@ -3,6 +3,8 @@ import { runRiskOperation } from "../core/risk";
 import { navigateTo, workbenchRoutes } from "./router";
 import { readActiveView, writeActiveView, type WorkbenchView } from "./state";
 import { createFeatureContext, type FeatureModule } from "./featureContext";
+import { renderErrorState, renderLoadingState } from "../features/sharedView";
+import { applyTheme, readTheme, type ThemeMode } from "../ui/theme/controller";
 import { mountDashboardFeature } from "../features/dashboard";
 import { mountRuntimesFeature } from "../features/runtimes";
 import { mountEnvironmentFeature } from "../features/environment";
@@ -53,6 +55,7 @@ function renderShell() {
             .map(
               (route) => `
                 <button class="nav-item" data-view="${route.id}">
+                  <span class="nav-icon" aria-hidden="true">${route.icon}</span>
                   <span>${route.label}</span>
                 </button>
               `,
@@ -65,17 +68,32 @@ function renderShell() {
           <div>
             <p class="eyebrow">Local environment workbench</p>
             <h1 id="view-title">Dashboard</h1>
+            <p id="view-description">Health summary and safe shortcuts.</p>
           </div>
           <div class="toolbar compact">
-            <button id="open-command-palette" type="button">Command Palette</button>
-            <button id="refresh-active-view" type="button">Refresh</button>
+            <button id="open-command-palette" class="button button--primary primary" type="button">Command Palette</button>
+            <button id="refresh-active-view" class="button button--secondary" type="button">Refresh</button>
+            <div class="theme-switcher" aria-label="Theme">
+              ${(["light", "dark", "system", "high-contrast"] as const)
+                .map((mode) => `<button class="icon-button" data-theme-quick="${mode}" type="button" aria-label="Theme ${mode}">${themeLabel(mode)}</button>`)
+                .join("")}
+            </div>
           </div>
         </header>
         <section id="feature-root" class="view active" aria-live="polite"></section>
+        <footer class="workbench-statusbar">
+          <span id="workbench-status-view">Dashboard</span>
+          <span>Draft PR #118</span>
+          <span>Risk actions require plan and token</span>
+        </footer>
       </section>
     </main>
     <div id="toast" class="toast" role="status"></div>
   `;
+}
+
+function themeLabel(mode: ThemeMode) {
+  return ({ light: "L", dark: "D", system: "S", "high-contrast": "HC" } as Record<ThemeMode, string>)[mode];
 }
 
 function toast(message: string, danger = false) {
@@ -92,9 +110,17 @@ function setActiveNav(view: WorkbenchView) {
     button.classList.toggle("active", button.dataset.view === view);
   }
   const title = document.querySelector<HTMLElement>("#view-title");
+  const description = document.querySelector<HTMLElement>("#view-description");
+  const status = document.querySelector<HTMLElement>("#workbench-status-view");
   const route = workbenchRoutes.find((item) => item.id === view);
   if (title && route) {
     title.textContent = route.label;
+  }
+  if (description && route) {
+    description.textContent = route.description;
+  }
+  if (status && route) {
+    status.textContent = route.label;
   }
 }
 
@@ -104,7 +130,8 @@ async function mount(view: WorkbenchView) {
   if (!root || !module) return;
   setActiveNav(view);
   writeActiveView(view);
-  root.innerHTML = `<div class="loading">Loading ${view}...</div>`;
+  const route = workbenchRoutes.find((item) => item.id === view);
+  root.innerHTML = renderLoadingState(`Loading ${route?.label ?? view}`);
   const context = createFeatureContext({
     root,
     invoke,
@@ -120,7 +147,8 @@ async function mount(view: WorkbenchView) {
   try {
     await module(context);
   } catch (error) {
-    root.innerHTML = `<section class="panel"><h2>Unable to load ${view}</h2><p>${escapeHtml(String(error))}</p></section>`;
+    root.innerHTML = renderErrorState(`Unable to load ${route?.label ?? view}`, error instanceof Error ? error.message : String(error), "retry-active-view");
+    root.querySelector("[data-action='retry-active-view']")?.addEventListener("click", () => void mount(view));
     toast(error instanceof Error ? error.message : String(error), true);
   }
 }
@@ -140,6 +168,14 @@ function bindShellEvents() {
   });
   document.querySelector("#open-command-palette")?.addEventListener("click", () => {
     window.dispatchEvent(new CustomEvent("devenv:open-command-palette"));
+  });
+  document.querySelectorAll<HTMLButtonElement>("[data-theme-quick]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.themeQuick === readTheme());
+    button.addEventListener("click", () => {
+      applyTheme(button.dataset.themeQuick as ThemeMode);
+      document.querySelectorAll<HTMLButtonElement>("[data-theme-quick]").forEach((item) => item.classList.toggle("active", item === button));
+      toast(`Theme switched to ${button.dataset.themeQuick}`);
+    });
   });
   window.addEventListener("devenv:navigate", (event) => {
     const view = (event as CustomEvent<WorkbenchView>).detail;

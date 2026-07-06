@@ -59,6 +59,7 @@ export function createRiskToken(request: RiskTokenRequest): Promise<Confirmation
 
 export async function runRiskOperation(operation: RiskOperationView): Promise<unknown> {
   const host = ensureRiskHost();
+  const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   host.innerHTML = `
     <div class="risk-ux" role="dialog" aria-modal="true" aria-label="${operation.title}">
       <div class="risk-ux__panel">
@@ -75,14 +76,31 @@ export async function runRiskOperation(operation: RiskOperationView): Promise<un
       </div>
     </div>
   `;
+  let keyHandler: ((event: KeyboardEvent) => void) | null = null;
   const close = () => {
     host.innerHTML = "";
+    if (keyHandler) {
+      window.removeEventListener("keydown", keyHandler);
+      keyHandler = null;
+    }
+    previousFocus?.focus();
   };
   host.querySelectorAll("[data-risk-close]").forEach((button) => button.addEventListener("click", close));
+  const executeButton = host.querySelector<HTMLButtonElement>("[data-risk-execute]");
+  const closeButton = host.querySelector<HTMLButtonElement>("[data-risk-close]");
+  keyHandler = (event: KeyboardEvent) => {
+    if (event.key === "Escape") {
+      close();
+    }
+  };
+  window.addEventListener("keydown", keyHandler);
+  closeButton?.focus();
   return new Promise((resolve, reject) => {
-    host.querySelector("[data-risk-execute]")?.addEventListener("click", () => {
+    executeButton?.addEventListener("click", () => {
       void (async () => {
         try {
+          executeButton.disabled = true;
+          executeButton.textContent = "Creating token...";
           const token = await createRiskToken({
             command: operation.command,
             actionId: operation.actionId ?? operation.command,
@@ -94,13 +112,17 @@ export async function runRiskOperation(operation: RiskOperationView): Promise<un
           });
           const panel = host.querySelector<HTMLElement>(".risk-ux__panel");
           if (panel) panel.insertAdjacentHTML("beforeend", executionProgress("Executing through backend token gate."));
+          executeButton.textContent = "Executing...";
           const result = await operation.execute(token.token);
           if (panel) {
             panel.insertAdjacentHTML("beforeend", resultReport(result));
             panel.insertAdjacentHTML("beforeend", rollbackPanel(operation));
           }
+          executeButton.textContent = "Executed";
           resolve(result);
         } catch (error) {
+          executeButton.disabled = false;
+          executeButton.textContent = "Create token and execute";
           reject(error);
         }
       })();

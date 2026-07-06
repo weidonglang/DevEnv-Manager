@@ -49,11 +49,14 @@ function commands(): PaletteCommand[] {
 export function registerCommandPalette(): void {
   let palette: HTMLDivElement | null = null;
   let selected = 0;
+  let previousFocus: HTMLElement | null = null;
 
   const close = () => {
     palette?.remove();
     palette = null;
     selected = 0;
+    previousFocus?.focus();
+    previousFocus = null;
   };
 
   const run = (command: PaletteCommand) => {
@@ -69,11 +72,12 @@ export function registerCommandPalette(): void {
 
   const open = () => {
     close();
+    previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     palette = document.createElement("div");
     palette.className = "command-palette";
     palette.innerHTML = `
       <div class="command-palette__panel" role="dialog" aria-modal="true" aria-label="Command palette">
-        <input class="command-palette__search" type="search" placeholder="Search commands" autofocus />
+        <input class="command-palette__search" type="search" placeholder="Search commands" aria-label="Search commands" autofocus />
         <div class="command-palette__list" role="listbox"></div>
       </div>
     `;
@@ -89,12 +93,14 @@ export function registerCommandPalette(): void {
       visible = allCommands.filter((command) => command.title.toLowerCase().includes(query)).slice(0, 18);
       selected = Math.min(selected, Math.max(visible.length - 1, 0));
       if (list) {
-        list.innerHTML = visible
-          .map(
-            (command, index) =>
-              `<button class="command-palette__item ${index === selected ? "active" : ""}" data-command="${command.id}" role="option" aria-selected="${index === selected ? "true" : "false"}"><span>${command.title}</span><small>${command.safe ? "safe" : "plan only"}</small></button>`,
-          )
-          .join("");
+        list.innerHTML = visible.length
+          ? visible
+              .map(
+                (command, index) =>
+                  `<button class="command-palette__item ${index === selected ? "active" : ""}" data-command="${command.id}" role="option" aria-selected="${index === selected ? "true" : "false"}"><span>${command.title}</span><small>${command.safe ? "safe" : "plan only"}</small></button>`,
+              )
+              .join("")
+          : `<div class="command-palette__empty" role="status">No matching commands</div>`;
       }
     };
 
@@ -105,11 +111,11 @@ export function registerCommandPalette(): void {
     input?.addEventListener("keydown", (event) => {
       if (event.key === "ArrowDown") {
         event.preventDefault();
-        selected = Math.min(selected + 1, visible.length - 1);
+        selected = visible.length ? (selected + 1) % visible.length : 0;
         render();
       } else if (event.key === "ArrowUp") {
         event.preventDefault();
-        selected = Math.max(selected - 1, 0);
+        selected = visible.length ? (selected - 1 + visible.length) % visible.length : 0;
         render();
       } else if (event.key === "Enter" && visible[selected]) {
         event.preventDefault();
