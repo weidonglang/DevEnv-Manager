@@ -124,8 +124,8 @@ pub fn create_env_repair_plan(
     if actions.is_empty() {
         warnings.push("当前没有可应用的环境修复动作。".to_string());
     }
-    let plan_id = format!("env-plan-{}", now_string());
-    let backup_name = format!("env-repair-backup-{}.json", now_string());
+    let plan_id = unique_id("env-plan");
+    let backup_name = format!("{}.json", unique_id("env-repair-backup"));
     let diff = diff_text(
         old_java.as_deref(),
         expected.java_home.as_deref(),
@@ -152,7 +152,18 @@ pub fn create_env_repair_plan(
 }
 
 pub(crate) fn store_plan(plan: &EnvRepairPlan) -> Result<(), String> {
-    write_json(&plan_dir().join(format!("{}.json", plan.plan_id)), plan)
+    let path = plan_dir().join(format!("{}.json", plan.plan_id));
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|err| format!("create plan directory failed: {err}"))?;
+    }
+    let text =
+        serde_json::to_string_pretty(plan).map_err(|err| format!("搴忓垪鍖栧け璐ワ細{err}"))?;
+    fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&path)
+        .and_then(|mut file| std::io::Write::write_all(&mut file, text.as_bytes()))
+        .map_err(|err| format!("write plan file failed: {err}"))
 }
 
 pub(crate) fn load_plan(plan_id: &str) -> Result<EnvRepairPlan, String> {

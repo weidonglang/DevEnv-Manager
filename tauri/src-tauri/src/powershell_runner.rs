@@ -226,6 +226,31 @@ pub fn run_native_command_with_timeout(
     })
 }
 
+pub fn run_probe_command(
+    executable: impl AsRef<OsStr>,
+    args: &[&str],
+    timeout_seconds: u64,
+) -> Result<NativeCommandResult, String> {
+    run_native_command_with_timeout(executable, args, timeout_seconds)
+}
+
+pub fn native_command_message(result: &NativeCommandResult) -> String {
+    let first_line = result
+        .stderr
+        .lines()
+        .chain(result.stdout.lines())
+        .map(str::trim)
+        .find(|line| !line.is_empty())
+        .unwrap_or("");
+    if result.timed_out {
+        format!("timed out after {} ms", result.elapsed_ms)
+    } else if !first_line.is_empty() {
+        format!("exit {:?}: {first_line}", result.exit_code)
+    } else {
+        format!("exit {:?}", result.exit_code)
+    }
+}
+
 pub fn decode_output(bytes: &[u8]) -> String {
     if bytes.len() >= 2 {
         let little_endian = bytes[0] == 0xff && bytes[1] == 0xfe;

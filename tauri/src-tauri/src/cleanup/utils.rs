@@ -1,9 +1,11 @@
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::Path;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub const MAX_SCAN_ENTRIES: usize = 250_000;
+static UNIQUE_ID_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[allow(dead_code)]
 pub fn directory_size(root: &Path) -> (u64, usize, bool) {
@@ -61,6 +63,15 @@ pub fn system_time_string(value: SystemTime) -> Option<String> {
 
 pub fn generated_at() -> String {
     system_time_string(SystemTime::now()).unwrap_or_else(|| "0".to_string())
+}
+
+pub fn unique_id(prefix: &str) -> String {
+    let counter = UNIQUE_ID_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let millis = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis();
+    format!("{prefix}-{millis}-{}-{counter}", std::process::id())
 }
 
 #[cfg(test)]

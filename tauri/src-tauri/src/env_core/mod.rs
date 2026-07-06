@@ -36,6 +36,7 @@ use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::powershell_runner;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -55,6 +56,8 @@ pub const MANAGED_PATHS: [&str; 8] = [
     r"%DEVENV_HOME%\current\go\bin",
     r"%DEVENV_HOME%\tools\npm-global",
 ];
+
+static UNIQUE_ID_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -209,13 +212,27 @@ pub(crate) fn command_text(stdout: &[u8], stderr: &[u8]) -> String {
 }
 
 pub(crate) fn run_command(path: &Path, args: &[&str]) -> String {
-    hidden_command(path)
-        .args(args)
-        .output()
+    powershell_runner::run_probe_command(path, args, 10)
         .ok()
-        .filter(|output| output.status.success())
-        .map(|output| command_text(&output.stdout, &output.stderr))
+        .filter(|output| output.success)
+        .map(|output| command_text(output.stdout.as_bytes(), output.stderr.as_bytes()))
         .unwrap_or_default()
+}
+
+pub(crate) fn unix_timestamp_millis() -> u128 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|value| value.as_millis())
+        .unwrap_or(0)
+}
+
+pub(crate) fn unique_id(prefix: &str) -> String {
+    let counter = UNIQUE_ID_COUNTER.fetch_add(1, Ordering::Relaxed);
+    format!(
+        "{prefix}-{}-{}-{counter}",
+        unix_timestamp_millis(),
+        std::process::id()
+    )
 }
 
 pub(crate) fn find_in_path(

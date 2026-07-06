@@ -182,13 +182,34 @@ struct ConfigProfileImportPreview {
     profiles: Vec<ConfigProfilePreviewItem>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 struct ProfileRequirement {
     kind: String,
     version: String,
     installed: bool,
     auto_install_supported: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct ProfileApplyPlan {
+    plan_id: String,
+    profile_id: String,
+    profile_name: String,
+    missing_requirements: Vec<ProfileRequirement>,
+    runtime_switches: Vec<String>,
+    will_install: bool,
+    will_write_environment: bool,
+    backup_name: String,
+    warnings: Vec<String>,
+}
+
+#[derive(Clone)]
+struct PendingProfileApplyPlan {
+    public: ProfileApplyPlan,
+    profile_fingerprint: String,
+    requirements_fingerprint: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -374,6 +395,44 @@ struct PortRecord {
     conflict_evidence: Vec<String>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct PortResolutionPlan {
+    plan_id: String,
+    pid: u32,
+    port: u16,
+    process_name: String,
+    process_path: String,
+    command_line: String,
+    parent_pid: Option<u32>,
+    parent_process_name: Option<String>,
+    child_processes: Vec<ChildProcessSummary>,
+    service_names: Vec<String>,
+    related_ports: Vec<u16>,
+    project_root: Option<String>,
+    risk_level: String,
+    warnings: Vec<String>,
+    recommended_actions: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct ChildProcessSummary {
+    pid: u32,
+    name: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PortResolutionResult {
+    success: bool,
+    message: String,
+    pid_exited: bool,
+    port_released: bool,
+    release_checked_at: String,
+    remaining_owners: Vec<PortRecord>,
+}
+
 #[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 struct ProjectPortConfig {
@@ -383,6 +442,9 @@ struct ProjectPortConfig {
     current_port: u16,
     line: usize,
     description: String,
+    mode: String,
+    will_overwrite_existing_file: bool,
+    backup_path: Option<String>,
 }
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -519,6 +581,24 @@ struct DoctorRepairResult {
     applied: Vec<String>,
     remaining: Vec<String>,
     report: DoctorReport,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct DoctorRepairPlan {
+    plan_id: String,
+    before_score: u8,
+    actions: Vec<String>,
+    will_cleanup_path: bool,
+    will_configure_environment: bool,
+    backup_name: String,
+    warnings: Vec<String>,
+}
+
+#[derive(Clone)]
+struct PendingDoctorRepairPlan {
+    public: DoctorRepairPlan,
+    actions_fingerprint: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -1001,9 +1081,27 @@ struct RuntimeMeta {
 }
 
 static CONFIRMATION_TOKENS: OnceLock<Mutex<HashMap<String, ConfirmationToken>>> = OnceLock::new();
+static PORT_RESOLUTION_PLANS: OnceLock<Mutex<HashMap<String, PortResolutionPlan>>> =
+    OnceLock::new();
+static PROFILE_APPLY_PLANS: OnceLock<Mutex<HashMap<String, PendingProfileApplyPlan>>> =
+    OnceLock::new();
+static DOCTOR_REPAIR_PLANS: OnceLock<Mutex<HashMap<String, PendingDoctorRepairPlan>>> =
+    OnceLock::new();
 
 fn confirmation_tokens() -> &'static Mutex<HashMap<String, ConfirmationToken>> {
     CONFIRMATION_TOKENS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn port_resolution_plans() -> &'static Mutex<HashMap<String, PortResolutionPlan>> {
+    PORT_RESOLUTION_PLANS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn profile_apply_plans() -> &'static Mutex<HashMap<String, PendingProfileApplyPlan>> {
+    PROFILE_APPLY_PLANS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn doctor_repair_plans() -> &'static Mutex<HashMap<String, PendingDoctorRepairPlan>> {
+    DOCTOR_REPAIR_PLANS.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
 const RISK_OPERATION_REGISTRY: &[RiskOperationSpec] = &[
@@ -1062,6 +1160,102 @@ const RISK_OPERATION_REGISTRY: &[RiskOperationSpec] = &[
         requires_backup: true,
         requires_token: true,
         description: "写入用户级 DEVENV_HOME/JAVA_HOME/PATH 配置",
+    },
+    RiskOperationSpec {
+        command: "apply_python_repair",
+        action_id: "apply_python_repair",
+        risk_level: "high",
+        requires_backup: true,
+        requires_token: true,
+        description: "Execute Python pip/PATH repair plan",
+    },
+    RiskOperationSpec {
+        command: "apply_config_profile",
+        action_id: "apply_config_profile",
+        risk_level: "high",
+        requires_backup: true,
+        requires_token: true,
+        description: "Apply config profile and write user environment",
+    },
+    RiskOperationSpec {
+        command: "execute_profile_apply_plan",
+        action_id: "execute_profile_apply_plan",
+        risk_level: "high",
+        requires_backup: true,
+        requires_token: true,
+        description: "Install missing runtimes and apply config profile",
+    },
+    RiskOperationSpec {
+        command: "execute_doctor_repair_plan",
+        action_id: "execute_doctor_repair_plan",
+        risk_level: "high",
+        requires_backup: true,
+        requires_token: true,
+        description: "Execute Doctor repair plan and write user environment",
+    },
+    RiskOperationSpec {
+        command: "switch_runtime",
+        action_id: "switch_runtime",
+        risk_level: "medium",
+        requires_backup: true,
+        requires_token: true,
+        description: "Switch managed runtime current pointer and environment",
+    },
+    RiskOperationSpec {
+        command: "uninstall_runtime",
+        action_id: "uninstall_runtime",
+        risk_level: "high",
+        requires_backup: false,
+        requires_token: true,
+        description: "Uninstall managed runtime and delete its directory",
+    },
+    RiskOperationSpec {
+        command: "install_jdk",
+        action_id: "install_jdk",
+        risk_level: "high",
+        requires_backup: true,
+        requires_token: true,
+        description: "Install managed JDK and optionally switch current runtime",
+    },
+    RiskOperationSpec {
+        command: "install_node",
+        action_id: "install_node",
+        risk_level: "high",
+        requires_backup: true,
+        requires_token: true,
+        description: "Install managed Node.js and switch current runtime",
+    },
+    RiskOperationSpec {
+        command: "install_python",
+        action_id: "install_python",
+        risk_level: "high",
+        requires_backup: true,
+        requires_token: true,
+        description: "Install managed Python and switch current runtime",
+    },
+    RiskOperationSpec {
+        command: "install_go",
+        action_id: "install_go",
+        risk_level: "high",
+        requires_backup: true,
+        requires_token: true,
+        description: "Install managed Go and switch current runtime",
+    },
+    RiskOperationSpec {
+        command: "install_maven_latest",
+        action_id: "install_maven_latest",
+        risk_level: "high",
+        requires_backup: true,
+        requires_token: true,
+        description: "Install managed Maven and switch current runtime",
+    },
+    RiskOperationSpec {
+        command: "install_gradle_latest",
+        action_id: "install_gradle_latest",
+        risk_level: "high",
+        requires_backup: true,
+        requires_token: true,
+        description: "Install managed Gradle and switch current runtime",
     },
     RiskOperationSpec {
         command: "manage_system_platform",
@@ -1150,6 +1344,14 @@ const RISK_OPERATION_REGISTRY: &[RiskOperationSpec] = &[
         requires_backup: false,
         requires_token: true,
         description: "结束进程及子进程",
+    },
+    RiskOperationSpec {
+        command: "execute_port_resolution_plan",
+        action_id: "execute_port_resolution_plan",
+        risk_level: "high",
+        requires_backup: false,
+        requires_token: true,
+        description: "Execute port resolution plan",
     },
     RiskOperationSpec {
         command: "execute_mysql_repair_plan",
@@ -1891,12 +2093,11 @@ fn verify_jdk_tool(id: &str, title: &str, executable: &Path, args: &[&str]) -> V
     }
     match powershell_runner::run_native_command_with_timeout(executable, args, 10) {
         Ok(output) => {
-            let detail =
-                first_meaningful_output_line(&command_text(
-                    output.stdout.as_bytes(),
-                    output.stderr.as_bytes(),
-                ))
-                    .unwrap_or_else(|| "命令没有返回版本文本".to_string());
+            let detail = first_meaningful_output_line(&command_text(
+                output.stdout.as_bytes(),
+                output.stderr.as_bytes(),
+            ))
+            .unwrap_or_else(|| "命令没有返回版本文本".to_string());
             let detail = if output.timed_out {
                 "命令超时（10 秒）".to_string()
             } else {
@@ -3273,14 +3474,36 @@ async fn install_jdk(
     app: tauri::AppHandle,
     version: String,
     distribution: Option<String>,
+    switch_after_install: Option<bool>,
+    confirmation_token: Option<String>,
 ) -> Result<OperationResult, String> {
-    run_blocking(move || install_jdk_blocking(app, version, distribution)).await?
+    run_blocking(move || {
+        let install_plan_id = install_runtime_plan_id(
+            "install_jdk",
+            &format!(
+                "{}:{}",
+                version.trim(),
+                distribution.as_deref().unwrap_or("temurin")
+            ),
+        );
+        require_risk_operation_token("install_jdk", &install_plan_id, confirmation_token.clone())?;
+        install_jdk_blocking(
+            app,
+            version,
+            distribution,
+            switch_after_install.unwrap_or(false),
+            confirmation_token,
+        )
+    })
+    .await?
 }
 
 fn install_jdk_blocking(
     app: tauri::AppHandle,
     version: String,
     distribution: Option<String>,
+    switch_after_install: bool,
+    _confirmation_token: Option<String>,
 ) -> Result<OperationResult, String> {
     let version = version.trim();
     let distribution = distribution.as_deref().unwrap_or("temurin");
@@ -3337,12 +3560,14 @@ fn install_jdk_blocking(
             "detail": output.lines().next().unwrap_or(""),
         }),
     )?;
-    switch_runtime_blocking(
-        "jdk".to_string(),
-        installed_version,
-        Some(display_path(&target)),
-    )?;
-    refresh_user_java_home(&paths)?;
+    if switch_after_install {
+        switch_runtime_blocking(
+            "jdk".to_string(),
+            installed_version,
+            Some(display_path(&target)),
+        )?;
+        refresh_user_java_home(&paths)?;
+    }
     emit_task_progress(&app, &task, 100, "安装完成");
     Ok(OperationResult {
         success: true,
@@ -3354,8 +3579,20 @@ fn install_jdk_blocking(
 }
 
 #[tauri::command]
-async fn install_node(app: tauri::AppHandle, version: String) -> Result<OperationResult, String> {
-    run_blocking(move || install_node_blocking(app, version)).await?
+async fn install_node(
+    app: tauri::AppHandle,
+    version: String,
+    confirmation_token: Option<String>,
+) -> Result<OperationResult, String> {
+    run_blocking(move || {
+        require_risk_operation_token(
+            "install_node",
+            &install_runtime_plan_id("install_node", &version),
+            confirmation_token,
+        )?;
+        install_node_blocking(app, version)
+    })
+    .await?
 }
 
 fn install_node_blocking(
@@ -3414,8 +3651,20 @@ fn install_node_blocking(
 }
 
 #[tauri::command]
-async fn install_go(app: tauri::AppHandle, version: String) -> Result<OperationResult, String> {
-    run_blocking(move || install_go_blocking(app, version)).await?
+async fn install_go(
+    app: tauri::AppHandle,
+    version: String,
+    confirmation_token: Option<String>,
+) -> Result<OperationResult, String> {
+    run_blocking(move || {
+        require_risk_operation_token(
+            "install_go",
+            &install_runtime_plan_id("install_go", &version),
+            confirmation_token,
+        )?;
+        install_go_blocking(app, version)
+    })
+    .await?
 }
 
 fn install_go_blocking(app: tauri::AppHandle, version: String) -> Result<OperationResult, String> {
@@ -3466,8 +3715,20 @@ fn install_go_blocking(app: tauri::AppHandle, version: String) -> Result<Operati
 }
 
 #[tauri::command]
-async fn install_python(app: tauri::AppHandle, version: String) -> Result<OperationResult, String> {
-    run_blocking(move || install_python_blocking(app, version)).await?
+async fn install_python(
+    app: tauri::AppHandle,
+    version: String,
+    confirmation_token: Option<String>,
+) -> Result<OperationResult, String> {
+    run_blocking(move || {
+        require_risk_operation_token(
+            "install_python",
+            &install_runtime_plan_id("install_python", &version),
+            confirmation_token,
+        )?;
+        install_python_blocking(app, version)
+    })
+    .await?
 }
 
 fn install_python_blocking(
@@ -3588,8 +3849,19 @@ fn install_python_blocking(
 }
 
 #[tauri::command]
-async fn install_maven_latest(app: tauri::AppHandle) -> Result<OperationResult, String> {
-    run_blocking(move || install_maven_latest_blocking(app)).await?
+async fn install_maven_latest(
+    app: tauri::AppHandle,
+    confirmation_token: Option<String>,
+) -> Result<OperationResult, String> {
+    run_blocking(move || {
+        require_risk_operation_token(
+            "install_maven_latest",
+            &install_runtime_plan_id("install_maven_latest", "latest"),
+            confirmation_token,
+        )?;
+        install_maven_latest_blocking(app)
+    })
+    .await?
 }
 
 fn install_maven_latest_blocking(app: tauri::AppHandle) -> Result<OperationResult, String> {
@@ -3633,8 +3905,19 @@ fn install_maven_latest_blocking(app: tauri::AppHandle) -> Result<OperationResul
 }
 
 #[tauri::command]
-async fn install_gradle_latest(app: tauri::AppHandle) -> Result<OperationResult, String> {
-    run_blocking(move || install_gradle_latest_blocking(app)).await?
+async fn install_gradle_latest(
+    app: tauri::AppHandle,
+    confirmation_token: Option<String>,
+) -> Result<OperationResult, String> {
+    run_blocking(move || {
+        require_risk_operation_token(
+            "install_gradle_latest",
+            &install_runtime_plan_id("install_gradle_latest", "latest"),
+            confirmation_token,
+        )?;
+        install_gradle_latest_blocking(app)
+    })
+    .await?
 }
 
 fn install_gradle_latest_blocking(app: tauri::AppHandle) -> Result<OperationResult, String> {
@@ -3687,8 +3970,27 @@ async fn switch_runtime(
     kind: String,
     version: String,
     path: Option<String>,
+    confirmation_token: Option<String>,
 ) -> Result<OperationResult, String> {
-    run_blocking(move || switch_runtime_blocking(kind, version, path)).await?
+    run_blocking(move || {
+        let plan_id = runtime_plan_id(&kind, &version, path.as_deref());
+        require_risk_operation_token("switch_runtime", &plan_id, confirmation_token)?;
+        switch_runtime_blocking(kind, version, path)
+    })
+    .await?
+}
+
+fn runtime_plan_id(kind: &str, version: &str, path: Option<&str>) -> String {
+    format!(
+        "{}:{}:{}",
+        kind.trim(),
+        version.trim(),
+        path.unwrap_or("").trim()
+    )
+}
+
+fn install_runtime_plan_id(command: &str, version: &str) -> String {
+    format!("{}:{}", command.trim(), version.trim())
 }
 
 fn switch_runtime_blocking(
@@ -3786,8 +4088,14 @@ async fn uninstall_runtime(
     kind: String,
     version: String,
     path: Option<String>,
+    confirmation_token: Option<String>,
 ) -> Result<OperationResult, String> {
-    run_blocking(move || uninstall_runtime_blocking(kind, version, path)).await?
+    run_blocking(move || {
+        let plan_id = runtime_plan_id(&kind, &version, path.as_deref());
+        require_risk_operation_token("uninstall_runtime", &plan_id, confirmation_token)?;
+        uninstall_runtime_blocking(kind, version, path)
+    })
+    .await?
 }
 
 fn uninstall_runtime_blocking(
@@ -3901,9 +4209,10 @@ fn kill_process(
     if force {
         args.push("/F".to_string());
     }
-    let output = hidden_command("taskkill").args(&args).output();
+    let arg_refs = args.iter().map(String::as_str).collect::<Vec<_>>();
+    let output = powershell_runner::run_probe_command("taskkill", &arg_refs, 10);
     match output {
-        Ok(done) if done.status.success() => KillResult {
+        Ok(done) if done.success => KillResult {
             success: true,
             message: if force {
                 format!("已强制结束 PID {pid} / {name}")
@@ -3914,7 +4223,7 @@ fn kill_process(
             blocked: false,
         },
         Ok(done) => {
-            let text = command_text(&done.stdout, &done.stderr);
+            let text = powershell_runner::native_command_message(&done);
             KillResult {
                 success: false,
                 message: if force {
@@ -3951,12 +4260,16 @@ async fn scan_ports() -> Result<Vec<PortRecord>, String> {
 }
 
 fn scan_ports_blocking() -> Result<Vec<PortRecord>, String> {
-    let output = hidden_command("netstat")
-        .args(["-ano"])
-        .output()
+    let output = powershell_runner::run_probe_command("netstat", &["-ano"], 5)
         .map_err(|err| format!("无法执行 netstat: {err}"))?;
+    if !output.success {
+        return Err(format!(
+            "netstat failed: {}",
+            powershell_runner::native_command_message(&output)
+        ));
+    }
 
-    let text = String::from_utf8_lossy(&output.stdout);
+    let text = output.stdout;
     let system = sysinfo::System::new_all();
     let services = windows_service_map();
     let mut records = Vec::new();
@@ -4035,6 +4348,174 @@ fn scan_ports_blocking() -> Result<Vec<PortRecord>, String> {
     });
     let _ = update_port_history(&records);
     Ok(records)
+}
+
+#[tauri::command]
+async fn create_port_resolution_plan(pid: u32, port: u16) -> Result<PortResolutionPlan, String> {
+    run_blocking(move || create_port_resolution_plan_blocking(pid, port)).await?
+}
+
+fn create_port_resolution_plan_blocking(pid: u32, port: u16) -> Result<PortResolutionPlan, String> {
+    if BLOCKED_PIDS.contains(&pid) {
+        return Err(format!("PID {pid} is protected"));
+    }
+    let records = scan_ports_blocking()?;
+    let record = records
+        .iter()
+        .find(|item| {
+            item.pid == pid
+                && item.local_port == port
+                && item.state.eq_ignore_ascii_case("LISTENING")
+        })
+        .ok_or_else(|| "Port owner changed; rescan before creating a plan".to_string())?;
+    let system = sysinfo::System::new_all();
+    let child_processes = system
+        .processes()
+        .iter()
+        .filter(|(_, process)| process.parent().map(|value| value.as_u32()) == Some(pid))
+        .map(|(child_pid, process)| ChildProcessSummary {
+            pid: child_pid.as_u32(),
+            name: process.name().to_string_lossy().to_string(),
+        })
+        .collect::<Vec<_>>();
+    let related_ports = records
+        .iter()
+        .filter(|item| item.pid == pid)
+        .map(|item| item.local_port)
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect::<Vec<_>>();
+    let mut warnings = Vec::new();
+    if !record.service_names.is_empty() {
+        warnings
+            .push("Windows service owns this port; prefer stopping the service first".to_string());
+    }
+    if matches!(port, 3306 | 5432 | 6379 | 27017 | 9200 | 1433) || record.risk_level == "high" {
+        warnings.push("Sensitive database or middleware port".to_string());
+    }
+    let plan_id = port_resolution_plan_id(record);
+    let plan = PortResolutionPlan {
+        plan_id: plan_id.clone(),
+        pid,
+        port,
+        process_name: record.process_name.clone(),
+        process_path: record.process_path.clone(),
+        command_line: record.command_line.clone(),
+        parent_pid: (record.parent_pid != 0).then_some(record.parent_pid),
+        parent_process_name: (!record.parent_process_name.is_empty())
+            .then(|| record.parent_process_name.clone()),
+        child_processes,
+        service_names: record.service_names.clone(),
+        related_ports,
+        project_root: project_root_from_command_line(&record.command_line),
+        risk_level: record.risk_level.clone(),
+        warnings,
+        recommended_actions: vec![
+            "Open the project directory".to_string(),
+            "Change the project port".to_string(),
+            "Stop the owning service when applicable".to_string(),
+            "Terminate the process and verify port release".to_string(),
+        ],
+    };
+    port_resolution_plans()
+        .lock()
+        .map_err(|_| "Port resolution plan store is unavailable".to_string())?
+        .insert(plan_id, plan.clone());
+    Ok(plan)
+}
+
+#[tauri::command]
+async fn execute_port_resolution_plan(
+    plan_id: String,
+    confirmation_token: Option<String>,
+) -> Result<PortResolutionResult, String> {
+    run_blocking(move || execute_port_resolution_plan_blocking(plan_id, confirmation_token)).await?
+}
+
+fn execute_port_resolution_plan_blocking(
+    plan_id: String,
+    confirmation_token: Option<String>,
+) -> Result<PortResolutionResult, String> {
+    require_risk_operation_token("execute_port_resolution_plan", &plan_id, confirmation_token)?;
+    let plan = port_resolution_plans()
+        .lock()
+        .map_err(|_| "Port resolution plan store is unavailable".to_string())?
+        .remove(&plan_id)
+        .ok_or_else(|| "Port resolution plan does not exist or was already used".to_string())?;
+    let before = scan_ports_blocking()?;
+    if !before
+        .iter()
+        .any(|item| port_owner_matches_plan(item, &plan))
+    {
+        return Err("Port owner changed; execution refused".to_string());
+    }
+    let pid = plan.pid.to_string();
+    let kill = powershell_runner::run_probe_command("taskkill", &["/PID", &pid, "/T"], 10)
+        .map_err(|err| format!("Failed to run taskkill: {err}"))?;
+    let remaining = scan_ports_blocking().unwrap_or_default();
+    let remaining_owners = remaining
+        .into_iter()
+        .filter(|item| item.local_port == plan.port && item.state.eq_ignore_ascii_case("LISTENING"))
+        .collect::<Vec<_>>();
+    let pid_exited = process_name(&sysinfo::System::new_all(), plan.pid).is_empty();
+    let port_released = remaining_owners.is_empty();
+    Ok(PortResolutionResult {
+        success: kill.success && port_released,
+        message: if kill.success {
+            format!("Port {} resolution executed", plan.port)
+        } else {
+            format!(
+                "taskkill failed: {}",
+                powershell_runner::native_command_message(&kill)
+            )
+        },
+        pid_exited,
+        port_released,
+        release_checked_at: unix_timestamp().to_string(),
+        remaining_owners,
+    })
+}
+
+fn port_resolution_plan_id(record: &PortRecord) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(record.pid.to_le_bytes());
+    hasher.update(record.local_port.to_le_bytes());
+    hasher.update(record.process_name.as_bytes());
+    hasher.update(record.process_path.as_bytes());
+    hasher.update(unix_timestamp().to_le_bytes());
+    format!("port-{:x}", hasher.finalize())
+}
+
+fn port_owner_matches_plan(record: &PortRecord, plan: &PortResolutionPlan) -> bool {
+    record.pid == plan.pid
+        && record.local_port == plan.port
+        && record.state.eq_ignore_ascii_case("LISTENING")
+        && record.process_name == plan.process_name
+        && record.process_path == plan.process_path
+        && sha256_text(&record.command_line) == sha256_text(&plan.command_line)
+        && sorted_strings(&record.service_names) == sorted_strings(&plan.service_names)
+}
+
+fn sha256_text(value: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(value.as_bytes());
+    format!("{:x}", hasher.finalize())
+}
+
+fn sorted_strings(values: &[String]) -> Vec<String> {
+    let mut values = values
+        .iter()
+        .map(|value| value.to_ascii_lowercase())
+        .collect::<Vec<_>>();
+    values.sort();
+    values
+}
+
+fn project_root_from_command_line(command_line: &str) -> Option<String> {
+    command_line
+        .split_whitespace()
+        .find(|item| item.contains("pom.xml") || item.contains("build.gradle"))
+        .map(|item| item.trim_matches('"').to_string())
 }
 
 #[tauri::command]
@@ -4207,10 +4688,13 @@ fn inspect_project_port_configs_blocking(root: &Path) -> Result<Vec<ProjectPortC
         configs.push(ProjectPortConfig {
             id: project_port_config_id(&file, "spring-properties-new", 0),
             kind: "spring-properties-new".to_string(),
-            file: display_path(file),
+            file: display_path(&file),
             current_port: 8080,
             line: 0,
             description: "Spring Boot 默认端口（将创建 server.port）".to_string(),
+            mode: if file.exists() { "append" } else { "create" }.to_string(),
+            will_overwrite_existing_file: false,
+            backup_path: None,
         });
     }
     configs.sort_by(|left, right| left.file.cmp(&right.file).then(left.line.cmp(&right.line)));
@@ -4323,6 +4807,9 @@ fn push_project_port(
             current_port: port,
             line,
             description: description.to_string(),
+            mode: "replace".to_string(),
+            will_overwrite_existing_file: false,
+            backup_path: None,
         });
     }
 }
@@ -4362,8 +4849,27 @@ fn update_project_port_blocking(
         if let Some(parent) = file.parent() {
             fs::create_dir_all(parent).map_err(|err| format!("创建资源目录失败：{err}"))?;
         }
-        fs::write(&file, format!("server.port={new_port}\n"))
-            .map_err(|err| format!("创建 Spring Boot 端口配置失败：{err}"))?;
+        if file.exists() {
+            let text =
+                fs::read_to_string(&file).map_err(|err| format!("读取端口配置失败：{err}"))?;
+            let backup = file.with_file_name(format!(
+                "{}.devenv-backup-{}",
+                file.file_name()
+                    .and_then(OsStr::to_str)
+                    .unwrap_or("port-config"),
+                filename_timestamp()
+            ));
+            fs::copy(&file, &backup).map_err(|err| format!("备份端口配置失败：{err}"))?;
+            let mut updated = text;
+            if !updated.is_empty() && !updated.ends_with('\n') {
+                updated.push('\n');
+            }
+            updated.push_str(&format!("server.port={new_port}\n"));
+            fs::write(&file, updated).map_err(|err| format!("写入端口配置失败：{err}"))?;
+        } else {
+            fs::write(&file, format!("server.port={new_port}\n"))
+                .map_err(|err| format!("创建 Spring Boot 端口配置失败：{err}"))?;
+        }
     } else {
         let text = fs::read_to_string(&file).map_err(|err| format!("读取端口配置失败：{err}"))?;
         let mut lines = text.lines().map(str::to_string).collect::<Vec<_>>();
@@ -5736,14 +6242,17 @@ async fn run_learning_check(command: String) -> Result<CommandRunResult, String>
         }
         let executable = parts.first().ok_or_else(|| "命令不能为空".to_string())?;
         let started = Instant::now();
-        let output = hidden_command(executable)
-            .args(parts.iter().skip(1))
-            .output()
+        let arg_refs = parts.iter().skip(1).map(String::as_str).collect::<Vec<_>>();
+        let output = powershell_runner::run_probe_command(executable, &arg_refs, 10)
             .map_err(|error| format!("执行只读检查失败：{error}"))?;
         Ok(CommandRunResult {
-            success: output.status.success(),
-            return_code: output.status.code().unwrap_or(-1),
-            output: command_text(&output.stdout, &output.stderr),
+            success: output.success,
+            return_code: output.exit_code.unwrap_or(-1),
+            output: if output.success {
+                command_text(output.stdout.as_bytes(), output.stderr.as_bytes())
+            } else {
+                powershell_runner::native_command_message(&output)
+            },
             elapsed_ms: started.elapsed().as_millis(),
         })
     })
@@ -5990,8 +6499,11 @@ fn create_managed_python_pip_repair_plan(python_path: String) -> Result<PythonRe
 }
 
 #[tauri::command]
-async fn apply_managed_python_pip_repair(plan_id: String) -> Result<OperationResult, String> {
-    apply_python_repair(plan_id).await
+async fn apply_managed_python_pip_repair(
+    plan_id: String,
+    confirmation_token: Option<String>,
+) -> Result<OperationResult, String> {
+    apply_python_repair(plan_id, confirmation_token).await
 }
 
 fn prepend_path_entries(existing: &str, additions: &[String]) -> (String, Vec<String>) {
@@ -6057,6 +6569,12 @@ fn preview_python_repair(repair_pip: bool, repair_path: bool) -> Result<PythonRe
     hasher.update(python.path.as_bytes());
     hasher.update(created.to_le_bytes());
     hasher.update([repair_pip as u8, repair_path as u8]);
+    hasher.update(std::process::id().to_le_bytes());
+    hasher.update(
+        SAVE_JSON_COUNTER
+            .fetch_add(1, Ordering::Relaxed)
+            .to_le_bytes(),
+    );
     let plan_id = format!("python-{:x}", hasher.finalize());
     let mut actions = Vec::new();
     let mut commands = Vec::new();
@@ -6108,8 +6626,12 @@ fn preview_python_repair(repair_pip: bool, repair_path: bool) -> Result<PythonRe
 }
 
 #[tauri::command]
-async fn apply_python_repair(plan_id: String) -> Result<OperationResult, String> {
+async fn apply_python_repair(
+    plan_id: String,
+    confirmation_token: Option<String>,
+) -> Result<OperationResult, String> {
     run_blocking(move || {
+        require_risk_operation_token("apply_python_repair", &plan_id, confirmation_token)?;
         let pending = python_repair_store()
             .lock()
             .map_err(|_| "Python 修复预览暂时不可用".to_string())?
@@ -7061,14 +7583,13 @@ fn stop_local_service_blocking(port: u16, service_name: String) -> Result<Operat
     if !verified {
         return Err("重新扫描后没有确认该服务仍占用目标端口".to_string());
     }
-    let output = hidden_command("sc.exe")
-        .args(["stop", service_name.as_str()])
-        .output()
-        .map_err(|err| format!("停止 Windows 服务失败：{err}"))?;
-    if !output.status.success() {
+    let output =
+        powershell_runner::run_probe_command("sc.exe", &["stop", service_name.as_str()], 10)
+            .map_err(|err| format!("停止 Windows 服务失败：{err}"))?;
+    if !output.success {
         return Err(format!(
             "停止 Windows 服务失败：{}",
-            command_text(&output.stdout, &output.stderr)
+            powershell_runner::native_command_message(&output)
         ));
     }
     Ok(OperationResult {
@@ -7147,12 +7668,11 @@ fn manage_local_service_blocking(
         return Err("只允许启动、停止或重启数据库服务".to_string());
     }
     if action == "stop" || action == "restart" {
-        let output = hidden_command("sc.exe")
-            .args(["stop", service.name.as_str()])
-            .output()
-            .map_err(|err| format!("停止 Windows 服务失败：{err}"))?;
-        let text = command_text(&output.stdout, &output.stderr);
-        if !output.status.success() && !text.contains("1062") {
+        let output =
+            powershell_runner::run_probe_command("sc.exe", &["stop", service.name.as_str()], 10)
+                .map_err(|err| format!("停止 Windows 服务失败：{err}"))?;
+        let text = format!("{}{}", output.stdout, output.stderr);
+        if !output.success && !text.contains("1062") {
             return Err(format!("停止 Windows 服务失败：{text}"));
         }
         if action == "restart" {
@@ -7160,12 +7680,11 @@ fn manage_local_service_blocking(
         }
     }
     if action == "start" || action == "restart" {
-        let output = hidden_command("sc.exe")
-            .args(["start", service.name.as_str()])
-            .output()
-            .map_err(|err| format!("启动 Windows 服务失败：{err}"))?;
-        let text = command_text(&output.stdout, &output.stderr);
-        if !output.status.success() && !text.contains("1056") {
+        let output =
+            powershell_runner::run_probe_command("sc.exe", &["start", service.name.as_str()], 10)
+                .map_err(|err| format!("启动 Windows 服务失败：{err}"))?;
+        let text = format!("{}{}", output.stdout, output.stderr);
+        if !output.success && !text.contains("1056") {
             return Err(format!("启动 Windows 服务失败：{text}"));
         }
     }
@@ -8065,23 +8584,105 @@ fn list_config_profiles_blocking() -> Result<Vec<ConfigProfile>, String> {
 }
 
 #[tauri::command]
-async fn repair_doctor_safe() -> Result<DoctorRepairResult, String> {
-    run_blocking(repair_doctor_safe_blocking).await?
+async fn create_doctor_repair_plan() -> Result<DoctorRepairPlan, String> {
+    run_blocking(create_doctor_repair_plan_blocking).await?
 }
 
-fn repair_doctor_safe_blocking() -> Result<DoctorRepairResult, String> {
+fn create_doctor_repair_plan_blocking() -> Result<DoctorRepairPlan, String> {
     let before = run_doctor_blocking()?;
-    let actions = before
+    let actions = doctor_repair_actions(&before);
+    let will_cleanup_path = actions.iter().any(|item| item == "cleanup_path");
+    let will_configure_environment = actions.iter().any(|item| item == "configure_env");
+    let actions_fingerprint = doctor_actions_fingerprint(&actions, before.score);
+    let mut hasher = Sha256::new();
+    hasher.update(actions_fingerprint.as_bytes());
+    hasher.update(unix_timestamp().to_le_bytes());
+    hasher.update(std::process::id().to_le_bytes());
+    hasher.update(
+        SAVE_JSON_COUNTER
+            .fetch_add(1, Ordering::Relaxed)
+            .to_le_bytes(),
+    );
+    let plan_id = format!("doctor-repair-{:x}", hasher.finalize());
+    let plan = DoctorRepairPlan {
+        plan_id: plan_id.clone(),
+        before_score: before.score,
+        actions,
+        will_cleanup_path,
+        will_configure_environment,
+        backup_name: format!("doctor-repair-env-backup-{}", unix_timestamp()),
+        warnings: vec![
+            "This plan can write user-level DEVENV_HOME/JAVA_HOME/PATH values.".to_string(),
+            "The plan is single-use and must be recreated if Doctor findings change.".to_string(),
+        ],
+    };
+    doctor_repair_plans()
+        .lock()
+        .map_err(|_| "Doctor repair plan store is unavailable".to_string())?
+        .insert(
+            plan_id,
+            PendingDoctorRepairPlan {
+                public: plan.clone(),
+                actions_fingerprint,
+            },
+        );
+    Ok(plan)
+}
+
+fn doctor_repair_actions(report: &DoctorReport) -> Vec<String> {
+    report
         .checks
         .iter()
-        .filter(|item| item.status != "正常")
+        .filter(|item| doctor_check_needs_attention(item))
         .filter_map(|item| item.fix_action.as_deref())
-        .collect::<BTreeSet<_>>();
+        .filter(|action| matches!(*action, "cleanup_path" | "configure_env"))
+        .map(str::to_string)
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect()
+}
+
+fn doctor_actions_fingerprint(actions: &[String], before_score: u8) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(before_score.to_le_bytes());
+    for action in actions {
+        hasher.update(action.as_bytes());
+        hasher.update([0]);
+    }
+    format!("{:x}", hasher.finalize())
+}
+
+#[tauri::command]
+async fn execute_doctor_repair_plan(
+    plan_id: String,
+    confirmation_token: Option<String>,
+) -> Result<DoctorRepairResult, String> {
+    run_blocking(move || execute_doctor_repair_plan_blocking(plan_id, confirmation_token)).await?
+}
+
+fn execute_doctor_repair_plan_blocking(
+    plan_id: String,
+    confirmation_token: Option<String>,
+) -> Result<DoctorRepairResult, String> {
+    require_risk_operation_token("execute_doctor_repair_plan", &plan_id, confirmation_token)?;
+    let pending = doctor_repair_plans()
+        .lock()
+        .map_err(|_| "Doctor repair plan store is unavailable".to_string())?
+        .remove(&plan_id)
+        .ok_or_else(|| "Doctor repair plan does not exist or was already used".to_string())?;
+    let before = run_doctor_blocking()?;
+    let actions = doctor_repair_actions(&before);
+    if doctor_actions_fingerprint(&actions, before.score) != pending.actions_fingerprint {
+        return Err("Doctor repair plan is stale; rerun Doctor and create a new plan".to_string());
+    }
+    let paths = load_paths()?;
+    let environment = user_environment()?;
+    let _backup_name = create_environment_backup(&paths, &environment)?;
     let mut applied = Vec::new();
-    if actions.contains("cleanup_path") {
+    if pending.public.will_cleanup_path {
         applied.push(cleanup_path_entries_blocking()?.message);
     }
-    if actions.contains("configure_env") {
+    if pending.public.will_configure_environment {
         applied.push(configure_user_environment_blocking()?.message);
     }
     let report = run_doctor_blocking()?;
@@ -8089,7 +8690,7 @@ fn repair_doctor_safe_blocking() -> Result<DoctorRepairResult, String> {
         .checks
         .iter()
         .filter(|item| doctor_check_needs_attention(item))
-        .map(|item| format!("{}：{}", item.title, item.detail))
+        .map(|item| format!("{}: {}", item.title, item.detail))
         .collect();
     Ok(DoctorRepairResult {
         before_score: before.score,
@@ -8111,11 +8712,160 @@ fn config_profile_requirements(id: String) -> Result<Vec<ProfileRequirement>, St
 }
 
 #[tauri::command]
-async fn install_profile_missing(
+fn config_profile_plan_id(id: String) -> Result<String, String> {
+    config_profile_plan_id_blocking(&id)
+}
+
+fn config_profile_plan_id_blocking(id: &str) -> Result<String, String> {
+    let paths = load_paths()?;
+    let profiles = load_profiles(&paths)?;
+    let profile = profiles
+        .iter()
+        .find(|item| item.id == id)
+        .ok_or_else(|| "Config profile not found".to_string())?;
+    Ok(format!("config-profile-{}", profile_fingerprint(profile)))
+}
+
+fn profile_fingerprint(profile: &ConfigProfile) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(profile.id.as_bytes());
+    hasher.update(profile.name.as_bytes());
+    hasher.update(profile.path.as_bytes());
+    hasher.update(profile.java_home.as_deref().unwrap_or("").as_bytes());
+    hasher.update(profile.devenv_home.as_deref().unwrap_or("").as_bytes());
+    hasher.update(
+        serde_json::to_string(&profile.current)
+            .unwrap_or_default()
+            .as_bytes(),
+    );
+    format!("{:x}", hasher.finalize())
+}
+
+fn requirements_fingerprint(requirements: &[ProfileRequirement]) -> String {
+    let mut hasher = Sha256::new();
+    for requirement in requirements {
+        hasher.update(requirement.kind.as_bytes());
+        hasher.update(requirement.version.as_bytes());
+        hasher.update([
+            requirement.installed as u8,
+            requirement.auto_install_supported as u8,
+        ]);
+    }
+    format!("{:x}", hasher.finalize())
+}
+
+#[tauri::command]
+async fn create_profile_apply_plan(id: String) -> Result<ProfileApplyPlan, String> {
+    run_blocking(move || create_profile_apply_plan_blocking(id)).await?
+}
+
+fn create_profile_apply_plan_blocking(id: String) -> Result<ProfileApplyPlan, String> {
+    let paths = load_paths()?;
+    let profile = load_profiles(&paths)?
+        .into_iter()
+        .find(|item| item.id == id)
+        .ok_or_else(|| "Config profile not found".to_string())?;
+    let installed = load_installed(&paths)?;
+    let requirements = profile_requirements(&profile, &installed)?;
+    let missing_requirements = requirements
+        .iter()
+        .filter(|item| !item.installed)
+        .cloned()
+        .collect::<Vec<_>>();
+    if missing_requirements
+        .iter()
+        .any(|item| !item.auto_install_supported)
+    {
+        return Err(
+            "Profile contains missing runtimes that cannot be installed automatically".to_string(),
+        );
+    }
+    let runtime_switches = [
+        ("jdk", profile.current.jdk.as_ref()),
+        ("python", profile.current.python.as_ref()),
+        ("node", profile.current.node.as_ref()),
+        ("maven", profile.current.maven.as_ref()),
+        ("gradle", profile.current.gradle.as_ref()),
+        ("go", profile.current.go.as_ref()),
+    ]
+    .into_iter()
+    .filter_map(|(kind, version)| version.map(|value| format!("{kind} {value}")))
+    .collect::<Vec<_>>();
+    let profile_hash = profile_fingerprint(&profile);
+    let requirements_hash = requirements_fingerprint(&requirements);
+    let mut hasher = Sha256::new();
+    hasher.update(profile_hash.as_bytes());
+    hasher.update(requirements_hash.as_bytes());
+    hasher.update(unix_timestamp().to_le_bytes());
+    hasher.update(std::process::id().to_le_bytes());
+    hasher.update(
+        SAVE_JSON_COUNTER
+            .fetch_add(1, Ordering::Relaxed)
+            .to_le_bytes(),
+    );
+    let plan_id = format!("profile-apply-{:x}", hasher.finalize());
+    let plan = ProfileApplyPlan {
+        plan_id: plan_id.clone(),
+        profile_id: profile.id.clone(),
+        profile_name: profile.name.clone(),
+        missing_requirements,
+        runtime_switches,
+        will_install: requirements.iter().any(|item| !item.installed),
+        will_write_environment: true,
+        backup_name: format!("profile-apply-env-backup-{}", unix_timestamp()),
+        warnings: vec![
+            "This plan can install runtimes and write user-level environment values.".to_string(),
+            "The plan is single-use and must be recreated if the profile changes.".to_string(),
+        ],
+    };
+    profile_apply_plans()
+        .lock()
+        .map_err(|_| "Profile apply plan store is unavailable".to_string())?
+        .insert(
+            plan_id,
+            PendingProfileApplyPlan {
+                public: plan.clone(),
+                profile_fingerprint: profile_hash,
+                requirements_fingerprint: requirements_hash,
+            },
+        );
+    Ok(plan)
+}
+
+#[tauri::command]
+async fn execute_profile_apply_plan(
     app: tauri::AppHandle,
-    id: String,
+    plan_id: String,
+    confirmation_token: Option<String>,
 ) -> Result<OperationResult, String> {
-    run_blocking(move || install_profile_missing_blocking(app, id)).await?
+    run_blocking(move || execute_profile_apply_plan_blocking(app, plan_id, confirmation_token))
+        .await?
+}
+
+fn execute_profile_apply_plan_blocking(
+    app: tauri::AppHandle,
+    plan_id: String,
+    confirmation_token: Option<String>,
+) -> Result<OperationResult, String> {
+    require_risk_operation_token("execute_profile_apply_plan", &plan_id, confirmation_token)?;
+    let pending = profile_apply_plans()
+        .lock()
+        .map_err(|_| "Profile apply plan store is unavailable".to_string())?
+        .remove(&plan_id)
+        .ok_or_else(|| "Profile apply plan does not exist or was already used".to_string())?;
+    let paths = load_paths()?;
+    let profile = load_profiles(&paths)?
+        .into_iter()
+        .find(|item| item.id == pending.public.profile_id)
+        .ok_or_else(|| "Config profile not found".to_string())?;
+    let installed = load_installed(&paths)?;
+    let requirements = profile_requirements(&profile, &installed)?;
+    if profile_fingerprint(&profile) != pending.profile_fingerprint
+        || requirements_fingerprint(&requirements) != pending.requirements_fingerprint
+    {
+        return Err("Profile apply plan is stale; recreate the plan before executing".to_string());
+    }
+    install_profile_missing_blocking(app, pending.public.profile_id)
 }
 
 fn install_profile_missing_blocking(
@@ -8154,7 +8904,7 @@ fn install_profile_missing_blocking(
                     .filter(|value| ["temurin", "zulu", "liberica", "microsoft"].contains(value))
                     .unwrap_or("temurin")
                     .to_string();
-                install_jdk_blocking(app.clone(), major, Some(distribution))
+                install_jdk_blocking(app.clone(), major, Some(distribution), false, None)
             }
             "python" => install_python_blocking(app.clone(), requirement.version.clone()),
             "node" => install_node_blocking(app.clone(), requirement.version.clone()),
@@ -8275,8 +9025,16 @@ fn save_config_profile_blocking(name: String) -> Result<OperationResult, String>
 }
 
 #[tauri::command]
-async fn apply_config_profile(id: String) -> Result<OperationResult, String> {
-    run_blocking(move || apply_config_profile_blocking(id)).await?
+async fn apply_config_profile(
+    id: String,
+    confirmation_token: Option<String>,
+) -> Result<OperationResult, String> {
+    run_blocking(move || {
+        let plan_id = config_profile_plan_id_blocking(&id)?;
+        require_risk_operation_token("apply_config_profile", &plan_id, confirmation_token)?;
+        apply_config_profile_blocking(id)
+    })
+    .await?
 }
 
 fn apply_config_profile_blocking(id: String) -> Result<OperationResult, String> {
@@ -8312,18 +9070,51 @@ fn apply_config_profile_blocking(id: String) -> Result<OperationResult, String> 
             missing.join("、")
         ));
     }
+    let before_versions = installed.current.clone();
+    let before_environment = user_environment()?;
+    let backup_name = create_environment_backup(&paths, &before_environment)?;
     let mut applied = Vec::new();
     for (kind, version) in switches {
         if let Some(version) = version {
-            switch_runtime_blocking(kind.to_string(), version.clone(), None)?;
+            if let Err(error) = switch_runtime_blocking(kind.to_string(), version.clone(), None) {
+                restore_current_versions(&before_versions);
+                let _ = restore_environment_values(
+                    before_environment.get("DEVENV_HOME").map(String::as_str),
+                    before_environment.get("JAVA_HOME").map(String::as_str),
+                    before_environment
+                        .get("Path")
+                        .or_else(|| before_environment.get("PATH"))
+                        .map(String::as_str)
+                        .unwrap_or(""),
+                );
+                broadcast_environment_change();
+                return Err(format!(
+                    "Profile runtime switch failed after backup {backup_name}: {error}"
+                ));
+            }
             applied.push(format!("{kind} {version}"));
         }
     }
-    restore_environment_values(
+    if let Err(error) = restore_environment_values(
         profile.devenv_home.as_deref(),
         profile.java_home.as_deref(),
         &profile.path,
-    )?;
+    ) {
+        restore_current_versions(&before_versions);
+        let _ = restore_environment_values(
+            before_environment.get("DEVENV_HOME").map(String::as_str),
+            before_environment.get("JAVA_HOME").map(String::as_str),
+            before_environment
+                .get("Path")
+                .or_else(|| before_environment.get("PATH"))
+                .map(String::as_str)
+                .unwrap_or(""),
+        );
+        broadcast_environment_change();
+        return Err(format!(
+            "Profile environment restore failed after backup {backup_name}: {error}"
+        ));
+    }
     broadcast_environment_change();
     Ok(OperationResult {
         success: true,
@@ -9031,10 +9822,13 @@ pub fn run() {
             uninstall_runtime,
             kill_process,
             scan_ports,
+            create_port_resolution_plan,
+            execute_port_resolution_plan,
             port_history,
             open_process_location,
             run_doctor,
-            repair_doctor_safe,
+            create_doctor_repair_plan,
+            execute_doctor_repair_plan,
             export_doctor_report,
             export_doctor_report_json,
             doctor_report_text,
@@ -9076,7 +9870,9 @@ pub fn run() {
             environment_health,
             list_config_profiles,
             config_profile_requirements,
-            install_profile_missing,
+            config_profile_plan_id,
+            create_profile_apply_plan,
+            execute_profile_apply_plan,
             save_config_profile,
             apply_config_profile,
             delete_config_profile,
@@ -11409,15 +12205,15 @@ fn run_command_output(
     args: &[&str],
     timeout_seconds: u64,
 ) -> Result<String, String> {
-    let output = hidden_command(executable)
-        .args(args)
-        .output()
+    let output = powershell_runner::run_probe_command(executable, args, timeout_seconds)
         .map_err(|err| format!("执行命令失败：{err}"))?;
-    let _ = timeout_seconds;
-    if !output.status.success() {
-        return Err(command_text(&output.stdout, &output.stderr));
+    if !output.success {
+        return Err(powershell_runner::native_command_message(&output));
     }
-    Ok(command_text(&output.stdout, &output.stderr))
+    Ok(command_text(
+        output.stdout.as_bytes(),
+        output.stderr.as_bytes(),
+    ))
 }
 
 fn process_details(system: &sysinfo::System, pid: u32) -> (String, String, u32, String) {
@@ -12709,21 +13505,21 @@ fn probe_tool(name: &str, executable: Option<PathBuf>, args: &[&str]) -> ToolSta
             detail: "没有在受管目录、当前 PATH 或用户 PATH 中找到".to_string(),
         };
     };
-    let output = hidden_command(&executable).args(args).output();
+    let output = powershell_runner::run_probe_command(&executable, args, probe_timeout(name, args));
     match output {
         Ok(output) => {
-            let detail = command_text(&output.stdout, &output.stderr);
+            let detail = command_text(output.stdout.as_bytes(), output.stderr.as_bytes());
             let version =
                 first_meaningful_output_line(&detail).unwrap_or_else(|| "未返回版本".to_string());
             ToolState {
                 name: name.to_string(),
-                installed: output.status.success(),
+                installed: output.success,
                 version,
                 path: display_path(&executable),
-                detail: if output.status.success() {
+                detail: if output.success {
                     classify_source(&display_path(&executable))
                 } else {
-                    detail
+                    powershell_runner::native_command_message(&output)
                 },
             }
         }
@@ -12734,6 +13530,17 @@ fn probe_tool(name: &str, executable: Option<PathBuf>, args: &[&str]) -> ToolSta
             path: display_path(executable),
             detail: format!("执行失败：{err}"),
         },
+    }
+}
+
+fn probe_timeout(name: &str, args: &[&str]) -> u64 {
+    let lower = name.to_ascii_lowercase();
+    if lower.contains("gradle") {
+        30
+    } else if lower.contains("maven") || args.contains(&"-T") {
+        20
+    } else {
+        10
     }
 }
 
@@ -13808,6 +14615,18 @@ mod tests {
             "restore_environment_backup",
             "cleanup_path_entries",
             "apply_user_environment_configuration",
+            "apply_python_repair",
+            "apply_config_profile",
+            "execute_profile_apply_plan",
+            "execute_doctor_repair_plan",
+            "switch_runtime",
+            "uninstall_runtime",
+            "install_jdk",
+            "install_node",
+            "install_python",
+            "install_go",
+            "install_maven_latest",
+            "install_gradle_latest",
             "manage_system_platform",
             "manage_local_service",
             "stop_local_service",
@@ -13819,6 +14638,7 @@ mod tests {
             "clear_download_cache",
             "clean_dev_cache",
             "kill_process",
+            "execute_port_resolution_plan",
             "execute_mysql_repair_plan",
             "apply_file_association_plan",
             "rollback_file_association_backup",
@@ -14244,6 +15064,31 @@ mod tests {
             })
             .count();
         assert_eq!(backups, 1);
+    }
+
+    #[test]
+    fn spring_port_update_appends_without_overwriting_existing_properties() {
+        let temp = tempfile::tempdir().unwrap();
+        let resources = temp.path().join("src").join("main").join("resources");
+        fs::create_dir_all(&resources).unwrap();
+        fs::write(
+            temp.path().join("pom.xml"),
+            "<project><artifactId>spring-boot-starter-web</artifactId></project>",
+        )
+        .unwrap();
+        let file = resources.join("application.properties");
+        fs::write(&file, "spring.application.name=demo\n# keep this\n").unwrap();
+        let configs = inspect_project_port_configs_blocking(temp.path()).unwrap();
+        let config = configs
+            .iter()
+            .find(|item| item.kind == "spring-properties-new")
+            .unwrap();
+        assert_eq!(config.mode, "append");
+        update_project_port_blocking(temp.path(), &config.id, 9091).unwrap();
+        let updated = fs::read_to_string(&file).unwrap();
+        assert!(updated.contains("spring.application.name=demo"));
+        assert!(updated.contains("# keep this"));
+        assert!(updated.contains("server.port=9091"));
     }
 
     #[test]

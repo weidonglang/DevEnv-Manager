@@ -5,10 +5,12 @@ use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 const HIGH_RISK_EXTENSIONS: &[&str] = &[
     ".exe", ".msi", ".reg", ".bat", ".cmd", ".ps1", ".vbs", ".scr",
 ];
+static FILE_ASSOC_ID_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -344,7 +346,7 @@ pub fn create_file_association_plan_blocking(
         });
     }
     let created_at = current_timestamp();
-    let plan_id = format!("file-assoc-{}", timestamp_compact());
+    let plan_id = unique_file_assoc_id("file-assoc");
     let backup_path = backup_dir().join(format!("{plan_id}.json"));
     let requires_confirmation_token = changes.iter().any(|item| {
         item.risk == FileAssociationRisk::HighRisk
@@ -1430,6 +1432,15 @@ fn current_timestamp() -> String {
 
 fn timestamp_compact() -> String {
     unix_timestamp().to_string()
+}
+
+fn unique_file_assoc_id(prefix: &str) -> String {
+    let counter = FILE_ASSOC_ID_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let millis = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis();
+    format!("{prefix}-{millis}-{}-{counter}", std::process::id())
 }
 
 fn unix_timestamp() -> u64 {

@@ -259,6 +259,33 @@ export type PortRecord = {
   conflictEvidence: string[];
 };
 
+export type PortResolutionPlan = {
+  planId: string;
+  pid: number;
+  port: number;
+  processName: string;
+  processPath: string;
+  commandLine: string;
+  parentPid?: number;
+  parentProcessName?: string;
+  childProcesses: Array<{ pid: number; name: string }>;
+  serviceNames: string[];
+  relatedPorts: number[];
+  projectRoot?: string;
+  riskLevel: "low" | "medium" | "high" | "critical";
+  warnings: string[];
+  recommendedActions: string[];
+};
+
+export type PortResolutionResult = {
+  success: boolean;
+  message: string;
+  pidExited: boolean;
+  portReleased: boolean;
+  releaseCheckedAt: string;
+  remainingOwners: PortRecord[];
+};
+
 export type PortHistorySummary = {
   port: number;
   processName: string;
@@ -472,6 +499,9 @@ export type ProjectPortConfig = {
   currentPort: number;
   line: number;
   description: string;
+  mode: "replace" | "append" | "create";
+  willOverwriteExistingFile: boolean;
+  backupPath?: string;
 };
 
 
@@ -845,6 +875,16 @@ export type DoctorRepairResult = {
   report: DoctorReport;
 };
 
+export type DoctorRepairPlan = {
+  planId: string;
+  beforeScore: number;
+  actions: string[];
+  willCleanupPath: boolean;
+  willConfigureEnvironment: boolean;
+  backupName: string;
+  warnings: string[];
+};
+
 export type ConfigProfileImportPreview = {
   source: string;
   exportedAt: string;
@@ -861,6 +901,18 @@ export type ProfileRequirement = {
   version: string;
   installed: boolean;
   autoInstallSupported: boolean;
+};
+
+export type ProfileApplyPlan = {
+  planId: string;
+  profileId: string;
+  profileName: string;
+  missingRequirements: ProfileRequirement[];
+  runtimeSwitches: string[];
+  willInstall: boolean;
+  willWriteEnvironment: boolean;
+  backupName: string;
+  warnings: string[];
 };
 
 export type CleanupCandidate = {

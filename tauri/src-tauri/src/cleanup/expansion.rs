@@ -1,7 +1,7 @@
 use super::disk::inspect_disk_overview;
 use super::model::{ExpansionPlan, ExpansionResult};
 use super::partition::inspect_partition_layout;
-use super::utils::generated_at;
+use super::utils::unique_id;
 use std::process::Command;
 
 pub fn create_c_drive_expansion_plan() -> Result<ExpansionPlan, String> {
@@ -13,7 +13,7 @@ pub fn create_c_drive_expansion_plan() -> Result<ExpansionPlan, String> {
     if report.can_extend_safely {
         let added = report.unallocated_after_c.unwrap_or(0);
         Ok(ExpansionPlan {
-            plan_id: format!("expand-{}", generated_at()),
+            plan_id: unique_id("expand"),
             mode: "safe_extend_unallocated".to_string(),
             can_execute: true,
             requires_admin: true,
@@ -32,7 +32,7 @@ pub fn create_c_drive_expansion_plan() -> Result<ExpansionPlan, String> {
         let adjacent = report.adjacent_right.clone().unwrap_or_default();
         risks.push("将删除 C 盘右侧空分区；仅当确认没有用户文件时才可继续。".to_string());
         Ok(ExpansionPlan {
-            plan_id: format!("expand-{}", generated_at()),
+            plan_id: unique_id("expand"),
             mode: "delete_empty_adjacent_partition_then_extend".to_string(),
             can_execute: true,
             requires_admin: true,
@@ -58,7 +58,7 @@ pub fn create_c_drive_expansion_plan() -> Result<ExpansionPlan, String> {
             "different_physical_disk"
         };
         Ok(ExpansionPlan {
-            plan_id: format!("expand-{}", generated_at()),
+            plan_id: unique_id("expand"),
             mode: mode.to_string(),
             can_execute: false,
             requires_admin: false,

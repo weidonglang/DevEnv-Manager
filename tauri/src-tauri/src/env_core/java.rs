@@ -169,6 +169,9 @@ pub fn create_java_stabilize_plan(
     jdk_path: String,
 ) -> Result<EnvRepairPlan, String> {
     let jdk = PathBuf::from(jdk_path);
+    if !jdk.is_absolute() {
+        return Err("JAVA_HOME must be an absolute JDK root path".to_string());
+    }
     if jdk.to_string_lossy().contains('%') {
         return Err(
             "JAVA_HOME 不允许写入 %DEVENV_HOME% 等间接引用，请选择真实绝对 JDK 路径".to_string(),
@@ -182,6 +185,24 @@ pub fn create_java_stabilize_plan(
     }
     if !jdk.join("bin/javac.exe").is_file() {
         return Err("目标目录缺少 bin\\javac.exe；JRE 或残缺 JDK 不能作为 JAVA_HOME".to_string());
+    }
+    if !jdk.join("bin/jar.exe").is_file() {
+        return Err("Target JDK is missing bin\\jar.exe".to_string());
+    }
+    for (tool, args) in [
+        ("java.exe", &["-version"][..]),
+        ("javac.exe", &["-version"][..]),
+        ("jar.exe", &["--help"][..]),
+    ] {
+        let executable = jdk.join("bin").join(tool);
+        let output = crate::powershell_runner::run_probe_command(&executable, args, 10)
+            .map_err(|err| format!("Failed to run {tool}: {err}"))?;
+        if !output.success {
+            return Err(format!(
+                "{tool} probe failed: {}",
+                crate::powershell_runner::native_command_message(&output)
+            ));
+        }
     }
     create_env_repair_plan(
         managed_root,
