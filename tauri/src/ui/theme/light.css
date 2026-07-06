@@ -1,0 +1,16 @@
+:root,
+:root[data-theme="light"] {
+  color-scheme: light;
+  --surface: #f5f7fb;
+  --panel: #ffffff;
+  --panel-muted: #f8fafc;
+  --text: #172033;
+  --muted: #637083;
+  --border: #d7dde8;
+  --accent: #2563eb;
+  --accent-strong: #1d4ed8;
+  --hover: #eef4ff;
+  --danger: #b42318;
+  --warning: #b45309;
+  --success: #15803d;
+}

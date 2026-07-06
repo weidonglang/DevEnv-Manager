@@ -5,6 +5,7 @@ import sys
 
 from check_tauri_command_contract import main as check_tauri_command_contract
 from check_release_consistency import main as check_release_consistency
+from check_frontend_architecture import main as check_frontend_architecture
 
 
 BLOCKED_PARTS = {
@@ -54,6 +55,9 @@ def main() -> int:
     contract_result = check_tauri_command_contract()
     if contract_result != 0:
         return contract_result
+    frontend_result = check_frontend_architecture()
+    if frontend_result != 0:
+        return frontend_result
     release_result = check_release_consistency()
     if release_result != 0:
         return release_result
