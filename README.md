@@ -2,9 +2,9 @@
 
 [GitHub 主仓库](https://github.com/weidonglang/DevEnv-Manager) · [Gitee 国内镜像](https://gitee.com/weidonglang/DevEnv-Manager) · [GitHub Release](https://github.com/weidonglang/DevEnv-Manager/releases) · [Gitee Release](https://gitee.com/weidonglang/DevEnv-Manager/releases) · [完整操作手册](docs/user-guide.md) · [安全说明](docs/safety-and-disclaimer.md) · [问题反馈](https://github.com/weidonglang/DevEnv-Manager/issues)
 
-面向 Windows 的开发环境诊断器与安全操作面板。当前版本：**1.8.0 Stable**。
+面向 Windows 的开发环境诊断器与安全操作面板。当前版本：**1.8.1 Stable**。
 
-1.8.0 完成 Runtime/JDK/Python/port reliability hardening、Profile/Doctor plan-token-execute safety model、file association safety gates、Fluent workbench frontend、Command Palette、unified Risk UX，以及 Light/Dark/System/High Contrast themes。
+1.8.1 是 hotfix 版本：修复 Dashboard 因 port scan / netstat timeout 整页加载失败的问题，新增 Auto / 简体中文 / English 语言选项，恢复首启安全声明和每页功能/风险说明，并补齐 GitHub + Gitee 发布元数据一致性。
 
 ## 下载与镜像
 
@@ -12,7 +12,7 @@
 - Gitee 国内镜像：https://gitee.com/weidonglang/DevEnv-Manager
 - GitHub Release：https://github.com/weidonglang/DevEnv-Manager/releases
 - Gitee Release：https://gitee.com/weidonglang/DevEnv-Manager/releases
-- SHA256：`e827d5bcaaf4ea7d250d687011629253420e1ec9f92930c0af571d7998e6a51a`
+- SHA256：`366eea864333bc1927da182d8409462b53676da8b4a8432c24a5aa2d2def8de6`
 
 适合：
 
@@ -44,6 +44,19 @@ DevEnv Manager 解决的是 Windows 上多个开发生态互相影响的问题�
 - 适合希望用图形界面查看诊断证据，同时保留 CLI 自动化入口的用户。
 - 不适合希望软件自动接管整台机器、清理任意个人文件或替代专业包管理器的场景。
 - 熟练使用 mise/asdf/Scoop/Chocolatey 且环境已经稳定的用户，可以只使用诊断能力。
+
+## 1.8.1 Stable
+
+v1.8.1 is a hotfix release for:
+
+- Dashboard fallback loading when port scan / netstat times out.
+- App-level i18n with Auto / zh-CN / en-US language selection.
+- Restored first-launch safety notice and per-page usage/risk guidance.
+- GitHub + Gitee release metadata consistency.
+
+Installer: `DevEnv.Manager_1.8.1_x64-setup.exe`
+
+SHA256: `366eea864333bc1927da182d8409462b53676da8b4a8432c24a5aa2d2def8de6`
 
 ## 1.8.0 Stable
 

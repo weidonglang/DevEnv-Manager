@@ -1,21 +1,33 @@
-# DevEnv Manager 1.8.0 Stable 操作手册
+# DevEnv Manager 1.8.1 Stable 操作手册
 
-本手册覆盖 v1.8.0 的 Fluent workbench、Command Palette、统一 Risk UX、运行时管理、环境修复、Ports & Services、File Associations、Profiles、Reports、Settings，以及更新/发布校验流程。
+本手册覆盖 v1.8.1 的 Fluent workbench、Command Palette、统一 Risk UX、应用级语言切换、Dashboard 降级加载、运行时管理、环境修复、Ports & Services、File Associations、Profiles、Reports、Settings，以及更新/发布校验流程。
 
-## 0. v1.8.0 Workbench overview
+## 0. v1.8.1 Workbench overview
 
-- Dashboard：查看 JDK/Python/PATH/Ports/File Associations、PowerShell runner、更新状态和快捷入口。
+- Dashboard：查看 JDK/Python/PATH/File Associations、PowerShell runner、更新状态和快捷入口；端口摘要不可用或 netstat 超时时不会影响整页加载。
 - Runtimes：发现 JDK、Node.js、Python、Go、Maven、Gradle，安装/切换/卸载高风险动作均走 token gate。
 - Environment：查看 JAVA_HOME raw/expanded、PATH first java/javac/jar、Maven/Gradle Java、备份和修复计划。
 - Ports & Services：扫描端口、过滤、诊断 owner/service、生成并执行 port resolution plan。
 - File Associations：扫描扩展名、搜索 app candidate、生成 plan、apply/rollback 均走确认 token。
 - Profiles：保存、列出、预览导入、导出、删除 profile，apply 使用 plan -> token -> execute。
 - Reports：导出 Doctor、Environment、Python diagnostic、File Association、Cleanup 报告，并查看 Port/Project 报告入口。
-- Settings：管理 root directory、auto update、theme、安全说明、app config、PowerShell runner 和 update source。
+- Settings：管理 root directory、auto update、theme、language、安全说明、app config、PowerShell runner 和 update source。
 
 ### Command Palette
 
-按 `Ctrl+Shift+P` 打开 Command Palette。可以搜索 Run Doctor、Inspect Environment、Scan Ports、Export reports、主题切换和 `Go to ...` 页面跳转。高风险命令不会直接执行，只会进入对应页面的 plan/preview 流程。
+按 `Ctrl+Shift+P` 打开 Command Palette。可以搜索 Run Doctor、Inspect Environment、Scan Ports、Export reports、主题切换、语言切换和 `Go to ...` 页面跳转。高风险命令不会直接执行，只会进入对应页面的 plan/preview 流程。
+
+### Language / 语言
+
+Settings 提供 Auto / 简体中文 / English。Auto 会根据系统语言选择 zh-CN 或 en-US；手动选择会保存到本机 localStorage，并立即重渲染当前工作台，不需要重启应用。Command Palette 也提供 Switch Language: Auto / Chinese / English。
+
+### First-launch safety notice
+
+新安装或清空本机配置后，进入工作台前会显示“使用前请阅读 / Safety notice before use”。未同意前不会进入主界面；同意状态只保存在本机。Settings 中可以重新查看安全声明和风险等级定义。
+
+### Dashboard fallback
+
+Dashboard 默认不执行完整 `scan_ports`。如果端口摘要不可用，会只在 Ports 卡片显示“尚未扫描”或超时提示，Root directory、JDK status、Python status、PowerShell runner 和 Update status 仍可查看。需要重新扫描时进入 Ports & Services 页面执行 Scan Ports。
 
 ### Unified Risk UX
 
@@ -23,9 +35,9 @@
 
 ### Update / release verification
 
-正式发布包为 `DevEnv.Manager_1.8.0_x64-setup.exe`。安装或更新前请核对 GitHub/Gitee Release notes 中的 SHA256；应用内 Check Update 应显示 latest version `1.8.0`，下载 URL 指向 v1.8.0 asset，checksum 与 manifest 一致。
+正式发布包为 `DevEnv.Manager_1.8.1_x64-setup.exe`。安装或更新前请核对 GitHub/Gitee Release notes 中的 SHA256；应用内 Check Update 应显示 latest version `1.8.1`，下载 URL 指向 v1.8.1 asset，checksum 与 manifest 一致。
 
-本手册适用于 Windows 10/11 上的 DevEnv Manager 1.8.0。程序定位是开发环境诊断器与安全操作面板，不替代 npm、pnpm、pip、uv、Maven、Gradle、Cargo、chsrc、Scoop、Chocolatey、WSL 等成熟工具。
+本手册适用于 Windows 10/11 上的 DevEnv Manager 1.8.1。程序定位是开发环境诊断器与安全操作面板，不替代 npm、pnpm、pip、uv、Maven、Gradle、Cargo、chsrc、Scoop、Chocolatey、WSL 等成熟工具。
 
 ## 1. 下载、安装与校验
 

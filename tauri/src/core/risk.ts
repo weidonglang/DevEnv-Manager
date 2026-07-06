@@ -1,4 +1,5 @@
 import { invoke } from "./invoke";
+import { t } from "./i18n";
 import type { ConfirmationTokenView } from "../types";
 import {
   backupReceipt,
@@ -63,15 +64,15 @@ export async function runRiskOperation(operation: RiskOperationView): Promise<un
   host.innerHTML = `
     <div class="risk-ux" role="dialog" aria-modal="true" aria-label="${operation.title}">
       <div class="risk-ux__panel">
-        <header><h2>${operation.title}</h2><button data-risk-close type="button">Close</button></header>
+        <header><h2>${operation.title}</h2><button data-risk-close type="button">${t("risk.close")}</button></header>
         ${planPreview(operation)}
         ${riskExplanation(operation)}
         ${backupReceipt(operation)}
         ${confirmationDialog(operation)}
         ${tokenGate(operation)}
         <footer>
-          <button data-risk-close type="button">Cancel</button>
-          <button data-risk-execute class="danger" type="button">Create token and execute</button>
+          <button data-risk-close type="button">${t("risk.cancel")}</button>
+          <button data-risk-execute class="danger" type="button">${t("risk.createTokenAndExecute")}</button>
         </footer>
       </div>
     </div>
@@ -100,7 +101,7 @@ export async function runRiskOperation(operation: RiskOperationView): Promise<un
       void (async () => {
         try {
           executeButton.disabled = true;
-          executeButton.textContent = "Creating token...";
+          executeButton.textContent = t("risk.creatingToken");
           const token = await createRiskToken({
             command: operation.command,
             actionId: operation.actionId ?? operation.command,
@@ -111,18 +112,18 @@ export async function runRiskOperation(operation: RiskOperationView): Promise<un
             backupReceipt: operation.backupReceipt,
           });
           const panel = host.querySelector<HTMLElement>(".risk-ux__panel");
-          if (panel) panel.insertAdjacentHTML("beforeend", executionProgress("Executing through backend token gate."));
-          executeButton.textContent = "Executing...";
+          if (panel) panel.insertAdjacentHTML("beforeend", executionProgress(t("risk.executingThroughGate")));
+          executeButton.textContent = t("risk.executing");
           const result = await operation.execute(token.token);
           if (panel) {
             panel.insertAdjacentHTML("beforeend", resultReport(result));
             panel.insertAdjacentHTML("beforeend", rollbackPanel(operation));
           }
-          executeButton.textContent = "Executed";
+          executeButton.textContent = t("risk.executed");
           resolve(result);
         } catch (error) {
           executeButton.disabled = false;
-          executeButton.textContent = "Create token and execute";
+          executeButton.textContent = t("risk.createTokenAndExecute");
           reject(error);
         }
       })();
