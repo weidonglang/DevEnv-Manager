@@ -54,7 +54,7 @@ function renderRuntimeInstallGrid(state: RuntimeWorkbenchState): string {
 
 function renderVersionInstallCard(title: string, selectId: string, versions: string[], selected: string, action: string, label: string): string {
   return `<article class="runtime-install-card">
-    <div><strong>${escapeHtml(title)}</strong><span>${escapeHtml(selected)} LTS / managed</span></div>
+    <div><strong>${escapeHtml(title)}</strong><span>${t("feature.runtimes.managedVersion", { version: selected })}</span></div>
     <select id="${escapeHtml(selectId)}">${versions.map((version) => `<option value="${version}" ${version === selected ? "selected" : ""}>${escapeHtml(title)} ${version}</option>`).join("")}</select>
     ${renderActionButton(action, label)}
   </article>`;
@@ -62,7 +62,7 @@ function renderVersionInstallCard(title: string, selectId: string, versions: str
 
 function renderLatestInstallCard(title: string, action: string, label: string): string {
   return `<article class="runtime-install-card">
-    <div><strong>${escapeHtml(title)}</strong><span>latest managed</span></div>
+    <div><strong>${escapeHtml(title)}</strong><span>${t("feature.runtimes.latestManaged")}</span></div>
     ${renderActionButton(action, label)}
   </article>`;
 }
@@ -70,7 +70,7 @@ function renderLatestInstallCard(title: string, action: string, label: string): 
 function renderRuntimeRow(runtime: RuntimeRowViewModel): string {
   return `<article class="runtime" data-runtime-row="${escapeHtml(runtime.id)}">
     <div><strong>${escapeHtml(runtime.kind)} ${escapeHtml(runtime.version)}</strong><span>${escapeHtml(runtime.runtimeRoot)}</span></div>
-    <small>Executable: ${escapeHtml(runtime.executable)} - Source: ${escapeHtml(runtime.source)} - ${escapeHtml(runtime.current)} - ${escapeHtml(runtime.status)}</small>
+    <small>${t("feature.runtimes.executable")}: ${escapeHtml(runtime.executable)} - ${t("feature.runtimes.source")}: ${escapeHtml(runtime.source)} - ${escapeHtml(runtime.current)} - ${escapeHtml(runtime.status)}</small>
     <div class="row-actions">${runtime.managed ? renderManagedActions(runtime) : renderExternalActions(runtime)}</div>
   </article>`;
 }
@@ -92,13 +92,13 @@ function renderRuntimeDetails(runtime: RuntimeRowViewModel | null): string {
   return `<section class="panel runtime-detail-panel">
     <div class="panel-head"><div><h2>${t("feature.runtimes.details")}</h2><p>${escapeHtml(runtime.kind)} ${escapeHtml(runtime.version)}</p></div></div>
     <dl class="kv-list">
-      <div><dt>Kind</dt><dd>${escapeHtml(runtime.kind)}</dd></div>
-      <div><dt>Version</dt><dd>${escapeHtml(runtime.version)}</dd></div>
-      <div><dt>Source</dt><dd>${escapeHtml(runtime.source)}</dd></div>
-      <div><dt>Status</dt><dd>${escapeHtml(runtime.status)}</dd></div>
-      <div><dt>Current</dt><dd>${escapeHtml(runtime.current)}</dd></div>
-      <div><dt>Root</dt><dd>${escapeHtml(runtime.runtimeRoot)}</dd></div>
-      <div><dt>Executable</dt><dd>${escapeHtml(runtime.executable)}</dd></div>
+      <div><dt>${t("feature.runtimes.kind")}</dt><dd>${escapeHtml(runtime.kind)}</dd></div>
+      <div><dt>${t("feature.runtimes.version")}</dt><dd>${escapeHtml(runtime.version)}</dd></div>
+      <div><dt>${t("feature.runtimes.source")}</dt><dd>${escapeHtml(runtime.source)}</dd></div>
+      <div><dt>${t("feature.runtimes.status")}</dt><dd>${escapeHtml(runtime.status)}</dd></div>
+      <div><dt>${t("feature.runtimes.current")}</dt><dd>${escapeHtml(runtime.current)}</dd></div>
+      <div><dt>${t("feature.runtimes.root")}</dt><dd>${escapeHtml(runtime.runtimeRoot)}</dd></div>
+      <div><dt>${t("feature.runtimes.executable")}</dt><dd>${escapeHtml(runtime.executable)}</dd></div>
     </dl>
   </section>`;
 }

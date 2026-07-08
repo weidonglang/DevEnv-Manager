@@ -18,8 +18,8 @@ export function bindRuntimeEvents(context: FeatureContext, state: RuntimeWorkben
       title: t("feature.runtimes.installJdkTitle", { version }),
       summary: t("feature.runtimes.installJdkSummary", { version }),
       before: [
-        { label: "Distribution", value: distribution },
-        { label: "Version", value: version },
+        { label: t("feature.runtimes.distribution"), value: distribution },
+        { label: t("feature.runtimes.version"), value: version },
       ],
       warnings: [
         t("feature.runtimes.installJdkWhy"),
@@ -90,7 +90,7 @@ function installLatestWithRisk(context: FeatureContext, command: "install_maven_
     riskLevel: "high",
     title: t("feature.runtimes.installGenericTitle", { name: label, version: "latest" }),
     summary: t("feature.runtimes.installGenericSummary"),
-    before: [{ label: "Version", value: "latest" }],
+    before: [{ label: t("feature.runtimes.version"), value: t("feature.runtimes.latest") }],
     warnings: [t("feature.runtimes.installGenericWarning")],
     execute: (confirmationToken) => installRuntime(command, { confirmationToken }),
   });
@@ -148,9 +148,9 @@ async function runRuntimeRowAction(context: FeatureContext, state: RuntimeWorkbe
       command: "switch_runtime",
       planId: `${kind}:${version}:${path}`,
       riskLevel: "medium",
-      title: `Switch ${label}`,
-      summary: "Switches a DevEnv managed runtime through the backend token gate.",
-      warnings: ["Only DevEnv managed runtimes can be switched from this list."],
+      title: t("feature.runtimes.switchTitle", { name: label, version }),
+      summary: t("feature.runtimes.switchSummary"),
+      warnings: [t("feature.runtimes.switchWarning")],
       execute: (confirmationToken) => switchRuntime(kind, version, path, confirmationToken),
     });
     return;
@@ -161,9 +161,9 @@ async function runRuntimeRowAction(context: FeatureContext, state: RuntimeWorkbe
       command: "uninstall_runtime",
       planId: `${kind}:${version}:${path}`,
       riskLevel: "high",
-      title: `Uninstall ${label}`,
-      summary: "Removes a DevEnv managed runtime through the backend token gate.",
-      warnings: ["External runtimes are read-only and cannot be uninstalled here."],
+      title: t("feature.runtimes.uninstallTitle", { name: label, version }),
+      summary: t("feature.runtimes.uninstallSummary"),
+      warnings: [t("feature.runtimes.uninstallWarning")],
       execute: (confirmationToken) => uninstallRuntime(kind, version, path, confirmationToken),
     });
   }

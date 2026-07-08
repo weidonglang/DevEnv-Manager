@@ -60,9 +60,9 @@ export function pageItems<T>(items: T[], page: number, pageSize = 10): { items: 
 export function renderPagination(scope: string, page: number, totalPages: number, total: number): string {
   if (total <= 10) return "";
   return `<div class="pagination" data-page-scope="${escapeHtml(scope)}">
-    <button data-page-action="${escapeHtml(scope)}:prev" type="button" ${page <= 1 ? "disabled" : ""}>Prev</button>
-    <span>${escapeHtml(page)} / ${escapeHtml(totalPages)} · ${escapeHtml(total)} items</span>
-    <button data-page-action="${escapeHtml(scope)}:next" type="button" ${page >= totalPages ? "disabled" : ""}>Next</button>
+    <button data-page-action="${escapeHtml(scope)}:prev" type="button" ${page <= 1 ? "disabled" : ""}>${t("pagination.previous")}</button>
+    <span>${t("pagination.summary", { page, totalPages, total })}</span>
+    <button data-page-action="${escapeHtml(scope)}:next" type="button" ${page >= totalPages ? "disabled" : ""}>${t("pagination.next")}</button>
   </div>`;
 }
 
@@ -84,7 +84,7 @@ export async function runLoad<T>(context: FeatureContext, label: string, loader:
   context.progress.start(label);
   try {
     const result = await loader();
-    context.progress.done(`${label} complete`);
+    context.progress.done(t("state.operationComplete", { operation: label }));
     return result;
   } catch (error) {
     context.progress.fail(error instanceof Error ? error.message : String(error));

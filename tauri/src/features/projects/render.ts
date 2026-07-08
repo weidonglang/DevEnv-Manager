@@ -26,20 +26,20 @@ export function renderProjectWorkbench(state: ProjectWorkbenchState): string {
       <section class="panel">
         <h2>${t("feature.projects.health")}</h2>
         <div class="metrics">
-          ${renderMetric("Health", vm.health, state.errors.analysis ?? "")}
-          ${renderMetric("Signals", vm.signals)}
-          ${renderMetric("Port configs", vm.ports, state.errors.ports ?? "")}
-          ${renderMetric("Agent traces", vm.traces, state.errors.traces ?? "")}
+          ${renderMetric(t("feature.projects.health"), vm.health, state.errors.analysis ?? "")}
+          ${renderMetric(t("feature.projects.signals"), vm.signals)}
+          ${renderMetric(t("feature.projects.portConfigs"), vm.ports, state.errors.ports ?? "")}
+          ${renderMetric(t("feature.projects.agentTraces"), vm.traces, state.errors.traces ?? "")}
         </div>
         ${renderRows(vm.analysisRows, t("state.notChecked"))}
       </section>
-      <section class="panel"><h2>Recommended runtimes</h2>${renderRows(vm.recommendedRuntimeRows, t("state.notChecked"))}</section>
-      <section class="panel"><h2>Detected actions</h2>${renderRows(vm.actionRows, t("state.notChecked"))}</section>
+      <section class="panel"><h2>${t("feature.projects.recommendedRuntimes")}</h2>${renderRows(vm.recommendedRuntimeRows, t("state.notChecked"))}</section>
+      <section class="panel"><h2>${t("feature.projects.detectedActions")}</h2>${renderRows(vm.actionRows, t("state.notChecked"))}</section>
       <section class="panel"><h2>${t("feature.projects.preview")}</h2>${state.preview ? `${renderRows(vm.previewRows)}${renderRows(vm.previewFileRows, t("state.notChecked"))}` : `<div class="empty">${escapeHtml(state.errors.preview || t("feature.projects.noPreview"))}</div>`}</section>
-      <section class="panel"><h2>Project ports</h2>${renderRows(vm.portRows, state.errors.ports || t("state.notChecked"))}</section>
-      <section class="panel"><h2>IDEA inspect result</h2>${renderRows(vm.ideaRows, state.errors.idea || t("state.notChecked"))}</section>
-      <section class="panel"><h2>Java consumer result</h2>${renderRows(vm.javaConsumerRows, state.errors.javaConsumer || t("state.notChecked"))}</section>
-      <section class="panel"><h2>Agent traces</h2>${renderRows(vm.traceRows, state.errors.traces || t("state.notChecked"))}</section>
+      <section class="panel"><h2>${t("feature.projects.projectPorts")}</h2>${renderRows(vm.portRows, state.errors.ports || t("state.notChecked"))}</section>
+      <section class="panel"><h2>${t("feature.projects.ideaInspectResult")}</h2>${renderRows(vm.ideaRows, state.errors.idea || t("state.notChecked"))}</section>
+      <section class="panel"><h2>${t("feature.projects.javaConsumerResult")}</h2>${renderRows(vm.javaConsumerRows, state.errors.javaConsumer || t("state.notChecked"))}</section>
+      <section class="panel"><h2>${t("feature.projects.agentTraces")}</h2>${renderRows(vm.traceRows, state.errors.traces || t("state.notChecked"))}</section>
     </div>
   `;
 }
