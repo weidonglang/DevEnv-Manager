@@ -11,6 +11,7 @@ import {
   exportPortReport,
   exportProjectReport,
   exportPythonDiagnosticReport,
+  openReportLocation,
   runDoctorReport,
 } from "./api";
 import { renderReportsWorkbench } from "./render";
@@ -30,8 +31,23 @@ export function bindReportEvents(context: FeatureContext, state: ReportsWorkbenc
     if (!ensureDoctor(context, state)) return;
     state.text = await doctorReportText(state.doctor, "markdown");
     await navigator.clipboard.writeText(state.text || state.doctor.summary);
+    context.toast(t("feature.reports.summaryCopied"));
     context.root.innerHTML = renderReportsWorkbench(state);
     bindReportEvents(context, state);
+  });
+  bindAction(context.root, "open-latest-report-location", async () => {
+    const path = state.lastExportPath || extractExportPath(state.lastExport);
+    if (!path) {
+      context.toast(t("feature.reports.latestExportLocationMissing"), true);
+      return;
+    }
+    context.progress.start(t("feature.reports.openingLatestExport"));
+    try {
+      const result = await openReportLocation(path);
+      context.progress.done(result.message);
+    } catch (error) {
+      context.progress.fail(errorMessage(error));
+    }
   });
   bindAction(context.root, "export-environment-report", () => exportWithProgress(context, state, () => exportEnvReliabilityReport("markdown")));
   bindAction(context.root, "export-python-report", () => exportWithProgress(context, state, () => exportPythonDiagnosticReport().then((result) => result.message)));
@@ -67,10 +83,18 @@ async function exportWithProgress(context: FeatureContext, state: ReportsWorkben
 
 function showExport(context: FeatureContext, state: ReportsWorkbenchState, message: string): void {
   state.lastExport = message;
+  state.lastExportPath = extractExportPath(message);
   context.toast(message);
   if (!context.isCurrent()) return;
   context.root.innerHTML = renderReportsWorkbench(state);
   bindReportEvents(context, state);
+}
+
+function extractExportPath(message: string): string {
+  const trimmed = message.trim();
+  if (/^[A-Za-z]:[\\/]/.test(trimmed)) return trimmed;
+  const match = message.match(/[A-Za-z]:[\\/][^:*?"<>|\r\n]+/);
+  return match?.[0]?.trim() ?? "";
 }
 
 function errorMessage(error: unknown): string {

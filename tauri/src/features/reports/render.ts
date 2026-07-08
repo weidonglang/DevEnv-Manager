@@ -17,6 +17,7 @@ export function renderReportsWorkbench(state: ReportsWorkbenchState): string {
           ${renderActionButton("export-doctor-markdown", t("feature.reports.exportMarkdown"))}
           ${renderActionButton("export-doctor-json", t("feature.reports.exportJson"))}
           ${renderActionButton("copy-report-summary", t("feature.reports.copySummary"))}
+          ${renderActionButton("open-latest-report-location", t("feature.reports.openLatestExport"))}
           ${renderActionButton("export-environment-report", t("feature.environment.export"))}
           ${renderActionButton("export-python-report", t("feature.reports.exportPython"))}
           ${renderActionButton("export-file-association-report", t("feature.reports.exportAssoc"))}
@@ -39,7 +40,7 @@ export function renderReportsWorkbench(state: ReportsWorkbenchState): string {
           ${renderReportCoverageRow("Project report", "JSON export with project analysis, config preview signals, ports, IDEA, and agent traces", "available")}
         </div>
       </section>
-      <section class="panel"><h2>${t("feature.reports.latestExport")}</h2><p>${escapeHtml(state.lastExport || t("feature.reports.noExport"))}</p></section>
+      <section class="panel"><h2>${t("feature.reports.latestExport")}</h2><p>${escapeHtml(state.lastExport || t("feature.reports.noExport"))}</p>${state.lastExportPath ? `<p><strong>${escapeHtml(state.lastExportPath)}</strong></p>` : ""}</section>
     </div>
   `;
 }

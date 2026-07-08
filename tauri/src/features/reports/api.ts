@@ -40,3 +40,7 @@ export function exportPortReport(format: "markdown" | "json"): Promise<string> {
 export function exportProjectReport(format: "markdown" | "json"): Promise<string> {
   return invoke<string>("export_project_report", { format });
 }
+
+export function openReportLocation(path: string): Promise<OperationResult> {
+  return invoke<OperationResult>("open_analysis_path", { path });
+}

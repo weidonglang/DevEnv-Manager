@@ -7,9 +7,9 @@ import { renderCleanupWorkbench } from "./render";
 import type { CleanupWorkbenchState } from "./state";
 
 export function bindCleanupEvents(context: FeatureContext, state: CleanupWorkbenchState): void {
+  bindCleanupCandidateSelection(context, state);
   bindAction(context.root, "scan-cleanup", () => refreshCleanup(context, state));
   bindAction(context.root, "create-cleanup-plan", async () => {
-    state.selectedIds = collectSelectedIds(state);
     if (!state.selectedIds.length) {
       context.toast(t("toast.selectCleanupCandidateFirst"), true);
       return;
@@ -154,11 +154,12 @@ export async function refreshCleanup(context: FeatureContext, state: CleanupWork
   applySettled(state, "overview", overview);
   applySettled(state, "scan", scan);
   applySettled(state, "rollbackRecords", rollbackRecords);
+  state.selectedIds = defaultSelectedIds(state);
   context.root.innerHTML = renderCleanupWorkbench(state);
   bindCleanupEvents(context, state);
 }
 
-function collectSelectedIds(state: CleanupWorkbenchState): string[] {
+function defaultSelectedIds(state: CleanupWorkbenchState): string[] {
   return state.scan?.categories.flatMap((category) => category.items.filter((item) => item.selectedByDefault).map((item) => item.id)) ?? [];
 }
 
@@ -206,6 +207,22 @@ function bindCleanupPagination(context: FeatureContext, state: CleanupWorkbenchS
       const action = button.dataset.pageAction;
       if (action === "cleanup-large-files:prev") state.largeFilesPage = Math.max(1, state.largeFilesPage - 1);
       if (action === "cleanup-large-files:next") state.largeFilesPage += 1;
+      context.root.innerHTML = renderCleanupWorkbench(state);
+      bindCleanupEvents(context, state);
+    });
+  });
+}
+
+function bindCleanupCandidateSelection(context: FeatureContext, state: CleanupWorkbenchState): void {
+  context.root.querySelectorAll<HTMLInputElement>("[data-cleanup-candidate]").forEach((checkbox) => {
+    checkbox.addEventListener("change", () => {
+      const id = checkbox.dataset.cleanupCandidate || "";
+      if (!id) return;
+      const selected = new Set(state.selectedIds);
+      if (checkbox.checked) selected.add(id);
+      else selected.delete(id);
+      state.selectedIds = Array.from(selected);
+      state.plan = null;
       context.root.innerHTML = renderCleanupWorkbench(state);
       bindCleanupEvents(context, state);
     });

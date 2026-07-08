@@ -37,7 +37,7 @@ export function bindPortEvents(context: FeatureContext, state: PortsWorkbenchSta
       context.toast(t("toast.createPortPlanFirst"), true);
       return;
     }
-    await context.risk.run({
+    const result = await context.risk.run({
       command: "execute_port_resolution_plan",
       planId: state.plan.planId,
       riskLevel: "high",
@@ -46,6 +46,8 @@ export function bindPortEvents(context: FeatureContext, state: PortsWorkbenchSta
       warnings: ["Review owner, identity, risk level, and confidence before executing."],
       execute: (confirmationToken) => executePortResolutionPlan(state.plan!.planId, confirmationToken),
     });
+    state.executionResult = result as PortsWorkbenchState["executionResult"];
+    renderAndBind(context, state);
   });
   bindAction(context.root, "inspect-local-services", async () => {
     state.services = await inspectLocalServices();
@@ -136,6 +138,7 @@ async function createPlanForPort(context: FeatureContext, state: PortsWorkbenchS
   context.progress.start(t("feature.ports.createPlan"));
   try {
     state.plan = await createPortResolutionPlan(pid, port);
+    state.executionResult = null;
     state.planError = "";
     state.retryPlanRequest = null;
     if (!context.isCurrent()) return;

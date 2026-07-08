@@ -82,26 +82,31 @@ function renderCleanupReport(state: CleanupWorkbenchState): string {
   if (!state.scan) {
     return `<section class="panel"><h2>${t("feature.cleanup.report")}</h2>${renderEmptyState(t("feature.cleanup.noScan"), t("feature.cleanup.noScanDetail"))}</section>`;
   }
-  const selected = state.scan.categories.flatMap((category) => category.items.filter((item) => item.selectedByDefault));
+  const candidates = state.scan.categories.flatMap((category) => category.items);
   return `<section class="panel">
     <h2>${t("feature.cleanup.report")}</h2>
     <div class="metrics">
       ${renderMetric(t("feature.cleanup.scanned"), state.scan.totalItems)}
       ${renderMetric(t("feature.cleanup.bytes"), formatBytes(state.scan.totalBytes))}
-      ${renderMetric(t("feature.cleanup.selected"), selected.length)}
+      ${renderMetric(t("feature.cleanup.selected"), state.selectedIds.length)}
       ${renderMetric(t("feature.cleanup.generatedAt"), state.scan.generatedAt)}
     </div>
     ${renderStringList(t("feature.cleanup.warnings"), state.scan.warnings)}
     <div class="cleanup-summary">${state.scan.categories.map((category) => `<div><strong>${escapeHtml(category.name)}</strong><span>${formatBytes(category.totalBytes)} / ${category.itemCount}</span><small>${escapeHtml(category.description)}</small></div>`).join("")}</div>
-    ${renderCandidates(selected)}
+    ${renderCandidates(state, candidates)}
   </section>`;
 }
 
-function renderCandidates(items: CleanupCandidate[]): string {
+function renderCandidates(state: CleanupWorkbenchState, items: CleanupCandidate[]): string {
   if (!items.length) return renderEmptyState(t("feature.cleanup.noSelectedCandidates"), t("feature.cleanup.noSelectedCandidatesDetail"));
-  return `<div class="table-wrap"><table><thead><tr><th>${t("feature.cleanup.path")}</th><th>${t("feature.cleanup.size")}</th><th>${t("feature.cleanup.reason")}</th><th>${t("feature.cleanup.risk")}</th></tr></thead><tbody>${items
-    .slice(0, 10)
-    .map((item) => `<tr><td title="${escapeHtml(item.path)}">${escapeHtml(item.path)}</td><td>${formatBytes(item.size)}</td><td>${escapeHtml(item.reason)}</td><td>${escapeHtml(item.risk)}</td></tr>`)
+  return `<div class="table-wrap"><table><thead><tr><th>${t("feature.cleanup.selected")}</th><th>${t("feature.cleanup.path")}</th><th>${t("feature.cleanup.size")}</th><th>${t("feature.cleanup.reason")}</th><th>${t("feature.cleanup.risk")}</th></tr></thead><tbody>${items
+    .slice(0, 50)
+    .map((item) => {
+      const selected = state.selectedIds.includes(item.id);
+      const disabled = !item.cleanable;
+      const reason = item.skippedReason || item.reason;
+      return `<tr><td><input type="checkbox" data-cleanup-candidate="${escapeHtml(item.id)}" ${selected ? "checked" : ""} ${disabled ? "disabled" : ""} aria-label="${escapeHtml(item.path)}" /></td><td title="${escapeHtml(item.path)}">${escapeHtml(item.path)}</td><td>${formatBytes(item.size)}</td><td>${escapeHtml(reason)}</td><td>${escapeHtml(item.risk)}</td></tr>`;
+    })
     .join("")}</tbody></table></div>`;
 }
 

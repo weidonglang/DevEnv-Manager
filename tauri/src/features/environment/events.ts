@@ -1,4 +1,5 @@
 import type { FeatureContext } from "../../app/featureContext";
+import { open } from "../../api/tauri";
 import { t } from "../../core/i18n";
 import { bindAction, valueOf } from "../sharedView";
 import { applyEnvRepairPlan, cleanupPathEntries, createJavaStabilizePlan, environmentHealth, inspectEnvironmentReliability, listEnvBackups, listEnvironmentBackups, previewUserEnvironmentConfiguration } from "./api";
@@ -7,8 +8,25 @@ import type { EnvironmentWorkbenchState } from "./state";
 
 export function bindEnvironmentEvents(context: FeatureContext, state: EnvironmentWorkbenchState): void {
   bindAction(context.root, "inspect-environment", () => refreshEnvironment(context, state));
+  context.root.querySelector<HTMLSelectElement>("#java-plan-jdk-path")?.addEventListener("change", (event) => {
+    state.selectedJdkRoot = normalizeJdkRoot((event.currentTarget as HTMLSelectElement).value.trim());
+    context.root.innerHTML = renderEnvironmentWorkbench(state);
+    bindEnvironmentEvents(context, state);
+  });
+  bindAction(context.root, "choose-jdk-root", async () => {
+    const selected = await open({ directory: true, multiple: false });
+    if (!selected || Array.isArray(selected)) {
+      context.toast(t("feature.environment.chooseJdkCancelled"));
+      return;
+    }
+    state.selectedJdkRoot = normalizeJdkRoot(selected);
+    state.plan = null;
+    context.toast(t("feature.environment.jdkRootSelected"));
+    context.root.innerHTML = renderEnvironmentWorkbench(state);
+    bindEnvironmentEvents(context, state);
+  });
   bindAction(context.root, "create-java-plan", async () => {
-    const jdkPath = normalizeJdkRoot(context.root.querySelector<HTMLSelectElement>("#java-plan-jdk-path")?.value.trim() ?? "");
+    const jdkPath = normalizeJdkRoot(state.selectedJdkRoot || context.root.querySelector<HTMLSelectElement>("#java-plan-jdk-path")?.value.trim() || "");
     if (!jdkPath) {
       context.toast(t("feature.environment.selectJdkRootFirst"), true);
       return;

@@ -10,9 +10,19 @@ export function renderPortsWorkbench(state: PortsWorkbenchState): string {
       <section class="panel" id="ports-table-panel">
         ${renderPortsTable(state)}
       </section>
-      <section class="panel"><h2>${t("feature.ports.currentPlan")}</h2>${state.plan ? renderObjectTable(state.plan, ["planId", "riskLevel", "summary", "recommendation", "targetPid", "targetPort"]) : `<div class="empty">${t("feature.ports.noPlan")}</div>`}</section>
+      <section class="panel"><h2>${t("feature.ports.currentPlan")}</h2>${state.plan ? renderObjectTable(state.plan, ["planId", "riskLevel", "summary", "recommendation", "targetPid", "targetPort"]) : `<div class="empty">${t("feature.ports.noPlan")}</div>`}${state.executionResult ? renderPortExecutionResult(state) : ""}</section>
     </div>
   `;
+}
+
+function renderPortExecutionResult(state: PortsWorkbenchState): string {
+  const result = state.executionResult;
+  if (!result) return "";
+  return `<div class="execution-result">
+    <h3>${t("feature.ports.executionResult")}</h3>
+    ${renderObjectTable(result, ["success", "message", "pidExited", "portReleased", "releaseCheckedAt"])}
+    ${result.remainingOwners.length ? `<div class="small-note"><strong>${t("feature.ports.remainingOwners")}</strong><ul>${result.remainingOwners.map((owner) => `<li>${escapeHtml(owner.localPort)} / ${escapeHtml(owner.pid)} / ${escapeHtml(owner.processName)} / ${escapeHtml(owner.identity)}</li>`).join("")}</ul></div>` : ""}
+  </div>`;
 }
 
 function renderPortsShell(state: PortsWorkbenchState): string {

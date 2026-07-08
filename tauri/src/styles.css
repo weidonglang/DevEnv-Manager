@@ -1273,6 +1273,31 @@ select {
   background: #ffffff;
 }
 
+input[type="checkbox"] {
+  width: 18px;
+  min-height: 18px;
+  padding: 0;
+}
+
+.environment-plan-input {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.1fr) minmax(240px, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.environment-plan-input input[readonly] {
+  color: #31424f;
+  background: #f8fafc;
+}
+
+@media (max-width: 760px) {
+  .environment-plan-input {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .toolbar {
   display: flex;
   flex-wrap: wrap;

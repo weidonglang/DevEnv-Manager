@@ -29,8 +29,8 @@ export function renderEnvironmentWorkbench(state: EnvironmentWorkbenchState): st
         ${renderJdkPlanSelector(state)}
       </section>
       <section class="panel"><h2>${t("feature.environment.details")}</h2>${renderRows(vm.detailRows)}</section>
-      <section class="panel"><h2>PATH warnings</h2>${renderRows(vm.pathRows)}</section>
-      <section class="panel"><h2>Environment issues</h2>${renderRows(vm.issueRows, t("state.notChecked"))}</section>
+      <section class="panel"><h2>${t("feature.environment.pathWarnings")}</h2>${renderRows(vm.pathRows)}</section>
+      <section class="panel"><h2>${t("feature.environment.issues")}</h2>${renderRows(vm.issueRows, t("state.notChecked"))}</section>
       <section class="panel"><h2>${t("feature.environment.repairPlan")}</h2>${state.plan ? renderObjectTable(state.plan, ["planId", "riskLevel", "backupName", "summary", "warnings"]) : `<div class="empty">${t("feature.environment.noPlan")}</div>`}</section>
     </div>
   `;
@@ -39,12 +39,17 @@ export function renderEnvironmentWorkbench(state: EnvironmentWorkbenchState): st
 function renderJdkPlanSelector(state: EnvironmentWorkbenchState): string {
   const candidates = state.reliability?.java.candidates ?? [];
   const current = state.reliability?.java.javaHomeExpanded || state.reliability?.userEnv.javaHomeExpanded || "";
+  const selected = state.selectedJdkRoot;
+  const selectedInCandidates = candidates.some((candidate) => candidate.path === selected) || current === selected;
   return `<div class="form-grid environment-plan-input">
     <select id="java-plan-jdk-path">
       <option value="">${t("feature.environment.selectJdkRoot")}</option>
-      ${current ? `<option value="${escapeHtml(current)}">${t("feature.environment.currentJavaHome")}: ${escapeHtml(current)}</option>` : ""}
-      ${candidates.map((candidate) => `<option value="${escapeHtml(candidate.path)}">${escapeHtml(candidate.version)} - ${escapeHtml(candidate.source)} - ${escapeHtml(candidate.path)}</option>`).join("")}
+      ${selected && !selectedInCandidates ? `<option value="${escapeHtml(selected)}" selected>${t("feature.environment.manualJdkRoot")}: ${escapeHtml(selected)}</option>` : ""}
+      ${current ? `<option value="${escapeHtml(current)}" ${selected === current ? "selected" : ""}>${t("feature.environment.currentJavaHome")}: ${escapeHtml(current)}</option>` : ""}
+      ${candidates.map((candidate) => `<option value="${escapeHtml(candidate.path)}" ${selected === candidate.path ? "selected" : ""}>${escapeHtml(candidate.version)} - ${escapeHtml(candidate.source)} - ${escapeHtml(candidate.path)}</option>`).join("")}
     </select>
+    <input id="java-plan-selected-root" readonly value="${escapeHtml(selected)}" placeholder="${t("feature.environment.noJdkRootSelected")}" />
+    ${renderActionButton("choose-jdk-root", t("feature.environment.chooseJdkRoot"))}
   </div>`;
 }
 
