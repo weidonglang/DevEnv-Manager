@@ -9,7 +9,7 @@ import { renderProjectWorkbench } from "./render";
 import { projectWorkbenchInitialState } from "./state";
 
 export function mountProjectsFeature(context: FeatureContext): void {
-  const state = { ...projectWorkbenchInitialState };
+  const state = { ...projectWorkbenchInitialState, selectedPath: localStorage.getItem("devenv.projects.selectedPath") || projectWorkbenchInitialState.selectedPath };
   context.root.innerHTML = renderProjectWorkbench(state);
   bindProjectEvents(context, state);
 }

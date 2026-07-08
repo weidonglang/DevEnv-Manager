@@ -2,16 +2,16 @@
   "schemaVersion": 2,
   "channel": "stable",
   "version": "1.8.1",
-  "date": "2026-07-07",
+  "date": "2026-07-08",
   "notes": [
-    "v1.8.1 hotfix: fixes Dashboard fallback loading when port scan / netstat times out, adds app-level i18n with Auto / zh-CN / en-US language selection, restores first-launch safety notice and per-page usage/risk guidance, and aligns GitHub + Gitee release metadata."
+    "v1.8.1 public hotfix: stabilizes Workbench navigation, Dashboard fallback loading, port search, plan/token feedback, Risk UX, Debug export, dark/high-contrast readability, runtime managed/external boundaries, and core Environment/Projects/Ports/Cleanup/Reports/Profiles result rendering. Advanced completeness work continues in v1.8.2 / v1.9.0."
   ],
   "assets": [
     {
       "platform": "windows-x64",
       "fileName": "DevEnv.Manager_1.8.1_x64-setup.exe",
-      "size": 2626160,
-      "sha256": "366eea864333bc1927da182d8409462b53676da8b4a8432c24a5aa2d2def8de6",
+      "size": 2657072,
+      "sha256": "0020a53785094797c77e15ff811c62802669db9b657dcd168437e050b9747df0",
       "primaryUrl": "https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.8.1/DevEnv.Manager_1.8.1_x64-setup.exe",
       "mirrors": [
         {

@@ -8,6 +8,7 @@ export type ProjectWorkbenchState = {
   javaConsumer: JavaConsumerReport | null;
   traces: AgentTraceReport | null;
   selectedPath: string;
+  errors: Partial<Record<"analysis" | "preview" | "ports" | "idea" | "javaConsumer" | "traces", string>>;
 };
 
 export const projectWorkbenchInitialState: ProjectWorkbenchState = {
@@ -18,4 +19,5 @@ export const projectWorkbenchInitialState: ProjectWorkbenchState = {
   javaConsumer: null,
   traces: null,
   selectedPath: "",
+  errors: {},
 };

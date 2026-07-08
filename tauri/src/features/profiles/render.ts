@@ -1,9 +1,10 @@
-import { escapeHtml, renderActionButton, renderMetric, renderObjectTable, valueOf } from "../sharedView";
+import { escapeHtml, pageItems, renderActionButton, renderMetric, renderObjectTable, renderPagination, valueOf } from "../sharedView";
 import { t } from "../../core/i18n";
 import { renderFeatureGuide } from "../../components/featureGuide";
 import type { ProfilesState } from "./state";
 
 export function renderProfilesWorkbench(state: ProfilesState): string {
+  const page = pageItems(state.profiles, state.page, 10);
   return `
     <div class="feature-layout">
       <section class="panel">
@@ -21,7 +22,7 @@ export function renderProfilesWorkbench(state: ProfilesState): string {
           ${renderActionButton("delete-profile", t("feature.profiles.delete"))}
         </div>
       </section>
-      <section class="panel"><h2>${t("feature.profiles.profiles")}</h2><div class="data-table">${state.profiles.map((profile) => `<button class="data-row" data-profile-id="${escapeHtml(profile.id)}"><span>${escapeHtml(profile.name)}</span><span>${escapeHtml(profile.path)}</span><span>${escapeHtml(profile.createdAt)}</span></button>`).join("") || `<div class="empty">${t("feature.profiles.empty")}</div>`}</div></section>
+      <section class="panel"><h2>${t("feature.profiles.profiles")}</h2><div class="data-table">${page.items.map((profile) => `<button class="data-row" data-profile-id="${escapeHtml(profile.id)}"><span>${escapeHtml(profile.name)}</span><span>${escapeHtml(profile.path)}</span><span>${escapeHtml(profile.createdAt)}</span></button>`).join("") || `<div class="empty">${t("feature.profiles.empty")}</div>`}</div>${renderPagination("profiles", page.page, page.totalPages, page.total)}</section>
       <section class="panel"><h2>${t("feature.profiles.applyPlan")}</h2>${state.plan ? renderObjectTable(state.plan, ["profileName", "profileId", "runtimeSwitches", "missingRequirements", "willInstall", "willWriteEnvironment", "backupName", "warnings", "planId"]) : `<div class="empty">${t("feature.profiles.noApplyPlan")}</div>`}</section>
     </div>
   `;

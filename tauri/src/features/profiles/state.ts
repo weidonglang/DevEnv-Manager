@@ -5,6 +5,7 @@ export type ProfilesState = {
   selectedProfileId: string | null;
   plan: ProfileApplyPlan | null;
   importPreview: ConfigProfileImportPreview | null;
+  page: number;
 };
 
 export const profilesInitialState: ProfilesState = {
@@ -12,4 +13,5 @@ export const profilesInitialState: ProfilesState = {
   selectedProfileId: null,
   plan: null,
   importPreview: null,
+  page: 1,
 };

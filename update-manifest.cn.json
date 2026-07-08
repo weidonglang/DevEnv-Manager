@@ -2,16 +2,16 @@
   "schemaVersion": 2,
   "channel": "stable",
   "version": "1.8.1",
-  "date": "2026-07-07",
+  "date": "2026-07-08",
   "notes": [
-    "v1.8.1 热修复：修复端口扫描 / netstat 超时导致 Dashboard 整页加载失败的问题，新增 Auto / zh-CN / en-US 应用级语言选项，恢复首次启动安全声明和每页功能/风险说明，并补齐 GitHub + Gitee 发布元数据一致性。"
+    "v1.8.1 公开热修复：稳定 Workbench 导航、Dashboard 降级加载、端口搜索、计划/令牌反馈、Risk UX、Debug 导出、深色/高对比度可读性、运行时受管/外部边界，以及 Environment/Projects/Ports/Cleanup/Reports/Profiles 核心结果渲染。高级功能完整性继续进入 v1.8.2 / v1.9.0。"
   ],
   "assets": [
     {
       "platform": "windows-x64",
       "fileName": "DevEnv.Manager_1.8.1_x64-setup.exe",
-      "size": 2626160,
-      "sha256": "366eea864333bc1927da182d8409462b53676da8b4a8432c24a5aa2d2def8de6",
+      "size": 2657072,
+      "sha256": "0020a53785094797c77e15ff811c62802669db9b657dcd168437e050b9747df0",
       "primaryUrl": "https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.8.1/DevEnv.Manager_1.8.1_x64-setup.exe",
       "mirrors": [
         {

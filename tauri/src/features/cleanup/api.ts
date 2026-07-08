@@ -1,5 +1,5 @@
 import { invoke } from "../../core/invoke";
-import type { CleanupArchitecture, CleanupPlan, CleanupResult, CleanupScanReport, ExpansionPlan, ExpansionResult, FolderUsageReport, LargeFileItem, MaintenanceOverview, MovePlan, MoveResult, OperationResult, RollbackRecord } from "../../types";
+import type { CleanupArchitecture, CleanupPlan, CleanupResult, CleanupScanReport, ExpansionPlan, ExpansionResult, FolderUsageReport, LargeFileItem, MaintenanceOverview, MovePlan, MoveResult, OperationResult, PartitionLayoutReport, RollbackRecord } from "../../types";
 
 export function fileDirectory(path: string, directory?: string) {
   return directory || path.replace(/[\\/][^\\/]*$/, "");
@@ -21,8 +21,8 @@ export function createCleanupPlan(selectedItemIds: string[]): Promise<CleanupPla
   return invoke<CleanupPlan>("create_cleanup_plan", { selectedItemIds });
 }
 
-export function cleanSelectedTargets(plan: CleanupPlan): Promise<CleanupResult> {
-  return invoke<CleanupResult>("clean_selected_targets", { plan });
+export function cleanSelectedTargets(plan: CleanupPlan, confirmationToken: string): Promise<CleanupResult> {
+  return invoke<CleanupResult>("clean_selected_targets", { plan, confirmationToken });
 }
 
 export function clearDownloadCache(confirmationToken: string): Promise<OperationResult> {
@@ -45,8 +45,8 @@ export function rollbackMove(rollbackId: string, confirmationToken: string): Pro
   return invoke<MoveResult>("rollback_move", { rollbackId, confirmationToken });
 }
 
-export function inspectPartitionLayout() {
-  return invoke("inspect_partition_layout");
+export function inspectPartitionLayout(): Promise<PartitionLayoutReport> {
+  return invoke<PartitionLayoutReport>("inspect_partition_layout");
 }
 
 export function createCDriveExpansionPlan(): Promise<ExpansionPlan> {
@@ -71,4 +71,8 @@ export function inspectDownloads(): Promise<FolderUsageReport> {
 
 export function scanLargeFiles(root: string, minSizeMb: number): Promise<LargeFileItem[]> {
   return invoke<LargeFileItem[]>("scan_large_files", { root, minSizeMb, limit: 100 });
+}
+
+export function openAnalysisPath(path: string): Promise<OperationResult> {
+  return invoke<OperationResult>("open_analysis_path", { path });
 }

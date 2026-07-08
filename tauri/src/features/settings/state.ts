@@ -6,6 +6,8 @@ export type SettingsWorkbenchState = {
   powershell: PowerShellResult | null;
   update: UpdateCheckResult | null;
   theme: ThemeMode;
+  debugPage: number;
+  errors: Partial<Record<"config" | "powershell" | "update", string>>;
 };
 
 export const settingsWorkbenchInitialState: SettingsWorkbenchState = {
@@ -13,4 +15,6 @@ export const settingsWorkbenchInitialState: SettingsWorkbenchState = {
   powershell: null,
   update: null,
   theme: "system",
+  debugPage: 1,
+  errors: {},
 };

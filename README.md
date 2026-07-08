@@ -4,7 +4,7 @@
 
 面向 Windows 的开发环境诊断器与安全操作面板。当前版本：**1.8.1 Stable**。
 
-1.8.1 是 hotfix 版本：修复 Dashboard 因 port scan / netstat timeout 整页加载失败的问题，新增 Auto / 简体中文 / English 语言选项，恢复首启安全声明和每页功能/风险说明，并补齐 GitHub + Gitee 发布元数据一致性。
+1.8.1 是公开 hotfix 版本：先修复 Workbench 大面积“不可用”、Dashboard/端口扫描降级、异步导航回跳、计划/令牌操作无反馈、Risk UX 卡住、运行时受管/外部边界、深色/高对比度可读性和 Debug 导出等稳定性问题。剩余高级功能完整性继续进入 v1.8.2 / v1.9.0。
 
 ## 下载与镜像
 
@@ -12,7 +12,7 @@
 - Gitee 国内镜像：https://gitee.com/weidonglang/DevEnv-Manager
 - GitHub Release：https://github.com/weidonglang/DevEnv-Manager/releases
 - Gitee Release：https://gitee.com/weidonglang/DevEnv-Manager/releases
-- SHA256：`366eea864333bc1927da182d8409462b53676da8b4a8432c24a5aa2d2def8de6`
+- SHA256：`0020a53785094797c77e15ff811c62802669db9b657dcd168437e050b9747df0`
 
 适合：
 
@@ -47,16 +47,18 @@ DevEnv Manager 解决的是 Windows 上多个开发生态互相影响的问题�
 
 ## 1.8.1 Stable
 
-v1.8.1 is a hotfix release for:
+v1.8.1 is a public hotfix release for:
 
+- Workbench stability after frontend data-contract regressions.
 - Dashboard fallback loading when port scan / netstat times out.
-- App-level i18n with Auto / zh-CN / en-US language selection.
-- Restored first-launch safety notice and per-page usage/risk guidance.
+- Async navigation, port search, plan/token feedback, and Risk UX progress/result rendering.
+- Runtime managed/external boundaries and safer install-only JDK feedback.
+- Dark/high-contrast readability and Debug export for troubleshooting.
 - GitHub + Gitee release metadata consistency.
 
 Installer: `DevEnv.Manager_1.8.1_x64-setup.exe`
 
-SHA256: `366eea864333bc1927da182d8409462b53676da8b4a8432c24a5aa2d2def8de6`
+SHA256: `0020a53785094797c77e15ff811c62802669db9b657dcd168437e050b9747df0`
 
 ## 1.8.0 Stable
 

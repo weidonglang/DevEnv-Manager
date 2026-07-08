@@ -203,32 +203,36 @@ const guides: Record<FeatureGuideId, Guide> = {
 
 export function renderFeatureGuide(id: FeatureGuideId): string {
   const item = guides[id];
-  return `<section class="feature-help-card">
-    <div><h3>${text(item.title)}</h3><span class="risk-chip risk-${item.risk}">${item.risk}</span></div>
-    ${section("guide.whatDoes", item.does)}
-    ${section("guide.whatNot", item.notDo)}
-    ${row("guide.how", item.how)}
-    ${row("guide.changes", item.changes)}
-    ${row("guide.noChanges", item.noChanges)}
-    ${row("guide.admin", item.admin)}
-    ${row("guide.backup", item.backup)}
-    ${row("guide.recovery", item.recovery)}
-    ${row("guide.useWhen", item.useWhen)}
-    ${row("guide.avoidWhen", item.avoidWhen)}
-  </section>`;
+  return `<details class="feature-help-card">
+    <summary><span>${text(item.title)}</span><span class="risk-chip risk-${item.risk}">${riskSummary(item)}</span></summary>
+    <div class="feature-help-card__body">
+      ${section("guide.whatDoes", item.does)}
+      ${section("guide.whatNot", item.notDo)}
+      ${row("guide.how", item.how)}
+      ${row("guide.changes", item.changes)}
+      ${row("guide.noChanges", item.noChanges)}
+      ${row("guide.admin", item.admin)}
+      ${row("guide.backup", item.backup)}
+      ${row("guide.recovery", item.recovery)}
+      ${row("guide.useWhen", item.useWhen)}
+      ${row("guide.avoidWhen", item.avoidWhen)}
+    </div>
+  </details>`;
 }
 
 export function renderRiskLevelGuide(): string {
-  return `<section class="feature-help-card">
-    <div><h3>${t("guide.riskLevels")}</h3><span class="risk-chip risk-info">Info</span></div>
-    <ul>
-      <li>${t("guide.riskInfo")}</li>
-      <li>${t("guide.riskLow")}</li>
-      <li>${t("guide.riskMedium")}</li>
-      <li>${t("guide.riskHigh")}</li>
-      <li>${t("guide.riskCritical")}</li>
-    </ul>
-  </section>`;
+  return `<details class="feature-help-card">
+    <summary><span>${t("guide.riskLevels")}</span><span class="risk-chip risk-info">Info</span></summary>
+    <div class="feature-help-card__body">
+      <ul>
+        <li>${t("guide.riskInfo")}</li>
+        <li>${t("guide.riskLow")}</li>
+        <li>${t("guide.riskMedium")}</li>
+        <li>${t("guide.riskHigh")}</li>
+        <li>${t("guide.riskCritical")}</li>
+      </ul>
+    </div>
+  </details>`;
 }
 
 function guide(
@@ -268,6 +272,26 @@ function localized(en: string, zh: string): LocalizedText {
 
 function text(value: LocalizedText): string {
   return escapeHtml(getActiveLocale() === "zh-CN" ? value.zh : value.en);
+}
+
+function riskSummary(item: Guide): string {
+  const zh = getActiveLocale() === "zh-CN";
+  const labels: Record<Guide["risk"], string> = zh
+    ? {
+        info: "信息风险 / 只读 / 无需备份 / 无需管理员 / 删除导出文件即可恢复",
+        low: "低风险 / 单步确认 / 通常无需备份 / 无需管理员 / 可回退设置",
+        medium: "中风险 / 明确确认 / 建议备份 / 通常无需管理员 / 按回执恢复",
+        high: "高风险 / Token 确认 / 需要备份 / 可能需要管理员 / 用备份或反向操作恢复",
+        critical: "关键风险 / 多重确认 / 必须备份 / 可能需要管理员 / 需按恢复计划处理",
+      }
+    : {
+        info: "Info risk / read-only / no backup / no admin / delete exports to recover",
+        low: "Low risk / single confirmation / usually no backup / no admin / reversible settings",
+        medium: "Medium risk / explicit confirmation / backup recommended / usually no admin / receipt-based recovery",
+        high: "High risk / token confirmation / backup required / admin may be needed / restore backup or reverse action",
+        critical: "Critical risk / multi-step confirmation / backup required / admin may be needed / recovery plan required",
+      };
+  return escapeHtml(labels[item.risk]);
 }
 
 function section(titleKey: Parameters<typeof t>[0], items: LocalizedText[]): string {

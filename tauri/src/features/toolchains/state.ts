@@ -7,6 +7,7 @@ export type ToolchainWorkbenchState = {
   services: LocalServiceStatus[];
   mysql: MySqlRepairReport | null;
   mysqlPlan: MySqlRepairPlan | null;
+  errors: Partial<Record<"report" | "platform" | "system" | "services" | "mysql", string>>;
 };
 
 export const toolchainWorkbenchInitialState: ToolchainWorkbenchState = {
@@ -16,4 +17,5 @@ export const toolchainWorkbenchInitialState: ToolchainWorkbenchState = {
   services: [],
   mysql: null,
   mysqlPlan: null,
+  errors: {},
 };

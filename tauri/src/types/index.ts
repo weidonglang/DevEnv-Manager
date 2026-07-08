@@ -686,6 +686,7 @@ export type MySqlRepairPlan = {
 
 export type ConfirmationTokenView = {
   token: string;
+  command: string;
   actionId: string;
   planId: string;
   riskLevel: string;

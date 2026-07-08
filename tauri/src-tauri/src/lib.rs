@@ -1213,7 +1213,7 @@ const RISK_OPERATION_REGISTRY: &[RiskOperationSpec] = &[
         command: "install_jdk",
         action_id: "install_jdk",
         risk_level: "high",
-        requires_backup: true,
+        requires_backup: false,
         requires_token: true,
         description: "Install managed JDK and optionally switch current runtime",
     },
@@ -1320,6 +1320,14 @@ const RISK_OPERATION_REGISTRY: &[RiskOperationSpec] = &[
         requires_backup: true,
         requires_token: true,
         description: "执行磁盘扩容计划",
+    },
+    RiskOperationSpec {
+        command: "execute_cleanup_plan",
+        action_id: "execute_cleanup_plan",
+        risk_level: "medium",
+        requires_backup: false,
+        requires_token: true,
+        description: "鎵ц宸查瑙堢殑瀹夊叏娓呯悊璁″垝",
     },
     RiskOperationSpec {
         command: "clear_download_cache",
@@ -1693,8 +1701,10 @@ async fn create_cleanup_plan(
 #[tauri::command]
 async fn clean_selected_targets(
     plan: cleanup::CleanupPlan,
+    confirmation_token: Option<String>,
 ) -> Result<cleanup::CleanupResult, String> {
     run_blocking(move || {
+        require_risk_operation_token("execute_cleanup_plan", &plan.plan_id, confirmation_token)?;
         let paths = load_paths()?;
         cleanup::clean_selected_targets(&paths.root, plan)
     })
@@ -4260,16 +4270,20 @@ async fn scan_ports() -> Result<Vec<PortRecord>, String> {
 }
 
 fn scan_ports_blocking() -> Result<Vec<PortRecord>, String> {
-    let output = powershell_runner::run_probe_command("netstat", &["-ano"], 5)
-        .map_err(|err| format!("无法执行 netstat: {err}"))?;
-    if !output.success {
-        return Err(format!(
-            "netstat failed: {}",
-            powershell_runner::native_command_message(&output)
-        ));
+    match powershell_runner::run_probe_command("netstat", &["-ano"], 5) {
+        Ok(output) if output.success => parse_netstat_ports(&output.stdout),
+        Ok(output) => parse_powershell_ports().map_err(|fallback| {
+            format!(
+                "netstat failed: {}; fallback failed: {fallback}",
+                powershell_runner::native_command_message(&output)
+            )
+        }),
+        Err(err) => parse_powershell_ports()
+            .map_err(|fallback| format!("无法执行 netstat: {err}; fallback failed: {fallback}")),
     }
+}
 
-    let text = output.stdout;
+fn parse_netstat_ports(text: &str) -> Result<Vec<PortRecord>, String> {
     let system = sysinfo::System::new_all();
     let services = windows_service_map();
     let mut records = Vec::new();
@@ -4296,50 +4310,149 @@ fn scan_ports_blocking() -> Result<Vec<PortRecord>, String> {
             continue;
         };
         let pid = pid_text.parse::<u32>().unwrap_or(0);
-        let process_name = process_name(&system, pid);
-        let (process_path, command_line, parent_pid, parent_process_name) =
-            process_details(&system, pid);
-        let service_names = services.get(&pid).cloned().unwrap_or_default();
-        let signature = analyze_port_signature(
-            local_port,
-            &state,
-            &process_name,
-            &process_path,
-            &command_line,
-            &service_names,
-        );
-        let command_line = redact_command_line(&command_line);
-        let common_usage = signature.identity.clone();
-        let explanation = signature.explanation.clone();
-        let risk = signature.risk.clone();
+        records.push(build_port_record(
+            &system,
+            &services,
+            PortRecordSeed {
+                local_port,
+                protocol,
+                local_address,
+                remote_address: remote.to_string(),
+                state,
+                pid,
+            },
+        ));
+    }
+    finish_port_records(records)
+}
 
-        records.push(PortRecord {
-            protocol,
-            local_address,
-            local_port,
-            remote_address: remote.to_string(),
-            state,
-            pid,
-            process_name,
-            process_path,
-            command_line,
-            parent_pid,
-            parent_process_name,
-            service_names,
-            common_usage,
-            explanation,
-            risk,
-            identity: signature.identity,
-            confidence: signature.confidence,
-            evidence_count: signature.evidence.len(),
-            conflict_count: signature.conflict_evidence.len(),
-            risk_level: signature.risk_level,
-            recommendation: signature.recommendation,
-            evidence: signature.evidence,
-            conflict_evidence: signature.conflict_evidence,
+fn parse_powershell_ports() -> Result<Vec<PortRecord>, String> {
+    let script = r#"
+$ErrorActionPreference = 'Stop'
+$tcp = Get-NetTCPConnection -ErrorAction Stop | Select-Object `
+  @{Name='Protocol';Expression={'TCP'}}, LocalAddress, LocalPort, RemoteAddress, RemotePort, State, OwningProcess
+$udp = @()
+try {
+  $udp = Get-NetUDPEndpoint -ErrorAction Stop | Select-Object `
+    @{Name='Protocol';Expression={'UDP'}}, LocalAddress, LocalPort, @{Name='RemoteAddress';Expression={'*'}}, @{Name='RemotePort';Expression={'*'}}, @{Name='State';Expression={'LISTENING'}}, OwningProcess
+} catch {}
+@($tcp) + @($udp) | ConvertTo-Csv -NoTypeInformation
+"#;
+    let output = powershell_runner::run_powershell_script(script, Vec::new(), 8)?;
+    if !output.success {
+        let message = if output.stderr.trim().is_empty() {
+            output.stdout.trim().to_string()
+        } else {
+            output.stderr.trim().to_string()
+        };
+        return Err(if message.is_empty() {
+            "PowerShell port fallback failed".to_string()
+        } else {
+            message
         });
     }
+    let system = sysinfo::System::new_all();
+    let services = windows_service_map();
+    let mut records = Vec::new();
+    for line in output.stdout.lines().skip(1) {
+        let columns = parse_csv_line(line);
+        if columns.len() < 7 {
+            continue;
+        }
+        let protocol = columns[0].trim().to_ascii_uppercase();
+        if protocol != "TCP" && protocol != "UDP" {
+            continue;
+        }
+        let local_address = columns[1].trim().to_string();
+        let Ok(local_port) = columns[2].trim().parse::<u16>() else {
+            continue;
+        };
+        let remote_address = match (columns[3].trim(), columns[4].trim()) {
+            ("", _) => "*".to_string(),
+            (address, "") | (address, "0") | (address, "*") => address.to_string(),
+            (address, port) => format!("{address}:{port}"),
+        };
+        let state = if protocol == "UDP" {
+            "LISTENING".to_string()
+        } else {
+            columns[5].trim().to_string()
+        };
+        let pid = columns[6].trim().parse::<u32>().unwrap_or(0);
+        records.push(build_port_record(
+            &system,
+            &services,
+            PortRecordSeed {
+                local_port,
+                protocol,
+                local_address,
+                remote_address,
+                state,
+                pid,
+            },
+        ));
+    }
+    finish_port_records(records)
+}
 
+struct PortRecordSeed {
+    local_port: u16,
+    protocol: String,
+    local_address: String,
+    remote_address: String,
+    state: String,
+    pid: u32,
+}
+
+fn build_port_record(
+    system: &sysinfo::System,
+    services: &std::collections::HashMap<u32, Vec<String>>,
+    seed: PortRecordSeed,
+) -> PortRecord {
+    let process_name = process_name(system, seed.pid);
+    let (process_path, command_line, parent_pid, parent_process_name) =
+        process_details(system, seed.pid);
+    let service_names = services.get(&seed.pid).cloned().unwrap_or_default();
+    let signature = analyze_port_signature(
+        seed.local_port,
+        &seed.state,
+        &process_name,
+        &process_path,
+        &command_line,
+        &service_names,
+    );
+    let command_line = redact_command_line(&command_line);
+    let common_usage = signature.identity.clone();
+    let explanation = signature.explanation.clone();
+    let risk = signature.risk.clone();
+
+    PortRecord {
+        protocol: seed.protocol,
+        local_address: seed.local_address,
+        local_port: seed.local_port,
+        remote_address: seed.remote_address,
+        state: seed.state,
+        pid: seed.pid,
+        process_name,
+        process_path,
+        command_line,
+        parent_pid,
+        parent_process_name,
+        service_names,
+        common_usage,
+        explanation,
+        risk,
+        identity: signature.identity,
+        confidence: signature.confidence,
+        evidence_count: signature.evidence.len(),
+        conflict_count: signature.conflict_evidence.len(),
+        risk_level: signature.risk_level,
+        recommendation: signature.recommendation,
+        evidence: signature.evidence,
+        conflict_evidence: signature.conflict_evidence,
+    }
+}
+
+fn finish_port_records(mut records: Vec<PortRecord>) -> Result<Vec<PortRecord>, String> {
     records.sort_by(|a, b| {
         a.local_port
             .cmp(&b.local_port)
@@ -5933,6 +6046,143 @@ fn doctor_report_text(report: DoctorReport, format: String) -> Result<String, St
         _ => return Err("不支持的报告格式".to_string()),
     };
     Ok(redact_report_text(&text))
+}
+
+#[tauri::command]
+async fn export_port_report(format: String) -> Result<String, String> {
+    run_blocking(move || export_port_report_blocking(format)).await?
+}
+
+fn export_port_report_blocking(format: String) -> Result<String, String> {
+    let records = scan_ports_blocking();
+    let history = port_history().unwrap_or_default();
+    let services = inspect_local_services_blocking().unwrap_or_default();
+    let scan_error = records.as_ref().err().cloned();
+    let records = records.unwrap_or_default();
+    let value = json!({
+        "generatedAt": current_timestamp(),
+        "scanError": scan_error,
+        "ports": records,
+        "history": history,
+        "services": services,
+    });
+    write_report_file("port-report", &format, value, port_report_markdown)
+}
+
+#[tauri::command]
+async fn export_project_report(format: String) -> Result<String, String> {
+    run_blocking(move || export_project_report_blocking(format)).await?
+}
+
+fn export_project_report_blocking(format: String) -> Result<String, String> {
+    let paths = load_paths()?;
+    let root = paths.root.clone();
+    let analysis = analyze_project_blocking(&root);
+    let preview = preview_project_configuration(display_path(&root)).ok();
+    let ports = inspect_project_port_configs_blocking(&root).unwrap_or_default();
+    let idea = inspect_idea_project_blocking(&root).ok();
+    let traces = diagnostics::inspect_agent_traces(Some(root.as_path()));
+    let value = json!({
+        "generatedAt": current_timestamp(),
+        "root": display_path(&root),
+        "analysisError": analysis.as_ref().err().cloned(),
+        "analysis": analysis.ok(),
+        "preview": preview,
+        "ports": ports,
+        "idea": idea,
+        "agentTraces": traces,
+    });
+    write_report_file("project-report", &format, value, project_report_markdown)
+}
+
+fn write_report_file(
+    prefix: &str,
+    format: &str,
+    mut value: serde_json::Value,
+    markdown: fn(&serde_json::Value) -> String,
+) -> Result<String, String> {
+    let paths = load_paths()?;
+    fs::create_dir_all(paths.logs()).map_err(|err| format!("创建报告目录失败：{err}"))?;
+    redact_json_value(&mut value);
+    let extension = if format == "json" { "json" } else { "md" };
+    let target = paths
+        .logs()
+        .join(format!("{prefix}-{}.{}", filename_timestamp(), extension));
+    let text = if format == "json" {
+        serde_json::to_string_pretty(&value).map_err(|err| format!("生成 JSON 报告失败：{err}"))?
+    } else {
+        markdown(&value)
+    };
+    fs::write(&target, redact_report_text(&text)).map_err(|err| format!("写入报告失败：{err}"))?;
+    Ok(display_path(target))
+}
+
+fn port_report_markdown(value: &serde_json::Value) -> String {
+    let ports = value["ports"].as_array().map(Vec::len).unwrap_or(0);
+    let services = value["services"].as_array().map(Vec::len).unwrap_or(0);
+    let history = value["history"].as_array().map(Vec::len).unwrap_or(0);
+    let mut text = String::new();
+    text.push_str("# DevEnv Manager 端口报告\n\n");
+    text.push_str(&format!(
+        "生成时间：{}\n\n",
+        value["generatedAt"].as_str().unwrap_or("")
+    ));
+    if let Some(error) = value["scanError"].as_str() {
+        text.push_str(&format!("端口扫描错误：{error}\n\n"));
+    }
+    text.push_str(&format!(
+        "- 端口记录：{ports}\n- 服务记录：{services}\n- 历史记录：{history}\n\n"
+    ));
+    text.push_str("## 原始数据\n\n```json\n");
+    text.push_str(&serde_json::to_string_pretty(value).unwrap_or_default());
+    text.push_str("\n```\n");
+    text
+}
+
+fn project_report_markdown(value: &serde_json::Value) -> String {
+    let ports = value["ports"].as_array().map(Vec::len).unwrap_or(0);
+    let mut text = String::new();
+    text.push_str("# DevEnv Manager 项目报告\n\n");
+    text.push_str(&format!(
+        "生成时间：{}\n",
+        value["generatedAt"].as_str().unwrap_or("")
+    ));
+    text.push_str(&format!(
+        "项目根目录：{}\n\n",
+        value["root"].as_str().unwrap_or("")
+    ));
+    if let Some(error) = value["analysisError"].as_str() {
+        text.push_str(&format!("项目分析错误：{error}\n\n"));
+    }
+    text.push_str(&format!("- 项目端口配置：{ports}\n"));
+    text.push_str(&format!(
+        "- 配置预览：{}\n",
+        if value["preview"].is_null() {
+            "未生成"
+        } else {
+            "已生成"
+        }
+    ));
+    text.push_str(&format!(
+        "- IDEA 信息：{}\n",
+        if value["idea"].is_null() {
+            "未发现"
+        } else {
+            "已发现"
+        }
+    ));
+    text.push_str(&format!(
+        "- Agent Trace：{}\n\n",
+        if value["agentTraces"].is_null() {
+            "未发现"
+        } else {
+            "已发现"
+        }
+    ));
+    text.push_str("## 原始数据\n\n```json\n");
+    text.push_str(&serde_json::to_string_pretty(value).unwrap_or_default());
+    text.push_str("\n```\n");
+    text
 }
 
 #[tauri::command]
@@ -9832,6 +10082,8 @@ pub fn run() {
             export_doctor_report,
             export_doctor_report_json,
             doctor_report_text,
+            export_port_report,
+            export_project_report,
             analyze_python_environment,
             export_python_diagnostic_report,
             preview_python_repair,
@@ -13836,10 +14088,7 @@ fn redact_windows_user_paths(text: &str) -> String {
 }
 
 fn filename_timestamp() -> String {
-    format!("{:?}", std::time::SystemTime::now())
-        .chars()
-        .map(|ch| if ch.is_ascii_alphanumeric() { ch } else { '-' })
-        .collect()
+    unix_timestamp().to_string()
 }
 
 fn slug(value: &str) -> String {
@@ -14134,7 +14383,7 @@ where
 
 fn current_timestamp() -> String {
     // Keep dependencies lean; second precision is enough for audit records.
-    format!("{:?}", std::time::SystemTime::now())
+    unix_timestamp().to_string()
 }
 
 fn unix_timestamp() -> u64 {

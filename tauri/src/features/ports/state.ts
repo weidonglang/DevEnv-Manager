@@ -7,6 +7,12 @@ export type PortsWorkbenchState = {
   plan: PortResolutionPlan | null;
   selectedPort: number | null;
   filter: string;
+  scanError: string;
+  historyError: string;
+  servicesError: string;
+  planError: string;
+  retryPlanRequest: { pid: number; port: number } | null;
+  page: number;
 };
 
 export const portsWorkbenchInitialState: PortsWorkbenchState = {
@@ -16,4 +22,10 @@ export const portsWorkbenchInitialState: PortsWorkbenchState = {
   plan: null,
   selectedPort: null,
   filter: "",
+  scanError: "",
+  historyError: "",
+  servicesError: "",
+  planError: "",
+  retryPlanRequest: null,
+  page: 1,
 };

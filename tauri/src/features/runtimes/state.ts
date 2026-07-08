@@ -5,6 +5,7 @@ export type RuntimeWorkbenchState = {
   distributions: JdkDistribution[];
   strongVerification: RuntimeStrongVerificationReport | null;
   selectedRuntimeId: string | null;
+  page: number;
 };
 
 export const runtimeWorkbenchInitialState: RuntimeWorkbenchState = {
@@ -12,4 +13,5 @@ export const runtimeWorkbenchInitialState: RuntimeWorkbenchState = {
   distributions: [],
   strongVerification: null,
   selectedRuntimeId: null,
+  page: 1,
 };

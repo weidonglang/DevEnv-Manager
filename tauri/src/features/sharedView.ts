@@ -1,4 +1,5 @@
 import type { FeatureContext } from "../app/featureContext";
+import { finishDebug, logDebug } from "../core/debugLog";
 import { t } from "../core/i18n";
 
 export type SafeResult<T> = { ok: true; value: T } | { ok: false; error: string };
@@ -48,9 +49,34 @@ export function renderActionButton(id: string, label: string, tone = "secondary"
   return `<button class="button button--${tone} ${tone}" data-action="${id}" type="button">${escapeHtml(label)}</button>`;
 }
 
+export function pageItems<T>(items: T[], page: number, pageSize = 10): { items: T[]; page: number; totalPages: number; total: number } {
+  const total = items.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const safePage = Math.min(Math.max(1, page || 1), totalPages);
+  const start = (safePage - 1) * pageSize;
+  return { items: items.slice(start, start + pageSize), page: safePage, totalPages, total };
+}
+
+export function renderPagination(scope: string, page: number, totalPages: number, total: number): string {
+  if (total <= 10) return "";
+  return `<div class="pagination" data-page-scope="${escapeHtml(scope)}">
+    <button data-page-action="${escapeHtml(scope)}:prev" type="button" ${page <= 1 ? "disabled" : ""}>Prev</button>
+    <span>${escapeHtml(page)} / ${escapeHtml(totalPages)} · ${escapeHtml(total)} items</span>
+    <button data-page-action="${escapeHtml(scope)}:next" type="button" ${page >= totalPages ? "disabled" : ""}>Next</button>
+  </div>`;
+}
+
 export function bindAction(root: ParentNode, id: string, handler: () => unknown | Promise<unknown>): void {
   root.querySelector<HTMLElement>(`[data-action="${id}"]`)?.addEventListener("click", () => {
-    void handler();
+    const actionLog = logDebug({ type: "click", name: id, status: "started" });
+    Promise.resolve()
+      .then(() => handler())
+      .then(() => finishDebug(actionLog, "success"))
+      .catch((error) => {
+        const message = error instanceof Error ? error.message : String(error);
+        finishDebug(actionLog, "failed", message, { action: id, error: message });
+        window.dispatchEvent(new CustomEvent("devenv:action-error", { detail: message }));
+      });
   });
 }
 

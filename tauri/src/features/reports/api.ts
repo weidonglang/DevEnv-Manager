@@ -32,3 +32,11 @@ export function exportFileAssociationReport(): Promise<string> {
 export function exportCleanupReport(format: "markdown" | "json"): Promise<string> {
   return invoke<string>("export_cleanup_report", { format });
 }
+
+export function exportPortReport(format: "markdown" | "json"): Promise<string> {
+  return invoke<string>("export_port_report", { format });
+}
+
+export function exportProjectReport(format: "markdown" | "json"): Promise<string> {
+  return invoke<string>("export_project_report", { format });
+}
