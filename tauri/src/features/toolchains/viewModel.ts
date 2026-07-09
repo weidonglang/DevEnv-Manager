@@ -47,7 +47,11 @@ export function toToolchainViewModel(state: ToolchainWorkbenchState): ToolchainV
           { label: label("Candidate", "候选项"), value: state.mysqlPlan.candidateId },
           { label: label("Action", "动作"), value: state.mysqlPlan.action },
           { label: label("Risk", "风险"), value: state.mysqlPlan.riskLevel },
+          { label: label("Requires admin", "需要管理员"), value: state.mysqlPlan.requiresAdmin ? t("state.yes") : t("state.no") },
+          { label: label("Requires backup", "需要备份"), value: state.mysqlPlan.requiresBackup ? t("state.yes") : t("state.no") },
+          { label: label("Fingerprint", "指纹"), value: state.mysqlPlan.planFingerprint },
           { label: label("Warnings", "警告"), value: list(state.mysqlPlan.warnings) },
+          { label: label("Execution result", "执行结果"), value: state.mysqlResult ? `${state.mysqlResult.success ? t("state.yes") : t("state.no")} - ${state.mysqlResult.message}` : notChecked() },
         ]
       : [
           { label: label("Generated at", "生成时间"), value: formatTimestamp(state.mysql?.generatedAt) },

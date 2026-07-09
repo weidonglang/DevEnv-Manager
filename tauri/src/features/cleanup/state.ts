@@ -8,6 +8,9 @@ export type CleanupWorkbenchState = {
   plan: CleanupPlan | null;
   cleanupResult: CleanupResult | null;
   movePlan: MovePlan | null;
+  moveSource: string;
+  moveTargetDrive: string;
+  moveMode: string;
   expansionPlan: ExpansionPlan | null;
   expansionResult: ExpansionResult | null;
   desktop: FolderUsageReport | null;
@@ -27,6 +30,9 @@ export const cleanupWorkbenchInitialState: CleanupWorkbenchState = {
   plan: null,
   cleanupResult: null,
   movePlan: null,
+  moveSource: "",
+  moveTargetDrive: "D",
+  moveMode: "archive",
   expansionPlan: null,
   expansionResult: null,
   desktop: null,

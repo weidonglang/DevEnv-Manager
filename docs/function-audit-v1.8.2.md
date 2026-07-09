@@ -50,18 +50,28 @@ Scope: v1.8.2 / v1.9.0 planning after v1.8.1 freeze. This matrix is intentionall
 
 ## P0 Repair Queue
 
-1. Add a static action-contract check so rendered buttons cannot silently lack `bindAction` handlers.
-2. Localize shared pagination and generic completion messages.
-3. Remove English hardcoded Runtime switch/uninstall Risk text and Runtime details labels.
-4. Remove English hardcoded Projects result headings.
-5. Keep v1.8.1 frozen; all new feature recovery goes to v1.8.2 unless it affects update/startup/safety.
+1. Complete: Add a static action-contract check so rendered buttons cannot silently lack `bindAction` handlers.
+2. Complete: Localize shared pagination and generic completion messages.
+3. Complete: Remove English hardcoded Runtime switch/uninstall Risk text and Runtime details labels.
+4. Complete: Remove English hardcoded Projects result headings and add visible apply result output.
+5. Complete: Keep v1.8.1 frozen; all new feature recovery goes to v1.8.2 unless it affects update/startup/safety.
+6. Complete in #132: Environment Java stabilize plan supports manual JDK directory selection and shows JAVA_HOME/PATH consistency evidence.
+7. Complete in #132: Reports persists last Doctor/export state, opens the latest export location, and exposes Doctor repair plan/result.
+8. Complete in #132: Cleanup has real candidate selection, move source/target/mode input, large-file open/copy, and visible cleanup/expansion results.
+9. Complete in #132: Ports renders execution verification results including PID exit, port release, and remaining owners.
+10. Complete in #132: Command palette/action contract checks are wired into repository hygiene.
 
 ## P1 / P2 Backlog
 
-- P1: Reports persistence and open report directory.
-- P1: Environment manual JDK picker and PATH warning grouping.
-- P1: Cleanup desktop/downloads/large-file parity and multi-disk overview.
-- P1: Profiles import picker, rename/copy/history restore.
-- P1: Learning Center entry backed by existing command sandbox.
+- P1 complete in #132: Reports persistence, latest export location, Doctor repair plan preview and execution result.
+- P1 complete in #132: Environment manual JDK picker, PATH warning grouping, JAVA_HOME/PATH mismatch explanation.
+- P1 complete in #132: Cleanup candidate selection, C drive rescue overview, large-file open/copy, and move plan source/target/mode input.
+- P1 complete in #132: Profiles import picker, import preview, import execution result, rename, and copy.
+- P1 complete in #132: Learning Center entry backed by the existing read-only command sandbox.
+- P1 complete in #132: File Associations candidate list now uses current DTO fields, supports selecting a candidate, and renders apply result.
+- P1 complete in #132: Toolchains surfaces update evidence, MySQL plan fingerprint/admin/backup requirements, MySQL execution result, and Learning Center output.
+- P1 remaining: Profile history restore requires a durable profile history model that does not exist yet.
+- P1 remaining: Cleanup duplicate scan and full multi-drive large-file workflow require backend scan commands that are not present in this branch.
+- P1 remaining: Runtime final grouping, multi-version Maven/Gradle selection, and unified verification belong to v1.9.0 #130.
 - P2: Docker/WSL/service UX polish.
 - P2: Runtime final grouping and multi-version verification belongs to v1.9.0 #130.

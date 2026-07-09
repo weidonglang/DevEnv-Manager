@@ -33,11 +33,21 @@ export function renderFileAssociations(state: FileAssociationUiState): string {
           ${renderActionButton("export-association-report", t("feature.fileAssociations.export"))}
         </div>
       </section>
-      <section class="panel"><h2>${t("feature.fileAssociations.candidates")}</h2>${state.appSearch ? renderObjectTable(state.appSearch, ["query", "extension", "bestCandidate.appName", "bestCandidate.exePath", "bestCandidate.confidence", "bestCandidate.matchReason", "bestCandidate.source"]) : `<div class="empty">${t("feature.fileAssociations.searchEmpty")}</div>`}</section>
+      <section class="panel"><h2>${t("feature.fileAssociations.candidates")}</h2>${state.appSearch ? renderAppCandidates(state) : `<div class="empty">${t("feature.fileAssociations.searchEmpty")}</div>`}</section>
       <section class="panel"><h2>${t("feature.fileAssociations.records")}</h2><div class="data-table">${records.slice(0, 40).map((record) => `<div class="data-row"><span>${escapeHtml(valueOf(record, "extension"))}</span><span>${escapeHtml(valueOf(record, "currentAppName"))}</span><span>${escapeHtml(valueOf(record, "risk"))}</span><span>${escapeHtml(valueOf(record, "source"))}</span><span><button data-assoc-extension="${escapeHtml(valueOf(record, "extension"))}" data-assoc-app="${escapeHtml(valueOf(record, "currentAppName", ""))}" type="button">${t("feature.fileAssociations.changeOpenWith")}</button></span></div>`).join("") || `<div class="empty">${t("feature.fileAssociations.noResults")}</div>`}</div></section>
-      <section class="panel"><h2>${t("feature.fileAssociations.plan")}</h2>${state.plan ? renderObjectTable(state.plan, ["planId", "riskLevel", "mode", "backupName", "warnings", "changes"]) : `<div class="empty">${t("feature.fileAssociations.noPlan")}</div>`}</section>
+      <section class="panel"><h2>${t("feature.fileAssociations.plan")}</h2>${state.plan ? renderObjectTable(state.plan, ["planId", "targetAppName", "targetExecutable", "backupPath", "warnings", "changes"]) : `<div class="empty">${t("feature.fileAssociations.noPlan")}</div>`}${state.applyResultMessage ? `<p>${escapeHtml(state.applyResultMessage)}</p>` : ""}</section>
     </div>
   `;
+}
+
+function renderAppCandidates(state: FileAssociationUiState): string {
+  const search = state.appSearch;
+  if (!search) return "";
+  const candidates = search.candidates ?? [];
+  return `<div>
+    ${renderObjectTable(search, ["query", "normalizedQuery", "matchedDisplayName", "manualSelectionRequired", "message"])}
+    <div class="data-table">${candidates.map((candidate) => `<button class="data-row" type="button" data-assoc-candidate-app="${escapeHtml(candidate.displayName)}" data-assoc-candidate-exe="${escapeHtml(candidate.executablePath)}"><span>${escapeHtml(candidate.displayName)}</span><span>${escapeHtml(candidate.executablePath)}</span><span>${escapeHtml(candidate.source)}</span><span>${escapeHtml(candidate.confidence)}</span></button>`).join("") || `<div class="empty">${t("feature.fileAssociations.searchEmpty")}</div>`}</div>
+  </div>`;
 }
 
 function filteredRecords(state: FileAssociationUiState): unknown[] {

@@ -32,3 +32,11 @@ export function exportConfigProfiles(): Promise<OperationResult> {
 export function deleteConfigProfile(id: string): Promise<OperationResult> {
   return invoke<OperationResult>("delete_config_profile", { id });
 }
+
+export function renameConfigProfile(id: string, name: string): Promise<OperationResult> {
+  return invoke<OperationResult>("rename_config_profile", { id, name });
+}
+
+export function copyConfigProfile(id: string, name: string): Promise<OperationResult> {
+  return invoke<OperationResult>("copy_config_profile", { id, name });
+}

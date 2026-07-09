@@ -31,6 +31,15 @@ export function renderCleanupWorkbench(state: CleanupWorkbenchState): string {
           ${renderActionButton("create-expansion-plan", t("feature.cleanup.expansion"))}
           ${renderActionButton("execute-expansion-plan", t("feature.cleanup.executeExpansion"), "danger")}
         </div>
+        <div class="form-grid environment-plan-input">
+          <input id="cleanup-move-source" value="${escapeHtml(state.moveSource)}" placeholder="${t("feature.cleanup.moveSource")}" />
+          <input id="cleanup-move-target-drive" value="${escapeHtml(state.moveTargetDrive)}" placeholder="${t("feature.cleanup.moveTargetDrive")}" />
+          <select id="cleanup-move-mode">
+            <option value="archive" ${state.moveMode === "archive" ? "selected" : ""}>${t("feature.cleanup.moveModeArchive")}</option>
+            <option value="junction" ${state.moveMode === "junction" ? "selected" : ""}>${t("feature.cleanup.moveModeJunction")}</option>
+          </select>
+          ${renderActionButton("choose-cleanup-move-source", t("feature.cleanup.chooseMoveSource"))}
+        </div>
       </section>
       ${renderCDriveRescue(state)}
       ${renderCleanupReport(state)}

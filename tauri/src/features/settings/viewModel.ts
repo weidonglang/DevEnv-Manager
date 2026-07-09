@@ -27,7 +27,11 @@ export function toSettingsViewModel(state: SettingsWorkbenchState): SettingsView
       { label: label("Latest version", "最新版本"), value: present(state.update?.latestVersion, notChecked()) },
       { label: label("Update source", "更新源"), value: present(state.update?.sourceName, notChecked()) },
       { label: label("Source URL", "源地址"), value: present(state.update?.sourceUrl, notChecked()) },
+      { label: label("Download URL", "下载地址"), value: present(state.update?.downloadUrl, notChecked()) },
+      { label: label("File name", "文件名"), value: present(state.update?.fileName, notChecked()) },
+      { label: label("SHA-256", "SHA-256"), value: present(state.update?.sha256, notChecked()) },
       { label: label("Checked at", "检查时间"), value: formatTimestamp(state.update?.checkedAt) },
+      { label: label("Mirrors", "镜像"), value: list(state.update?.mirrors?.map((mirror) => `${mirror.name}: ${mirror.url}`)) },
       { label: label("Failed sources", "失败源"), value: list(state.update?.failedSources) },
     ],
     powershellRows: [

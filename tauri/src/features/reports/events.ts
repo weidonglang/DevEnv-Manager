@@ -2,7 +2,9 @@ import type { FeatureContext } from "../../app/featureContext";
 import { t } from "../../core/i18n";
 import { bindAction } from "../sharedView";
 import {
+  createDoctorRepairPlan,
   doctorReportText,
+  executeDoctorRepairPlan,
   exportCleanupReport,
   exportDoctorReport,
   exportDoctorReportJson,
@@ -15,7 +17,7 @@ import {
   runDoctorReport,
 } from "./api";
 import { renderReportsWorkbench } from "./render";
-import type { ReportsWorkbenchState } from "./state";
+import { persistReportsState, type ReportsWorkbenchState } from "./state";
 
 export function bindReportEvents(context: FeatureContext, state: ReportsWorkbenchState): void {
   bindAction(context.root, "run-doctor-report", () => refreshReports(context, state));
@@ -32,6 +34,49 @@ export function bindReportEvents(context: FeatureContext, state: ReportsWorkbenc
     state.text = await doctorReportText(state.doctor, "markdown");
     await navigator.clipboard.writeText(state.text || state.doctor.summary);
     context.toast(t("feature.reports.summaryCopied"));
+    context.root.innerHTML = renderReportsWorkbench(state);
+    bindReportEvents(context, state);
+  });
+  bindAction(context.root, "create-doctor-repair-plan", async () => {
+    context.progress.start(t("feature.reports.creatingDoctorPlan"));
+    try {
+      state.doctorPlan = await createDoctorRepairPlan();
+      state.doctorRepairResult = null;
+      if (!context.isCurrent()) return;
+      context.progress.done(t("toast.planReady"));
+      persistReportsState(state);
+      context.root.innerHTML = renderReportsWorkbench(state);
+      bindReportEvents(context, state);
+    } catch (error) {
+      context.progress.fail(errorMessage(error));
+    }
+  });
+  bindAction(context.root, "execute-doctor-repair-plan", async () => {
+    if (!state.doctorPlan) {
+      context.toast(t("feature.reports.createDoctorPlanFirst"), true);
+      return;
+    }
+    const plan = state.doctorPlan;
+    const result = await context.risk.run({
+      command: "execute_doctor_repair_plan",
+      planId: plan.planId,
+      riskLevel: "high",
+      backupReceipt: plan.backupName,
+      title: t("feature.reports.executeDoctorPlan"),
+      summary: t("feature.reports.executeDoctorPlanSummary"),
+      before: [
+        { label: t("feature.reports.doctorScore"), value: String(plan.beforeScore) },
+        { label: t("feature.reports.actions"), value: plan.actions.join(", ") || t("state.notAvailable") },
+      ],
+      warnings: plan.warnings,
+      execute: (confirmationToken) => executeDoctorRepairPlan(plan.planId, confirmationToken),
+    });
+    state.doctorRepairResult = result as ReportsWorkbenchState["doctorRepairResult"];
+    state.doctor = state.doctorRepairResult?.report ?? state.doctor;
+    state.doctorPlan = null;
+    if (state.doctor) state.text = await doctorReportText(state.doctor, "markdown");
+    persistReportsState(state);
+    if (!context.isCurrent()) return;
     context.root.innerHTML = renderReportsWorkbench(state);
     bindReportEvents(context, state);
   });
@@ -62,6 +107,7 @@ export async function refreshReports(context: FeatureContext, state: ReportsWork
   try {
     state.doctor = await runDoctorReport();
     state.text = await doctorReportText(state.doctor, "markdown");
+    persistReportsState(state);
     if (!context.isCurrent()) return;
     context.progress.done(t("feature.reports.doctorDone"));
     context.root.innerHTML = renderReportsWorkbench(state);
@@ -84,6 +130,7 @@ async function exportWithProgress(context: FeatureContext, state: ReportsWorkben
 function showExport(context: FeatureContext, state: ReportsWorkbenchState, message: string): void {
   state.lastExport = message;
   state.lastExportPath = extractExportPath(message);
+  persistReportsState(state);
   context.toast(message);
   if (!context.isCurrent()) return;
   context.root.innerHTML = renderReportsWorkbench(state);

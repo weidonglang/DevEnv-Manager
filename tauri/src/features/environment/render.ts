@@ -15,6 +15,7 @@ export function renderEnvironmentWorkbench(state: EnvironmentWorkbenchState): st
           ${renderMetric("JAVA_HOME raw", vm.javaHomeRaw, state.errors.reliability ?? "")}
           ${renderMetric("JAVA_HOME expanded", vm.javaHomeExpanded)}
           ${renderMetric("PATH first java", vm.pathFirstJava)}
+          ${renderMetric("PATH first javac", vm.pathFirstJavac)}
           ${renderMetric("PATH warnings", vm.pathWarnings, vm.pathWarningDetail)}
           ${renderMetric(t("feature.fileAssociations.backups"), vm.backupCount, backupErrorText(state))}
         </div>

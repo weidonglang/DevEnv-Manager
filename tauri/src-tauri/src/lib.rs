@@ -9397,6 +9397,68 @@ fn delete_config_profile_blocking(id: String) -> Result<OperationResult, String>
 }
 
 #[tauri::command]
+async fn rename_config_profile(id: String, name: String) -> Result<OperationResult, String> {
+    run_blocking(move || rename_config_profile_blocking(id, name)).await?
+}
+
+fn rename_config_profile_blocking(id: String, name: String) -> Result<OperationResult, String> {
+    let name = name.trim();
+    if name.is_empty() {
+        return Err("配置模板名称不能为空".to_string());
+    }
+    let paths = load_paths()?;
+    let mut profiles = load_profiles(&paths)?;
+    if profiles.iter().any(|item| item.id != id && item.name == name) {
+        return Err("已存在同名配置模板".to_string());
+    }
+    let profile = profiles
+        .iter_mut()
+        .find(|item| item.id == id)
+        .ok_or_else(|| "没有找到配置模板".to_string())?;
+    profile.name = name.to_string();
+    save_json(&paths.profiles_file(), &profiles)?;
+    Ok(OperationResult {
+        success: true,
+        message: format!("已重命名配置模板：{name}"),
+    })
+}
+
+#[tauri::command]
+async fn copy_config_profile(id: String, name: String) -> Result<OperationResult, String> {
+    run_blocking(move || copy_config_profile_blocking(id, name)).await?
+}
+
+fn copy_config_profile_blocking(id: String, name: String) -> Result<OperationResult, String> {
+    let paths = load_paths()?;
+    let mut profiles = load_profiles(&paths)?;
+    let source = profiles
+        .iter()
+        .find(|item| item.id == id)
+        .cloned()
+        .ok_or_else(|| "没有找到配置模板".to_string())?;
+    let mut name = name.trim().to_string();
+    if name.is_empty() {
+        name = format!("{} copy", source.name);
+    }
+    if profiles.iter().any(|item| item.name == name) {
+        return Err("已存在同名配置模板".to_string());
+    }
+    let mut profile = source;
+    profile.id = format!(
+        "profile-copy-{}",
+        current_timestamp().replace([' ', ':', '.', '{', '}', ','], "-")
+    );
+    profile.name = name.clone();
+    profile.created_at = current_timestamp();
+    profiles.push(profile);
+    save_json(&paths.profiles_file(), &profiles)?;
+    Ok(OperationResult {
+        success: true,
+        message: format!("已复制配置模板：{name}"),
+    })
+}
+
+#[tauri::command]
 fn export_config_profiles() -> Result<OperationResult, String> {
     let paths = load_paths()?;
     let profiles = load_profiles(&paths)?;
@@ -10128,6 +10190,8 @@ pub fn run() {
             save_config_profile,
             apply_config_profile,
             delete_config_profile,
+            rename_config_profile,
+            copy_config_profile,
             export_config_profiles,
             preview_config_profiles,
             import_config_profiles,

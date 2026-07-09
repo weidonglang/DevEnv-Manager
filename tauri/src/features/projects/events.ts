@@ -8,6 +8,12 @@ import { renderProjectWorkbench } from "./render";
 import type { ProjectWorkbenchState } from "./state";
 
 export function bindProjectEvents(context: FeatureContext, state: ProjectWorkbenchState): void {
+  context.root.querySelectorAll<HTMLButtonElement>("[data-recent-project]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.selectedPath = button.dataset.recentProject || state.selectedPath;
+      renderAndBind(context, state);
+    });
+  });
   bindAction(context.root, "choose-project-dir", async () => {
     const pickerLog = logDebug({ type: "click", name: "project-directory-picker", view: context.view, status: "started" });
     try {
@@ -19,6 +25,7 @@ export function bindProjectEvents(context: FeatureContext, state: ProjectWorkben
       }
       state.selectedPath = selected;
       rememberProjectPath(state.selectedPath);
+      state.recentPaths = readRecentProjectPaths();
       finishDebug(pickerLog, "success", "Project directory selected.", { selectedPath: state.selectedPath });
       renderAndBind(context, state);
     } catch (error) {
@@ -38,14 +45,14 @@ export function bindProjectEvents(context: FeatureContext, state: ProjectWorkben
     }
     renderAndBind(context, state);
   });
-  bindAction(context.root, "apply-project-config", () => {
+  bindAction(context.root, "apply-project-config", async () => {
     if (!state.preview) {
       context.toast(t("toast.createProjectPreviewFirst"), true);
       return;
     }
     const preview = state.preview;
     const request = { ...preview, switches: preview.current };
-    return context.risk.run({
+    const result = await context.risk.run({
       command: "apply_project_configuration",
       planId: projectConfigurationPlanId(request),
       riskLevel: "high",
@@ -54,6 +61,8 @@ export function bindProjectEvents(context: FeatureContext, state: ProjectWorkben
       warnings: ["Review target files and backup metadata before applying."],
       execute: (confirmationToken) => applyProjectConfiguration(request, confirmationToken),
     });
+    state.applyResult = result as ProjectWorkbenchState["applyResult"];
+    renderAndBind(context, state);
   });
   bindAction(context.root, "inspect-project-ports", async () => {
     state.selectedPath = projectPath(context, state);
@@ -123,12 +132,27 @@ export async function refreshProject(context: FeatureContext, state: ProjectWork
 
 function projectPath(context: FeatureContext, state: ProjectWorkbenchState): string {
   const path = context.root.querySelector<HTMLInputElement>("#project-path")?.value.trim() || state.selectedPath;
-  if (path) rememberProjectPath(path);
+  if (path) {
+    rememberProjectPath(path);
+    state.recentPaths = readRecentProjectPaths();
+  }
   return path;
 }
 
 function rememberProjectPath(path: string): void {
-  if (path) localStorage.setItem("devenv.projects.selectedPath", path);
+  if (!path) return;
+  localStorage.setItem("devenv.projects.selectedPath", path);
+  const paths = [path, ...readRecentProjectPaths().filter((item) => item !== path)].slice(0, 8);
+  localStorage.setItem("devenv.projects.recentPaths", JSON.stringify(paths));
+}
+
+export function readRecentProjectPaths(): string[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem("devenv.projects.recentPaths") || "[]");
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string" && item.trim().length > 0).slice(0, 8) : [];
+  } catch {
+    return [];
+  }
 }
 
 function renderAndBind(context: FeatureContext, state: ProjectWorkbenchState): void {

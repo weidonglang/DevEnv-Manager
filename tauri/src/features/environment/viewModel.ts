@@ -36,6 +36,8 @@ export function toEnvironmentViewModel(state: EnvironmentWorkbenchState): Enviro
       { label: "PATH first java", value: toolPath(reliability?.java.pathJava || reliability?.effectiveTools.java.path, "java") },
       { label: "PATH first javac", value: toolPath(reliability?.java.pathJavac || reliability?.effectiveTools.javac.path, "javac") },
       { label: "Java consistency", value: present(reliability?.java.consistency) },
+      { label: label("External Java candidates", "外部 Java 候选"), value: String(reliability?.java.candidates.length ?? 0) },
+      { label: label("JAVA_HOME and PATH match", "JAVA_HOME 与 PATH 是否一致"), value: javaHomePathMatch(reliability) },
       { label: "Generated at", value: present(reliability?.generatedAt) },
     ],
     pathRows: [
@@ -48,6 +50,18 @@ export function toEnvironmentViewModel(state: EnvironmentWorkbenchState): Enviro
     ],
     issueRows: (reliability?.issues ?? []).map((issue) => ({ label: `${issue.severity}: ${issue.title}`, value: issue.detail })),
   };
+}
+
+function javaHomePathMatch(reliability: EnvReliabilitySnapshot | null): string {
+  if (!reliability) return t("state.notChecked");
+  const home = reliability.java.javaHomeExpanded || reliability.userEnv.javaHomeExpanded || "";
+  const pathJava = reliability.java.pathJava || reliability.effectiveTools.java.path || "";
+  if (!home && !pathJava) return label("No JAVA_HOME or PATH java detected", "未检测到 JAVA_HOME 或 PATH java");
+  if (!home) return label("External Java is on PATH, but JAVA_HOME is not configured", "PATH 中有外部 Java，但 JAVA_HOME 未配置");
+  if (!pathJava) return label("JAVA_HOME is configured, but java is not found on PATH", "JAVA_HOME 已配置，但 PATH 中未找到 java");
+  const normalizedHome = home.replace(/\//g, "\\").toLowerCase();
+  const normalizedJava = pathJava.replace(/\//g, "\\").toLowerCase();
+  return normalizedJava.startsWith(normalizedHome) ? t("state.yes") : label("No - PATH java points elsewhere", "否 - PATH java 指向其他位置");
 }
 
 function processJavaHome(reliability: EnvReliabilitySnapshot | null): string {

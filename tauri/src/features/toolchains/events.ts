@@ -1,7 +1,7 @@
 import type { FeatureContext } from "../../app/featureContext";
 import { t } from "../../core/i18n";
 import { bindAction } from "../sharedView";
-import { createMySqlRepairPlan, executeMySqlRepairPlan, inspectLocalServices, inspectMySqlRepair, inspectPlatformToolchains, inspectSystemPlatforms, inspectToolchains, manageLocalService, manageSystemPlatform } from "./api";
+import { createMySqlRepairPlan, executeMySqlRepairPlan, inspectCommandSafety, inspectLocalServices, inspectMySqlRepair, inspectPlatformToolchains, inspectSystemPlatforms, inspectToolchains, manageLocalService, manageSystemPlatform, runLearningCheck } from "./api";
 import { renderToolchainWorkbench } from "./render";
 import type { ToolchainWorkbenchState } from "./state";
 
@@ -91,15 +91,16 @@ export function bindToolchainEvents(context: FeatureContext, state: ToolchainWor
     context.progress.start(t("feature.toolchains.creatingMysqlPlan"));
     try {
       state.mysqlPlan = await createMySqlRepairPlan(candidate.id, "repair");
+      state.mysqlResult = null;
       context.progress.done(t("toast.planReady"));
       renderAndBind(context, state);
     } catch (error) {
       context.progress.fail(errorMessage(error));
     }
   });
-  bindAction(context.root, "execute-mysql-plan", () => {
+  bindAction(context.root, "execute-mysql-plan", async () => {
     if (!state.mysqlPlan) return context.toast(t("toast.createMysqlPlanFirst"), true);
-    return context.risk.run({
+    const result = await context.risk.run({
       command: "execute_mysql_repair_plan",
       planId: state.mysqlPlan.planId,
       actionId: `mysql_${state.mysqlPlan.action}`,
@@ -109,6 +110,46 @@ export function bindToolchainEvents(context: FeatureContext, state: ToolchainWor
       summary: "Runs the guarded MySQL repair plan. Critical flow keeps explicit confirmation.",
       warnings: ["Complete a full Data backup before execution.", "This may affect database service startup."],
       execute: (confirmationToken) => executeMySqlRepairPlan(state.mysqlPlan!.planId, "", confirmationToken),
+    });
+    state.mysqlResult = result as ToolchainWorkbenchState["mysqlResult"];
+    renderAndBind(context, state);
+  });
+  bindAction(context.root, "inspect-learning-command", async () => {
+    state.learningCommand = learningCommandInput(context, state);
+    context.progress.start(t("feature.toolchains.learningInspecting"));
+    try {
+      state.learningSafety = await inspectCommandSafety(state.learningCommand);
+      state.learningResult = null;
+      state.learningError = "";
+      context.progress.done(t("feature.toolchains.learningChecked"));
+    } catch (error) {
+      state.learningError = errorMessage(error);
+      context.progress.fail(state.learningError);
+    }
+    renderAndBind(context, state);
+  });
+  bindAction(context.root, "run-learning-command", async () => {
+    state.learningCommand = learningCommandInput(context, state);
+    context.progress.start(t("feature.toolchains.learningRunning"));
+    try {
+      state.learningSafety = await inspectCommandSafety(state.learningCommand);
+      state.learningResult = await runLearningCheck(state.learningCommand);
+      state.learningError = "";
+      context.progress.done(t("feature.toolchains.learningDone"));
+    } catch (error) {
+      state.learningResult = null;
+      state.learningError = errorMessage(error);
+      context.progress.fail(state.learningError);
+    }
+    renderAndBind(context, state);
+  });
+  context.root.querySelectorAll<HTMLButtonElement>("[data-learning-command]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.learningCommand = button.dataset.learningCommand || state.learningCommand;
+      state.learningSafety = null;
+      state.learningResult = null;
+      state.learningError = "";
+      renderAndBind(context, state);
     });
   });
 }
@@ -143,6 +184,10 @@ function renderAndBind(context: FeatureContext, state: ToolchainWorkbenchState):
   if (!context.isCurrent()) return;
   context.root.innerHTML = renderToolchainWorkbench(state);
   bindToolchainEvents(context, state);
+}
+
+function learningCommandInput(context: FeatureContext, state: ToolchainWorkbenchState): string {
+  return context.root.querySelector<HTMLInputElement>("#learning-command")?.value.trim() || state.learningCommand;
 }
 
 function errorMessage(error: unknown): string {

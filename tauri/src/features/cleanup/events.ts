@@ -1,4 +1,5 @@
 import type { FeatureContext } from "../../app/featureContext";
+import { open } from "../../api/tauri";
 import { bindAction, valueOf } from "../sharedView";
 import { t } from "../../core/i18n";
 import type { CleanupArchitecture, CleanupScanReport, ExpansionResult, FolderUsageReport, LargeFileItem, MaintenanceOverview, PartitionLayoutReport, RollbackRecord } from "../../types";
@@ -67,10 +68,25 @@ export function bindCleanupEvents(context: FeatureContext, state: CleanupWorkben
       execute: (confirmationToken) => cleanDevCache("npm", confirmationToken),
     }),
   );
+  bindAction(context.root, "choose-cleanup-move-source", async () => {
+    const selected = await open({ directory: true, multiple: false });
+    if (!selected || Array.isArray(selected)) {
+      context.toast(t("feature.cleanup.chooseMoveSourceCancelled"));
+      return;
+    }
+    state.moveSource = selected;
+    context.root.innerHTML = renderCleanupWorkbench(state);
+    bindCleanupEvents(context, state);
+  });
   bindAction(context.root, "create-move-plan", async () => {
+    syncMoveInputs(context, state);
+    if (!state.moveSource) {
+      context.toast(t("feature.cleanup.moveSourceRequired"), true);
+      return;
+    }
     context.progress.start(t("feature.cleanup.createMove"));
     try {
-      state.movePlan = await createMovePlan("", "D", "archive");
+      state.movePlan = await createMovePlan(state.moveSource, state.moveTargetDrive, state.moveMode);
       if (!context.isCurrent()) return;
       context.progress.done(t("toast.planReady"));
       context.root.innerHTML = renderCleanupWorkbench(state);
@@ -139,6 +155,12 @@ export function bindCleanupEvents(context: FeatureContext, state: CleanupWorkben
   });
   bindLargeFileActions(context);
   bindCleanupPagination(context, state);
+}
+
+function syncMoveInputs(context: FeatureContext, state: CleanupWorkbenchState): void {
+  state.moveSource = context.root.querySelector<HTMLInputElement>("#cleanup-move-source")?.value.trim() || state.moveSource;
+  state.moveTargetDrive = context.root.querySelector<HTMLInputElement>("#cleanup-move-target-drive")?.value.trim() || state.moveTargetDrive;
+  state.moveMode = context.root.querySelector<HTMLSelectElement>("#cleanup-move-mode")?.value.trim() || state.moveMode;
 }
 
 export async function refreshCleanup(context: FeatureContext, state: CleanupWorkbenchState): Promise<void> {

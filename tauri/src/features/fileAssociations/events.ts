@@ -52,7 +52,7 @@ export function bindFileAssociationEvents(context: FeatureContext, state: FileAs
   });
   bindAction(context.root, "apply-association-plan", async () => {
     if (!state.plan) return context.toast(t("toast.createAssociationPlanFirst"), true);
-    await context.risk.run({
+    const result = await context.risk.run({
       command: "apply_file_association_plan",
       planId: state.plan.planId,
       riskLevel: "high",
@@ -62,6 +62,9 @@ export function bindFileAssociationEvents(context: FeatureContext, state: FileAs
       warnings: ["UserChoice-protected associations may open Windows Settings instead of writing registry values."],
       execute: (confirmationToken) => applyAssociationPlan(state.plan!, confirmationToken),
     });
+    state.applyResultMessage = result ? JSON.stringify(result, null, 2) : "";
+    context.root.innerHTML = renderFileAssociations(state);
+    bindFileAssociationEvents(context, state);
   });
   bindAction(context.root, "rollback-association-backup", async () => {
     const backup = state.backups[0];
@@ -85,6 +88,16 @@ export function bindFileAssociationEvents(context: FeatureContext, state: FileAs
       const extension = button.dataset.assocExtension || "";
       state.selectedExtensions = new Set(extension ? [extension] : []);
       state.targetAppName = button.dataset.assocApp || state.targetAppName;
+      context.root.innerHTML = renderFileAssociations(state);
+      bindFileAssociationEvents(context, state);
+    });
+  });
+  context.root.querySelectorAll<HTMLButtonElement>("[data-assoc-candidate-app]").forEach((button) => {
+    button.addEventListener("click", () => {
+      syncInputs(context, state);
+      state.targetAppName = button.dataset.assocCandidateApp || state.targetAppName;
+      state.targetExecutable = button.dataset.assocCandidateExe || state.targetExecutable;
+      state.plan = null;
       context.root.innerHTML = renderFileAssociations(state);
       bindFileAssociationEvents(context, state);
     });

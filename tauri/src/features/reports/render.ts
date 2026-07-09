@@ -1,4 +1,4 @@
-import { escapeHtml, renderActionButton, renderBadge, renderMetric } from "../sharedView";
+import { escapeHtml, renderActionButton, renderBadge, renderMetric, renderObjectTable } from "../sharedView";
 import { getActiveLocale, t } from "../../core/i18n";
 import { renderFeatureGuide } from "../../components/featureGuide";
 import type { ReportsWorkbenchState } from "./state";
@@ -17,6 +17,8 @@ export function renderReportsWorkbench(state: ReportsWorkbenchState): string {
           ${renderActionButton("export-doctor-markdown", t("feature.reports.exportMarkdown"))}
           ${renderActionButton("export-doctor-json", t("feature.reports.exportJson"))}
           ${renderActionButton("copy-report-summary", t("feature.reports.copySummary"))}
+          ${renderActionButton("create-doctor-repair-plan", t("feature.reports.createDoctorPlan"))}
+          ${renderActionButton("execute-doctor-repair-plan", t("feature.reports.executeDoctorPlan"), "danger")}
           ${renderActionButton("open-latest-report-location", t("feature.reports.openLatestExport"))}
           ${renderActionButton("export-environment-report", t("feature.environment.export"))}
           ${renderActionButton("export-python-report", t("feature.reports.exportPython"))}
@@ -27,6 +29,7 @@ export function renderReportsWorkbench(state: ReportsWorkbenchState): string {
         </div>
       </section>
       <section class="panel"><h2>${t("feature.reports.doctorReport")}</h2>${state.doctor ? `${renderRows(vm.doctorRows)}${renderRows(vm.checkRows, label("No checks.", "暂无检查项。"))}${renderRows(vm.suggestionRows, label("No suggestions.", "暂无建议。"))}` : `<div class="empty">${t("feature.reports.noDoctor")}</div>`}</section>
+      <section class="panel"><h2>${t("feature.reports.doctorRepairPlan")}</h2>${renderDoctorRepair(state)}</section>
       <section class="panel"><h2>${t("feature.reports.reportText")}</h2><pre>${escapeHtml(vm.reportText)}</pre></section>
       <section class="panel">
         <h2>${t("feature.reports.coverage")}</h2>
@@ -43,6 +46,12 @@ export function renderReportsWorkbench(state: ReportsWorkbenchState): string {
       <section class="panel"><h2>${t("feature.reports.latestExport")}</h2><p>${escapeHtml(state.lastExport || t("feature.reports.noExport"))}</p>${state.lastExportPath ? `<p><strong>${escapeHtml(state.lastExportPath)}</strong></p>` : ""}</section>
     </div>
   `;
+}
+
+function renderDoctorRepair(state: ReportsWorkbenchState): string {
+  const plan = state.doctorPlan;
+  const result = state.doctorRepairResult;
+  return `${plan ? renderObjectTable(plan, ["planId", "beforeScore", "actions", "willCleanupPath", "willConfigureEnvironment", "backupName", "warnings"]) : `<div class="empty">${t("feature.reports.noDoctorPlan")}</div>`}${result ? renderObjectTable(result, ["beforeScore", "afterScore", "applied", "remaining"]) : ""}`;
 }
 
 function renderReportCoverageRow(name: string, detail: string, status: "available" | "view"): string {

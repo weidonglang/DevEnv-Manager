@@ -1,4 +1,4 @@
-import { escapeHtml, renderActionButton, renderMetric } from "../sharedView";
+import { escapeHtml, renderActionButton, renderMetric, renderObjectTable } from "../sharedView";
 import { getActiveLocale, t } from "../../core/i18n";
 import { renderFeatureGuide } from "../../components/featureGuide";
 import type { ToolchainWorkbenchState } from "./state";
@@ -32,8 +32,26 @@ export function renderToolchainWorkbench(state: ToolchainWorkbenchState): string
       <section class="panel"><h2>${label("Platform detail", "平台详情")}</h2>${renderRows(vm.platformRows)}</section>
       <section class="panel"><h2>${label("Local services", "本地服务")}</h2>${renderRows(vm.serviceRows, label("No services loaded.", "尚未加载服务。"))}</section>
       <section class="panel"><h2>${t("feature.toolchains.mysqlRepair")}</h2>${renderRows(vm.mysqlRows)}</section>
+      ${renderLearningCenter(state)}
     </div>
   `;
+}
+
+function renderLearningCenter(state: ToolchainWorkbenchState): string {
+  const commands = ["java -version", "javac -version", "python --version", "python -m pip --version", "node --version", "npm --version", "mvn -version", "gradle -version", "go version", "rustc --version", "cargo --version", "dotnet --info", "where java"];
+  return `<section class="panel">
+    <div class="panel-head"><div><h2>${t("feature.toolchains.learningCenter")}</h2><p>${t("feature.toolchains.learningCenterDetail")}</p></div></div>
+    <div class="form-row command-row">
+      <input id="learning-command" value="${escapeHtml(state.learningCommand)}" placeholder="${t("feature.toolchains.learningCommand")}" />
+      ${renderActionButton("inspect-learning-command", t("feature.toolchains.inspectLearningCommand"))}
+      ${renderActionButton("run-learning-command", t("feature.toolchains.runLearningCommand"), "primary")}
+    </div>
+    <div class="toolbar compact">${commands.map((command) => `<button type="button" data-learning-command="${escapeHtml(command)}">${escapeHtml(command)}</button>`).join("")}</div>
+    <p class="small-note">${t("feature.toolchains.learningBoundary")}</p>
+    ${state.learningError ? `<p class="error-text">${escapeHtml(state.learningError)}</p>` : ""}
+    ${state.learningSafety ? `<h3>${t("feature.toolchains.learningSafety")}</h3>${renderObjectTable(state.learningSafety, ["allowed", "risk", "reason", "requiresConfirmation", "elevated", "executable"])}` : ""}
+    ${state.learningResult ? `<h3>${t("feature.toolchains.learningResult")}</h3>${renderObjectTable(state.learningResult, ["success", "returnCode", "elapsedMs"])}<pre>${escapeHtml(state.learningResult.output)}</pre>` : ""}
+  </section>`;
 }
 
 function renderRows(rows: Array<{ label: string; value: string }>, empty = t("state.notChecked")): string {

@@ -1,5 +1,5 @@
 import { invoke } from "../../core/invoke";
-import type { DoctorReport, OperationResult } from "../../types";
+import type { DoctorRepairPlan, DoctorRepairResult, DoctorReport, OperationResult } from "../../types";
 
 export function runDoctorReport(): Promise<DoctorReport> {
   return invoke<DoctorReport>("run_doctor");
@@ -15,6 +15,14 @@ export function exportDoctorReportJson(report: DoctorReport): Promise<OperationR
 
 export function doctorReportText(report: DoctorReport, format: "markdown" | "json"): Promise<string> {
   return invoke<string>("doctor_report_text", { report, format });
+}
+
+export function createDoctorRepairPlan(): Promise<DoctorRepairPlan> {
+  return invoke<DoctorRepairPlan>("create_doctor_repair_plan");
+}
+
+export function executeDoctorRepairPlan(planId: string, confirmationToken: string): Promise<DoctorRepairResult> {
+  return invoke<DoctorRepairResult>("execute_doctor_repair_plan", { planId, confirmationToken });
 }
 
 export function exportEnvReliabilityReport(format: "markdown" | "json"): Promise<string> {

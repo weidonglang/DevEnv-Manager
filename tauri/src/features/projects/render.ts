@@ -12,6 +12,7 @@ export function renderProjectWorkbench(state: ProjectWorkbenchState): string {
         <div class="panel-head"><div><h2>${t("route.projects.label")}</h2><p>${t("feature.projects.description")}</p></div></div>
         ${renderFeatureGuide("projects")}
         <div class="form-grid"><input id="project-path" value="${escapeHtml(state.selectedPath)}" placeholder="${t("feature.projects.path")}" /></div>
+        ${renderRecentProjects(state)}
         <div class="toolbar">
           ${renderActionButton("choose-project-dir", t("feature.projects.chooseDirectory"))}
           ${renderActionButton("analyze-project", t("feature.projects.analyze"), "primary")}
@@ -36,12 +37,24 @@ export function renderProjectWorkbench(state: ProjectWorkbenchState): string {
       <section class="panel"><h2>${t("feature.projects.recommendedRuntimes")}</h2>${renderRows(vm.recommendedRuntimeRows, t("state.notChecked"))}</section>
       <section class="panel"><h2>${t("feature.projects.detectedActions")}</h2>${renderRows(vm.actionRows, t("state.notChecked"))}</section>
       <section class="panel"><h2>${t("feature.projects.preview")}</h2>${state.preview ? `${renderRows(vm.previewRows)}${renderRows(vm.previewFileRows, t("state.notChecked"))}` : `<div class="empty">${escapeHtml(state.errors.preview || t("feature.projects.noPreview"))}</div>`}</section>
+      <section class="panel"><h2>${t("feature.projects.applyResult")}</h2>${state.applyResult ? renderRows([{ label: "success", value: String(state.applyResult.success) }, { label: "message", value: state.applyResult.message }]) : `<div class="empty">${t("state.notChecked")}</div>`}</section>
       <section class="panel"><h2>${t("feature.projects.projectPorts")}</h2>${renderRows(vm.portRows, state.errors.ports || t("state.notChecked"))}</section>
       <section class="panel"><h2>${t("feature.projects.ideaInspectResult")}</h2>${renderRows(vm.ideaRows, state.errors.idea || t("state.notChecked"))}</section>
       <section class="panel"><h2>${t("feature.projects.javaConsumerResult")}</h2>${renderRows(vm.javaConsumerRows, state.errors.javaConsumer || t("state.notChecked"))}</section>
       <section class="panel"><h2>${t("feature.projects.agentTraces")}</h2>${renderRows(vm.traceRows, state.errors.traces || t("state.notChecked"))}</section>
     </div>
   `;
+}
+
+function renderRecentProjects(state: ProjectWorkbenchState): string {
+  if (!state.recentPaths.length) return "";
+  return `<div class="toolbar compact">${state.recentPaths.map((path) => `<button type="button" data-recent-project="${escapeHtml(path)}" title="${escapeHtml(path)}">${escapeHtml(shortPath(path))}</button>`).join("")}</div>`;
+}
+
+function shortPath(path: string): string {
+  const normalized = path.replace(/\//g, "\\");
+  const parts = normalized.split("\\").filter(Boolean);
+  return parts.slice(-2).join("\\") || normalized;
 }
 
 function renderRows(rows: Array<{ label: string; value: string }>, empty = t("state.notAvailable")): string {
