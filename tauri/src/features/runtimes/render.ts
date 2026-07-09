@@ -18,10 +18,11 @@ export function renderRuntimeWorkbench(state: RuntimeWorkbenchState): string {
           ${renderMetric(t("feature.runtimes.verification"), vm.verification, vm.verificationDetail)}
         </div>
         ${renderRuntimeInstallGrid(state)}
+        <div data-testid="runtime-operation-result" class="empty">${t("state.notChecked")}</div>
       </section>
       <section class="panel">
         <h2>${t("feature.runtimes.installedVersions")}</h2>
-        <div class="runtime-list">
+        <div class="runtime-list" data-testid="runtime-installed-list">
           ${page.items.map(renderRuntimeRow).join("") || `<div class="empty">${t("feature.runtimes.empty")}</div>`}
         </div>
         ${renderPagination("runtimes", page.page, page.totalPages, page.total)}
@@ -33,17 +34,17 @@ export function renderRuntimeWorkbench(state: RuntimeWorkbenchState): string {
 
 function renderRuntimeInstallGrid(state: RuntimeWorkbenchState): string {
   return `<div class="runtime-install-grid">
-    <article class="runtime-install-card">
+    <article class="runtime-install-card" data-testid="runtime-install-jdk-group">
       <div><strong>JDK</strong><span>Temurin / Microsoft / Zulu</span></div>
-      <select id="jdk-distribution">${state.distributions.map((item) => `<option value="${escapeHtml(item.id)}" ${item.recommended ? "selected" : ""}>${escapeHtml(item.name)}</option>`).join("") || `<option value="temurin">Temurin</option>`}</select>
-      <select id="jdk-version">${["8", "11", "17", "21", "25"].map((version) => `<option value="${version}" ${version === "21" ? "selected" : ""}>JDK ${version}</option>`).join("")}</select>
+      <select id="jdk-distribution" data-testid="runtime-jdk-distribution-select">${state.distributions.map((item) => `<option value="${escapeHtml(item.id)}" ${item.recommended ? "selected" : ""}>${escapeHtml(item.name)}</option>`).join("") || `<option value="temurin">Temurin</option>`}</select>
+      <select id="jdk-version" data-testid="runtime-jdk-version-select">${["8", "11", "17", "21", "25"].map((version) => `<option value="${version}" ${version === "21" ? "selected" : ""}>JDK ${version}</option>`).join("")}</select>
       ${renderActionButton("install-jdk", t("feature.runtimes.installJdk"))}
     </article>
-    ${renderVersionInstallCard("Node.js", "node-version", ["16", "18", "20", "22", "24"], "22", "install-node", t("feature.runtimes.installNode"))}
-    ${renderVersionInstallCard("Python", "python-version", ["3.9", "3.10", "3.11", "3.12", "3.13", "3.14"], "3.12", "install-python", t("feature.runtimes.installPython"))}
-    ${renderVersionInstallCard("Go", "go-version", ["1.22", "1.23", "1.24", "1.25", "1.26"], "1.25", "install-go", t("feature.runtimes.installGo"))}
-    ${renderLatestInstallCard("Maven", "install-maven", t("feature.runtimes.installMaven"))}
-    ${renderLatestInstallCard("Gradle", "install-gradle", t("feature.runtimes.installGradle"))}
+    ${renderVersionInstallCard("Node.js", "runtime-install-node-group", "node-version", "runtime-node-version-select", ["16", "18", "20", "22", "24"], "22", "install-node", t("feature.runtimes.installNode"))}
+    ${renderVersionInstallCard("Python", "runtime-install-python-group", "python-version", "runtime-python-version-select", ["3.9", "3.10", "3.11", "3.12", "3.13", "3.14"], "3.12", "install-python", t("feature.runtimes.installPython"))}
+    ${renderVersionInstallCard("Go", "runtime-install-go-group", "go-version", "runtime-go-version-select", ["1.22", "1.23", "1.24", "1.25", "1.26"], "1.25", "install-go", t("feature.runtimes.installGo"))}
+    ${renderLatestInstallCard("Maven", "runtime-install-maven-group", "install-maven", t("feature.runtimes.installMaven"))}
+    ${renderLatestInstallCard("Gradle", "runtime-install-gradle-group", "install-gradle", t("feature.runtimes.installGradle"))}
     <article class="runtime-install-card runtime-install-card--actions">
       <div><strong>${t("feature.runtimes.installedVersions")}</strong><span>${t("feature.runtimes.verification")}</span></div>
       ${renderActionButton("refresh-runtimes", t("feature.runtimes.discover"), "primary")}
@@ -52,16 +53,16 @@ function renderRuntimeInstallGrid(state: RuntimeWorkbenchState): string {
   </div>`;
 }
 
-function renderVersionInstallCard(title: string, selectId: string, versions: string[], selected: string, action: string, label: string): string {
-  return `<article class="runtime-install-card">
+function renderVersionInstallCard(title: string, testId: string, selectId: string, selectTestId: string, versions: string[], selected: string, action: string, label: string): string {
+  return `<article class="runtime-install-card" data-testid="${escapeHtml(testId)}">
     <div><strong>${escapeHtml(title)}</strong><span>${t("feature.runtimes.managedVersion", { version: selected })}</span></div>
-    <select id="${escapeHtml(selectId)}">${versions.map((version) => `<option value="${version}" ${version === selected ? "selected" : ""}>${escapeHtml(title)} ${version}</option>`).join("")}</select>
+    <select id="${escapeHtml(selectId)}" data-testid="${escapeHtml(selectTestId)}">${versions.map((version) => `<option value="${version}" ${version === selected ? "selected" : ""}>${escapeHtml(title)} ${version}</option>`).join("")}</select>
     ${renderActionButton(action, label)}
   </article>`;
 }
 
-function renderLatestInstallCard(title: string, action: string, label: string): string {
-  return `<article class="runtime-install-card">
+function renderLatestInstallCard(title: string, testId: string, action: string, label: string): string {
+  return `<article class="runtime-install-card" data-testid="${escapeHtml(testId)}">
     <div><strong>${escapeHtml(title)}</strong><span>${t("feature.runtimes.latestManaged")}</span></div>
     ${renderActionButton(action, label)}
   </article>`;

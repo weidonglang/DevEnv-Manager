@@ -33,6 +33,7 @@ export function renderCleanupWorkbench(state: CleanupWorkbenchState): string {
           ${renderActionButton("create-expansion-plan", t("feature.cleanup.expansion"))}
           ${renderActionButton("execute-expansion-plan", t("feature.cleanup.executeExpansion"), "danger")}
         </div>
+        ${state.errors.createPlan ? `<div class="error-state" data-testid="cleanup-inline-error">${escapeHtml(state.errors.createPlan)}</div>` : ""}
         <div class="form-grid environment-plan-input">
           <input id="cleanup-move-source" value="${escapeHtml(state.moveSource)}" placeholder="${t("feature.cleanup.moveSource")}" />
           <input id="cleanup-move-target-drive" value="${escapeHtml(state.moveTargetDrive)}" placeholder="${t("feature.cleanup.moveTargetDrive")}" />
@@ -54,7 +55,7 @@ export function renderCleanupWorkbench(state: CleanupWorkbenchState): string {
 function renderCDriveRescue(state: CleanupWorkbenchState): string {
   const overview = state.overview;
   const partition = state.partition;
-  return `<section class="panel">
+  return `<section class="panel" data-testid="cleanup-disk-overview-section">
     <div class="panel-head"><div><h2>${t("feature.cleanup.cRescue")}</h2><p>${t("feature.cleanup.cRescueDetail")}</p></div></div>
     <div class="metrics">
       ${renderMetric(t("feature.cleanup.cFree"), overview ? formatBytes(overview.cDrive.freeBytes) : t("state.notChecked"))}
@@ -64,7 +65,7 @@ function renderCDriveRescue(state: CleanupWorkbenchState): string {
     </div>
     ${state.errors.cRescue ? `<p class="error-text">${escapeHtml(state.errors.cRescue)}</p>` : ""}
     ${overview ? renderStringList(t("feature.cleanup.suggestions"), overview.suggestions) : ""}
-    ${overview ? renderVolumes(overview.volumes) : ""}
+    <div data-testid="cleanup-disk-overview-result">${overview ? renderVolumes(overview.volumes) : renderEmptyState(t("state.notChecked"), t("feature.cleanup.partitionNotCheckedDetail"))}</div>
     ${partition ? renderPartition(partition) : renderEmptyState(t("feature.cleanup.partitionNotChecked"), t("feature.cleanup.partitionNotCheckedDetail"))}
     ${state.architecture ? renderStringList(t("feature.cleanup.safetyRules"), state.architecture.safetyRules) : ""}
     <div class="folder-overview-grid">
@@ -152,7 +153,7 @@ function renderSkippedCleanupItems(state: CleanupWorkbenchState): string {
 function renderCleanupExecutionResult(state: CleanupWorkbenchState): string {
   const result = state.cleanupResult;
   if (!result) return "";
-  return `<div class="cleanup-result ${result.success ? "ok" : "warn"}">
+  return `<div class="cleanup-result ${result.success ? "ok" : "warn"}" data-testid="cleanup-operation-result">
     <h3>${t("feature.cleanup.executionResult")}</h3>
     <div class="metrics">
       ${renderMetric(t("feature.cleanup.resultSuccess"), result.success ? t("state.yes") : t("state.no"))}

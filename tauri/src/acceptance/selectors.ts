@@ -1,0 +1,51 @@
+export const acceptanceSelectors = {
+  cleanup: {
+    diskOverviewSection: "cleanup-disk-overview-section",
+    diskOverviewRefresh: "cleanup-disk-overview-refresh",
+    diskOverviewResult: "cleanup-disk-overview-result",
+    duplicateFilesSection: "cleanup-duplicate-files-section",
+    duplicateFilesScan: "cleanup-duplicate-files-scan",
+    duplicateFilesResult: "cleanup-duplicate-files-result",
+    desktopArchiveSection: "cleanup-desktop-archive-section",
+    desktopArchivePlan: "cleanup-desktop-archive-plan",
+    desktopArchiveResult: "cleanup-desktop-archive-result",
+    downloadsArchiveSection: "cleanup-downloads-archive-section",
+    downloadsArchivePlan: "cleanup-downloads-archive-plan",
+    downloadsArchiveResult: "cleanup-downloads-archive-result",
+    inlineError: "cleanup-inline-error",
+    operationResult: "cleanup-operation-result",
+  },
+  ports: {
+    tableSection: "ports-table-section",
+    row: "ports-row",
+    rowCloseabilityReason: "ports-row-closeability-reason",
+    createPlan: "ports-create-plan",
+    executePlan: "ports-execute-plan",
+    planPreview: "ports-plan-preview",
+    executeResult: "ports-execute-result",
+    inlineGuidance: "ports-inline-guidance",
+  },
+  runtime: {
+    installJdkGroup: "runtime-install-jdk-group",
+    installNodeGroup: "runtime-install-node-group",
+    installPythonGroup: "runtime-install-python-group",
+    installGoGroup: "runtime-install-go-group",
+    installMavenGroup: "runtime-install-maven-group",
+    installGradleGroup: "runtime-install-gradle-group",
+    installedList: "runtime-installed-list",
+    operationResult: "runtime-operation-result",
+  },
+  fileAssociations: {
+    searchInput: "file-associations-search-input",
+    recordsTable: "file-associations-records-table",
+    createPlan: "file-associations-create-plan",
+    planPreview: "file-associations-plan-preview",
+    rollbackInfo: "file-associations-rollback-info",
+  },
+  quality: {
+    persistentError: "quality-persistent-error",
+    persistentResult: "quality-persistent-result",
+  },
+} as const;
+
+export type AcceptanceSelectors = typeof acceptanceSelectors;

@@ -17,7 +17,7 @@ export function renderFileAssociations(state: FileAssociationUiState): string {
           ${renderMetric(t("feature.fileAssociations.backups"), state.backups.length)}
         </div>
         <div class="form-grid">
-          <input id="assoc-filter" placeholder="${t("feature.fileAssociations.filterExtension")}" value="${escapeHtml(state.filter.keyword)}" />
+          <input id="assoc-filter" data-testid="file-associations-search-input" placeholder="${t("feature.fileAssociations.filterExtension")}" value="${escapeHtml(state.filter.keyword)}" />
           <input id="assoc-extension" placeholder=".txt" value="${escapeHtml([...state.selectedExtensions][0] ?? "")}" />
           <input id="assoc-app" placeholder="${t("feature.fileAssociations.appName")}" value="${escapeHtml(state.targetAppName)}" />
           <input id="assoc-exe" placeholder="${t("feature.fileAssociations.exePath")}" value="${escapeHtml(state.targetExecutable)}" />
@@ -34,8 +34,8 @@ export function renderFileAssociations(state: FileAssociationUiState): string {
         </div>
       </section>
       <section class="panel"><h2>${t("feature.fileAssociations.candidates")}</h2>${state.appSearch ? renderAppCandidates(state) : `<div class="empty">${t("feature.fileAssociations.searchEmpty")}</div>`}</section>
-      <section class="panel"><h2>${t("feature.fileAssociations.records")}</h2><div class="data-table">${records.slice(0, 40).map((record) => `<div class="data-row"><span>${escapeHtml(valueOf(record, "extension"))}</span><span>${escapeHtml(valueOf(record, "currentAppName"))}</span><span>${escapeHtml(valueOf(record, "risk"))}</span><span>${escapeHtml(valueOf(record, "source"))}</span><span><button data-assoc-extension="${escapeHtml(valueOf(record, "extension"))}" data-assoc-app="${escapeHtml(valueOf(record, "currentAppName", ""))}" type="button">${t("feature.fileAssociations.changeOpenWith")}</button></span></div>`).join("") || `<div class="empty">${t("feature.fileAssociations.noResults")}</div>`}</div></section>
-      <section class="panel"><h2>${t("feature.fileAssociations.plan")}</h2>${state.plan ? renderObjectTable(state.plan, ["planId", "targetAppName", "targetExecutable", "backupPath", "warnings", "changes"]) : `<div class="empty">${t("feature.fileAssociations.noPlan")}</div>`}${state.applyResultMessage ? `<p>${escapeHtml(state.applyResultMessage)}</p>` : ""}</section>
+      <section class="panel"><h2>${t("feature.fileAssociations.records")}</h2><div class="data-table" data-testid="file-associations-records-table">${records.slice(0, 40).map((record) => `<div class="data-row"><span>${escapeHtml(valueOf(record, "extension"))}</span><span>${escapeHtml(valueOf(record, "currentAppName"))}</span><span>${escapeHtml(valueOf(record, "risk"))}</span><span>${escapeHtml(valueOf(record, "source"))}</span><span><button data-assoc-extension="${escapeHtml(valueOf(record, "extension"))}" data-assoc-app="${escapeHtml(valueOf(record, "currentAppName", ""))}" type="button">${t("feature.fileAssociations.changeOpenWith")}</button></span></div>`).join("") || `<div class="empty">${t("feature.fileAssociations.noResults")}</div>`}</div></section>
+      <section class="panel"><h2>${t("feature.fileAssociations.plan")}</h2><div data-testid="file-associations-plan-preview">${state.plan ? renderObjectTable(state.plan, ["planId", "targetAppName", "targetExecutable", "backupPath", "warnings", "changes"]) : `<div class="empty">${t("feature.fileAssociations.noPlan")}</div>`}</div><div data-testid="file-associations-rollback-info">${state.backups.length ? renderObjectTable(state.backups[0], ["backupName", "createdAt", "path"]) : `<div class="empty">${t("toast.noBackupAvailable")}</div>`}</div>${state.applyResultMessage ? `<p>${escapeHtml(state.applyResultMessage)}</p>` : ""}</section>
     </div>
   `;
 }

@@ -9,7 +9,7 @@ export function renderPortsWorkbench(state: PortsWorkbenchState): string {
   return `
     <div class="feature-layout">
       ${renderPortsShell(state)}
-      <section class="panel" id="ports-table-panel">
+      <section class="panel" id="ports-table-panel" data-testid="ports-table-section">
         ${renderPortsTable(state)}
       </section>
       <section class="panel">
@@ -23,7 +23,7 @@ export function renderPortsWorkbench(state: PortsWorkbenchState): string {
 function renderPortExecutionResult(state: PortsWorkbenchState): string {
   const result = state.executionResult;
   if (!result) return "";
-  return `<div class="execution-result ${result.success ? "ok" : "warn"}">
+  return `<div class="execution-result ${result.success ? "ok" : "warn"}" data-testid="ports-execute-result">
     <h3>${t("feature.ports.executionResult")}</h3>
     <div class="metrics">
       ${renderMetric(t("feature.ports.resultStatus"), result.success ? t("feature.ports.resultCompleted") : t("feature.ports.resultNotCompleted"))}
@@ -72,7 +72,7 @@ export function renderPortsTable(state: PortsWorkbenchState): string {
   return `
         <h2>${t("feature.ports.table")}</h2>
         <div class="data-table port-table">
-          <div class="data-row head"><span>${t("feature.ports.select")}</span><span>${t("feature.ports.port")}</span><span>${t("feature.ports.protocol")}</span><span>${t("feature.ports.state")}</span><span>PID</span><span>${t("feature.ports.process")}</span><span>${t("feature.ports.risk")}</span><span>${t("feature.ports.identity")}</span><span>${t("feature.ports.confidence")}</span></div>
+          <div class="data-row head"><span>${t("feature.ports.select")}</span><span>${t("feature.ports.port")}</span><span>${t("feature.ports.protocol")}</span><span>${t("feature.ports.state")}</span><span>PID</span><span>${t("feature.ports.process")}</span><span>${t("feature.ports.risk")}</span><span>${t("feature.ports.identity")}</span><span>${t("feature.ports.confidence")}</span><span>${t("feature.ports.recommendation")}</span></div>
           ${page.items.map((record) => renderPortRow(record, state.selectedKey)).join("") || `<div class="empty">${t("feature.ports.noRecords")}</div>`}
         </div>
         ${renderPagination("ports", page.page, page.totalPages, page.total)}
@@ -89,17 +89,17 @@ function renderPortRow(record: PortRecord, selectedKey: string | null): string {
   const key = portRecordKey(record);
   const selected = key === selectedKey;
   const treatability = assessPortTreatability(record);
-  return `<div class="data-row ${selected ? "is-selected" : ""}">
+  return `<div class="data-row ${selected ? "is-selected" : ""}" data-testid="ports-row">
     <span><button data-port-select="${escapeHtml(key)}" type="button" aria-pressed="${selected ? "true" : "false"}">${selected ? t("feature.ports.selectedRow") : t("feature.ports.select")}</button></span>
     <span>${escapeHtml(String(record.localPort))}</span><span>${escapeHtml(record.protocol)}</span><span>${escapeHtml(record.state)}</span>
     <span>${escapeHtml(String(record.pid))}</span><span>${escapeHtml(record.processName)}</span><span>${renderBadge(treatability.treatable ? t("feature.ports.operationRiskHigh") : t("feature.ports.protectedOwner"), treatability.treatable ? "warning" : "danger")}</span>
-    <span>${escapeHtml(record.identity)}</span><span>${escapeHtml(String(record.confidence))}</span>
+    <span>${escapeHtml(record.identity)}</span><span>${escapeHtml(String(record.confidence))}</span><span data-testid="ports-row-closeability-reason">${escapeHtml(t(treatability.reasonKey))}</span>
   </div>`;
 }
 
 function renderSelectedPortDetail(state: PortsWorkbenchState): string {
   const selected = selectedPortRecord(state.records, state.selectedKey);
-  if (!selected) return `<h2>${t("feature.ports.selectedDetail")}</h2><div class="empty">${t("feature.ports.noSelectedDetail")}</div>`;
+  if (!selected) return `<h2>${t("feature.ports.selectedDetail")}</h2><div class="empty" data-testid="ports-inline-guidance">${t("feature.ports.noSelectedDetail")}</div>`;
   const treatability = assessPortTreatability(selected);
   return `<div class="panel-head"><div><h2>${t("feature.ports.selectedDetail")}</h2><p>${escapeHtml(t(treatability.reasonKey))}</p></div>${renderBadge(treatability.treatable ? t("feature.ports.canHandle") : t("feature.ports.cannotHandle"), treatability.treatable ? "success" : "danger")}</div>
     <dl class="kv-list">
@@ -126,7 +126,7 @@ function renderSelectedPortDetail(state: PortsWorkbenchState): string {
 function renderPortPlan(state: PortsWorkbenchState): string {
   const plan = state.plan;
   if (!plan) return `<div class="empty">${t("feature.ports.noPlan")}</div>`;
-  return `<div class="port-plan">
+  return `<div class="port-plan" data-testid="ports-plan-preview">
     ${renderObjectTable(plan, ["planId", "riskLevel", "pid", "port", "processName", "processPath", "parentPid", "parentProcessName"])}
     ${plan.serviceNames.length ? renderList(t("feature.ports.services"), plan.serviceNames) : ""}
     ${plan.relatedPorts.length ? renderList(t("feature.ports.relatedPorts"), plan.relatedPorts.map(String)) : ""}

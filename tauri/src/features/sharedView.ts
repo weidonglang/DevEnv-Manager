@@ -46,7 +46,17 @@ export function renderObjectTable(data: unknown, keys: string[]): string {
 }
 
 export function renderActionButton(id: string, label: string, tone = "secondary"): string {
-  return `<button class="button button--${tone} ${tone}" data-action="${id}" type="button">${escapeHtml(label)}</button>`;
+  return `<button class="button button--${tone} ${tone}" data-action="${id}" data-testid="${escapeHtml(actionTestId(id))}" type="button">${escapeHtml(label)}</button>`;
+}
+
+function actionTestId(id: string): string {
+  const aliases: Record<string, string> = {
+    "create-port-plan": "ports-create-plan",
+    "execute-port-plan": "ports-execute-plan",
+    "inspect-c-drive-rescue": "cleanup-disk-overview-refresh",
+    "create-association-plan": "file-associations-create-plan",
+  };
+  return aliases[id] ?? id;
 }
 
 export function pageItems<T>(items: T[], page: number, pageSize = 10): { items: T[]; page: number; totalPages: number; total: number } {

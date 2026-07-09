@@ -3,6 +3,10 @@ import { finishDebug, logDebug } from "./debugLog";
 
 export type CommandArgs = Record<string, unknown>;
 
+export interface InvokeClient {
+  invoke<T = unknown>(command: string, args?: CommandArgs): Promise<T>;
+}
+
 export function invoke<T = unknown>(command: string, args?: CommandArgs): Promise<T> {
   const log = logDebug({ type: "invoke", name: command, status: "started", data: args });
   try {

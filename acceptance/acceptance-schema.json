@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DevEnv Manager Feature Acceptance Manifest",
+  "type": "object",
+  "required": ["version", "pages"],
+  "properties": {
+    "version": { "type": "string" },
+    "commandAllowlist": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["command", "reason"],
+        "properties": {
+          "command": { "type": "string" },
+          "reason": { "type": "string", "minLength": 1 },
+          "priority": { "type": "string" }
+        }
+      }
+    },
+    "pages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["pageId", "displayName", "priority", "features"],
+        "properties": {
+          "pageId": { "type": "string" },
+          "displayName": { "type": "string" },
+          "priority": { "enum": ["P0", "P1", "P2"] },
+          "features": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["featureId", "userVisibleName", "status", "frontendEntry", "backendCommands", "riskLevel", "requiresTauri", "safeSmokeMode", "acceptanceChecks"],
+              "properties": {
+                "featureId": { "type": "string" },
+                "userVisibleName": { "type": "string" },
+                "priority": { "enum": ["P0", "P1", "P2"] },
+                "status": { "enum": ["implemented", "partial", "backendOnly", "uiOnly", "missing", "deferred", "manualOnly"] },
+                "frontendEntry": {
+                  "type": "object",
+                  "required": ["route", "testIds"],
+                  "properties": {
+                    "route": { "type": "string" },
+                    "testIds": { "type": "array", "items": { "type": "string" } }
+                  }
+                },
+                "backendCommands": { "type": "array", "items": { "type": "string" } },
+                "riskLevel": { "type": "string" },
+                "requiresTauri": { "type": "boolean" },
+                "requiresWindows": { "type": "boolean" },
+                "safeSmokeMode": { "type": "string" },
+                "manualOnlyReason": { "type": ["string", "null"] },
+                "acceptanceChecks": { "type": "array", "items": { "type": "string" } }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

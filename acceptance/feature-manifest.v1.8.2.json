@@ -1,0 +1,307 @@
+{
+  "version": "1.8.2",
+  "commandAllowlist": [
+    {
+      "command": "accept_safety_disclaimer",
+      "priority": "P1",
+      "reason": "Startup safety gate command, not mapped to a workbench feature row."
+    },
+    {
+      "command": "load_config",
+      "priority": "P1",
+      "reason": "Application bootstrap command, covered by settings and startup smoke rather than feature-level acceptance."
+    }
+  ],
+  "pages": [
+    {
+      "pageId": "dashboard",
+      "displayName": "仪表盘",
+      "priority": "P1",
+      "features": [
+        {
+          "featureId": "dashboard.snapshot",
+          "userVisibleName": "仪表盘快照",
+          "priority": "P1",
+          "status": "partial",
+          "frontendEntry": { "route": "dashboard", "testIds": ["dashboard-summary-section"] },
+          "backendCommands": ["app_snapshot"],
+          "riskLevel": "readOnly",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "safeSmokeMode": "readOnly",
+          "manualOnlyReason": null,
+          "acceptanceChecks": ["frontendEntryVisible", "backendCommandRegistered", "noUnavailableFlood"]
+        }
+      ]
+    },
+    {
+      "pageId": "runtimes",
+      "displayName": "运行时",
+      "priority": "P0",
+      "features": [
+        {
+          "featureId": "runtime.install.groups",
+          "userVisibleName": "运行时安装分组",
+          "priority": "P0",
+          "status": "partial",
+          "frontendEntry": {
+            "route": "runtimes",
+            "testIds": [
+              "runtime-install-jdk-group",
+              "runtime-install-node-group",
+              "runtime-install-python-group",
+              "runtime-install-go-group",
+              "runtime-install-maven-group",
+              "runtime-install-gradle-group"
+            ]
+          },
+          "backendCommands": ["jdk_distributions", "install_jdk", "install_node", "install_python", "install_go", "install_maven_latest", "install_gradle_latest"],
+          "riskLevel": "medium",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "safeSmokeMode": "dryRun",
+          "manualOnlyReason": null,
+          "acceptanceChecks": ["frontendEntryVisible", "selectorsPresent", "resultPanelVisible"]
+        },
+        {
+          "featureId": "runtime.installed.actions.external",
+          "userVisibleName": "外部运行时只读操作",
+          "priority": "P0",
+          "status": "implemented",
+          "frontendEntry": { "route": "runtimes", "testIds": ["runtime-installed-list", "runtime-operation-result"] },
+          "backendCommands": ["discover_runtimes"],
+          "riskLevel": "readOnly",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "safeSmokeMode": "readOnly",
+          "manualOnlyReason": null,
+          "acceptanceChecks": ["frontendEntryVisible", "noExternalDirectUninstall", "resultPanelVisible"]
+        }
+      ]
+    },
+    {
+      "pageId": "environment",
+      "displayName": "环境",
+      "priority": "P1",
+      "features": [
+        {
+          "featureId": "environment.doctor",
+          "userVisibleName": "环境医生",
+          "priority": "P1",
+          "status": "partial",
+          "frontendEntry": { "route": "environment", "testIds": ["environment-doctor-section", "environment-operation-result"] },
+          "backendCommands": ["inspect_env_reliability", "environment_health"],
+          "riskLevel": "readOnly",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "safeSmokeMode": "readOnly",
+          "manualOnlyReason": null,
+          "acceptanceChecks": ["frontendEntryVisible", "backendCommandRegistered", "durableErrors"]
+        }
+      ]
+    },
+    {
+      "pageId": "ports",
+      "displayName": "端口与服务",
+      "priority": "P0",
+      "features": [
+        {
+          "featureId": "ports.scan.table",
+          "userVisibleName": "端口扫描表格",
+          "priority": "P0",
+          "status": "partial",
+          "frontendEntry": { "route": "ports", "testIds": ["ports-table-section", "ports-row", "ports-row-closeability-reason"] },
+          "backendCommands": ["scan_ports"],
+          "riskLevel": "readOnly",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "safeSmokeMode": "readOnly",
+          "manualOnlyReason": null,
+          "acceptanceChecks": ["frontendEntryVisible", "tableVisible", "rowReasonVisible"]
+        },
+        {
+          "featureId": "ports.plan.visible",
+          "userVisibleName": "端口解决计划预览",
+          "priority": "P0",
+          "status": "partial",
+          "frontendEntry": { "route": "ports", "testIds": ["ports-create-plan", "ports-plan-preview"] },
+          "backendCommands": ["create_port_resolution_plan"],
+          "riskLevel": "high",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "safeSmokeMode": "dryRun",
+          "manualOnlyReason": null,
+          "acceptanceChecks": ["planPreviewVisible", "noToastOnly", "backendCommandRegistered"]
+        },
+        {
+          "featureId": "ports.execute.result",
+          "userVisibleName": "端口执行结果",
+          "priority": "P0",
+          "status": "partial",
+          "frontendEntry": { "route": "ports", "testIds": ["ports-execute-plan", "ports-execute-result"] },
+          "backendCommands": ["execute_port_resolution_plan"],
+          "riskLevel": "high",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "safeSmokeMode": "manual",
+          "manualOnlyReason": "Real process termination is only safe against a temporary disposable process.",
+          "acceptanceChecks": ["resultPanelVisible", "manualDisposablePortSmoke", "noToastOnly"]
+        }
+      ]
+    },
+    {
+      "pageId": "fileAssociations",
+      "displayName": "文件关联",
+      "priority": "P0",
+      "features": [
+        {
+          "featureId": "fileAssociations.searchByExtension",
+          "userVisibleName": "扩展名搜索",
+          "priority": "P0",
+          "status": "implemented",
+          "frontendEntry": { "route": "fileAssociations", "testIds": ["file-associations-search-input", "file-associations-records-table"] },
+          "backendCommands": ["scan_file_associations"],
+          "riskLevel": "readOnly",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "safeSmokeMode": "readOnly",
+          "manualOnlyReason": null,
+          "acceptanceChecks": ["frontendEntryVisible", "tableVisible"]
+        },
+        {
+          "featureId": "fileAssociations.planPreview",
+          "userVisibleName": "关联修改计划",
+          "priority": "P0",
+          "status": "partial",
+          "frontendEntry": { "route": "fileAssociations", "testIds": ["file-associations-create-plan", "file-associations-plan-preview", "file-associations-rollback-info"] },
+          "backendCommands": ["create_file_association_plan", "apply_file_association_plan", "rollback_file_association_backup"],
+          "riskLevel": "high",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "safeSmokeMode": "dryRun",
+          "manualOnlyReason": null,
+          "acceptanceChecks": ["planPreviewVisible", "resultPanelVisible", "noToastOnly"]
+        }
+      ]
+    },
+    {
+      "pageId": "cleanup",
+      "displayName": "清理",
+      "priority": "P0",
+      "features": [
+        {
+          "featureId": "cleanup.diskOverview.ui",
+          "userVisibleName": "磁盘概览",
+          "priority": "P0",
+          "status": "backendOnly",
+          "frontendEntry": { "route": "cleanup", "testIds": ["cleanup-disk-overview-section", "cleanup-disk-overview-refresh", "cleanup-disk-overview-result"] },
+          "backendCommands": ["inspect_disk_overview"],
+          "riskLevel": "readOnly",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "safeSmokeMode": "readOnly",
+          "manualOnlyReason": null,
+          "acceptanceChecks": ["frontendEntryVisible", "backendCommandRegistered", "resultPanelVisible", "noToastOnly"]
+        },
+        {
+          "featureId": "cleanup.duplicateLargeFiles.ui",
+          "userVisibleName": "重复大文件扫描",
+          "priority": "P0",
+          "status": "backendOnly",
+          "frontendEntry": { "route": "cleanup", "testIds": ["cleanup-duplicate-files-section", "cleanup-duplicate-files-scan", "cleanup-duplicate-files-result"] },
+          "backendCommands": ["scan_duplicate_large_files"],
+          "riskLevel": "readOnly",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "safeSmokeMode": "readOnlyTempDir",
+          "manualOnlyReason": null,
+          "acceptanceChecks": ["frontendEntryVisible", "backendCommandRegistered", "resultPanelVisible", "noToastOnly"]
+        },
+        {
+          "featureId": "cleanup.desktopArchive.ui",
+          "userVisibleName": "桌面归档",
+          "priority": "P0",
+          "status": "backendOnly",
+          "frontendEntry": { "route": "cleanup", "testIds": ["cleanup-desktop-archive-section", "cleanup-desktop-archive-plan", "cleanup-desktop-archive-result", "cleanup-desktop-archive-rollback"] },
+          "backendCommands": ["create_desktop_archive_plan", "execute_desktop_archive_plan"],
+          "riskLevel": "high",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "safeSmokeMode": "dryRun",
+          "manualOnlyReason": null,
+          "acceptanceChecks": ["planPreviewVisible", "resultPanelVisible", "rollbackInfoVisible", "noToastOnly"]
+        },
+        {
+          "featureId": "cleanup.downloadsArchive.ui",
+          "userVisibleName": "下载目录归档",
+          "priority": "P0",
+          "status": "backendOnly",
+          "frontendEntry": { "route": "cleanup", "testIds": ["cleanup-downloads-archive-section", "cleanup-downloads-archive-plan", "cleanup-downloads-archive-result", "cleanup-downloads-archive-rollback"] },
+          "backendCommands": ["create_downloads_archive_plan", "execute_downloads_archive_plan"],
+          "riskLevel": "high",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "safeSmokeMode": "dryRun",
+          "manualOnlyReason": null,
+          "acceptanceChecks": ["planPreviewVisible", "resultPanelVisible", "rollbackInfoVisible", "noToastOnly"]
+        },
+        {
+          "featureId": "cleanup.emptySelection.error",
+          "userVisibleName": "清理空选择错误",
+          "priority": "P0",
+          "status": "partial",
+          "frontendEntry": { "route": "cleanup", "testIds": ["create-cleanup-plan", "cleanup-inline-error", "cleanup-operation-result"] },
+          "backendCommands": ["create_cleanup_plan"],
+          "riskLevel": "medium",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "safeSmokeMode": "dryRun",
+          "manualOnlyReason": null,
+          "acceptanceChecks": ["durableErrors", "noUnhandledRejection", "noToastOnly"]
+        }
+      ]
+    },
+    {
+      "pageId": "reports",
+      "displayName": "报告",
+      "priority": "P1",
+      "features": [
+        {
+          "featureId": "reports.exports",
+          "userVisibleName": "报告导出",
+          "priority": "P1",
+          "status": "partial",
+          "frontendEntry": { "route": "reports", "testIds": ["reports-export-section", "reports-export-result"] },
+          "backendCommands": ["export_env_reliability_report", "export_python_diagnostic_report", "export_file_association_report", "export_cleanup_report", "export_port_report", "export_project_report"],
+          "riskLevel": "readOnlyWritesReport",
+          "requiresTauri": true,
+          "requiresWindows": false,
+          "safeSmokeMode": "tempFile",
+          "manualOnlyReason": null,
+          "acceptanceChecks": ["frontendEntryVisible", "resultPanelVisible", "noToastOnly"]
+        }
+      ]
+    },
+    {
+      "pageId": "settings",
+      "displayName": "设置",
+      "priority": "P1",
+      "features": [
+        {
+          "featureId": "settings.debugAndThemes",
+          "userVisibleName": "调试与主题",
+          "priority": "P1",
+          "status": "partial",
+          "frontendEntry": { "route": "settings", "testIds": ["settings-debug-section", "settings-theme-section"] },
+          "backendCommands": ["load_config", "set_root_dir", "set_auto_check_update"],
+          "riskLevel": "low",
+          "requiresTauri": true,
+          "requiresWindows": false,
+          "safeSmokeMode": "dryRun",
+          "manualOnlyReason": null,
+          "acceptanceChecks": ["frontendEntryVisible", "darkHighContrastManual", "wideLayoutManual"]
+        }
+      ]
+    }
+  ]
+}
