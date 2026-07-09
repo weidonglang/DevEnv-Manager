@@ -2,6 +2,7 @@ import type { FeatureContext } from "../../app/featureContext";
 import { t } from "../../core/i18n";
 import { bindAction, valueOf } from "../sharedView";
 import { createPortResolutionPlan, executePortResolutionPlan, inspectLocalServices, portHistory, scanPorts, stopLocalService } from "./api";
+import { assessPortTreatability, portRecordKey, selectedPortRecord } from "./portSafety";
 import { renderPortsTable, renderPortsWorkbench } from "./render";
 import type { PortsWorkbenchState } from "./state";
 
@@ -28,9 +29,9 @@ export function bindPortEvents(context: FeatureContext, state: PortsWorkbenchSta
   });
   bindPortsTableEvents(context, state);
   bindAction(context.root, "create-port-plan", async () => {
-    const first = state.records[0];
-    if (!first) return context.toast(t("toast.portScanFirst"), true);
-    await createPlanForPort(context, state, Number(valueOf(first, "pid", "0")), Number(valueOf(first, "localPort", "0")));
+    const selected = selectedPortRecord(state.records, state.selectedKey);
+    if (!selected) return context.toast(state.records.length ? t("feature.ports.selectPortFirst") : t("toast.portScanFirst"), true);
+    await createPlanForPort(context, state, selected.pid, selected.localPort);
   });
   bindAction(context.root, "execute-port-plan", async () => {
     if (!state.plan) {
@@ -41,9 +42,19 @@ export function bindPortEvents(context: FeatureContext, state: PortsWorkbenchSta
       command: "execute_port_resolution_plan",
       planId: state.plan.planId,
       riskLevel: "high",
-      title: "Execute port resolution plan",
-      summary: "Executes a backend-generated plan and verifies whether the port was released.",
-      warnings: ["Review owner, identity, risk level, and confidence before executing."],
+      title: t("feature.ports.executeRiskTitle"),
+      summary: t("feature.ports.executeRiskSummary"),
+      before: [
+        { label: t("feature.ports.port"), value: String(state.plan.port) },
+        { label: "PID", value: String(state.plan.pid) },
+        { label: t("feature.ports.process"), value: state.plan.processName },
+        { label: t("feature.ports.risk"), value: state.plan.riskLevel },
+      ],
+      after: [
+        { label: t("feature.ports.ownerRecheck"), value: t("feature.ports.ownerRecheckDetail") },
+        { label: t("feature.ports.verification"), value: t("feature.ports.verificationDetail") },
+      ],
+      warnings: [t("feature.ports.executeRiskWarning"), ...state.plan.warnings],
       execute: (confirmationToken) => executePortResolutionPlan(state.plan!.planId, confirmationToken),
     });
     state.executionResult = result as PortsWorkbenchState["executionResult"];
@@ -57,7 +68,8 @@ export function bindPortEvents(context: FeatureContext, state: PortsWorkbenchSta
   bindAction(context.root, "stop-local-service", () =>
     {
       const serviceName = valueOf(state.services[0], "serviceName", "");
-      const port = state.selectedPort ?? 0;
+      const selected = selectedPortRecord(state.records, state.selectedKey);
+      const port = selected?.localPort ?? state.selectedPort ?? 0;
       return context.risk.run({
       command: "stop_local_service",
       planId: `${port}:${serviceName}`,
@@ -79,6 +91,8 @@ export function bindPortEvents(context: FeatureContext, state: PortsWorkbenchSta
       renderAndBind(context, state);
       return;
     }
+    state.selectedKey = portRecordKey(refreshed);
+    state.selectedPort = refreshed.localPort;
     await createPlanForPort(context, state, refreshed.pid, refreshed.localPort);
   });
 }
@@ -90,6 +104,12 @@ export async function refreshPorts(context: FeatureContext, state: PortsWorkbenc
     state.records = records.value;
     state.page = 1;
     state.scanError = "";
+    if (state.selectedKey && !selectedPortRecord(state.records, state.selectedKey)) {
+      state.selectedKey = null;
+      state.selectedPort = null;
+      state.plan = null;
+      state.executionResult = null;
+    }
   } else {
     state.records = [];
     state.scanError = `Port scan unavailable: ${errorMessage(records.reason)}`;
@@ -126,15 +146,32 @@ function bindPortsTableEvents(context: FeatureContext, state: PortsWorkbenchStat
       updatePortsTable(context, state);
     });
   });
-  context.root.querySelectorAll<HTMLButtonElement>("[data-port-pid]").forEach((button) => {
-    button.addEventListener("click", async () => {
-      state.selectedPort = Number(button.dataset.port || "0");
-      await createPlanForPort(context, state, Number(button.dataset.portPid || "0"), state.selectedPort);
+  context.root.querySelectorAll<HTMLButtonElement>("[data-port-select]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const key = button.dataset.portSelect || "";
+      const selected = state.records.find((record) => portRecordKey(record) === key);
+      if (!selected) return;
+      state.selectedKey = key;
+      state.selectedPort = selected.localPort;
+      state.plan = null;
+      state.executionResult = null;
+      state.planError = "";
+      renderAndBind(context, state);
     });
   });
 }
 
 async function createPlanForPort(context: FeatureContext, state: PortsWorkbenchState, pid: number, port: number): Promise<void> {
+  const selected = state.records.find((record) => record.pid === pid && record.localPort === port) ?? selectedPortRecord(state.records, state.selectedKey);
+  const treatability = assessPortTreatability(selected);
+  if (!selected || !treatability.treatable) {
+    state.plan = null;
+    state.executionResult = null;
+    state.planError = t(treatability.reasonKey);
+    context.toast(state.planError, true);
+    renderAndBind(context, state);
+    return;
+  }
   context.progress.start(t("feature.ports.createPlan"));
   try {
     state.plan = await createPortResolutionPlan(pid, port);
@@ -144,6 +181,7 @@ async function createPlanForPort(context: FeatureContext, state: PortsWorkbenchS
     if (!context.isCurrent()) return;
     context.progress.done(t("toast.planReady"));
     renderAndBind(context, state);
+    scrollToPortPlan(context);
   } catch (error) {
     const message = normalizePlanError(error);
     state.planError = message;
@@ -159,9 +197,16 @@ function renderAndBind(context: FeatureContext, state: PortsWorkbenchState): voi
   bindPortEvents(context, state);
 }
 
+function scrollToPortPlan(context: FeatureContext): void {
+  window.requestAnimationFrame(() => {
+    context.root.querySelector<HTMLElement>("#ports-plan-panel")?.scrollIntoView({ block: "start", behavior: "smooth" });
+  });
+}
+
 function normalizePlanError(error: unknown): string {
   const message = errorMessage(error);
   if (message.toLowerCase().includes("owner changed")) return t("feature.ports.ownerChanged");
+  if (message.toLowerCase().includes("pid 4") || message.toLowerCase().includes("protected")) return t("feature.ports.protectedOwnerReason");
   return message;
 }
 

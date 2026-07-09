@@ -61,6 +61,16 @@ Scope: v1.8.2 / v1.9.0 planning after v1.8.1 freeze. This matrix is intentionall
 9. Complete in #132: Ports renders execution verification results including PID exit, port release, and remaining owners.
 10. Complete in #132: Command palette/action contract checks are wired into repository hygiene.
 
+## User Tauri Smoke Blocker Fixes
+
+- Complete in #132: Cleanup Risk UX no longer renders structured backend results as `[object Object]`; cleanup execution result now shows success, cleaned bytes/items, skipped/failed counts, failure reasons, and report summary.
+- Complete in #132: Cleanup selection and estimates count only cleanable candidates. System folders, drive roots, managed runtimes, and scan-only items are shown as skipped/not allowed and are excluded before plan creation.
+- Complete in #132: Cleanup selection changes invalidate stale cleanup plans and previous execution results.
+- Complete in #132: Cleanup Risk copy is cleanup-specific and explains exclusions, confirmation, and recovery expectations.
+- Complete in #132: Ports now uses an explicit select -> detail -> plan -> execute flow instead of silently planning the first row.
+- Complete in #132: Ports explains PID 4/System/protected owners in user-facing language and blocks normal resolution-plan actions for non-treatable owners.
+- Complete in #132: Ports plan and execution Risk copy is localized and describes owner re-check and release verification.
+
 ## P1 / P2 Backlog
 
 - P1 complete in #132: Reports persistence, latest export location, Doctor repair plan preview and execution result.

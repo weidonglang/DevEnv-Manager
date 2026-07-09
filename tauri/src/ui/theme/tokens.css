@@ -343,6 +343,11 @@ button:disabled {
   background: var(--color-surface-raised);
 }
 
+.data-row.is-selected {
+  border-color: var(--color-accent);
+  background: var(--color-surface-raised);
+}
+
 .status-badge {
   display: inline-flex;
   align-items: center;

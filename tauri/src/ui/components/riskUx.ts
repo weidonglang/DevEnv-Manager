@@ -45,12 +45,14 @@ export function executionProgress(message: string): string {
 }
 
 export function resultReport(result: unknown, operation?: RiskOperationView): string {
-  const value = operation?.command === "execute_profile_apply_plan"
-    ? t("feature.profiles.applied")
-    : result && typeof result === "object" && "message" in result
-      ? String((result as { message: unknown }).message)
-      : String(result);
-  return `<section class="risk-section"><h3>${t("risk.result")}</h3><p>${value}</p></section>`;
+  if (operation?.command === "execute_profile_apply_plan") {
+    return `<section class="risk-section"><h3>${t("risk.result")}</h3><p>${t("feature.profiles.applied")}</p></section>`;
+  }
+  const resultRows = resultToRows(result);
+  if (resultRows.length) {
+    return `<section class="risk-section"><h3>${t("risk.result")}</h3>${rows(resultRows)}</section>`;
+  }
+  return `<section class="risk-section"><h3>${t("risk.result")}</h3><p>${escapeHtml(formatPrimitive(result))}</p></section>`;
 }
 
 export function errorReport(message: string): string {
@@ -67,4 +69,36 @@ function riskLevelLabel(riskLevel: string): string {
   if (riskLevel === "medium") return t("risk.levelMedium");
   if (riskLevel === "low") return t("risk.levelLow");
   return riskLevel;
+}
+
+function resultToRows(result: unknown): Array<{ label: string; value: string }> {
+  if (!result || typeof result !== "object" || Array.isArray(result)) return [];
+  return Object.entries(result as Record<string, unknown>)
+    .filter(([key]) => key !== "reportMarkdown")
+    .slice(0, 10)
+    .map(([key, value]) => ({ label: escapeHtml(key), value: escapeHtml(formatValue(value)) }));
+}
+
+function formatValue(value: unknown): string {
+  if (Array.isArray(value)) {
+    if (!value.length) return "0";
+    const preview = value.slice(0, 3).map(formatValue).join("; ");
+    return value.length > 3 ? `${value.length}: ${preview}` : preview;
+  }
+  if (value && typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>).slice(0, 4);
+    if (!entries.length) return "{}";
+    return entries.map(([key, child]) => `${key}: ${formatPrimitive(child)}`).join("; ");
+  }
+  return formatPrimitive(value);
+}
+
+function formatPrimitive(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "boolean") return value ? t("state.yes") : t("state.no");
+  return String(value);
+}
+
+function escapeHtml(value: string): string {
+  return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char] || char);
 }

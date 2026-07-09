@@ -11,13 +11,17 @@ export function bindCleanupEvents(context: FeatureContext, state: CleanupWorkben
   bindCleanupCandidateSelection(context, state);
   bindAction(context.root, "scan-cleanup", () => refreshCleanup(context, state));
   bindAction(context.root, "create-cleanup-plan", async () => {
-    if (!state.selectedIds.length) {
+    const selectedIds = selectedCleanableIds(state);
+    if (!selectedIds.length) {
       context.toast(t("toast.selectCleanupCandidateFirst"), true);
       return;
     }
+    state.selectedIds = selectedIds;
+    state.plan = null;
+    state.cleanupResult = null;
     context.progress.start(t("feature.cleanup.createPlan"));
     try {
-      state.plan = await createCleanupPlan(state.selectedIds);
+      state.plan = await createCleanupPlan(selectedIds);
       if (!context.isCurrent()) return;
       context.progress.done(t("toast.planReady"));
       context.root.innerHTML = renderCleanupWorkbench(state);
@@ -37,8 +41,13 @@ export function bindCleanupEvents(context: FeatureContext, state: CleanupWorkben
       before: [
         { label: t("feature.cleanup.selected"), value: String(state.plan.selectedItems.length) },
         { label: t("feature.cleanup.bytes"), value: String(state.plan.estimatedBytes) },
+        { label: t("feature.cleanup.planExecutable"), value: String(state.plan.selectedItems.length) },
       ],
-      warnings: [t("feature.cleanup.executePlanWarning"), ...state.plan.warnings],
+      after: [
+        { label: t("feature.cleanup.resultCleaned"), value: t("feature.cleanup.resultAvailableAfterExecute") },
+        { label: t("feature.cleanup.resultRecovery"), value: t("feature.cleanup.resultRecoveryDetail") },
+      ],
+      warnings: [t("feature.cleanup.executePlanWarning"), t("feature.cleanup.executePlanRecoveryWarning"), ...state.plan.warnings],
       execute: (confirmationToken) => cleanSelectedTargets(state.plan!, confirmationToken),
     });
     state.cleanupResult = result as CleanupWorkbenchState["cleanupResult"];
@@ -177,12 +186,14 @@ export async function refreshCleanup(context: FeatureContext, state: CleanupWork
   applySettled(state, "scan", scan);
   applySettled(state, "rollbackRecords", rollbackRecords);
   state.selectedIds = defaultSelectedIds(state);
+  state.plan = null;
+  state.cleanupResult = null;
   context.root.innerHTML = renderCleanupWorkbench(state);
   bindCleanupEvents(context, state);
 }
 
 function defaultSelectedIds(state: CleanupWorkbenchState): string[] {
-  return state.scan?.categories.flatMap((category) => category.items.filter((item) => item.selectedByDefault).map((item) => item.id)) ?? [];
+  return state.scan?.categories.flatMap((category) => category.items.filter((item) => item.cleanable && item.selectedByDefault).map((item) => item.id)) ?? [];
 }
 
 async function refreshCDriveRescue(context: FeatureContext, state: CleanupWorkbenchState): Promise<void> {
@@ -240,15 +251,30 @@ function bindCleanupCandidateSelection(context: FeatureContext, state: CleanupWo
     checkbox.addEventListener("change", () => {
       const id = checkbox.dataset.cleanupCandidate || "";
       if (!id) return;
+      const candidate = findCandidate(state, id);
+      if (!candidate?.cleanable) {
+        checkbox.checked = false;
+        context.toast(candidate?.skippedReason || t("feature.cleanup.notAllowed"), true);
+        return;
+      }
       const selected = new Set(state.selectedIds);
       if (checkbox.checked) selected.add(id);
       else selected.delete(id);
-      state.selectedIds = Array.from(selected);
+      state.selectedIds = Array.from(selected).filter((candidateId) => findCandidate(state, candidateId)?.cleanable);
       state.plan = null;
+      state.cleanupResult = null;
       context.root.innerHTML = renderCleanupWorkbench(state);
       bindCleanupEvents(context, state);
     });
   });
+}
+
+function selectedCleanableIds(state: CleanupWorkbenchState): string[] {
+  return state.selectedIds.filter((id) => findCandidate(state, id)?.cleanable);
+}
+
+function findCandidate(state: CleanupWorkbenchState, id: string) {
+  return state.scan?.categories.flatMap((category) => category.items).find((item) => item.id === id);
 }
 
 function bindLargeFileActions(context: FeatureContext): void {

@@ -6,6 +6,7 @@ import { renderFeatureGuide } from "../../components/featureGuide";
 import type { CleanupWorkbenchState } from "./state";
 
 export function renderCleanupWorkbench(state: CleanupWorkbenchState): string {
+  const selected = selectedCleanableCandidates(state);
   return `
     <div class="feature-layout">
       <section class="panel">
@@ -15,7 +16,8 @@ export function renderCleanupWorkbench(state: CleanupWorkbenchState): string {
           ${renderMetric(t("feature.cleanup.scanned"), valueOf(state.scan, "totalItems", "0"))}
           ${renderMetric(t("feature.cleanup.bytes"), valueOf(state.scan, "totalBytes", "0"))}
           ${renderMetric(t("feature.cleanup.rollbackRecords"), state.rollbackRecords.length)}
-          ${renderMetric(t("feature.cleanup.selected"), state.selectedIds.length)}
+          ${renderMetric(t("feature.cleanup.selected"), selected.length)}
+          ${renderMetric(t("feature.cleanup.selectedBytes"), formatBytes(sumBytes(selected)))}
         </div>
         <div class="toolbar">
           ${renderActionButton("scan-cleanup", t("feature.cleanup.scan"), "primary")}
@@ -44,7 +46,7 @@ export function renderCleanupWorkbench(state: CleanupWorkbenchState): string {
       ${renderCDriveRescue(state)}
       ${renderCleanupReport(state)}
       ${renderLargeFiles(state)}
-      <section class="panel"><h2>${t("feature.cleanup.plans")}</h2>${state.plan ? renderObjectTable(state.plan, ["planId", "estimatedBytes", "requiresAdmin", "riskSummary", "warnings"]) : `<div class="empty">${t("feature.cleanup.noPlan")}</div>`}${state.cleanupResult ? renderObjectTable(state.cleanupResult, ["planId", "success", "cleanedBytes", "cleanedItems", "failedItems", "reportMarkdown"]) : ""}${state.movePlan ? renderObjectTable(state.movePlan, ["planId", "source", "target", "mode", "warnings"]) : ""}${state.expansionPlan ? renderObjectTable(state.expansionPlan, ["planId", "mode", "canExecute", "requiresAdmin", "estimatedAddedBytes", "backupRequired", "explanation"]) : ""}${state.expansionResult ? renderObjectTable(state.expansionResult, ["planId", "success", "beforeFree", "afterFree", "output"]) : ""}</section>
+      <section class="panel"><h2>${t("feature.cleanup.plans")}</h2>${renderCleanupPlan(state)}${renderCleanupExecutionResult(state)}${state.movePlan ? renderObjectTable(state.movePlan, ["planId", "source", "target", "mode", "warnings"]) : ""}${state.expansionPlan ? renderObjectTable(state.expansionPlan, ["planId", "mode", "canExecute", "requiresAdmin", "estimatedAddedBytes", "backupRequired", "explanation"]) : ""}${state.expansionResult ? renderObjectTable(state.expansionResult, ["planId", "success", "beforeFree", "afterFree", "output"]) : ""}</section>
     </div>
   `;
 }
@@ -92,12 +94,14 @@ function renderCleanupReport(state: CleanupWorkbenchState): string {
     return `<section class="panel"><h2>${t("feature.cleanup.report")}</h2>${renderEmptyState(t("feature.cleanup.noScan"), t("feature.cleanup.noScanDetail"))}</section>`;
   }
   const candidates = state.scan.categories.flatMap((category) => category.items);
+  const selected = selectedCleanableCandidates(state);
   return `<section class="panel">
     <h2>${t("feature.cleanup.report")}</h2>
     <div class="metrics">
       ${renderMetric(t("feature.cleanup.scanned"), state.scan.totalItems)}
       ${renderMetric(t("feature.cleanup.bytes"), formatBytes(state.scan.totalBytes))}
-      ${renderMetric(t("feature.cleanup.selected"), state.selectedIds.length)}
+      ${renderMetric(t("feature.cleanup.selected"), selected.length)}
+      ${renderMetric(t("feature.cleanup.selectedBytes"), formatBytes(sumBytes(selected)))}
       ${renderMetric(t("feature.cleanup.generatedAt"), state.scan.generatedAt)}
     </div>
     ${renderStringList(t("feature.cleanup.warnings"), state.scan.warnings)}
@@ -114,9 +118,53 @@ function renderCandidates(state: CleanupWorkbenchState, items: CleanupCandidate[
       const selected = state.selectedIds.includes(item.id);
       const disabled = !item.cleanable;
       const reason = item.skippedReason || item.reason;
-      return `<tr><td><input type="checkbox" data-cleanup-candidate="${escapeHtml(item.id)}" ${selected ? "checked" : ""} ${disabled ? "disabled" : ""} aria-label="${escapeHtml(item.path)}" /></td><td title="${escapeHtml(item.path)}">${escapeHtml(item.path)}</td><td>${formatBytes(item.size)}</td><td>${escapeHtml(reason)}</td><td>${escapeHtml(item.risk)}</td></tr>`;
+      return `<tr><td><input type="checkbox" data-cleanup-candidate="${escapeHtml(item.id)}" ${selected && !disabled ? "checked" : ""} ${disabled ? "disabled" : ""} aria-label="${escapeHtml(item.path)}" /></td><td title="${escapeHtml(item.path)}">${escapeHtml(item.path)}</td><td>${formatBytes(item.size)}</td><td>${escapeHtml(reason)}</td><td>${disabled ? renderBadge(t("feature.cleanup.notAllowed"), "danger") : renderBadge(t("feature.cleanup.planExecutable"), "success")} ${escapeHtml(item.risk)}</td></tr>`;
     })
     .join("")}</tbody></table></div>`;
+}
+
+function renderCleanupPlan(state: CleanupWorkbenchState): string {
+  if (!state.plan) {
+    return `<div class="empty">${t("feature.cleanup.noPlan")}</div>${renderSkippedCleanupItems(state)}`;
+  }
+  return `<div class="cleanup-plan-panel">
+    ${renderObjectTable(state.plan, ["planId", "estimatedBytes", "requiresAdmin", "riskSummary", "warnings"])}
+    <h3>${t("feature.cleanup.planExecutableItems")}</h3>
+    <div class="table-wrap"><table><thead><tr><th>${t("feature.cleanup.path")}</th><th>${t("feature.cleanup.size")}</th><th>${t("feature.cleanup.action")}</th><th>${t("feature.cleanup.risk")}</th><th>${t("feature.cleanup.reversible")}</th></tr></thead><tbody>${state.plan.selectedItems
+      .map((item) => `<tr><td title="${escapeHtml(item.path)}">${escapeHtml(item.path)}</td><td>${formatBytes(item.size)}</td><td>${escapeHtml(item.action)}</td><td>${escapeHtml(item.risk)}</td><td>${item.reversible ? t("state.yes") : t("state.no")}</td></tr>`)
+      .join("")}</tbody></table></div>
+    ${renderSkippedCleanupItems(state)}
+  </div>`;
+}
+
+function renderSkippedCleanupItems(state: CleanupWorkbenchState): string {
+  const skipped = state.scan?.categories.flatMap((category) => category.items.filter((item) => !item.cleanable).map((item) => ({ ...item, categoryName: category.name }))) ?? [];
+  if (!skipped.length) return "";
+  return `<div class="small-note">
+    <strong>${t("feature.cleanup.planSkippedItems")}</strong>
+    <div class="table-wrap"><table><thead><tr><th>${t("feature.cleanup.path")}</th><th>${t("feature.cleanup.reason")}</th><th>${t("feature.cleanup.risk")}</th></tr></thead><tbody>${skipped
+      .slice(0, 20)
+      .map((item) => `<tr><td title="${escapeHtml(item.path)}">${escapeHtml(item.path)}</td><td>${escapeHtml(item.skippedReason || item.reason || item.categoryName)}</td><td>${renderBadge(t("feature.cleanup.notAllowed"), "danger")} ${escapeHtml(item.risk)}</td></tr>`)
+      .join("")}</tbody></table></div>
+  </div>`;
+}
+
+function renderCleanupExecutionResult(state: CleanupWorkbenchState): string {
+  const result = state.cleanupResult;
+  if (!result) return "";
+  return `<div class="cleanup-result ${result.success ? "ok" : "warn"}">
+    <h3>${t("feature.cleanup.executionResult")}</h3>
+    <div class="metrics">
+      ${renderMetric(t("feature.cleanup.resultSuccess"), result.success ? t("state.yes") : t("state.no"))}
+      ${renderMetric(t("feature.cleanup.resultCleanedBytes"), formatBytes(result.cleanedBytes))}
+      ${renderMetric(t("feature.cleanup.resultCleaned"), result.cleanedItems)}
+      ${renderMetric(t("feature.cleanup.resultSkipped"), result.skippedItems)}
+      ${renderMetric(t("feature.cleanup.resultFailed"), result.failedItems)}
+    </div>
+    ${renderObjectTable(result, ["planId", "startedAt", "finishedAt"])}
+    ${result.failures.length ? `<div class="small-note"><strong>${t("feature.cleanup.resultFailures")}</strong><ul>${result.failures.map((failure) => `<li>${escapeHtml(failure.path)} - ${escapeHtml(failure.reason)}</li>`).join("")}</ul></div>` : `<p class="small-note">${t("feature.cleanup.resultNoFailures")}</p>`}
+    ${result.reportMarkdown ? `<details class="small-note"><summary>${t("feature.cleanup.resultReport")}</summary><pre>${escapeHtml(result.reportMarkdown)}</pre></details>` : ""}
+  </div>`;
 }
 
 function renderLargeFiles(state: CleanupWorkbenchState): string {
@@ -152,4 +200,13 @@ function renderFolderOverview(label: string, report: FolderUsageReport | null): 
 function renderStringList(title: string, items: string[]): string {
   if (!items.length) return "";
   return `<div class="small-note"><strong>${escapeHtml(title)}</strong><ul>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul></div>`;
+}
+
+function selectedCleanableCandidates(state: CleanupWorkbenchState): CleanupCandidate[] {
+  const selected = new Set(state.selectedIds);
+  return state.scan?.categories.flatMap((category) => category.items.filter((item) => item.cleanable && selected.has(item.id))) ?? [];
+}
+
+function sumBytes(items: CleanupCandidate[]): number {
+  return items.reduce((total, item) => total + item.size, 0);
 }
