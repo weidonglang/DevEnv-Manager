@@ -9,6 +9,15 @@ from check_frontend_architecture import main as check_frontend_architecture
 from check_frontend_data_contracts import main as check_frontend_data_contracts
 from check_frontend_action_contracts import main as check_frontend_action_contracts
 from check_frontend_quality_regressions import main as check_frontend_quality_regressions
+from check_feature_manifest import main as check_feature_manifest
+from check_feature_coverage import main as check_feature_coverage
+from check_acceptance_deferred_reasons import main as check_acceptance_deferred_reasons
+from check_acceptance_risk_contracts import main as check_acceptance_risk_contracts
+from check_acceptance_report_contracts import main as check_acceptance_report_contracts
+from check_acceptance_debug_contracts import main as check_acceptance_debug_contracts
+from check_backend_ui_drift import main as check_backend_ui_drift
+from check_frontend_acceptance_selectors import main as check_frontend_acceptance_selectors
+from check_toast_only_actions import main as check_toast_only_actions
 
 
 BLOCKED_PARTS = {
@@ -55,6 +64,21 @@ def main() -> int:
         if len(blocked) > 200:
             print(f"... and {len(blocked) - 200} more")
         return 1
+    acceptance_checks = [
+        check_feature_manifest,
+        check_feature_coverage,
+        check_acceptance_deferred_reasons,
+        check_acceptance_risk_contracts,
+        check_acceptance_report_contracts,
+        check_acceptance_debug_contracts,
+        check_backend_ui_drift,
+        check_frontend_acceptance_selectors,
+        check_toast_only_actions,
+    ]
+    for check in acceptance_checks:
+        result = check()
+        if result != 0:
+            return result
     contract_result = check_tauri_command_contract()
     if contract_result != 0:
         return contract_result
