@@ -31,8 +31,12 @@ export function bindReportEvents(context: FeatureContext, state: ReportsWorkbenc
   });
   bindAction(context.root, "copy-report-summary", async () => {
     if (!ensureDoctor(context, state)) return;
+    state.actionResult = "";
+    state.actionError = "";
     state.text = await doctorReportText(state.doctor, "markdown");
     await navigator.clipboard.writeText(state.text || state.doctor.summary);
+    state.actionResult = t("feature.reports.summaryCopied");
+    persistReportsState(state);
     context.toast(t("feature.reports.summaryCopied"));
     context.root.innerHTML = renderReportsWorkbench(state);
     bindReportEvents(context, state);
@@ -53,28 +57,40 @@ export function bindReportEvents(context: FeatureContext, state: ReportsWorkbenc
   });
   bindAction(context.root, "execute-doctor-repair-plan", async () => {
     if (!state.doctorPlan) {
+      state.actionError = t("feature.reports.createDoctorPlanFirst");
+      persistReportsState(state);
+      context.root.innerHTML = renderReportsWorkbench(state);
+      bindReportEvents(context, state);
       context.toast(t("feature.reports.createDoctorPlanFirst"), true);
       return;
     }
     const plan = state.doctorPlan;
-    const result = await context.risk.run({
-      command: "execute_doctor_repair_plan",
-      planId: plan.planId,
-      riskLevel: "high",
-      backupReceipt: plan.backupName,
-      title: t("feature.reports.executeDoctorPlan"),
-      summary: t("feature.reports.executeDoctorPlanSummary"),
-      before: [
-        { label: t("feature.reports.doctorScore"), value: String(plan.beforeScore) },
-        { label: t("feature.reports.actions"), value: plan.actions.join(", ") || t("state.notAvailable") },
-      ],
-      warnings: plan.warnings,
-      execute: (confirmationToken) => executeDoctorRepairPlan(plan.planId, confirmationToken),
-    });
-    state.doctorRepairResult = result as ReportsWorkbenchState["doctorRepairResult"];
-    state.doctor = state.doctorRepairResult?.report ?? state.doctor;
-    state.doctorPlan = null;
-    if (state.doctor) state.text = await doctorReportText(state.doctor, "markdown");
+    state.doctorRepairResult = null;
+    state.actionResult = "";
+    state.actionError = "";
+    try {
+      const result = await context.risk.run({
+        command: "execute_doctor_repair_plan",
+        planId: plan.planId,
+        riskLevel: "high",
+        backupReceipt: plan.backupName,
+        title: t("feature.reports.executeDoctorPlan"),
+        summary: t("feature.reports.executeDoctorPlanSummary"),
+        before: [
+          { label: t("feature.reports.doctorScore"), value: String(plan.beforeScore) },
+          { label: t("feature.reports.actions"), value: plan.actions.join(", ") || t("state.notAvailable") },
+        ],
+        warnings: plan.warnings,
+        execute: (confirmationToken) => executeDoctorRepairPlan(plan.planId, confirmationToken),
+      });
+      state.doctorRepairResult = result as ReportsWorkbenchState["doctorRepairResult"];
+      state.doctor = state.doctorRepairResult?.report ?? state.doctor;
+      state.doctorPlan = null;
+      state.actionResult = t("feature.reports.executeDoctorPlan");
+      if (state.doctor) state.text = await doctorReportText(state.doctor, "markdown");
+    } catch (error) {
+      state.actionError = errorMessage(error);
+    }
     persistReportsState(state);
     if (!context.isCurrent()) return;
     context.root.innerHTML = renderReportsWorkbench(state);
@@ -83,16 +99,29 @@ export function bindReportEvents(context: FeatureContext, state: ReportsWorkbenc
   bindAction(context.root, "open-latest-report-location", async () => {
     const path = state.lastExportPath || extractExportPath(state.lastExport);
     if (!path) {
+      state.actionError = t("feature.reports.latestExportLocationMissing");
+      persistReportsState(state);
+      context.root.innerHTML = renderReportsWorkbench(state);
+      bindReportEvents(context, state);
       context.toast(t("feature.reports.latestExportLocationMissing"), true);
       return;
     }
+    state.actionResult = "";
+    state.actionError = "";
     context.progress.start(t("feature.reports.openingLatestExport"));
     try {
       const result = await openReportLocation(path);
+      state.actionResult = result.message;
+      persistReportsState(state);
       context.progress.done(result.message);
     } catch (error) {
+      state.actionError = errorMessage(error);
+      persistReportsState(state);
       context.progress.fail(errorMessage(error));
     }
+    if (!context.isCurrent()) return;
+    context.root.innerHTML = renderReportsWorkbench(state);
+    bindReportEvents(context, state);
   });
   bindAction(context.root, "export-environment-report", () => exportWithProgress(context, state, () => exportEnvReliabilityReport("markdown")));
   bindAction(context.root, "export-python-report", () => exportWithProgress(context, state, () => exportPythonDiagnosticReport().then((result) => result.message)));

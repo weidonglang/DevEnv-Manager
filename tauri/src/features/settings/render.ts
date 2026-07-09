@@ -31,6 +31,7 @@ export function renderSettingsWorkbench(state: SettingsWorkbenchState): string {
         </div>
       </section>
       ${renderRiskLevelGuide()}
+      <section class="panel" data-testid="settings-operation-result"><h2>操作结果</h2>${state.operationError ? `<div class="error-state">${escapeHtml(state.operationError)}</div>` : ""}${state.operationResult ? `<div class="small-note">${escapeHtml(state.operationResult)}</div>` : `<div class="empty">${t("state.notChecked")}</div>`}</section>
       <section class="panel"><h2>${t("settings.updateSource")}</h2>${renderRows(vm.updateRows)}</section>
       <section class="panel"><h2>${t("settings.powershellRunner")}</h2>${renderRows(vm.powershellRows)}</section>
       ${isAdvancedMode() ? renderDebugPanel(state.debugPage) : ""}

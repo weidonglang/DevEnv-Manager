@@ -10,7 +10,7 @@ export type ProjectWorkbenchState = {
   selectedPath: string;
   recentPaths: string[];
   applyResult: OperationResult | null;
-  errors: Partial<Record<"analysis" | "preview" | "ports" | "idea" | "javaConsumer" | "traces", string>>;
+  errors: Partial<Record<"analysis" | "preview" | "ports" | "idea" | "javaConsumer" | "traces" | "applyResult", string>>;
 };
 
 export const projectWorkbenchInitialState: ProjectWorkbenchState = {

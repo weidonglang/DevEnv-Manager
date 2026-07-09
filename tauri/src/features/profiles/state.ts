@@ -7,6 +7,8 @@ export type ProfilesState = {
   importPreview: ConfigProfileImportPreview | null;
   importPath: string;
   importResult: string;
+  operationResult: string;
+  operationError: string;
   page: number;
 };
 
@@ -17,5 +19,7 @@ export const profilesInitialState: ProfilesState = {
   importPreview: null,
   importPath: "",
   importResult: "",
+  operationResult: "",
+  operationError: "",
   page: 1,
 };

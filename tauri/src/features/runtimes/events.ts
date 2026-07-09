@@ -7,40 +7,55 @@ import type { RuntimeWorkbenchState } from "./state";
 
 export function bindRuntimeEvents(context: FeatureContext, state: RuntimeWorkbenchState): void {
   bindAction(context.root, "refresh-runtimes", () => refreshRuntimes(context, state));
-  bindAction(context.root, "install-jdk", () => {
+  bindAction(context.root, "install-jdk", async () => {
     const version = context.root.querySelector<HTMLSelectElement>("#jdk-version")?.value || "21";
     const distribution = context.root.querySelector<HTMLSelectElement>("#jdk-distribution")?.value || "temurin";
-    return context.risk.run({
-      command: "install_jdk",
-      planId: `install_jdk:${version}:${distribution}`,
-      riskLevel: "high",
-      backupRequired: false,
-      title: t("feature.runtimes.installJdkTitle", { version }),
-      summary: t("feature.runtimes.installJdkSummary", { version }),
-      before: [
-        { label: t("feature.runtimes.distribution"), value: distribution },
-        { label: t("feature.runtimes.version"), value: version },
-      ],
-      warnings: [
-        t("feature.runtimes.installJdkWhy"),
-        t("feature.runtimes.installJdkBackup"),
-        t("feature.runtimes.installJdkVerify"),
-      ],
-      execute: (confirmationToken) => installRuntime("install_jdk", { version, distribution, switchAfterInstall: false, confirmationToken }),
-    });
+    state.operationResult = "";
+    state.operationError = "";
+    try {
+      const result = await context.risk.run({
+        command: "install_jdk",
+        planId: `install_jdk:${version}:${distribution}`,
+        riskLevel: "high",
+        backupRequired: false,
+        title: t("feature.runtimes.installJdkTitle", { version }),
+        summary: t("feature.runtimes.installJdkSummary", { version }),
+        before: [
+          { label: t("feature.runtimes.distribution"), value: distribution },
+          { label: t("feature.runtimes.version"), value: version },
+        ],
+        warnings: [
+          t("feature.runtimes.installJdkWhy"),
+          t("feature.runtimes.installJdkBackup"),
+          t("feature.runtimes.installJdkVerify"),
+        ],
+        execute: (confirmationToken) => installRuntime("install_jdk", { version, distribution, switchAfterInstall: false, confirmationToken }),
+      });
+      state.operationResult = resultMessage(result, t("feature.runtimes.installJdk"));
+    } catch (error) {
+      state.operationError = errorMessage(error);
+    }
+    renderAndBind(context, state);
   });
-  bindAction(context.root, "install-node", () => installWithRisk(context, "install_node", context.root.querySelector<HTMLSelectElement>("#node-version")?.value || "22"));
-  bindAction(context.root, "install-python", () => installWithRisk(context, "install_python", context.root.querySelector<HTMLSelectElement>("#python-version")?.value || "3.12"));
-  bindAction(context.root, "install-go", () => installWithRisk(context, "install_go", context.root.querySelector<HTMLSelectElement>("#go-version")?.value || "1.25"));
-  bindAction(context.root, "install-maven", () => installLatestWithRisk(context, "install_maven_latest", "Maven"));
-  bindAction(context.root, "install-gradle", () => installLatestWithRisk(context, "install_gradle_latest", "Gradle"));
+  bindAction(context.root, "install-node", () => installWithRisk(context, state, "install_node", context.root.querySelector<HTMLSelectElement>("#node-version")?.value || "22"));
+  bindAction(context.root, "install-python", () => installWithRisk(context, state, "install_python", context.root.querySelector<HTMLSelectElement>("#python-version")?.value || "3.12"));
+  bindAction(context.root, "install-go", () => installWithRisk(context, state, "install_go", context.root.querySelector<HTMLSelectElement>("#go-version")?.value || "1.25"));
+  bindAction(context.root, "install-maven", () => installLatestWithRisk(context, state, "install_maven_latest", "Maven"));
+  bindAction(context.root, "install-gradle", () => installLatestWithRisk(context, state, "install_gradle_latest", "Gradle"));
   bindAction(context.root, "verify-runtimes", async () => {
     context.progress.start(t("feature.runtimes.healthCheck"));
-    state.strongVerification = await inspectRuntimeStrongVerification();
-    if (!context.isCurrent()) return;
-    context.progress.done(t("feature.runtimes.healthCheckDone"));
-    context.root.innerHTML = renderRuntimeWorkbench(state);
-    bindRuntimeEvents(context, state);
+    state.operationResult = "";
+    state.operationError = "";
+    try {
+      state.strongVerification = await inspectRuntimeStrongVerification();
+      state.operationResult = t("feature.runtimes.healthCheckDone");
+      if (!context.isCurrent()) return;
+      context.progress.done(t("feature.runtimes.healthCheckDone"));
+    } catch (error) {
+      state.operationError = errorMessage(error);
+      context.progress.fail(state.operationError);
+    }
+    renderAndBind(context, state);
   });
   context.root.querySelectorAll<HTMLButtonElement>("[data-runtime-action]").forEach((button) => {
     button.addEventListener("click", () => runRuntimeRowAction(context, state, button));
@@ -71,29 +86,45 @@ export async function refreshRuntimes(context: FeatureContext, state: RuntimeWor
   bindRuntimeEvents(context, state);
 }
 
-function installWithRisk(context: FeatureContext, command: "install_node" | "install_python" | "install_go", version: string) {
-  return context.risk.run({
-    command,
-    planId: `${command}:${version}`,
-    riskLevel: "high",
-    title: t("feature.runtimes.installGenericTitle", { name: runtimeName(command), version }),
-    summary: t("feature.runtimes.installGenericSummary"),
-    warnings: [t("feature.runtimes.installGenericWarning")],
-    execute: (confirmationToken) => installRuntime(command, { version, confirmationToken }),
-  });
+async function installWithRisk(context: FeatureContext, state: RuntimeWorkbenchState, command: "install_node" | "install_python" | "install_go", version: string) {
+  state.operationResult = "";
+  state.operationError = "";
+  try {
+    const result = await context.risk.run({
+      command,
+      planId: `${command}:${version}`,
+      riskLevel: "high",
+      title: t("feature.runtimes.installGenericTitle", { name: runtimeName(command), version }),
+      summary: t("feature.runtimes.installGenericSummary"),
+      warnings: [t("feature.runtimes.installGenericWarning")],
+      execute: (confirmationToken) => installRuntime(command, { version, confirmationToken }),
+    });
+    state.operationResult = resultMessage(result, t("feature.runtimes.installGenericTitle", { name: runtimeName(command), version }));
+  } catch (error) {
+    state.operationError = errorMessage(error);
+  }
+  renderAndBind(context, state);
 }
 
-function installLatestWithRisk(context: FeatureContext, command: "install_maven_latest" | "install_gradle_latest", label: string) {
-  return context.risk.run({
-    command,
-    planId: `${command}:latest`,
-    riskLevel: "high",
-    title: t("feature.runtimes.installGenericTitle", { name: label, version: "latest" }),
-    summary: t("feature.runtimes.installGenericSummary"),
-    before: [{ label: t("feature.runtimes.version"), value: t("feature.runtimes.latest") }],
-    warnings: [t("feature.runtimes.installGenericWarning")],
-    execute: (confirmationToken) => installRuntime(command, { confirmationToken }),
-  });
+async function installLatestWithRisk(context: FeatureContext, state: RuntimeWorkbenchState, command: "install_maven_latest" | "install_gradle_latest", label: string) {
+  state.operationResult = "";
+  state.operationError = "";
+  try {
+    const result = await context.risk.run({
+      command,
+      planId: `${command}:latest`,
+      riskLevel: "high",
+      title: t("feature.runtimes.installGenericTitle", { name: label, version: "latest" }),
+      summary: t("feature.runtimes.installGenericSummary"),
+      before: [{ label: t("feature.runtimes.version"), value: t("feature.runtimes.latest") }],
+      warnings: [t("feature.runtimes.installGenericWarning")],
+      execute: (confirmationToken) => installRuntime(command, { confirmationToken }),
+    });
+    state.operationResult = resultMessage(result, t("feature.runtimes.installGenericTitle", { name: label, version: "latest" }));
+  } catch (error) {
+    state.operationError = errorMessage(error);
+  }
+  renderAndBind(context, state);
 }
 
 async function runRuntimeRowAction(context: FeatureContext, state: RuntimeWorkbenchState, button: HTMLButtonElement): Promise<void> {
@@ -114,58 +145,108 @@ async function runRuntimeRowAction(context: FeatureContext, state: RuntimeWorkbe
   }
 
   if (action === "copy") {
-    await navigator.clipboard.writeText(executable);
-    context.toast(t("toast.runtimePathCopied"));
+    try {
+      await navigator.clipboard.writeText(executable);
+      state.operationResult = `${t("toast.runtimePathCopied")}: ${executable}`;
+      state.operationError = "";
+      context.toast(t("toast.runtimePathCopied"));
+    } catch (error) {
+      state.operationResult = "";
+      state.operationError = errorMessage(error);
+      context.toast(state.operationError, true);
+    }
+    renderAndBind(context, state);
     return;
   }
 
   if (action === "open") {
-    const result = await openRuntimeDirectory(path || executable);
-    context.toast(result.message || t("toast.runtimeOpened"));
+    try {
+      const result = await openRuntimeDirectory(path || executable);
+      state.operationResult = result.message || t("toast.runtimeOpened");
+      state.operationError = "";
+      context.toast(result.message || t("toast.runtimeOpened"));
+    } catch (error) {
+      state.operationResult = "";
+      state.operationError = errorMessage(error);
+      context.toast(state.operationError, true);
+    }
+    renderAndBind(context, state);
     return;
   }
 
   if (action === "health") {
     context.progress.start(t("feature.runtimes.healthCheck"));
-    const report = await inspectRuntimeStrongVerification();
-    if (!context.isCurrent()) return;
-    state.strongVerification = report;
-    context.progress.done(t("feature.runtimes.healthCheckDone"));
-    context.root.innerHTML = renderRuntimeWorkbench(state);
-    bindRuntimeEvents(context, state);
+    try {
+      const report = await inspectRuntimeStrongVerification();
+      if (!context.isCurrent()) return;
+      state.strongVerification = report;
+      state.operationResult = t("feature.runtimes.healthCheckDone");
+      state.operationError = "";
+      context.progress.done(t("feature.runtimes.healthCheckDone"));
+    } catch (error) {
+      state.operationResult = "";
+      state.operationError = errorMessage(error);
+      context.progress.fail(state.operationError);
+    }
+    renderAndBind(context, state);
     return;
   }
 
   if (action === "system") {
-    await navigator.clipboard.writeText(`${label} ${version}\n${executable}`);
-    const result = await openAppsFeatures();
-    context.toast(result.message || t("feature.runtimes.externalSystemUninstallHint"));
+    try {
+      await navigator.clipboard.writeText(`${label} ${version}\n${executable}`);
+      const result = await openAppsFeatures();
+      state.operationResult = result.message || t("feature.runtimes.externalSystemUninstallHint");
+      state.operationError = "";
+      context.toast(result.message || t("feature.runtimes.externalSystemUninstallHint"));
+    } catch (error) {
+      state.operationResult = "";
+      state.operationError = errorMessage(error);
+      context.toast(state.operationError, true);
+    }
+    renderAndBind(context, state);
     return;
   }
 
   if (action === "switch") {
-    await context.risk.run({
-      command: "switch_runtime",
-      planId: `${kind}:${version}:${path}`,
-      riskLevel: "medium",
-      title: t("feature.runtimes.switchTitle", { name: label, version }),
-      summary: t("feature.runtimes.switchSummary"),
-      warnings: [t("feature.runtimes.switchWarning")],
-      execute: (confirmationToken) => switchRuntime(kind, version, path, confirmationToken),
-    });
+    state.operationResult = "";
+    state.operationError = "";
+    try {
+      const result = await context.risk.run({
+        command: "switch_runtime",
+        planId: `${kind}:${version}:${path}`,
+        riskLevel: "medium",
+        title: t("feature.runtimes.switchTitle", { name: label, version }),
+        summary: t("feature.runtimes.switchSummary"),
+        warnings: [t("feature.runtimes.switchWarning")],
+        execute: (confirmationToken) => switchRuntime(kind, version, path, confirmationToken),
+      });
+      state.operationResult = resultMessage(result, t("feature.runtimes.switchTitle", { name: label, version }));
+    } catch (error) {
+      state.operationError = errorMessage(error);
+    }
+    renderAndBind(context, state);
     return;
   }
 
   if (action === "uninstall") {
-    await context.risk.run({
-      command: "uninstall_runtime",
-      planId: `${kind}:${version}:${path}`,
-      riskLevel: "high",
-      title: t("feature.runtimes.uninstallTitle", { name: label, version }),
-      summary: t("feature.runtimes.uninstallSummary"),
-      warnings: [t("feature.runtimes.uninstallWarning")],
-      execute: (confirmationToken) => uninstallRuntime(kind, version, path, confirmationToken),
-    });
+    state.operationResult = "";
+    state.operationError = "";
+    try {
+      const result = await context.risk.run({
+        command: "uninstall_runtime",
+        planId: `${kind}:${version}:${path}`,
+        riskLevel: "high",
+        title: t("feature.runtimes.uninstallTitle", { name: label, version }),
+        summary: t("feature.runtimes.uninstallSummary"),
+        warnings: [t("feature.runtimes.uninstallWarning")],
+        execute: (confirmationToken) => uninstallRuntime(kind, version, path, confirmationToken),
+      });
+      state.operationResult = resultMessage(result, t("feature.runtimes.uninstallTitle", { name: label, version }));
+    } catch (error) {
+      state.operationError = errorMessage(error);
+    }
+    renderAndBind(context, state);
   }
 }
 
@@ -173,4 +254,19 @@ function runtimeName(command: "install_node" | "install_python" | "install_go"):
   if (command === "install_node") return "Node.js";
   if (command === "install_python") return "Python";
   return "Go";
+}
+
+function renderAndBind(context: FeatureContext, state: RuntimeWorkbenchState): void {
+  if (!context.isCurrent()) return;
+  context.root.innerHTML = renderRuntimeWorkbench(state);
+  bindRuntimeEvents(context, state);
+}
+
+function resultMessage(result: unknown, fallback: string): string {
+  if (result && typeof result === "object" && "message" in result) return String((result as { message?: unknown }).message || fallback);
+  return fallback;
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }

@@ -11,11 +11,15 @@ export function bindFileAssociationEvents(context: FeatureContext, state: FileAs
   bindAction(context.root, "choose-association-exe", async () => {
     const selected = await open({ directory: false, multiple: false, filters: [{ name: "Executable", extensions: ["exe"] }] });
     if (!selected || Array.isArray(selected)) {
+      state.selectionResult = t("feature.fileAssociations.chooseExeCancelled");
       context.toast(t("feature.fileAssociations.chooseExeCancelled"));
+      context.root.innerHTML = renderFileAssociations(state);
+      bindFileAssociationEvents(context, state);
       return;
     }
     syncInputs(context, state);
     state.targetExecutable = selected;
+    state.selectionResult = `${t("feature.fileAssociations.exePath")}: ${selected}`;
     context.root.innerHTML = renderFileAssociations(state);
     bindFileAssociationEvents(context, state);
   });

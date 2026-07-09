@@ -52,6 +52,8 @@ export function renderReportsWorkbench(state: ReportsWorkbenchState): string {
       </section>
       <section class="panel" data-testid="reports-export-result">
         <h2>${t("feature.reports.latestExport")}</h2>
+        ${state.actionError ? `<div class="error-state">${escapeHtml(state.actionError)}</div>` : ""}
+        ${state.actionResult ? `<div class="small-note" data-testid="reports-action-result">${escapeHtml(state.actionResult)}</div>` : ""}
         <p>${escapeHtml(state.lastExport || t("feature.reports.noExport"))}</p>
         ${state.lastExportPath ? `<p><strong>${escapeHtml(state.lastExportPath)}</strong></p>` : ""}
       </section>

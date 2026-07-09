@@ -25,9 +25,21 @@ export function bindSettingsEvents(context: FeatureContext, state: SettingsWorkb
     });
   });
   bindAction(context.root, "save-root-dir", async () => {
-    state.config = await setRootDir(context.root.querySelector<HTMLInputElement>("#settings-root")?.value.trim() ?? "");
-    if (!context.isCurrent()) return;
-    context.toast(t("settings.rootSaved"));
+    state.operationResult = "";
+    state.operationError = "";
+    try {
+      state.config = await setRootDir(context.root.querySelector<HTMLInputElement>("#settings-root")?.value.trim() ?? "");
+      state.operationResult = t("settings.rootSaved");
+      if (!context.isCurrent()) return;
+      context.root.innerHTML = renderSettingsWorkbench(state);
+      bindSettingsEvents(context, state);
+      context.toast(t("settings.rootSaved"));
+    } catch (error) {
+      state.operationError = errorMessage(error);
+      context.root.innerHTML = renderSettingsWorkbench(state);
+      bindSettingsEvents(context, state);
+      context.toast(state.operationError, true);
+    }
   });
   bindAction(context.root, "toggle-auto-update", async () => {
     state.config = await setAutoCheckUpdate(!state.config?.settings.autoCheckUpdate);
@@ -41,7 +53,18 @@ export function bindSettingsEvents(context: FeatureContext, state: SettingsWorkb
     context.root.innerHTML = renderSettingsWorkbench(state);
     bindSettingsEvents(context, state);
   });
-  bindAction(context.root, "open-config-dir", openAppConfigDir);
+  bindAction(context.root, "open-config-dir", async () => {
+    state.operationResult = "";
+    state.operationError = "";
+    try {
+      const result = await openAppConfigDir();
+      state.operationResult = resultMessage(result, t("settings.openConfigDir"));
+    } catch (error) {
+      state.operationError = errorMessage(error);
+    }
+    context.root.innerHTML = renderSettingsWorkbench(state);
+    bindSettingsEvents(context, state);
+  });
   bindAction(context.root, "show-safety-notice", () => showSafetyNoticeDialog());
   bindAction(context.root, "toggle-advanced-mode", () => {
     setAdvancedMode(!isAdvancedMode());
@@ -54,6 +77,10 @@ export function bindSettingsEvents(context: FeatureContext, state: SettingsWorkb
   });
   bindAction(context.root, "copy-debug-log", async () => {
     await navigator.clipboard.writeText(debugEntriesAsMarkdown(readFilteredDebugEntries(context)));
+    state.operationResult = t("settings.debugCopied");
+    state.operationError = "";
+    context.root.innerHTML = renderSettingsWorkbench(state);
+    bindSettingsEvents(context, state);
     context.toast(t("settings.debugCopied"));
   });
   bindAction(context.root, "export-debug-markdown", () => exportDebug("devenv-debug-log.md", debugEntriesAsMarkdown(readFilteredDebugEntries(context)), "text/markdown"));
@@ -84,6 +111,12 @@ export async function refreshSettings(context: FeatureContext, state: SettingsWo
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function resultMessage(result: unknown, fallback: string): string {
+  if (result && typeof result === "object" && "message" in result) return String((result as { message?: unknown }).message || fallback);
+  if (typeof result === "string" && result.trim()) return result;
+  return fallback;
 }
 
 function exportDebug(fileName: string, content: string, type: string): void {

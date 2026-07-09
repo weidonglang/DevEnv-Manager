@@ -31,7 +31,7 @@ export function renderToolchainWorkbench(state: ToolchainWorkbenchState): string
       <section class="panel"><h2>${t("feature.toolchains.detail")}</h2>${renderRows(vm.detailRows)}</section>
       <section class="panel"><h2>${label("Platform detail", "平台详情")}</h2>${renderRows(vm.platformRows)}</section>
       <section class="panel"><h2>${label("Local services", "本地服务")}</h2>${renderRows(vm.serviceRows, label("No services loaded.", "尚未加载服务。"))}</section>
-      <section class="panel"><h2>${t("feature.toolchains.mysqlRepair")}</h2>${renderRows(vm.mysqlRows)}</section>
+      <section class="panel"><h2>${t("feature.toolchains.mysqlRepair")}</h2>${state.operationError ? `<div class="error-state">${escapeHtml(state.operationError)}</div>` : ""}${renderRows(vm.mysqlRows)}${state.mysqlResult ? renderObjectTable(state.mysqlResult, ["success", "message"]) : ""}</section>
       ${renderLearningCenter(state)}
     </div>
   `;

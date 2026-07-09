@@ -52,16 +52,23 @@ export function bindProjectEvents(context: FeatureContext, state: ProjectWorkben
     }
     const preview = state.preview;
     const request = { ...preview, switches: preview.current };
-    const result = await context.risk.run({
-      command: "apply_project_configuration",
-      planId: projectConfigurationPlanId(request),
-      riskLevel: "high",
-      title: "Apply project configuration",
-      summary: "Writes project configuration files after previewing append/create/replace semantics.",
-      warnings: ["Review target files and backup metadata before applying."],
-      execute: (confirmationToken) => applyProjectConfiguration(request, confirmationToken),
-    });
-    state.applyResult = result as ProjectWorkbenchState["applyResult"];
+    state.applyResult = null;
+    state.errors.applyResult = "";
+    try {
+      const result = await context.risk.run({
+        command: "apply_project_configuration",
+        planId: projectConfigurationPlanId(request),
+        riskLevel: "high",
+        title: "Apply project configuration",
+        summary: "Writes project configuration files after previewing append/create/replace semantics.",
+        warnings: ["Review target files and backup metadata before applying."],
+        execute: (confirmationToken) => applyProjectConfiguration(request, confirmationToken),
+      });
+      state.applyResult = result as ProjectWorkbenchState["applyResult"];
+      delete state.errors.applyResult;
+    } catch (error) {
+      state.errors.applyResult = errorMessage(error);
+    }
     renderAndBind(context, state);
   });
   bindAction(context.root, "inspect-project-ports", async () => {

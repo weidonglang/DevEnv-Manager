@@ -7,9 +7,10 @@ export type EnvironmentWorkbenchState = {
   envBackups: EnvBackupRecord[];
   environmentBackups: EnvironmentBackupInfo[];
   plan: EnvRepairPlan | null;
+  applyResult: string;
   selectedJdkRoot: string;
   checking: boolean;
-  errors: Partial<Record<"reliability" | "health" | "preview" | "envBackups" | "environmentBackups", string>>;
+  errors: Partial<Record<"reliability" | "health" | "preview" | "envBackups" | "environmentBackups" | "applyResult", string>>;
 };
 
 export const environmentWorkbenchInitialState: EnvironmentWorkbenchState = {
@@ -19,6 +20,7 @@ export const environmentWorkbenchInitialState: EnvironmentWorkbenchState = {
   envBackups: [],
   environmentBackups: [],
   plan: null,
+  applyResult: "",
   selectedJdkRoot: "",
   checking: false,
   errors: {},

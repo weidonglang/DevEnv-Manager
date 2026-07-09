@@ -18,7 +18,7 @@ export function renderRuntimeWorkbench(state: RuntimeWorkbenchState): string {
           ${renderMetric(t("feature.runtimes.verification"), vm.verification, vm.verificationDetail)}
         </div>
         ${renderRuntimeInstallGrid(state)}
-        <div data-testid="runtime-operation-result" class="empty">${t("state.notChecked")}</div>
+        ${renderRuntimeOperationResult(state)}
       </section>
       <section class="panel">
         <h2>${t("feature.runtimes.installedVersions")}</h2>
@@ -30,6 +30,13 @@ export function renderRuntimeWorkbench(state: RuntimeWorkbenchState): string {
       ${renderRuntimeDetails(vm.rows.find((row) => row.id === state.selectedRuntimeId) ?? null)}
     </div>
   `;
+}
+
+function renderRuntimeOperationResult(state: RuntimeWorkbenchState): string {
+  return `<div data-testid="runtime-operation-result">
+    ${state.operationError ? `<div class="error-state">${escapeHtml(state.operationError)}</div>` : ""}
+    ${state.operationResult ? `<div class="small-note">${escapeHtml(state.operationResult)}</div>` : `<div class="empty">${t("state.notChecked")}</div>`}
+  </div>`;
 }
 
 function renderRuntimeInstallGrid(state: RuntimeWorkbenchState): string {

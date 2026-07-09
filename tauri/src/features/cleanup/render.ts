@@ -50,7 +50,7 @@ export function renderCleanupWorkbench(state: CleanupWorkbenchState): string {
       ${renderDownloadsArchiveSection(state)}
       ${renderCleanupReport(state)}
       ${renderLargeFiles(state)}
-      <section class="panel"><h2>${t("feature.cleanup.plans")}</h2>${renderCleanupPlan(state)}${renderCleanupExecutionResult(state)}${state.movePlan ? renderObjectTable(state.movePlan, ["planId", "source", "target", "mode", "warnings"]) : ""}${state.expansionPlan ? renderObjectTable(state.expansionPlan, ["planId", "mode", "canExecute", "requiresAdmin", "estimatedAddedBytes", "backupRequired", "explanation"]) : ""}${state.expansionResult ? renderObjectTable(state.expansionResult, ["planId", "success", "beforeFree", "afterFree", "output"]) : ""}</section>
+      <section class="panel"><h2>${t("feature.cleanup.plans")}</h2>${renderCleanupPlan(state)}${renderCleanupExecutionResult(state)}${state.moveOperationResult ? `<div class="small-note" data-testid="cleanup-move-operation-result">${escapeHtml(state.moveOperationResult)}</div>` : ""}${state.movePlan ? renderObjectTable(state.movePlan, ["planId", "source", "target", "mode", "warnings"]) : ""}${state.expansionPlan ? renderObjectTable(state.expansionPlan, ["planId", "mode", "canExecute", "requiresAdmin", "estimatedAddedBytes", "backupRequired", "explanation"]) : ""}${state.expansionResult ? renderObjectTable(state.expansionResult, ["planId", "success", "beforeFree", "afterFree", "output"]) : ""}</section>
     </div>
   `;
 }
@@ -98,7 +98,7 @@ function renderDuplicateGroup(group: DuplicateGroup): string {
     <td title="${escapeHtml(group.hash)}">${escapeHtml(group.hash.slice(0, 16))}</td>
     <td>${formatBytes(group.size)}</td>
     <td>${group.files.length}</td>
-    <td><ul>${group.files.slice(0, 5).map((file) => `<li title="${escapeHtml(file.path)}">${escapeHtml(file.path)}${file.modifiedAt ? ` <small>${escapeHtml(file.modifiedAt)}</small>` : ""}</li>`).join("")}</ul></td>
+    <td><ul>${group.files.slice(0, 5).map((file) => `<li title="${escapeHtml(file.path)}">${escapeHtml(file.path)}${file.modifiedAt ? ` <small>${escapeHtml(file.modifiedAt)}</small>` : ""}<div class="row-actions compact"><button data-duplicate-file-open="${escapeHtml(file.path)}" type="button">${t("feature.cleanup.openLocation")}</button><button data-duplicate-file-copy="${escapeHtml(file.path)}" type="button">${t("feature.runtimes.copyPath")}</button></div></li>`).join("")}</ul></td>
   </tr>`;
 }
 
@@ -274,7 +274,12 @@ function renderVolumes(volumes: DiskVolumeInfo[]): string {
     <strong>${escapeHtml(volume.drive)}</strong>
     <span>${formatBytes(volume.freeBytes)} / ${formatBytes(volume.totalBytes)}</span>
     <small>${escapeHtml(volume.fileSystem ?? "")} - ${volume.usedPercent.toFixed(1)}% - ${escapeHtml(volume.risk)}</small>
+    <div class="row-actions compact"><button data-disk-open="${escapeHtml(volume.drive)}" type="button">${t("feature.cleanup.openLocation")}</button><button data-disk-copy="${escapeHtml(diskSummary(volume))}" type="button">${t("feature.runtimes.copyPath")}</button></div>
   </article>`).join("")}</div>`;
+}
+
+function diskSummary(volume: DiskVolumeInfo): string {
+  return `${volume.drive} ${formatBytes(volume.freeBytes)} free / ${formatBytes(volume.totalBytes)} total, ${volume.usedPercent.toFixed(1)}% used, ${volume.fileSystem ?? ""}, risk=${volume.risk}`;
 }
 
 function renderFolderOverview(label: string, report: FolderUsageReport | null): string {

@@ -100,18 +100,24 @@ export function bindToolchainEvents(context: FeatureContext, state: ToolchainWor
   });
   bindAction(context.root, "execute-mysql-plan", async () => {
     if (!state.mysqlPlan) return context.toast(t("toast.createMysqlPlanFirst"), true);
-    const result = await context.risk.run({
-      command: "execute_mysql_repair_plan",
-      planId: state.mysqlPlan.planId,
-      actionId: `mysql_${state.mysqlPlan.action}`,
-      riskLevel: state.mysqlPlan.riskLevel,
-      planFingerprint: state.mysqlPlan.planFingerprint,
-      title: "Execute MySQL repair plan",
-      summary: "Runs the guarded MySQL repair plan. Critical flow keeps explicit confirmation.",
-      warnings: ["Complete a full Data backup before execution.", "This may affect database service startup."],
-      execute: (confirmationToken) => executeMySqlRepairPlan(state.mysqlPlan!.planId, "", confirmationToken),
-    });
-    state.mysqlResult = result as ToolchainWorkbenchState["mysqlResult"];
+    state.mysqlResult = null;
+    state.operationError = "";
+    try {
+      const result = await context.risk.run({
+        command: "execute_mysql_repair_plan",
+        planId: state.mysqlPlan.planId,
+        actionId: `mysql_${state.mysqlPlan.action}`,
+        riskLevel: state.mysqlPlan.riskLevel,
+        planFingerprint: state.mysqlPlan.planFingerprint,
+        title: "Execute MySQL repair plan",
+        summary: "Runs the guarded MySQL repair plan. Critical flow keeps explicit confirmation.",
+        warnings: ["Complete a full Data backup before execution.", "This may affect database service startup."],
+        execute: (confirmationToken) => executeMySqlRepairPlan(state.mysqlPlan!.planId, "", confirmationToken),
+      });
+      state.mysqlResult = result as ToolchainWorkbenchState["mysqlResult"];
+    } catch (error) {
+      state.operationError = errorMessage(error);
+    }
     renderAndBind(context, state);
   });
   bindAction(context.root, "inspect-learning-command", async () => {

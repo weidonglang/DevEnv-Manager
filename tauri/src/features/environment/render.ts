@@ -33,9 +33,16 @@ export function renderEnvironmentWorkbench(state: EnvironmentWorkbenchState): st
       <section class="panel" data-testid="environment-result-panel"><h2>${t("feature.environment.details")}</h2>${renderRows(vm.detailRows)}</section>
       <section class="panel" data-testid="environment-path-section"><h2>${t("feature.environment.pathWarnings")}</h2>${renderRows(vm.pathRows)}</section>
       <section class="panel"><h2>${t("feature.environment.issues")}</h2>${renderRows(vm.issueRows, t("state.notChecked"))}</section>
-      <section class="panel" data-testid="environment-operation-result"><h2>${t("feature.environment.repairPlan")}</h2>${state.plan ? renderObjectTable(state.plan, ["planId", "riskLevel", "backupName", "summary", "warnings"]) : `<div class="empty">${t("feature.environment.noPlan")}</div>`}</section>
+      <section class="panel" data-testid="environment-operation-result"><h2>${t("feature.environment.repairPlan")}</h2>${state.plan ? renderObjectTable(state.plan, ["planId", "riskLevel", "backupName", "summary", "warnings"]) : `<div class="empty">${t("feature.environment.noPlan")}</div>`}${renderApplyResult(state)}</section>
     </div>
   `;
+}
+
+function renderApplyResult(state: EnvironmentWorkbenchState): string {
+  return `<div data-testid="environment-java-stabilize-execute-result">
+    ${state.errors.applyResult ? `<div class="error-state">${escapeHtml(state.errors.applyResult)}</div>` : ""}
+    ${state.applyResult ? `<div class="small-note">${escapeHtml(state.applyResult)}</div>` : `<div class="empty">${t("state.notChecked")}</div>`}
+  </div>`;
 }
 
 function renderJdkPlanSelector(state: EnvironmentWorkbenchState): string {

@@ -78,8 +78,12 @@ export function bindPortEvents(context: FeatureContext, state: PortsWorkbenchSta
   });
   bindAction(context.root, "copy-selected-port-diagnostics", async () => {
     const selected = selectedPortRecord(state.records, state.selectedKey);
-    if (!selected) return context.toast(t("feature.ports.selectPortFirst"), true);
-    await navigator.clipboard.writeText([
+    if (!selected) {
+      state.diagnosticsResult = t("feature.ports.selectPortFirst");
+      renderAndBind(context, state);
+      return context.toast(t("feature.ports.selectPortFirst"), true);
+    }
+    const text = [
       `${t("feature.ports.port")}: ${selected.localPort}/${selected.protocol}`,
       `PID: ${selected.pid}`,
       `${t("feature.ports.process")}: ${selected.processName}`,
@@ -88,7 +92,10 @@ export function bindPortEvents(context: FeatureContext, state: PortsWorkbenchSta
       `${t("feature.ports.identity")}: ${selected.identity}`,
       `${t("feature.ports.risk")}: ${selected.riskLevel}`,
       `${t("feature.ports.recommendation")}: ${selected.recommendation || selected.explanation}`,
-    ].join("\n"));
+    ].join("\n");
+    await navigator.clipboard.writeText(text);
+    state.diagnosticsResult = `${t("feature.ports.diagnosticsCopied")}: ${selected.localPort}/PID ${selected.pid}`;
+    renderAndBind(context, state);
     context.toast(t("feature.ports.diagnosticsCopied"));
   });
   bindAction(context.root, "stop-local-service", () =>

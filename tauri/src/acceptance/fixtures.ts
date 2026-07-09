@@ -107,6 +107,7 @@ export const portsAcceptanceFixture: PortsWorkbenchState = {
   historyError: "",
   servicesError: "",
   planError: "",
+  diagnosticsResult: "Diagnostics copied for 18765/PID 1644.",
   retryPlanRequest: null,
   page: 1,
 };
@@ -149,6 +150,7 @@ export const cleanupAcceptanceFixture: CleanupWorkbenchState = {
   plan: null,
   cleanupResult: null,
   movePlan: null,
+  moveOperationResult: "Fixture move source selected.",
   moveSource: "",
   moveTargetDrive: "D",
   moveMode: "archive",
@@ -187,6 +189,8 @@ export const runtimeAcceptanceFixture: RuntimeWorkbenchState = {
   distributions: [{ id: "temurin", name: "Temurin", recommended: true }] as unknown as RuntimeWorkbenchState["distributions"],
   strongVerification: null,
   selectedRuntimeId: null,
+  operationResult: "Runtime fixture operation result.",
+  operationError: "",
   page: 1,
 };
 
@@ -218,6 +222,7 @@ export const fileAssociationsAcceptanceFixture: FileAssociationUiState = {
   appSearch: null,
   applyResult: null,
   rollbackResult: null,
+  selectionResult: "Executable selected.",
   applyResultMessage: "Fixture apply result.",
   operationError: "",
 };

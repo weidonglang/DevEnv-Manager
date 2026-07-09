@@ -9,6 +9,7 @@ export type CleanupWorkbenchState = {
   plan: CleanupPlan | null;
   cleanupResult: CleanupResult | null;
   movePlan: MovePlan | null;
+  moveOperationResult: string;
   moveSource: string;
   moveTargetDrive: string;
   moveMode: string;
@@ -38,6 +39,7 @@ export const cleanupWorkbenchInitialState: CleanupWorkbenchState = {
   plan: null,
   cleanupResult: null,
   movePlan: null,
+  moveOperationResult: "",
   moveSource: "",
   moveTargetDrive: "D",
   moveMode: "archive",

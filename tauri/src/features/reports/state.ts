@@ -7,6 +7,8 @@ export type ReportsWorkbenchState = {
   text: string;
   lastExport: string;
   lastExportPath: string;
+  actionResult: string;
+  actionError: string;
 };
 
 export const reportsWorkbenchInitialState: ReportsWorkbenchState = {
@@ -16,6 +18,8 @@ export const reportsWorkbenchInitialState: ReportsWorkbenchState = {
   text: "",
   lastExport: "",
   lastExportPath: "",
+  actionResult: "",
+  actionError: "",
 };
 
 const REPORTS_STATE_KEY = "devenv.reports.state";
@@ -31,6 +35,8 @@ export function readPersistedReportsState(): ReportsWorkbenchState {
       text: parsed.text ?? "",
       lastExport: parsed.lastExport ?? "",
       lastExportPath: parsed.lastExportPath ?? "",
+      actionResult: parsed.actionResult ?? "",
+      actionError: parsed.actionError ?? "",
     };
   } catch {
     return { ...reportsWorkbenchInitialState };

@@ -27,8 +27,15 @@ export function renderProfilesWorkbench(state: ProfilesState): string {
         </div>
       </section>
       <section class="panel"><h2>${t("feature.profiles.profiles")}</h2><div class="data-table">${page.items.map((profile) => `<button class="data-row" data-profile-id="${escapeHtml(profile.id)}"><span>${escapeHtml(profile.name)}</span><span>${escapeHtml(profile.path)}</span><span>${escapeHtml(profile.createdAt)}</span></button>`).join("") || `<div class="empty">${t("feature.profiles.empty")}</div>`}</div>${renderPagination("profiles", page.page, page.totalPages, page.total)}</section>
-      <section class="panel"><h2>${t("feature.profiles.applyPlan")}</h2>${state.plan ? renderObjectTable(state.plan, ["profileName", "profileId", "runtimeSwitches", "missingRequirements", "willInstall", "willWriteEnvironment", "backupName", "warnings", "planId"]) : `<div class="empty">${t("feature.profiles.noApplyPlan")}</div>`}</section>
+      <section class="panel"><h2>${t("feature.profiles.applyPlan")}</h2>${state.plan ? renderObjectTable(state.plan, ["profileName", "profileId", "runtimeSwitches", "missingRequirements", "willInstall", "willWriteEnvironment", "backupName", "warnings", "planId"]) : `<div class="empty">${t("feature.profiles.noApplyPlan")}</div>`}${renderOperationResult(state)}</section>
       <section class="panel"><h2>${t("feature.profiles.importPreview")}</h2>${state.importPreview ? renderObjectTable(state.importPreview, ["source", "exportedAt", "profiles"]) : `<div class="empty">${t("feature.profiles.noImportPreview")}</div>`}${state.importResult ? `<p>${escapeHtml(state.importResult)}</p>` : ""}</section>
     </div>
   `;
+}
+
+function renderOperationResult(state: ProfilesState): string {
+  return `<div data-testid="profiles-operation-result">
+    ${state.operationError ? `<div class="error-state">${escapeHtml(state.operationError)}</div>` : ""}
+    ${state.operationResult ? `<div class="small-note">${escapeHtml(state.operationResult)}</div>` : `<div class="empty">${t("state.notChecked")}</div>`}
+  </div>`;
 }

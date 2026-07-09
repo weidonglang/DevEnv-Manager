@@ -24,38 +24,65 @@ export function bindProfileEvents(context: FeatureContext, state: ProfilesState)
     });
   });
   bindAction(context.root, "save-profile", async () => {
+    state.operationResult = "";
+    state.operationError = "";
     context.progress.start(t("feature.profiles.saving"));
     try {
       const result = await saveCurrentProfile(context.root.querySelector<HTMLInputElement>("#profile-name")?.value.trim() || "Current profile");
+      state.operationResult = result.message;
       context.toast(result.message);
       if (!context.isCurrent()) return;
       await refreshProfiles(context, state);
     } catch (error) {
+      state.operationError = errorMessage(error);
       context.progress.fail(errorMessage(error));
+      renderAndBind(context, state);
     }
   });
   bindAction(context.root, "rename-profile", async () => {
     const id = state.selectedProfileId || state.profiles[0]?.id;
     const name = context.root.querySelector<HTMLInputElement>("#profile-name")?.value.trim() || "";
-    if (!id) return context.toast(t("toast.selectProfileFirst"), true);
-    if (!name) return context.toast(t("feature.profiles.nameRequired"), true);
+    if (!id) {
+      state.operationError = t("toast.selectProfileFirst");
+      renderAndBind(context, state);
+      return context.toast(t("toast.selectProfileFirst"), true);
+    }
+    if (!name) {
+      state.operationError = t("feature.profiles.nameRequired");
+      renderAndBind(context, state);
+      return context.toast(t("feature.profiles.nameRequired"), true);
+    }
+    state.operationResult = "";
+    state.operationError = "";
     try {
       const result = await renameConfigProfile(id, name);
+      state.operationResult = result.message;
       context.toast(result.message);
       await refreshProfiles(context, state);
     } catch (error) {
+      state.operationError = errorMessage(error);
+      renderAndBind(context, state);
       context.toast(errorMessage(error), true);
     }
   });
   bindAction(context.root, "copy-profile", async () => {
     const id = state.selectedProfileId || state.profiles[0]?.id;
     const name = context.root.querySelector<HTMLInputElement>("#profile-name")?.value.trim() || "";
-    if (!id) return context.toast(t("toast.selectProfileFirst"), true);
+    if (!id) {
+      state.operationError = t("toast.selectProfileFirst");
+      renderAndBind(context, state);
+      return context.toast(t("toast.selectProfileFirst"), true);
+    }
+    state.operationResult = "";
+    state.operationError = "";
     try {
       const result = await copyConfigProfile(id, name);
+      state.operationResult = result.message;
       context.toast(result.message);
       await refreshProfiles(context, state);
     } catch (error) {
+      state.operationError = errorMessage(error);
+      renderAndBind(context, state);
       context.toast(errorMessage(error), true);
     }
   });
@@ -134,8 +161,18 @@ export function bindProfileEvents(context: FeatureContext, state: ProfilesState)
     }
   });
   bindAction(context.root, "export-profiles", async () => {
-    const result = await exportConfigProfiles();
-    context.toast(result.message);
+    state.operationResult = "";
+    state.operationError = "";
+    try {
+      const result = await exportConfigProfiles();
+      state.operationResult = result.message;
+      renderAndBind(context, state);
+      context.toast(result.message);
+    } catch (error) {
+      state.operationError = errorMessage(error);
+      renderAndBind(context, state);
+      context.toast(state.operationError, true);
+    }
   });
   bindAction(context.root, "delete-profile", async () => {
     const id = state.selectedProfileId || state.profiles[0]?.id;

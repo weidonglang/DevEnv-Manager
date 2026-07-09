@@ -83,10 +83,14 @@ export function bindCleanupEvents(context: FeatureContext, state: CleanupWorkben
   bindAction(context.root, "choose-cleanup-move-source", async () => {
     const selected = await open({ directory: true, multiple: false });
     if (!selected || Array.isArray(selected)) {
+      state.moveOperationResult = t("feature.cleanup.chooseMoveSourceCancelled");
       context.toast(t("feature.cleanup.chooseMoveSourceCancelled"));
+      context.root.innerHTML = renderCleanupWorkbench(state);
+      bindCleanupEvents(context, state);
       return;
     }
     state.moveSource = selected;
+    state.moveOperationResult = `${t("feature.cleanup.moveSource")}: ${selected}`;
     context.root.innerHTML = renderCleanupWorkbench(state);
     bindCleanupEvents(context, state);
   });
@@ -153,25 +157,32 @@ export function bindCleanupEvents(context: FeatureContext, state: CleanupWorkben
   });
   bindAction(context.root, "execute-expansion-plan", async () => {
     if (!state.expansionPlan) return context.toast(t("feature.cleanup.createExpansionFirst"), true);
-    const result = await context.risk.run({
-      command: "execute_expansion_plan",
-      planId: state.expansionPlan.planId,
-      riskLevel: "critical",
-      title: t("feature.cleanup.executeExpansionTitle"),
-      summary: t("feature.cleanup.executeExpansionSummary"),
-      before: [
-        { label: t("feature.cleanup.expansionMode"), value: state.expansionPlan.mode },
-        { label: t("feature.cleanup.estimatedAdded"), value: String(state.expansionPlan.estimatedAddedBytes) },
-      ],
-      warnings: [t("feature.cleanup.executeExpansionWarning")],
-      execute: (confirmationToken) => executeCDriveExpansion(state.expansionPlan!, confirmationToken),
-    });
-    state.expansionResult = result as ExpansionResult;
+    state.expansionResult = null;
+    state.errors.expansionResult = "";
+    try {
+      const result = await context.risk.run({
+        command: "execute_expansion_plan",
+        planId: state.expansionPlan.planId,
+        riskLevel: "critical",
+        title: t("feature.cleanup.executeExpansionTitle"),
+        summary: t("feature.cleanup.executeExpansionSummary"),
+        before: [
+          { label: t("feature.cleanup.expansionMode"), value: state.expansionPlan.mode },
+          { label: t("feature.cleanup.estimatedAdded"), value: String(state.expansionPlan.estimatedAddedBytes) },
+        ],
+        warnings: [t("feature.cleanup.executeExpansionWarning")],
+        execute: (confirmationToken) => executeCDriveExpansion(state.expansionPlan!, confirmationToken),
+      });
+      state.expansionResult = result as ExpansionResult;
+      delete state.errors.expansionResult;
+    } catch (error) {
+      state.errors.expansionResult = errorMessage(error);
+    }
     if (!context.isCurrent()) return;
     context.root.innerHTML = renderCleanupWorkbench(state);
     bindCleanupEvents(context, state);
   });
-  bindLargeFileActions(context);
+  bindCleanupUtilityActions(context, state);
   bindCleanupPagination(context, state);
 }
 
@@ -396,13 +407,19 @@ function findCandidate(state: CleanupWorkbenchState, id: string) {
   return state.scan?.categories.flatMap((category) => category.items).find((item) => item.id === id);
 }
 
-function bindLargeFileActions(context: FeatureContext): void {
+function bindCleanupUtilityActions(context: FeatureContext, state: CleanupWorkbenchState): void {
   context.root.querySelectorAll<HTMLButtonElement>("[data-large-file-open]").forEach((button) => {
     button.addEventListener("click", async () => {
       try {
         const result = await openAnalysisPath(button.dataset.largeFileOpen || "");
+        state.moveOperationResult = result.message;
+        context.root.innerHTML = renderCleanupWorkbench(state);
+        bindCleanupEvents(context, state);
         context.toast(result.message);
       } catch (error) {
+        state.moveOperationResult = errorMessage(error);
+        context.root.innerHTML = renderCleanupWorkbench(state);
+        bindCleanupEvents(context, state);
         context.toast(errorMessage(error), true);
       }
     });
@@ -410,6 +427,61 @@ function bindLargeFileActions(context: FeatureContext): void {
   context.root.querySelectorAll<HTMLButtonElement>("[data-large-file-copy]").forEach((button) => {
     button.addEventListener("click", async () => {
       await navigator.clipboard.writeText(button.dataset.largeFileCopy || "");
+      state.moveOperationResult = `${t("feature.runtimes.copyPath")}: ${button.dataset.largeFileCopy || ""}`;
+      context.root.innerHTML = renderCleanupWorkbench(state);
+      bindCleanupEvents(context, state);
+      context.toast(t("toast.runtimePathCopied"));
+    });
+  });
+  context.root.querySelectorAll<HTMLButtonElement>("[data-duplicate-file-open]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      try {
+        const result = await openAnalysisPath(button.dataset.duplicateFileOpen || "");
+        state.moveOperationResult = result.message;
+        context.root.innerHTML = renderCleanupWorkbench(state);
+        bindCleanupEvents(context, state);
+        context.toast(result.message);
+      } catch (error) {
+        state.moveOperationResult = errorMessage(error);
+        context.root.innerHTML = renderCleanupWorkbench(state);
+        bindCleanupEvents(context, state);
+        context.toast(errorMessage(error), true);
+      }
+    });
+  });
+  context.root.querySelectorAll<HTMLButtonElement>("[data-duplicate-file-copy]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      await navigator.clipboard.writeText(button.dataset.duplicateFileCopy || "");
+      state.moveOperationResult = `${t("feature.runtimes.copyPath")}: ${button.dataset.duplicateFileCopy || ""}`;
+      context.root.innerHTML = renderCleanupWorkbench(state);
+      bindCleanupEvents(context, state);
+      context.toast(t("toast.runtimePathCopied"));
+    });
+  });
+  context.root.querySelectorAll<HTMLButtonElement>("[data-disk-open]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const drive = button.dataset.diskOpen || "";
+      const path = drive.endsWith("\\") ? drive : `${drive}\\`;
+      try {
+        const result = await openAnalysisPath(path);
+        state.moveOperationResult = result.message;
+        context.root.innerHTML = renderCleanupWorkbench(state);
+        bindCleanupEvents(context, state);
+        context.toast(result.message);
+      } catch (error) {
+        state.moveOperationResult = errorMessage(error);
+        context.root.innerHTML = renderCleanupWorkbench(state);
+        bindCleanupEvents(context, state);
+        context.toast(errorMessage(error), true);
+      }
+    });
+  });
+  context.root.querySelectorAll<HTMLButtonElement>("[data-disk-copy]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      await navigator.clipboard.writeText(button.dataset.diskCopy || "");
+      state.moveOperationResult = button.dataset.diskCopy || "";
+      context.root.innerHTML = renderCleanupWorkbench(state);
+      bindCleanupEvents(context, state);
       context.toast(t("toast.runtimePathCopied"));
     });
   });

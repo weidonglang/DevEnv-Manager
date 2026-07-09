@@ -47,16 +47,26 @@ export function bindEnvironmentEvents(context: FeatureContext, state: Environmen
       context.toast(t("toast.createRepairPlanFirst"), true);
       return;
     }
-    await context.risk.run({
-      command: "apply_env_repair_plan",
-      planId: state.plan.planId,
-      riskLevel: "high",
-      backupReceipt: valueOf(state.plan, "backupName", null),
-      title: "Apply environment repair plan",
-      summary: "Writes user-level environment variables after showing before/after and backup metadata.",
-      warnings: [valueOf(state.plan, "warnings", "Review plan warnings before execution.")],
-      execute: (confirmationToken) => applyEnvRepairPlan(state.plan!, confirmationToken),
-    });
+    state.applyResult = "";
+    state.errors.applyResult = "";
+    try {
+      const result = await context.risk.run({
+        command: "apply_env_repair_plan",
+        planId: state.plan.planId,
+        riskLevel: "high",
+        backupReceipt: valueOf(state.plan, "backupName", null),
+        title: "Apply environment repair plan",
+        summary: "Writes user-level environment variables after showing before/after and backup metadata.",
+        warnings: [valueOf(state.plan, "warnings", "Review plan warnings before execution.")],
+        execute: (confirmationToken) => applyEnvRepairPlan(state.plan!, confirmationToken),
+      });
+      state.applyResult = resultMessage(result, t("feature.environment.applyPlan"));
+      delete state.errors.applyResult;
+    } catch (error) {
+      state.errors.applyResult = errorMessage(error);
+    }
+    context.root.innerHTML = renderEnvironmentWorkbench(state);
+    bindEnvironmentEvents(context, state);
   });
   bindAction(context.root, "cleanup-path", () =>
     context.risk.run({
@@ -114,4 +124,9 @@ function normalizeJdkRoot(path: string): string {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function resultMessage(result: unknown, fallback: string): string {
+  if (result && typeof result === "object" && "message" in result) return String((result as { message?: unknown }).message || fallback);
+  return fallback;
 }

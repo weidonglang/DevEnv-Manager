@@ -17,6 +17,7 @@ export type FileAssociationUiState = {
   appSearch: FileAssociationAppSearchResult | null;
   applyResult: FileAssociationApplyResult | null;
   rollbackResult: FileAssociationApplyResult | null;
+  selectionResult: string;
   applyResultMessage: string;
   operationError: string;
 };
@@ -38,6 +39,7 @@ export const fileAssociationInitialState: FileAssociationUiState = {
   appSearch: null,
   applyResult: null,
   rollbackResult: null,
+  selectionResult: "",
   applyResultMessage: "",
   operationError: "",
 };

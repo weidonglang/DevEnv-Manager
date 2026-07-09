@@ -8,6 +8,7 @@ export type ToolchainWorkbenchState = {
   mysql: MySqlRepairReport | null;
   mysqlPlan: MySqlRepairPlan | null;
   mysqlResult: OperationResult | null;
+  operationError: string;
   learningCommand: string;
   learningSafety: CommandSafetyAssessment | null;
   learningResult: CommandRunResult | null;
@@ -23,6 +24,7 @@ export const toolchainWorkbenchInitialState: ToolchainWorkbenchState = {
   mysql: null,
   mysqlPlan: null,
   mysqlResult: null,
+  operationError: "",
   learningCommand: "java -version",
   learningSafety: null,
   learningResult: null,

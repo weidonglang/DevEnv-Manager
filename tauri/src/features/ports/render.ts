@@ -99,7 +99,7 @@ function renderPortRow(record: PortRecord, selectedKey: string | null): string {
 
 function renderSelectedPortDetail(state: PortsWorkbenchState): string {
   const selected = selectedPortRecord(state.records, state.selectedKey);
-  if (!selected) return `<h2>${t("feature.ports.selectedDetail")}</h2><div class="empty" data-testid="ports-inline-guidance">${t("feature.ports.noSelectedDetail")}</div>`;
+  if (!selected) return `<h2>${t("feature.ports.selectedDetail")}</h2><div class="empty" data-testid="ports-inline-guidance">${t("feature.ports.noSelectedDetail")}</div>${state.diagnosticsResult ? `<div class="small-note" data-testid="ports-diagnostics-result">${escapeHtml(state.diagnosticsResult)}</div>` : ""}`;
   const treatability = assessPortTreatability(selected);
   return `<div class="panel-head"><div><h2>${t("feature.ports.selectedDetail")}</h2><p>${escapeHtml(t(treatability.reasonKey))}</p></div>${renderBadge(treatability.treatable ? t("feature.ports.canHandle") : t("feature.ports.cannotHandle"), treatability.treatable ? "success" : "danger")}</div>
     <dl class="kv-list">
@@ -120,7 +120,8 @@ function renderSelectedPortDetail(state: PortsWorkbenchState): string {
       ${renderActionButton("copy-selected-port-diagnostics", t("feature.ports.copyDiagnostics"))}
       ${renderActionButton("scan-ports", t("dashboard.scanPorts"))}
       ${selected.serviceNames.length ? renderActionButton("inspect-local-services", t("feature.ports.inspectServices")) : ""}
-    </div>`;
+    </div>
+    ${state.diagnosticsResult ? `<div class="small-note" data-testid="ports-diagnostics-result">${escapeHtml(state.diagnosticsResult)}</div>` : ""}`;
 }
 
 function renderPortPlan(state: PortsWorkbenchState): string {
