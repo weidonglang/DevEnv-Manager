@@ -8,6 +8,7 @@ from check_release_consistency import main as check_release_consistency
 from check_frontend_architecture import main as check_frontend_architecture
 from check_frontend_data_contracts import main as check_frontend_data_contracts
 from check_frontend_action_contracts import main as check_frontend_action_contracts
+from check_frontend_quality_regressions import main as check_frontend_quality_regressions
 
 
 BLOCKED_PARTS = {
@@ -66,6 +67,9 @@ def main() -> int:
     frontend_action_result = check_frontend_action_contracts()
     if frontend_action_result != 0:
         return frontend_action_result
+    frontend_quality_result = check_frontend_quality_regressions()
+    if frontend_quality_result != 0:
+        return frontend_quality_result
     release_result = check_release_consistency()
     if release_result != 0:
         return release_result

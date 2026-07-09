@@ -65,6 +65,21 @@ export function bindPortEvents(context: FeatureContext, state: PortsWorkbenchSta
     context.root.innerHTML = renderPortsWorkbench(state);
     bindPortEvents(context, state);
   });
+  bindAction(context.root, "copy-selected-port-diagnostics", async () => {
+    const selected = selectedPortRecord(state.records, state.selectedKey);
+    if (!selected) return context.toast(t("feature.ports.selectPortFirst"), true);
+    await navigator.clipboard.writeText([
+      `${t("feature.ports.port")}: ${selected.localPort}/${selected.protocol}`,
+      `PID: ${selected.pid}`,
+      `${t("feature.ports.process")}: ${selected.processName}`,
+      `${t("feature.ports.processPath")}: ${selected.processPath || t("state.notAvailable")}`,
+      `${t("feature.ports.services")}: ${selected.serviceNames.join(", ") || t("feature.ports.none")}`,
+      `${t("feature.ports.identity")}: ${selected.identity}`,
+      `${t("feature.ports.risk")}: ${selected.riskLevel}`,
+      `${t("feature.ports.recommendation")}: ${selected.recommendation || selected.explanation}`,
+    ].join("\n"));
+    context.toast(t("feature.ports.diagnosticsCopied"));
+  });
   bindAction(context.root, "stop-local-service", () =>
     {
       const serviceName = valueOf(state.services[0], "serviceName", "");
@@ -207,6 +222,7 @@ function normalizePlanError(error: unknown): string {
   const message = errorMessage(error);
   if (message.toLowerCase().includes("owner changed")) return t("feature.ports.ownerChanged");
   if (message.toLowerCase().includes("pid 4") || message.toLowerCase().includes("protected")) return t("feature.ports.protectedOwnerReason");
+  if (message.toLowerCase().includes("service_owned_port") || message.toLowerCase().includes("windows service owns")) return t("feature.ports.serviceOwnedReason");
   return message;
 }
 

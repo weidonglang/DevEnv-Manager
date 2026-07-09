@@ -4,6 +4,7 @@ export type PortTreatabilityReasonKey =
   | "feature.ports.noSelectedDetail"
   | "feature.ports.noPidReason"
   | "feature.ports.protectedOwnerReason"
+  | "feature.ports.serviceOwnedReason"
   | "feature.ports.systemProcessReason"
   | "feature.ports.criticalOwnerReason"
   | "feature.ports.treatableReason";
@@ -25,6 +26,7 @@ export function assessPortTreatability(record: PortRecord | null | undefined): P
   const identity = `${record.identity || ""} ${record.riskLevel || ""} ${record.risk || ""}`.toLowerCase();
   if (!record.pid) return { treatable: false, reasonKey: "feature.ports.noPidReason" };
   if (record.pid <= 4 || processName === "system") return { treatable: false, reasonKey: "feature.ports.protectedOwnerReason" };
+  if (record.serviceNames.length) return { treatable: false, reasonKey: "feature.ports.serviceOwnedReason" };
   if (SYSTEM_PROCESS_NAMES.has(processName)) return { treatable: false, reasonKey: "feature.ports.systemProcessReason" };
   if (identity.includes("critical") || identity.includes("system")) return { treatable: false, reasonKey: "feature.ports.criticalOwnerReason" };
   return { treatable: true, reasonKey: "feature.ports.treatableReason" };

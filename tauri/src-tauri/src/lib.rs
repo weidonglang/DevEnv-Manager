@@ -427,6 +427,13 @@ struct ChildProcessSummary {
 struct PortResolutionResult {
     success: bool,
     message: String,
+    target_port: u16,
+    target_pid: u32,
+    process_name: String,
+    service_owned: bool,
+    requires_admin: bool,
+    failure_reason: String,
+    next_steps: Vec<String>,
     pid_exited: bool,
     port_released: bool,
     release_checked_at: String,
@@ -4500,11 +4507,13 @@ fn create_port_resolution_plan_blocking(pid: u32, port: u16) -> Result<PortResol
         .collect::<Vec<_>>();
     let mut warnings = Vec::new();
     if !record.service_names.is_empty() {
-        warnings
-            .push("Windows service owns this port; prefer stopping the service first".to_string());
+        return Err(
+            "service_owned_port: Windows service owns this port; use service management instead"
+                .to_string(),
+        );
     }
     if matches!(port, 3306 | 5432 | 6379 | 27017 | 9200 | 1433) || record.risk_level == "high" {
-        warnings.push("Sensitive database or middleware port".to_string());
+        warnings.push("sensitive_service_port".to_string());
     }
     let plan_id = port_resolution_plan_id(record);
     let plan = PortResolutionPlan {
@@ -4521,13 +4530,12 @@ fn create_port_resolution_plan_blocking(pid: u32, port: u16) -> Result<PortResol
         service_names: record.service_names.clone(),
         related_ports,
         project_root: project_root_from_command_line(&record.command_line),
-        risk_level: record.risk_level.clone(),
+        risk_level: "high".to_string(),
         warnings,
         recommended_actions: vec![
-            "Open the project directory".to_string(),
-            "Change the project port".to_string(),
-            "Stop the owning service when applicable".to_string(),
-            "Terminate the process and verify port release".to_string(),
+            "open_project_or_process_location".to_string(),
+            "change_project_port_when_possible".to_string(),
+            "terminate_process_and_verify_release".to_string(),
         ],
     };
     port_resolution_plans()
@@ -4572,21 +4580,99 @@ fn execute_port_resolution_plan_blocking(
         .collect::<Vec<_>>();
     let pid_exited = process_name(&sysinfo::System::new_all(), plan.pid).is_empty();
     let port_released = remaining_owners.is_empty();
+    let requires_admin = port_failure_requires_admin(&kill);
+    let failure_reason = if kill.success && port_released {
+        String::new()
+    } else {
+        port_failure_reason(&kill, pid_exited, port_released)
+    };
+    let next_steps = port_resolution_next_steps(&plan, kill.success, pid_exited, port_released, requires_admin);
     Ok(PortResolutionResult {
         success: kill.success && port_released,
-        message: if kill.success {
-            format!("Port {} resolution executed", plan.port)
+        message: if kill.success && port_released {
+            format!("端口 {} 已释放", plan.port)
         } else {
-            format!(
-                "taskkill failed: {}",
-                powershell_runner::native_command_message(&kill)
-            )
+            "端口释放未完成，请查看失败原因和下一步建议".to_string()
         },
+        target_port: plan.port,
+        target_pid: plan.pid,
+        process_name: plan.process_name,
+        service_owned: !plan.service_names.is_empty(),
+        requires_admin,
+        failure_reason,
+        next_steps,
         pid_exited,
         port_released,
         release_checked_at: unix_timestamp().to_string(),
         remaining_owners,
     })
+}
+
+fn port_failure_requires_admin(result: &powershell_runner::NativeCommandResult) -> bool {
+    let text = format!("{} {}", result.stdout, result.stderr).to_ascii_lowercase();
+    !result.success
+        && (text.contains("access is denied")
+            || text.contains("access denied")
+            || text.contains("拒绝访问")
+            || result.exit_code == Some(5))
+}
+
+fn port_failure_reason(
+    result: &powershell_runner::NativeCommandResult,
+    pid_exited: bool,
+    port_released: bool,
+) -> String {
+    if result.timed_out {
+        return format!("停止进程超时，{} ms 后仍未完成。", result.elapsed_ms);
+    }
+    if port_released && !pid_exited {
+        return "端口已释放，但原 PID 仍在运行，可能只是关闭了监听套接字。".to_string();
+    }
+    if result.success && !port_released {
+        return "系统已接受停止请求，但端口复查仍显示被占用。".to_string();
+    }
+    if port_failure_requires_admin(result) {
+        return "Windows 拒绝停止该进程，通常需要管理员权限或该进程受服务/系统策略保护。".to_string();
+    }
+    if result.exit_code.is_some() {
+        return format!(
+            "停止进程命令返回退出码 {:?}，未确认端口释放。",
+            result.exit_code
+        );
+    }
+    "停止进程失败，未确认端口释放。".to_string()
+}
+
+fn port_resolution_next_steps(
+    plan: &PortResolutionPlan,
+    kill_success: bool,
+    pid_exited: bool,
+    port_released: bool,
+    requires_admin: bool,
+) -> Vec<String> {
+    let mut steps = Vec::new();
+    if requires_admin {
+        steps.push("如确认这是可停止的本地开发进程，请使用管理员权限重新打开应用后再重试。".to_string());
+    }
+    if !plan.service_names.is_empty() {
+        steps.push(format!(
+            "该端口由 Windows 服务托管，请优先通过服务管理器处理：{}。",
+            plan.service_names.join(", ")
+        ));
+    }
+    if !kill_success {
+        steps.push("复制诊断信息，确认 PID、进程路径和所属项目后再决定是否手动处理。".to_string());
+    }
+    if !pid_exited {
+        steps.push("如果 PID 仍在运行，请检查它是否有子进程、守护进程或 IDE 自动重启。".to_string());
+    }
+    if !port_released {
+        steps.push("重新扫描端口，确认是否出现新的占用方或原服务自动拉起。".to_string());
+    }
+    if steps.is_empty() {
+        steps.push("重新扫描端口确认没有新的占用方。".to_string());
+    }
+    steps
 }
 
 fn port_resolution_plan_id(record: &PortRecord) -> String {
@@ -12929,7 +13015,9 @@ fn analyze_port_signature(
     let unknown_or_weak = identity == "未识别的本地服务" || identity.contains("仅端口弱证据");
     let risk_level = if !state.eq_ignore_ascii_case("LISTENING") {
         "low"
-    } else if matches!(port, 3306 | 5432 | 6379 | 27017 | 9200 | 1433) {
+    } else if !service_names.is_empty()
+        || matches!(port, 3306 | 5432 | 6379 | 27017 | 9200 | 1433)
+    {
         "high"
     } else if unknown_or_weak && matches!(port, 80 | 443 | 8000 | 8080..=8082 | 8888) {
         "low"
@@ -12947,6 +13035,8 @@ fn analyze_port_signature(
     .to_string();
     let recommendation = if !state.eq_ignore_ascii_case("LISTENING") {
         "这是已有连接记录，优先确认远端地址，不建议结束进程。"
+    } else if !service_names.is_empty() {
+        "这是 Windows 服务托管的端口，建议先通过服务管理器或服务详情处理，不走普通进程释放流程。"
     } else if confidence < 40 {
         "识别证据不足，先打开进程位置或查看详情再操作。"
     } else if risk_level == "high" {
@@ -15054,6 +15144,21 @@ mod tests {
         assert_eq!(signature.identity, "未识别的本地服务");
         assert!(signature.confidence < 40);
         assert_eq!(signature.risk_level, "low");
+    }
+
+    #[test]
+    fn service_owned_port_is_high_risk_and_not_low() {
+        let signature = analyze_port_signature(
+            43595,
+            "LISTENING",
+            "tomcat10.exe",
+            r"C:\Program Files\Apache Software Foundation\Tomcat 10.1\bin\tomcat10.exe",
+            r#""C:\Program Files\Apache Software Foundation\Tomcat 10.1\bin\tomcat10.exe" //RS//Tomcat10"#,
+            &["Tomcat10".to_string()],
+        );
+        assert_eq!(signature.identity, "Tomcat");
+        assert_eq!(signature.risk_level, "high");
+        assert!(signature.recommendation.contains("Windows 服务托管"));
     }
 
     #[test]

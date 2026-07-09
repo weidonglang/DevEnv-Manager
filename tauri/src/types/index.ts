@@ -280,6 +280,13 @@ export type PortResolutionPlan = {
 export type PortResolutionResult = {
   success: boolean;
   message: string;
+  targetPort: number;
+  targetPid: number;
+  processName: string;
+  serviceOwned: boolean;
+  requiresAdmin: boolean;
+  failureReason: string;
+  nextSteps: string[];
   pidExited: boolean;
   portReleased: boolean;
   releaseCheckedAt: string;

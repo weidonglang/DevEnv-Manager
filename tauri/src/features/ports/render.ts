@@ -23,10 +23,20 @@ export function renderPortsWorkbench(state: PortsWorkbenchState): string {
 function renderPortExecutionResult(state: PortsWorkbenchState): string {
   const result = state.executionResult;
   if (!result) return "";
-  return `<div class="execution-result">
+  return `<div class="execution-result ${result.success ? "ok" : "warn"}">
     <h3>${t("feature.ports.executionResult")}</h3>
-    ${renderObjectTable(result, ["success", "message", "pidExited", "portReleased", "releaseCheckedAt"])}
-    ${result.remainingOwners.length ? `<div class="small-note"><strong>${t("feature.ports.remainingOwners")}</strong><ul>${result.remainingOwners.map((owner) => `<li>${escapeHtml(owner.localPort)} / ${escapeHtml(owner.pid)} / ${escapeHtml(owner.processName)} / ${escapeHtml(owner.identity)}</li>`).join("")}</ul></div>` : ""}
+    <div class="metrics">
+      ${renderMetric(t("feature.ports.resultStatus"), result.success ? t("feature.ports.resultCompleted") : t("feature.ports.resultNotCompleted"))}
+      ${renderMetric(t("feature.ports.port"), result.targetPort)}
+      ${renderMetric("PID", result.targetPid)}
+      ${renderMetric(t("feature.ports.process"), result.processName || t("state.notAvailable"))}
+      ${renderMetric(t("feature.ports.serviceOwned"), result.serviceOwned ? t("state.yes") : t("state.no"))}
+      ${renderMetric(t("feature.ports.requiresAdmin"), result.requiresAdmin ? t("state.yes") : t("state.no"))}
+    </div>
+    ${renderObjectTable(result, ["message", "pidExited", "portReleased", "releaseCheckedAt"])}
+    ${result.failureReason ? `<div class="small-note"><strong>${t("feature.ports.failureReason")}</strong><p>${escapeHtml(result.failureReason)}</p></div>` : ""}
+    ${result.nextSteps.length ? renderList(t("feature.ports.nextSteps"), result.nextSteps) : ""}
+    ${renderRemainingOwners(result.remainingOwners)}
   </div>`;
 }
 
@@ -82,7 +92,7 @@ function renderPortRow(record: PortRecord, selectedKey: string | null): string {
   return `<div class="data-row ${selected ? "is-selected" : ""}">
     <span><button data-port-select="${escapeHtml(key)}" type="button" aria-pressed="${selected ? "true" : "false"}">${selected ? t("feature.ports.selectedRow") : t("feature.ports.select")}</button></span>
     <span>${escapeHtml(String(record.localPort))}</span><span>${escapeHtml(record.protocol)}</span><span>${escapeHtml(record.state)}</span>
-    <span>${escapeHtml(String(record.pid))}</span><span>${escapeHtml(record.processName)}</span><span>${renderBadge(treatability.treatable ? record.riskLevel : t("feature.ports.protectedOwner"), treatability.treatable ? "warning" : "danger")}</span>
+    <span>${escapeHtml(String(record.pid))}</span><span>${escapeHtml(record.processName)}</span><span>${renderBadge(treatability.treatable ? t("feature.ports.operationRiskHigh") : t("feature.ports.protectedOwner"), treatability.treatable ? "warning" : "danger")}</span>
     <span>${escapeHtml(record.identity)}</span><span>${escapeHtml(String(record.confidence))}</span>
   </div>`;
 }
@@ -97,13 +107,20 @@ function renderSelectedPortDetail(state: PortsWorkbenchState): string {
       ${detailRow("PID", String(selected.pid))}
       ${detailRow(t("feature.ports.process"), selected.processName)}
       ${detailRow(t("feature.ports.processPath"), selected.processPath || t("state.notAvailable"))}
+      ${detailRow(t("feature.ports.services"), selected.serviceNames.join(", ") || t("feature.ports.none"))}
       ${detailRow(t("feature.ports.ownerType"), selected.identity)}
-      ${detailRow(t("feature.ports.risk"), selected.riskLevel)}
+      ${detailRow(t("feature.ports.ownerRisk"), selected.riskLevel)}
+      ${detailRow(t("feature.ports.operationRisk"), treatability.treatable ? t("feature.ports.operationRiskHigh") : t("feature.ports.notExecutable"))}
       ${detailRow(t("feature.ports.confidence"), String(selected.confidence))}
       ${detailRow(t("feature.ports.treatable"), treatability.treatable ? t("state.yes") : t("state.no"))}
       ${detailRow(t("feature.ports.recommendation"), selected.recommendation || selected.explanation || t("state.notAvailable"))}
     </dl>
-    <div class="toolbar">${treatability.treatable ? renderActionButton("create-port-plan", t("feature.ports.createPlanForSelected")) : ""}</div>`;
+    <div class="toolbar">
+      ${treatability.treatable ? renderActionButton("create-port-plan", t("feature.ports.createPlanForSelected")) : ""}
+      ${renderActionButton("copy-selected-port-diagnostics", t("feature.ports.copyDiagnostics"))}
+      ${renderActionButton("scan-ports", t("dashboard.scanPorts"))}
+      ${selected.serviceNames.length ? renderActionButton("inspect-local-services", t("feature.ports.inspectServices")) : ""}
+    </div>`;
 }
 
 function renderPortPlan(state: PortsWorkbenchState): string {
@@ -116,6 +133,15 @@ function renderPortPlan(state: PortsWorkbenchState): string {
     ${plan.recommendedActions.length ? renderList(t("feature.ports.recommendedActions"), plan.recommendedActions) : ""}
     ${plan.warnings.length ? renderList(t("feature.ports.warnings"), plan.warnings) : ""}
     <p class="small-note"><strong>${t("feature.ports.ownerRecheck")}</strong> ${t("feature.ports.ownerRecheckDetail")}</p>
+  </div>`;
+}
+
+function renderRemainingOwners(owners: PortRecord[]): string {
+  if (!owners.length) return "";
+  return `<div class="small-note"><strong>${t("feature.ports.remainingOwners")}</strong>
+    <div class="table-wrap"><table><thead><tr><th>${t("feature.ports.protocol")}</th><th>${t("feature.ports.localAddress")}</th><th>${t("feature.ports.port")}</th><th>PID</th><th>${t("feature.ports.process")}</th><th>${t("feature.ports.state")}</th></tr></thead><tbody>${owners
+      .map((owner) => `<tr><td>${escapeHtml(owner.protocol)}</td><td>${escapeHtml(owner.localAddress)}</td><td>${escapeHtml(String(owner.localPort))}</td><td>${escapeHtml(String(owner.pid))}</td><td>${escapeHtml(owner.processName)}</td><td>${escapeHtml(owner.state)}</td></tr>`)
+      .join("")}</tbody></table></div>
   </div>`;
 }
 
