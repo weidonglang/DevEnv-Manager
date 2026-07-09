@@ -82,7 +82,7 @@ export function renderPortsTable(state: PortsWorkbenchState): string {
 function renderPortErrors(state: PortsWorkbenchState): string {
   const messages = [state.scanError, state.historyError, state.servicesError, state.planError].filter(Boolean);
   if (!messages.length) return "";
-  return `<div class="error-state">${messages.map((message) => `<p>${escapeHtml(message)}</p>`).join("")}</div>`;
+  return `<div class="error-state" data-testid="ports-operation-error">${messages.map((message) => `<p>${escapeHtml(message)}</p>`).join("")}</div>`;
 }
 
 function renderPortRow(record: PortRecord, selectedKey: string | null): string {

@@ -656,14 +656,14 @@
           "frontendEntry": {
             "route": "cleanup",
             "testIds": [
-              "cleanup-disk-overview-section",
-              "cleanup-disk-overview-refresh",
+              "cleanup-disk-overview-entry",
+              "cleanup-disk-overview-action",
               "cleanup-disk-overview-result"
             ]
           },
           "selectors": {
-            "entry": "cleanup-disk-overview-section",
-            "primaryAction": "cleanup-disk-overview-refresh",
+            "entry": "cleanup-disk-overview-entry",
+            "primaryAction": "cleanup-disk-overview-action",
             "result": "cleanup-disk-overview-result",
             "error": "cleanup-inline-error"
           },
@@ -715,22 +715,22 @@
           "name": "Multi-disk overview",
           "priority": "P0",
           "targetVersion": "v1.8.2",
-          "status": "backendOnly",
+          "status": "partial",
           "oldFeature": true,
           "oldEntry": "Cleanup > Disk overview",
-          "currentEntry": null,
+          "currentEntry": "Cleanup > Multi-disk overview",
           "frontendComponent": "CleanupPage",
           "frontendEntry": {
             "route": "cleanup",
             "testIds": [
-              "cleanup-disk-overview-section",
-              "cleanup-disk-overview-refresh",
+              "cleanup-disk-overview-entry",
+              "cleanup-disk-overview-action",
               "cleanup-disk-overview-result"
             ]
           },
           "selectors": {
-            "entry": "cleanup-disk-overview-section",
-            "primaryAction": "cleanup-disk-overview-refresh",
+            "entry": "cleanup-disk-overview-entry",
+            "primaryAction": "cleanup-disk-overview-action",
             "result": "cleanup-disk-overview-result",
             "error": "cleanup-inline-error"
           },
@@ -738,7 +738,7 @@
             "inspect_disk_overview"
           ],
           "backendExists": true,
-          "frontendWired": false,
+          "frontendWired": true,
           "riskLevel": "readOnly",
           "requiresTauri": true,
           "requiresWindows": true,
@@ -757,7 +757,7 @@
           "safeSmokeMode": "readOnly",
           "manualOnlyReason": null,
           "deferredReason": null,
-          "expectedFailureReason": "Backend command exists but Workbench UI has no dedicated invoke/result/progress wiring.",
+          "expectedFailureReason": null,
           "testModes": [
             "static",
             "frontend",
@@ -766,7 +766,6 @@
           "manualAllowed": false,
           "acceptanceChecks": [
             "backendCommandRegistered",
-            "backendOnlyFails",
             "resultPanelVisible",
             "debugContract",
             "reportContract"
@@ -780,30 +779,30 @@
           "name": "Duplicate large files",
           "priority": "P0",
           "targetVersion": "v1.8.2",
-          "status": "backendOnly",
+          "status": "partial",
           "oldFeature": true,
           "oldEntry": "Cleanup > Duplicate files",
-          "currentEntry": null,
+          "currentEntry": "Cleanup > Duplicate large files",
           "frontendComponent": "CleanupPage",
           "frontendEntry": {
             "route": "cleanup",
             "testIds": [
-              "cleanup-duplicate-files-section",
-              "cleanup-duplicate-files-scan",
-              "cleanup-duplicate-files-result"
+              "cleanup-duplicate-large-files-entry",
+              "cleanup-duplicate-large-files-action",
+              "cleanup-duplicate-large-files-result"
             ]
           },
           "selectors": {
-            "entry": "cleanup-duplicate-files-section",
-            "primaryAction": "cleanup-duplicate-files-scan",
-            "result": "cleanup-duplicate-files-result",
-            "error": "cleanup-duplicate-files-error"
+            "entry": "cleanup-duplicate-large-files-entry",
+            "primaryAction": "cleanup-duplicate-large-files-action",
+            "result": "cleanup-duplicate-large-files-result",
+            "error": "cleanup-duplicate-large-files-error"
           },
           "backendCommands": [
             "scan_duplicate_large_files"
           ],
           "backendExists": true,
-          "frontendWired": false,
+          "frontendWired": true,
           "riskLevel": "readOnly",
           "requiresTauri": true,
           "requiresWindows": true,
@@ -822,7 +821,7 @@
           "safeSmokeMode": "readOnlyTempDir",
           "manualOnlyReason": null,
           "deferredReason": null,
-          "expectedFailureReason": "Backend command exists but Workbench UI has no dedicated entry/result/progress wiring.",
+          "expectedFailureReason": null,
           "testModes": [
             "static",
             "frontend",
@@ -831,7 +830,6 @@
           "manualAllowed": false,
           "acceptanceChecks": [
             "backendCommandRegistered",
-            "backendOnlyFails",
             "resultPanelVisible",
             "noToastOnly",
             "debugContract",
@@ -846,24 +844,26 @@
           "name": "Desktop archive",
           "priority": "P0",
           "targetVersion": "v1.8.2",
-          "status": "backendOnly",
+          "status": "partial",
           "oldFeature": true,
           "oldEntry": "Cleanup > Desktop rescue",
-          "currentEntry": null,
+          "currentEntry": "Cleanup > Desktop rescue archive",
           "frontendComponent": "CleanupPage",
           "frontendEntry": {
             "route": "cleanup",
             "testIds": [
               "cleanup-desktop-archive-section",
-              "cleanup-desktop-archive-plan",
-              "cleanup-desktop-archive-result",
+              "cleanup-desktop-archive-plan-action",
+              "cleanup-desktop-archive-plan-result",
+              "cleanup-desktop-archive-execute-action",
+              "cleanup-desktop-archive-execute-result",
               "cleanup-desktop-archive-rollback"
             ]
           },
           "selectors": {
             "entry": "cleanup-desktop-archive-section",
-            "primaryAction": "cleanup-desktop-archive-plan",
-            "result": "cleanup-desktop-archive-result",
+            "primaryAction": "cleanup-desktop-archive-plan-action",
+            "result": "cleanup-desktop-archive-execute-result",
             "error": "cleanup-desktop-archive-error"
           },
           "backendCommands": [
@@ -871,7 +871,7 @@
             "execute_desktop_archive_plan"
           ],
           "backendExists": true,
-          "frontendWired": false,
+          "frontendWired": true,
           "riskLevel": "high",
           "requiresTauri": true,
           "requiresWindows": true,
@@ -890,7 +890,7 @@
           "safeSmokeMode": "dryRun",
           "manualOnlyReason": null,
           "deferredReason": null,
-          "expectedFailureReason": "Desktop archive backend commands exist but UI entry, plan preview, execute result, and rollback surface are missing.",
+          "expectedFailureReason": null,
           "testModes": [
             "static",
             "frontend",
@@ -899,7 +899,6 @@
           "manualAllowed": false,
           "acceptanceChecks": [
             "backendCommandRegistered",
-            "backendOnlyFails",
             "riskContract",
             "resultPanelVisible",
             "debugContract",
@@ -914,24 +913,26 @@
           "name": "Downloads archive",
           "priority": "P0",
           "targetVersion": "v1.8.2",
-          "status": "backendOnly",
+          "status": "partial",
           "oldFeature": true,
           "oldEntry": "Cleanup > Downloads rescue",
-          "currentEntry": null,
+          "currentEntry": "Cleanup > Downloads rescue archive",
           "frontendComponent": "CleanupPage",
           "frontendEntry": {
             "route": "cleanup",
             "testIds": [
               "cleanup-downloads-archive-section",
-              "cleanup-downloads-archive-plan",
-              "cleanup-downloads-archive-result",
+              "cleanup-downloads-archive-plan-action",
+              "cleanup-downloads-archive-plan-result",
+              "cleanup-downloads-archive-execute-action",
+              "cleanup-downloads-archive-execute-result",
               "cleanup-downloads-archive-rollback"
             ]
           },
           "selectors": {
             "entry": "cleanup-downloads-archive-section",
-            "primaryAction": "cleanup-downloads-archive-plan",
-            "result": "cleanup-downloads-archive-result",
+            "primaryAction": "cleanup-downloads-archive-plan-action",
+            "result": "cleanup-downloads-archive-execute-result",
             "error": "cleanup-downloads-archive-error"
           },
           "backendCommands": [
@@ -939,7 +940,7 @@
             "execute_downloads_archive_plan"
           ],
           "backendExists": true,
-          "frontendWired": false,
+          "frontendWired": true,
           "riskLevel": "high",
           "requiresTauri": true,
           "requiresWindows": true,
@@ -958,7 +959,7 @@
           "safeSmokeMode": "dryRun",
           "manualOnlyReason": null,
           "deferredReason": null,
-          "expectedFailureReason": "Downloads archive backend commands exist but UI entry, plan preview, execute result, and rollback surface are missing.",
+          "expectedFailureReason": null,
           "testModes": [
             "static",
             "frontend",
@@ -967,7 +968,6 @@
           "manualAllowed": false,
           "acceptanceChecks": [
             "backendCommandRegistered",
-            "backendOnlyFails",
             "riskContract",
             "resultPanelVisible",
             "debugContract",
@@ -2162,15 +2162,18 @@
           "frontendEntry": {
             "route": "global",
             "testIds": [
-              "toast",
-              "quality-persistent-error",
-              "quality-persistent-result"
+              "global-toast-region",
+              "global-persistent-error",
+              "global-persistent-result",
+              "global-risk-dialog",
+              "global-risk-result",
+              "global-debug-status"
             ]
           },
           "selectors": {
-            "entry": "toast",
-            "result": "quality-persistent-result",
-            "error": "quality-persistent-error"
+            "entry": "global-toast-region",
+            "result": "global-persistent-result",
+            "error": "global-persistent-error"
           },
           "backendCommands": [],
           "backendExists": false,

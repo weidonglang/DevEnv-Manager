@@ -52,33 +52,52 @@ export function bindFileAssociationEvents(context: FeatureContext, state: FileAs
   });
   bindAction(context.root, "apply-association-plan", async () => {
     if (!state.plan) return context.toast(t("toast.createAssociationPlanFirst"), true);
-    const result = await context.risk.run({
-      command: "apply_file_association_plan",
-      planId: state.plan.planId,
-      riskLevel: "high",
-      backupReceipt: valueOf(state.plan, "backupName", null),
-      title: "Apply file association plan",
-      summary: "Applies ordinary and high-risk file association changes through a backend token gate.",
-      warnings: ["UserChoice-protected associations may open Windows Settings instead of writing registry values."],
-      execute: (confirmationToken) => applyAssociationPlan(state.plan!, confirmationToken),
-    });
-    state.applyResultMessage = result ? JSON.stringify(result, null, 2) : "";
+    state.applyResult = null;
+    state.rollbackResult = null;
+    state.operationError = "";
+    state.applyResultMessage = "";
+    try {
+      const result = await context.risk.run({
+        command: "apply_file_association_plan",
+        planId: state.plan.planId,
+        riskLevel: "high",
+        backupReceipt: valueOf(state.plan, "backupName", null),
+        title: "Apply file association plan",
+        summary: "Applies ordinary and high-risk file association changes through a backend token gate.",
+        warnings: ["UserChoice-protected associations may open Windows Settings instead of writing registry values."],
+        execute: (confirmationToken) => applyAssociationPlan(state.plan!, confirmationToken),
+      });
+      state.applyResult = result as FileAssociationUiState["applyResult"];
+      state.applyResultMessage = state.applyResult?.message ?? "";
+    } catch (error) {
+      state.operationError = errorMessage(error);
+    }
     context.root.innerHTML = renderFileAssociations(state);
     bindFileAssociationEvents(context, state);
   });
   bindAction(context.root, "rollback-association-backup", async () => {
     const backup = state.backups[0];
     if (!backup) return context.toast(t("toast.noBackupAvailable"), true);
-    await context.risk.run({
-      command: "rollback_file_association_backup",
-      planId: backup.backupId,
-      riskLevel: "high",
-      backupReceipt: backup.backupPath,
-      title: "Rollback file association backup",
-      summary: "Restores a previous file association backup through a token-gated backend command.",
-      warnings: ["Review the backup timestamp before rollback."],
-      execute: (confirmationToken) => rollbackAssociationBackup(backup.backupId, confirmationToken),
-    });
+    state.rollbackResult = null;
+    state.operationError = "";
+    try {
+      const result = await context.risk.run({
+        command: "rollback_file_association_backup",
+        planId: backup.backupId,
+        riskLevel: "high",
+        backupReceipt: backup.backupPath,
+        title: "Rollback file association backup",
+        summary: "Restores a previous file association backup through a token-gated backend command.",
+        warnings: ["Review the backup timestamp before rollback."],
+        execute: (confirmationToken) => rollbackAssociationBackup(backup.backupId, confirmationToken),
+      });
+      state.rollbackResult = result as FileAssociationUiState["rollbackResult"];
+      state.applyResultMessage = state.rollbackResult?.message ?? "";
+    } catch (error) {
+      state.operationError = errorMessage(error);
+    }
+    context.root.innerHTML = renderFileAssociations(state);
+    bindFileAssociationEvents(context, state);
   });
   bindAction(context.root, "open-default-apps", openDefaultAppsSettings);
   bindAction(context.root, "export-association-report", async () => context.toast(await exportAssociationReport()));

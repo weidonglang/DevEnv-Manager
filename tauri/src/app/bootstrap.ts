@@ -88,7 +88,7 @@ function renderShell() {
             </div>
           </div>
         </header>
-        <section id="feature-root" class="view active" aria-live="polite"></section>
+        <section id="feature-root" class="view active" aria-live="polite" data-testid="global-persistent-result"></section>
         <footer class="workbench-statusbar">
           <span id="workbench-status-view">${t("route.dashboard.label")}</span>
           <span>${t("app.statusRelease")}</span>
@@ -96,7 +96,7 @@ function renderShell() {
         </footer>
       </section>
     </main>
-    <div id="toast" class="toast" role="status"></div>
+    <div id="global-toast-region" data-testid="global-toast-region"><div id="toast" class="toast" role="status" data-testid="global-persistent-error"></div></div>
   `;
 }
 
@@ -111,7 +111,7 @@ function renderSafetyGate(message = "") {
         </section>
       </section>
     </main>
-    <div id="toast" class="toast" role="status"></div>
+    <div id="global-toast-region" data-testid="global-toast-region"><div id="toast" class="toast" role="status" data-testid="global-persistent-error"></div></div>
   `;
   document.querySelector("#accept-safety-disclaimer")?.addEventListener("click", () => {
     void acceptSafetyGate();

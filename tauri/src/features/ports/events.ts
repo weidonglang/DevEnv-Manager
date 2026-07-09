@@ -31,33 +31,44 @@ export function bindPortEvents(context: FeatureContext, state: PortsWorkbenchSta
   bindAction(context.root, "create-port-plan", async () => {
     const selected = selectedPortRecord(state.records, state.selectedKey);
     if (!selected) return context.toast(state.records.length ? t("feature.ports.selectPortFirst") : t("toast.portScanFirst"), true);
+    state.plan = null;
+    state.executionResult = null;
+    state.planError = "";
     await createPlanForPort(context, state, selected.pid, selected.localPort);
   });
   bindAction(context.root, "execute-port-plan", async () => {
     if (!state.plan) {
+      state.planError = t("toast.createPortPlanFirst");
+      renderAndBind(context, state);
       context.toast(t("toast.createPortPlanFirst"), true);
       return;
     }
-    const result = await context.risk.run({
-      command: "execute_port_resolution_plan",
-      planId: state.plan.planId,
-      riskLevel: "high",
-      title: t("feature.ports.executeRiskTitle"),
-      summary: t("feature.ports.executeRiskSummary"),
-      before: [
-        { label: t("feature.ports.port"), value: String(state.plan.port) },
-        { label: "PID", value: String(state.plan.pid) },
-        { label: t("feature.ports.process"), value: state.plan.processName },
-        { label: t("feature.ports.risk"), value: state.plan.riskLevel },
-      ],
-      after: [
-        { label: t("feature.ports.ownerRecheck"), value: t("feature.ports.ownerRecheckDetail") },
-        { label: t("feature.ports.verification"), value: t("feature.ports.verificationDetail") },
-      ],
-      warnings: [t("feature.ports.executeRiskWarning"), ...state.plan.warnings],
-      execute: (confirmationToken) => executePortResolutionPlan(state.plan!.planId, confirmationToken),
-    });
-    state.executionResult = result as PortsWorkbenchState["executionResult"];
+    state.executionResult = null;
+    state.planError = "";
+    try {
+      const result = await context.risk.run({
+        command: "execute_port_resolution_plan",
+        planId: state.plan.planId,
+        riskLevel: "high",
+        title: t("feature.ports.executeRiskTitle"),
+        summary: t("feature.ports.executeRiskSummary"),
+        before: [
+          { label: t("feature.ports.port"), value: String(state.plan.port) },
+          { label: "PID", value: String(state.plan.pid) },
+          { label: t("feature.ports.process"), value: state.plan.processName },
+          { label: t("feature.ports.risk"), value: state.plan.riskLevel },
+        ],
+        after: [
+          { label: t("feature.ports.ownerRecheck"), value: t("feature.ports.ownerRecheckDetail") },
+          { label: t("feature.ports.verification"), value: t("feature.ports.verificationDetail") },
+        ],
+        warnings: [t("feature.ports.executeRiskWarning"), ...state.plan.warnings],
+        execute: (confirmationToken) => executePortResolutionPlan(state.plan!.planId, confirmationToken),
+      });
+      state.executionResult = result as PortsWorkbenchState["executionResult"];
+    } catch (error) {
+      state.planError = errorMessage(error);
+    }
     renderAndBind(context, state);
   });
   bindAction(context.root, "inspect-local-services", async () => {

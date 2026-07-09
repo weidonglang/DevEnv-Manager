@@ -2,8 +2,8 @@ import type { FeatureContext } from "../../app/featureContext";
 import { open } from "../../api/tauri";
 import { bindAction, valueOf } from "../sharedView";
 import { t } from "../../core/i18n";
-import type { CleanupArchitecture, CleanupScanReport, ExpansionResult, FolderUsageReport, LargeFileItem, MaintenanceOverview, PartitionLayoutReport, RollbackRecord } from "../../types";
-import { cleanDevCache, cleanSelectedTargets, clearDownloadCache, createCDriveExpansionPlan, createCleanupPlan, createMovePlan, executeCDriveExpansion, executeMovePlan, inspectDesktop, inspectDownloads, inspectMaintenanceOverview, inspectPartitionLayout, listRollbackRecords, openAnalysisPath, rollbackMove, scanCleanupTargets, scanLargeFiles, storageCleanupArchitecture } from "./api";
+import type { CleanupArchitecture, CleanupScanReport, DiskVolumeInfo, DuplicateGroup, ExpansionResult, FolderUsageReport, LargeFileItem, MaintenanceOverview, MoveResult, PartitionLayoutReport, RollbackRecord } from "../../types";
+import { cleanDevCache, cleanSelectedTargets, clearDownloadCache, createCDriveExpansionPlan, createCleanupPlan, createDesktopArchivePlan, createDownloadsArchivePlan, createMovePlan, executeCDriveExpansion, executeDesktopArchivePlan, executeDownloadsArchivePlan, executeMovePlan, inspectDesktop, inspectDiskOverview, inspectDownloads, inspectMaintenanceOverview, inspectPartitionLayout, listRollbackRecords, openAnalysisPath, rollbackMove, scanCleanupTargets, scanDuplicateLargeFiles, scanLargeFiles, storageCleanupArchitecture } from "./api";
 import { renderCleanupWorkbench } from "./render";
 import type { CleanupWorkbenchState } from "./state";
 
@@ -32,6 +32,8 @@ export function bindCleanupEvents(context: FeatureContext, state: CleanupWorkben
   });
   bindAction(context.root, "execute-cleanup-plan", async () => {
     if (!state.plan) return context.toast(t("toast.createCleanupPlanFirst"), true);
+    state.cleanupResult = null;
+    state.errors.executeCleanupResult = "";
     const result = await context.risk.run({
       command: "execute_cleanup_plan",
       planId: state.plan.planId,
@@ -51,6 +53,7 @@ export function bindCleanupEvents(context: FeatureContext, state: CleanupWorkben
       execute: (confirmationToken) => cleanSelectedTargets(state.plan!, confirmationToken),
     });
     state.cleanupResult = result as CleanupWorkbenchState["cleanupResult"];
+    delete state.errors.executeCleanupResult;
     if (!context.isCurrent()) return;
     context.root.innerHTML = renderCleanupWorkbench(state);
     bindCleanupEvents(context, state);
@@ -128,7 +131,13 @@ export function bindCleanupEvents(context: FeatureContext, state: CleanupWorkben
     }),
   );
   bindAction(context.root, "inspect-c-drive-rescue", () => refreshCDriveRescue(context, state));
+  bindAction(context.root, "inspect-disk-overview", () => refreshDiskOverview(context, state));
   bindAction(context.root, "scan-large-files-c", () => scanCLargeFiles(context, state));
+  bindAction(context.root, "scan-duplicate-large-files", () => scanDuplicateFiles(context, state));
+  bindAction(context.root, "create-desktop-archive-plan", () => createArchivePlan(context, state, "desktop"));
+  bindAction(context.root, "execute-desktop-archive-plan", () => executeArchivePlan(context, state, "desktop"));
+  bindAction(context.root, "create-downloads-archive-plan", () => createArchivePlan(context, state, "downloads"));
+  bindAction(context.root, "execute-downloads-archive-plan", () => executeArchivePlan(context, state, "downloads"));
   bindAction(context.root, "create-expansion-plan", async () => {
     context.progress.start(t("feature.cleanup.expansion"));
     try {
@@ -173,9 +182,10 @@ function syncMoveInputs(context: FeatureContext, state: CleanupWorkbenchState): 
 }
 
 export async function refreshCleanup(context: FeatureContext, state: CleanupWorkbenchState): Promise<void> {
-  const [architecture, overview, scan, rollbackRecords] = await Promise.allSettled([
+  const [architecture, overview, diskOverview, scan, rollbackRecords] = await Promise.allSettled([
     storageCleanupArchitecture(),
     inspectMaintenanceOverview(),
+    inspectDiskOverview(),
     scanCleanupTargets(),
     listRollbackRecords(),
   ]);
@@ -183,6 +193,7 @@ export async function refreshCleanup(context: FeatureContext, state: CleanupWork
   state.errors = {};
   applySettled(state, "architecture", architecture);
   applySettled(state, "overview", overview);
+  applySettled(state, "diskOverview", diskOverview);
   applySettled(state, "scan", scan);
   applySettled(state, "rollbackRecords", rollbackRecords);
   state.selectedIds = defaultSelectedIds(state);
@@ -218,6 +229,21 @@ async function refreshCDriveRescue(context: FeatureContext, state: CleanupWorkbe
   bindCleanupEvents(context, state);
 }
 
+async function refreshDiskOverview(context: FeatureContext, state: CleanupWorkbenchState): Promise<void> {
+  context.progress.start("Refreshing disk overview");
+  try {
+    state.diskOverview = await inspectDiskOverview();
+    delete state.errors.diskOverview;
+    context.progress.done("Disk overview refreshed");
+  } catch (error) {
+    state.errors.diskOverview = errorMessage(error);
+    context.progress.fail(state.errors.diskOverview);
+  }
+  if (!context.isCurrent()) return;
+  context.root.innerHTML = renderCleanupWorkbench(state);
+  bindCleanupEvents(context, state);
+}
+
 async function scanCLargeFiles(context: FeatureContext, state: CleanupWorkbenchState): Promise<void> {
   context.progress.start(t("feature.cleanup.scanLargeFiles"));
   try {
@@ -234,12 +260,105 @@ async function scanCLargeFiles(context: FeatureContext, state: CleanupWorkbenchS
   bindCleanupEvents(context, state);
 }
 
+async function scanDuplicateFiles(context: FeatureContext, state: CleanupWorkbenchState): Promise<void> {
+  context.progress.start("Scanning duplicate large files");
+  try {
+    state.duplicateGroups = await scanDuplicateLargeFiles("C:\\", 100);
+    state.duplicateGroupsPage = 1;
+    delete state.errors.duplicateFiles;
+    context.progress.done("Duplicate scan complete");
+  } catch (error) {
+    state.errors.duplicateFiles = errorMessage(error);
+    context.progress.fail(state.errors.duplicateFiles);
+  }
+  if (!context.isCurrent()) return;
+  context.root.innerHTML = renderCleanupWorkbench(state);
+  bindCleanupEvents(context, state);
+}
+
+async function createArchivePlan(context: FeatureContext, state: CleanupWorkbenchState, kind: "desktop" | "downloads"): Promise<void> {
+  syncMoveInputs(context, state);
+  const targetDrive = state.moveTargetDrive || "D";
+  const errorKey = kind === "desktop" ? "desktopArchive" : "downloadsArchive";
+  context.progress.start(kind === "desktop" ? "Creating desktop archive plan" : "Creating downloads archive plan");
+  try {
+    if (kind === "desktop") {
+      state.desktopArchivePlan = await createDesktopArchivePlan(targetDrive);
+      state.desktopArchiveResult = null;
+      state.desktop = await inspectDesktop();
+    } else {
+      state.downloadsArchivePlan = await createDownloadsArchivePlan(targetDrive);
+      state.downloadsArchiveResult = null;
+      state.downloads = await inspectDownloads();
+    }
+    delete state.errors[errorKey];
+    if (!context.isCurrent()) return;
+    context.progress.done(t("toast.planReady"));
+    context.root.innerHTML = renderCleanupWorkbench(state);
+    bindCleanupEvents(context, state);
+  } catch (error) {
+    state.errors[errorKey] = errorMessage(error);
+    context.progress.fail(state.errors[errorKey]);
+    if (!context.isCurrent()) return;
+    context.root.innerHTML = renderCleanupWorkbench(state);
+    bindCleanupEvents(context, state);
+  }
+}
+
+async function executeArchivePlan(context: FeatureContext, state: CleanupWorkbenchState, kind: "desktop" | "downloads"): Promise<void> {
+  const plan = kind === "desktop" ? state.desktopArchivePlan : state.downloadsArchivePlan;
+  const errorKey = kind === "desktop" ? "desktopArchive" : "downloadsArchive";
+  if (!plan) {
+    state.errors[errorKey] = kind === "desktop" ? "Create a desktop archive plan first." : "Create a downloads archive plan first.";
+    context.toast(state.errors[errorKey], true);
+    context.root.innerHTML = renderCleanupWorkbench(state);
+    bindCleanupEvents(context, state);
+    return;
+  }
+  if (kind === "desktop") state.desktopArchiveResult = null;
+  else state.downloadsArchiveResult = null;
+  state.errors[`${errorKey}Result`] = "";
+  try {
+    const result = await context.risk.run({
+      command: "execute_move_plan",
+      actionId: kind === "desktop" ? "execute_desktop_archive_plan" : "execute_downloads_archive_plan",
+      planId: plan.planId,
+      riskLevel: "high",
+      backupReceipt: plan.reversible ? plan.target : null,
+      title: kind === "desktop" ? "Execute desktop archive plan" : "Execute downloads archive plan",
+      summary: kind === "desktop" ? "Archives selected desktop files after preview and token confirmation." : "Archives selected Downloads files after preview and token confirmation.",
+      before: [
+        { label: "Source", value: plan.source },
+        { label: "Target", value: plan.target },
+        { label: t("feature.cleanup.bytes"), value: String(plan.estimatedBytes) },
+      ],
+      after: [
+        { label: t("feature.cleanup.resultCleaned"), value: "Moved items and failures are rendered in the Cleanup page result panel." },
+        { label: t("feature.cleanup.resultRecovery"), value: "Use target folder, rollback record, or report summary to restore files." },
+      ],
+      warnings: plan.warnings,
+      execute: (confirmationToken) => kind === "desktop" ? executeDesktopArchivePlan(plan, confirmationToken) : executeDownloadsArchivePlan(plan, confirmationToken),
+    });
+    if (kind === "desktop") state.desktopArchiveResult = result as MoveResult;
+    else state.downloadsArchiveResult = result as MoveResult;
+    delete state.errors[errorKey];
+    delete state.errors[`${errorKey}Result`];
+  } catch (error) {
+    state.errors[errorKey] = errorMessage(error);
+  }
+  if (!context.isCurrent()) return;
+  context.root.innerHTML = renderCleanupWorkbench(state);
+  bindCleanupEvents(context, state);
+}
+
 function bindCleanupPagination(context: FeatureContext, state: CleanupWorkbenchState): void {
   context.root.querySelectorAll<HTMLButtonElement>("[data-page-action]").forEach((button) => {
     button.addEventListener("click", () => {
       const action = button.dataset.pageAction;
       if (action === "cleanup-large-files:prev") state.largeFilesPage = Math.max(1, state.largeFilesPage - 1);
       if (action === "cleanup-large-files:next") state.largeFilesPage += 1;
+      if (action === "cleanup-duplicate-large-files:prev") state.duplicateGroupsPage = Math.max(1, state.duplicateGroupsPage - 1);
+      if (action === "cleanup-duplicate-large-files:next") state.duplicateGroupsPage += 1;
       context.root.innerHTML = renderCleanupWorkbench(state);
       bindCleanupEvents(context, state);
     });
@@ -298,11 +417,13 @@ function bindLargeFileActions(context: FeatureContext): void {
 
 function applySettled(state: CleanupWorkbenchState, key: "architecture", result: PromiseSettledResult<CleanupArchitecture>): void;
 function applySettled(state: CleanupWorkbenchState, key: "overview", result: PromiseSettledResult<MaintenanceOverview>): void;
+function applySettled(state: CleanupWorkbenchState, key: "diskOverview", result: PromiseSettledResult<DiskVolumeInfo[]>): void;
 function applySettled(state: CleanupWorkbenchState, key: "scan", result: PromiseSettledResult<CleanupScanReport>): void;
 function applySettled(state: CleanupWorkbenchState, key: "rollbackRecords", result: PromiseSettledResult<RollbackRecord[]>): void;
 function applySettled(state: CleanupWorkbenchState, key: "partition", result: PromiseSettledResult<PartitionLayoutReport>): void;
 function applySettled(state: CleanupWorkbenchState, key: "desktop", result: PromiseSettledResult<FolderUsageReport>): void;
 function applySettled(state: CleanupWorkbenchState, key: "downloads", result: PromiseSettledResult<FolderUsageReport>): void;
+function applySettled(state: CleanupWorkbenchState, key: "duplicateGroups", result: PromiseSettledResult<DuplicateGroup[]>): void;
 function applySettled(state: CleanupWorkbenchState, key: keyof CleanupWorkbenchState, result: PromiseSettledResult<unknown>): void {
   if (result.status === "fulfilled") {
     (state as unknown as Record<string, unknown>)[key] = result.value;

@@ -7,11 +7,15 @@ import { toReportsViewModel } from "./viewModel";
 export function renderReportsWorkbench(state: ReportsWorkbenchState): string {
   const vm = toReportsViewModel(state);
   return `
-    <div class="feature-layout">
-      <section class="panel">
+    <div class="feature-layout" data-testid="reports-page">
+      <section class="panel" data-testid="reports-doctor-section">
         <div class="panel-head"><div><h2>${t("route.reports.label")}</h2><p>${t("feature.reports.description")}</p></div></div>
         ${renderFeatureGuide("reports")}
-        <div class="metrics">${renderMetric(t("feature.reports.doctorScore"), vm.doctorScore, vm.doctorScoreDetail)}${renderMetric(t("feature.reports.checks"), vm.checks)}${renderMetric(t("feature.reports.suggestions"), vm.suggestions)}</div>
+        <div class="metrics">
+          ${renderMetric(t("feature.reports.doctorScore"), vm.doctorScore, vm.doctorScoreDetail)}
+          ${renderMetric(t("feature.reports.checks"), vm.checks)}
+          ${renderMetric(t("feature.reports.suggestions"), vm.suggestions)}
+        </div>
         <div class="toolbar">
           ${renderActionButton("run-doctor-report", t("feature.reports.runDoctor"), "primary")}
           ${renderActionButton("export-doctor-markdown", t("feature.reports.exportMarkdown"))}
@@ -28,10 +32,13 @@ export function renderReportsWorkbench(state: ReportsWorkbenchState): string {
           ${renderActionButton("export-project-report", t("feature.reports.exportProject"))}
         </div>
       </section>
-      <section class="panel"><h2>${t("feature.reports.doctorReport")}</h2>${state.doctor ? `${renderRows(vm.doctorRows)}${renderRows(vm.checkRows, label("No checks.", "暂无检查项。"))}${renderRows(vm.suggestionRows, label("No suggestions.", "暂无建议。"))}` : `<div class="empty">${t("feature.reports.noDoctor")}</div>`}</section>
-      <section class="panel"><h2>${t("feature.reports.doctorRepairPlan")}</h2>${renderDoctorRepair(state)}</section>
-      <section class="panel"><h2>${t("feature.reports.reportText")}</h2><pre>${escapeHtml(vm.reportText)}</pre></section>
-      <section class="panel">
+      <section class="panel" data-testid="reports-doctor-result">
+        <h2>${t("feature.reports.doctorReport")}</h2>
+        ${state.doctor ? `${renderRows(vm.doctorRows)}${renderRows(vm.checkRows, label("No checks.", "No checks."))}${renderRows(vm.suggestionRows, label("No suggestions.", "No suggestions."))}` : `<div class="empty">${t("feature.reports.noDoctor")}</div>`}
+      </section>
+      <section class="panel" data-testid="reports-repair-result"><h2>${t("feature.reports.doctorRepairPlan")}</h2>${renderDoctorRepair(state)}</section>
+      <section class="panel" data-testid="reports-persistent-result"><h2>${t("feature.reports.reportText")}</h2><pre>${escapeHtml(vm.reportText)}</pre></section>
+      <section class="panel" data-testid="reports-export-section">
         <h2>${t("feature.reports.coverage")}</h2>
         <div class="data-table">
           ${renderReportCoverageRow("Doctor report", "Markdown and JSON export", "available")}
@@ -43,7 +50,12 @@ export function renderReportsWorkbench(state: ReportsWorkbenchState): string {
           ${renderReportCoverageRow("Project report", "JSON export with project analysis, config preview signals, ports, IDEA, and agent traces", "available")}
         </div>
       </section>
-      <section class="panel"><h2>${t("feature.reports.latestExport")}</h2><p>${escapeHtml(state.lastExport || t("feature.reports.noExport"))}</p>${state.lastExportPath ? `<p><strong>${escapeHtml(state.lastExportPath)}</strong></p>` : ""}</section>
+      <section class="panel" data-testid="reports-export-result">
+        <h2>${t("feature.reports.latestExport")}</h2>
+        <p>${escapeHtml(state.lastExport || t("feature.reports.noExport"))}</p>
+        ${state.lastExportPath ? `<p><strong>${escapeHtml(state.lastExportPath)}</strong></p>` : ""}
+      </section>
+      <section class="panel" data-testid="reports-doctor-error"><h2>Error state</h2><div class="empty">${t("state.notChecked")}</div></section>
     </div>
   `;
 }

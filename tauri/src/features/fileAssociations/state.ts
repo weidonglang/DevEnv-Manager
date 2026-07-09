@@ -1,4 +1,4 @@
-import type { FileAssociationAppSearchResult, FileAssociationBackupSummary, FileAssociationPlan, FileAssociationReport } from "../../types";
+import type { FileAssociationAppSearchResult, FileAssociationApplyResult, FileAssociationBackupSummary, FileAssociationPlan, FileAssociationReport } from "../../types";
 
 export type FileAssociationUiState = {
   report: FileAssociationReport | null;
@@ -15,7 +15,10 @@ export type FileAssociationUiState = {
   targetAppName: string;
   targetExecutable: string;
   appSearch: FileAssociationAppSearchResult | null;
+  applyResult: FileAssociationApplyResult | null;
+  rollbackResult: FileAssociationApplyResult | null;
   applyResultMessage: string;
+  operationError: string;
 };
 
 export const fileAssociationInitialState: FileAssociationUiState = {
@@ -33,5 +36,8 @@ export const fileAssociationInitialState: FileAssociationUiState = {
   targetAppName: "",
   targetExecutable: "",
   appSearch: null,
+  applyResult: null,
+  rollbackResult: null,
   applyResultMessage: "",
+  operationError: "",
 };

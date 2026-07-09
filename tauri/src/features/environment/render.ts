@@ -7,8 +7,8 @@ import { toEnvironmentViewModel } from "./viewModel";
 export function renderEnvironmentWorkbench(state: EnvironmentWorkbenchState): string {
   const vm = toEnvironmentViewModel(state);
   return `
-    <div class="feature-layout">
-      <section class="panel">
+    <div class="feature-layout" data-testid="environment-page">
+      <section class="panel" data-testid="environment-doctor-section">
         <div class="panel-head"><div><h2>${t("route.environment.label")}</h2><p>${t("feature.environment.description")}</p></div></div>
         ${renderFeatureGuide("environment")}
         <div class="metrics">
@@ -27,12 +27,13 @@ export function renderEnvironmentWorkbench(state: EnvironmentWorkbenchState): st
           ${renderActionButton("export-environment-report", t("feature.environment.export"))}
         </div>
         ${state.checking ? `<div class="loading-state inline-loading" role="status"><span class="loading-spinner" aria-hidden="true"></span><strong>${t("feature.environment.checking")}</strong></div>` : ""}
+        ${Object.keys(state.errors).length ? `<div class="error-state" data-testid="environment-error-panel">${Object.values(state.errors).map((message) => `<p>${escapeHtml(message)}</p>`).join("")}</div>` : ""}
         ${renderJdkPlanSelector(state)}
       </section>
-      <section class="panel"><h2>${t("feature.environment.details")}</h2>${renderRows(vm.detailRows)}</section>
-      <section class="panel"><h2>${t("feature.environment.pathWarnings")}</h2>${renderRows(vm.pathRows)}</section>
+      <section class="panel" data-testid="environment-result-panel"><h2>${t("feature.environment.details")}</h2>${renderRows(vm.detailRows)}</section>
+      <section class="panel" data-testid="environment-path-section"><h2>${t("feature.environment.pathWarnings")}</h2>${renderRows(vm.pathRows)}</section>
       <section class="panel"><h2>${t("feature.environment.issues")}</h2>${renderRows(vm.issueRows, t("state.notChecked"))}</section>
-      <section class="panel"><h2>${t("feature.environment.repairPlan")}</h2>${state.plan ? renderObjectTable(state.plan, ["planId", "riskLevel", "backupName", "summary", "warnings"]) : `<div class="empty">${t("feature.environment.noPlan")}</div>`}</section>
+      <section class="panel" data-testid="environment-operation-result"><h2>${t("feature.environment.repairPlan")}</h2>${state.plan ? renderObjectTable(state.plan, ["planId", "riskLevel", "backupName", "summary", "warnings"]) : `<div class="empty">${t("feature.environment.noPlan")}</div>`}</section>
     </div>
   `;
 }
@@ -42,7 +43,7 @@ function renderJdkPlanSelector(state: EnvironmentWorkbenchState): string {
   const current = state.reliability?.java.javaHomeExpanded || state.reliability?.userEnv.javaHomeExpanded || "";
   const selected = state.selectedJdkRoot;
   const selectedInCandidates = candidates.some((candidate) => candidate.path === selected) || current === selected;
-  return `<div class="form-grid environment-plan-input">
+  return `<div class="form-grid environment-plan-input" data-testid="environment-jdk-picker">
     <select id="java-plan-jdk-path">
       <option value="">${t("feature.environment.selectJdkRoot")}</option>
       ${selected && !selectedInCandidates ? `<option value="${escapeHtml(selected)}" selected>${t("feature.environment.manualJdkRoot")}: ${escapeHtml(selected)}</option>` : ""}

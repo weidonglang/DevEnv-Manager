@@ -1,5 +1,5 @@
 import { invoke } from "../../core/invoke";
-import type { CleanupArchitecture, CleanupPlan, CleanupResult, CleanupScanReport, ExpansionPlan, ExpansionResult, FolderUsageReport, LargeFileItem, MaintenanceOverview, MovePlan, MoveResult, OperationResult, PartitionLayoutReport, RollbackRecord } from "../../types";
+import type { CleanupArchitecture, CleanupPlan, CleanupResult, CleanupScanReport, DiskVolumeInfo, DuplicateGroup, ExpansionPlan, ExpansionResult, FolderUsageReport, LargeFileItem, MaintenanceOverview, MovePlan, MoveResult, OperationResult, PartitionLayoutReport, RollbackRecord } from "../../types";
 
 export function fileDirectory(path: string, directory?: string) {
   return directory || path.replace(/[\\/][^\\/]*$/, "");
@@ -11,6 +11,10 @@ export function storageCleanupArchitecture(): Promise<CleanupArchitecture> {
 
 export function inspectMaintenanceOverview(): Promise<MaintenanceOverview> {
   return invoke<MaintenanceOverview>("inspect_maintenance_overview");
+}
+
+export function inspectDiskOverview(): Promise<DiskVolumeInfo[]> {
+  return invoke<DiskVolumeInfo[]>("inspect_disk_overview");
 }
 
 export function scanCleanupTargets(): Promise<CleanupScanReport> {
@@ -71,6 +75,26 @@ export function inspectDownloads(): Promise<FolderUsageReport> {
 
 export function scanLargeFiles(root: string, minSizeMb: number): Promise<LargeFileItem[]> {
   return invoke<LargeFileItem[]>("scan_large_files", { root, minSizeMb, limit: 100 });
+}
+
+export function scanDuplicateLargeFiles(root: string, minSizeMb: number): Promise<DuplicateGroup[]> {
+  return invoke<DuplicateGroup[]>("scan_duplicate_large_files", { root, minSizeMb });
+}
+
+export function createDesktopArchivePlan(targetDrive: string): Promise<MovePlan> {
+  return invoke<MovePlan>("create_desktop_archive_plan", { targetDrive });
+}
+
+export function executeDesktopArchivePlan(plan: MovePlan, confirmationToken: string): Promise<MoveResult> {
+  return invoke<MoveResult>("execute_desktop_archive_plan", { plan, confirmationToken });
+}
+
+export function createDownloadsArchivePlan(targetDrive: string): Promise<MovePlan> {
+  return invoke<MovePlan>("create_downloads_archive_plan", { targetDrive });
+}
+
+export function executeDownloadsArchivePlan(plan: MovePlan, confirmationToken: string): Promise<MoveResult> {
+  return invoke<MoveResult>("execute_downloads_archive_plan", { plan, confirmationToken });
 }
 
 export function openAnalysisPath(path: string): Promise<OperationResult> {

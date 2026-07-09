@@ -1,5 +1,5 @@
 import { formatBytes } from "../../core/format";
-import type { CleanupCandidate, DiskVolumeInfo, FolderUsageReport, LargeFileItem } from "../../types";
+import type { CleanupCandidate, DiskVolumeInfo, DuplicateGroup, FolderUsageReport, LargeFileItem, MovePlan, MoveResult } from "../../types";
 import { escapeHtml, pageItems, renderActionButton, renderBadge, renderEmptyState, renderMetric, renderObjectTable, renderPagination, valueOf } from "../sharedView";
 import { t } from "../../core/i18n";
 import { renderFeatureGuide } from "../../components/featureGuide";
@@ -8,7 +8,7 @@ import type { CleanupWorkbenchState } from "./state";
 export function renderCleanupWorkbench(state: CleanupWorkbenchState): string {
   const selected = selectedCleanableCandidates(state);
   return `
-    <div class="feature-layout">
+    <div class="feature-layout" data-testid="cleanup-page">
       <section class="panel">
         <div class="panel-head"><div><h2>${t("route.cleanup.label")}</h2><p>${t("feature.cleanup.description")}</p></div></div>
         ${renderFeatureGuide("cleanup")}
@@ -45,6 +45,9 @@ export function renderCleanupWorkbench(state: CleanupWorkbenchState): string {
         </div>
       </section>
       ${renderCDriveRescue(state)}
+      ${renderDuplicateFiles(state)}
+      ${renderDesktopArchiveSection(state)}
+      ${renderDownloadsArchiveSection(state)}
       ${renderCleanupReport(state)}
       ${renderLargeFiles(state)}
       <section class="panel"><h2>${t("feature.cleanup.plans")}</h2>${renderCleanupPlan(state)}${renderCleanupExecutionResult(state)}${state.movePlan ? renderObjectTable(state.movePlan, ["planId", "source", "target", "mode", "warnings"]) : ""}${state.expansionPlan ? renderObjectTable(state.expansionPlan, ["planId", "mode", "canExecute", "requiresAdmin", "estimatedAddedBytes", "backupRequired", "explanation"]) : ""}${state.expansionResult ? renderObjectTable(state.expansionResult, ["planId", "success", "beforeFree", "afterFree", "output"]) : ""}</section>
@@ -55,17 +58,20 @@ export function renderCleanupWorkbench(state: CleanupWorkbenchState): string {
 function renderCDriveRescue(state: CleanupWorkbenchState): string {
   const overview = state.overview;
   const partition = state.partition;
-  return `<section class="panel" data-testid="cleanup-disk-overview-section">
+  const diskOverview = state.diskOverview.length ? state.diskOverview : overview?.volumes ?? [];
+  return `<section class="panel" data-testid="cleanup-disk-overview-entry">
     <div class="panel-head"><div><h2>${t("feature.cleanup.cRescue")}</h2><p>${t("feature.cleanup.cRescueDetail")}</p></div></div>
+    <div class="toolbar">${renderActionButton("inspect-disk-overview", "Refresh disk overview")}${renderActionButton("inspect-c-drive-rescue", t("feature.cleanup.cRescue"), "primary")}</div>
     <div class="metrics">
       ${renderMetric(t("feature.cleanup.cFree"), overview ? formatBytes(overview.cDrive.freeBytes) : t("state.notChecked"))}
       ${renderMetric(t("feature.cleanup.cUsed"), overview ? `${overview.cDrive.usedPercent.toFixed(1)}%` : t("state.notChecked"))}
       ${renderMetric(t("feature.cleanup.safeCleanEstimate"), overview ? formatBytes(overview.safeCleanEstimate) : t("state.notChecked"))}
       ${renderMetric(t("feature.cleanup.devCacheEstimate"), overview ? formatBytes(overview.devCacheEstimate) : t("state.notChecked"))}
     </div>
+    ${state.errors.diskOverview ? `<p class="error-text" data-testid="cleanup-disk-overview-error">${escapeHtml(state.errors.diskOverview)}</p>` : ""}
     ${state.errors.cRescue ? `<p class="error-text">${escapeHtml(state.errors.cRescue)}</p>` : ""}
     ${overview ? renderStringList(t("feature.cleanup.suggestions"), overview.suggestions) : ""}
-    <div data-testid="cleanup-disk-overview-result">${overview ? renderVolumes(overview.volumes) : renderEmptyState(t("state.notChecked"), t("feature.cleanup.partitionNotCheckedDetail"))}</div>
+    <div data-testid="cleanup-disk-overview-result">${diskOverview.length ? renderVolumes(diskOverview) : renderEmptyState(t("state.notChecked"), t("feature.cleanup.partitionNotCheckedDetail"))}</div>
     ${partition ? renderPartition(partition) : renderEmptyState(t("feature.cleanup.partitionNotChecked"), t("feature.cleanup.partitionNotCheckedDetail"))}
     ${state.architecture ? renderStringList(t("feature.cleanup.safetyRules"), state.architecture.safetyRules) : ""}
     <div class="folder-overview-grid">
@@ -73,6 +79,89 @@ function renderCDriveRescue(state: CleanupWorkbenchState): string {
       ${renderFolderOverview(t("feature.cleanup.downloads"), state.downloads)}
     </div>
   </section>`;
+}
+
+function renderDuplicateFiles(state: CleanupWorkbenchState): string {
+  const paged = pageItems(state.duplicateGroups, state.duplicateGroupsPage, 10);
+  return `<section class="panel" data-testid="cleanup-duplicate-large-files-entry">
+    <div class="panel-head"><div><h2>Duplicate large files</h2><p>Read-only duplicate scan. It does not delete files.</p></div></div>
+    <div class="toolbar">${renderActionButton("scan-duplicate-large-files", "Scan duplicate large files")}</div>
+    ${state.errors.duplicateFiles ? `<p class="error-text" data-testid="cleanup-duplicate-large-files-error">${escapeHtml(state.errors.duplicateFiles)}</p>` : ""}
+    <div data-testid="cleanup-duplicate-large-files-result">
+      ${state.duplicateGroups.length ? `<div class="table-wrap"><table><thead><tr><th>Hash</th><th>Size</th><th>Files</th><th>Evidence</th></tr></thead><tbody>${paged.items.map(renderDuplicateGroup).join("")}</tbody></table></div>${renderPagination("cleanup-duplicate-large-files", paged.page, paged.totalPages, paged.total)}` : renderEmptyState("No duplicate scan yet", "Run the read-only scan to list duplicate groups.")}
+    </div>
+  </section>`;
+}
+
+function renderDuplicateGroup(group: DuplicateGroup): string {
+  return `<tr>
+    <td title="${escapeHtml(group.hash)}">${escapeHtml(group.hash.slice(0, 16))}</td>
+    <td>${formatBytes(group.size)}</td>
+    <td>${group.files.length}</td>
+    <td><ul>${group.files.slice(0, 5).map((file) => `<li title="${escapeHtml(file.path)}">${escapeHtml(file.path)}${file.modifiedAt ? ` <small>${escapeHtml(file.modifiedAt)}</small>` : ""}</li>`).join("")}</ul></td>
+  </tr>`;
+}
+
+function renderDesktopArchiveSection(state: CleanupWorkbenchState): string {
+  return `<section class="panel" data-testid="cleanup-desktop-archive-section">
+    <div class="panel-head"><div><h2>Desktop rescue archive</h2><p>Analyze and archive selected desktop clutter through a token-gated move plan.</p></div></div>
+    <div class="toolbar">
+      ${renderActionButton("create-desktop-archive-plan", "Create archive plan")}
+      ${renderActionButton("execute-desktop-archive-plan", "Execute archive plan", "danger")}
+    </div>
+    ${state.errors.desktopArchive ? `<p class="error-text" data-testid="cleanup-desktop-archive-error">${escapeHtml(state.errors.desktopArchive)}</p>` : ""}
+    ${state.desktop ? renderFolderArchiveSummary(state.desktop) : renderEmptyState("Folder not analyzed yet", "Refresh C-drive rescue or create an archive plan to analyze this folder.")}
+    <div data-testid="cleanup-desktop-archive-plan-result">${state.desktopArchivePlan ? renderArchivePlan(state.desktopArchivePlan) : renderEmptyState("No archive plan", "Create a plan before executing. High-risk and unsafe items stay skipped.")}</div>
+    <div data-testid="cleanup-desktop-archive-execute-result">${state.desktopArchiveResult ? renderMoveResult(state.desktopArchiveResult) : renderEmptyState("No execution result", "Execution results, skipped items, failures, and report summary appear here.")}</div>
+    <div data-testid="cleanup-desktop-archive-rollback" class="small-note"><strong>Recovery</strong><p>Use the target folder and report summary to move files back manually, or use matching rollback records when available.</p></div>
+  </section>`;
+}
+
+function renderDownloadsArchiveSection(state: CleanupWorkbenchState): string {
+  return `<section class="panel" data-testid="cleanup-downloads-archive-section">
+    <div class="panel-head"><div><h2>Downloads rescue archive</h2><p>Analyze and archive selected Downloads clutter through a token-gated move plan.</p></div></div>
+    <div class="toolbar">
+      ${renderActionButton("create-downloads-archive-plan", "Create archive plan")}
+      ${renderActionButton("execute-downloads-archive-plan", "Execute archive plan", "danger")}
+    </div>
+    ${state.errors.downloadsArchive ? `<p class="error-text" data-testid="cleanup-downloads-archive-error">${escapeHtml(state.errors.downloadsArchive)}</p>` : ""}
+    ${state.downloads ? renderFolderArchiveSummary(state.downloads) : renderEmptyState("Folder not analyzed yet", "Refresh C-drive rescue or create an archive plan to analyze this folder.")}
+    <div data-testid="cleanup-downloads-archive-plan-result">${state.downloadsArchivePlan ? renderArchivePlan(state.downloadsArchivePlan) : renderEmptyState("No archive plan", "Create a plan before executing. High-risk and unsafe items stay skipped.")}</div>
+    <div data-testid="cleanup-downloads-archive-execute-result">${state.downloadsArchiveResult ? renderMoveResult(state.downloadsArchiveResult) : renderEmptyState("No execution result", "Execution results, skipped items, failures, and report summary appear here.")}</div>
+    <div data-testid="cleanup-downloads-archive-rollback" class="small-note"><strong>Recovery</strong><p>Use the target folder and report summary to move files back manually, or use matching rollback records when available.</p></div>
+  </section>`;
+}
+
+function renderFolderArchiveSummary(report: FolderUsageReport): string {
+  return `<div class="metrics">
+    ${renderMetric("Files/categories", report.categories.length)}
+    ${renderMetric(t("feature.cleanup.bytes"), formatBytes(report.totalBytes))}
+    ${renderMetric(t("feature.cleanup.path"), report.path)}
+  </div>
+  ${renderStringList(t("feature.cleanup.warnings"), report.warnings)}
+  ${renderStringList(t("feature.cleanup.suggestions"), report.suggestions)}
+  ${report.topFiles.length ? `<div class="table-wrap"><table><thead><tr><th>${t("feature.cleanup.file")}</th><th>${t("feature.cleanup.size")}</th><th>${t("feature.cleanup.suggestion")}</th></tr></thead><tbody>${report.topFiles.slice(0, 8).map((item) => `<tr><td title="${escapeHtml(item.path)}">${escapeHtml(item.fileName)}</td><td>${formatBytes(item.size)}</td><td>${escapeHtml(item.suggestion)}</td></tr>`).join("")}</tbody></table></div>` : ""}`;
+}
+
+function renderArchivePlan(plan: MovePlan): string {
+  return `<div class="cleanup-plan-panel">
+    ${renderObjectTable(plan, ["planId", "source", "target", "mode", "estimatedBytes", "itemCount", "risk", "requiresAdmin", "reversible", "warnings"])}
+    <p class="small-note"><strong>Preview required.</strong> Review source, target, skipped items, and warnings before executing.</p>
+  </div>`;
+}
+
+function renderMoveResult(result: MoveResult): string {
+  return `<div class="cleanup-result ${result.success ? "ok" : "warn"}">
+    <div class="metrics">
+      ${renderMetric(t("feature.cleanup.resultSuccess"), result.success ? t("state.yes") : t("state.no"))}
+      ${renderMetric(t("feature.cleanup.resultCleanedBytes"), formatBytes(result.movedBytes))}
+      ${renderMetric(t("feature.cleanup.resultCleaned"), result.movedItems)}
+      ${renderMetric("Target", result.targetPath)}
+    </div>
+    ${renderObjectTable(result, ["planId", "sourceBackup", "targetPath", "junctionCreated", "rollbackId"])}
+    ${result.failures.length ? `<div class="small-note"><strong>${t("feature.cleanup.resultFailures")}</strong><ul>${result.failures.map((failure) => `<li>${escapeHtml(failure)}</li>`).join("")}</ul></div>` : `<p class="small-note">${t("feature.cleanup.resultNoFailures")}</p>`}
+    ${result.reportMarkdown ? `<details class="small-note"><summary>${t("feature.cleanup.resultReport")}</summary><pre>${escapeHtml(result.reportMarkdown)}</pre></details>` : ""}
+  </div>`;
 }
 
 function renderPartition(partition: CleanupWorkbenchState["partition"]): string {

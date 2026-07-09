@@ -35,9 +35,25 @@ export function renderFileAssociations(state: FileAssociationUiState): string {
       </section>
       <section class="panel"><h2>${t("feature.fileAssociations.candidates")}</h2>${state.appSearch ? renderAppCandidates(state) : `<div class="empty">${t("feature.fileAssociations.searchEmpty")}</div>`}</section>
       <section class="panel"><h2>${t("feature.fileAssociations.records")}</h2><div class="data-table" data-testid="file-associations-records-table">${records.slice(0, 40).map((record) => `<div class="data-row"><span>${escapeHtml(valueOf(record, "extension"))}</span><span>${escapeHtml(valueOf(record, "currentAppName"))}</span><span>${escapeHtml(valueOf(record, "risk"))}</span><span>${escapeHtml(valueOf(record, "source"))}</span><span><button data-assoc-extension="${escapeHtml(valueOf(record, "extension"))}" data-assoc-app="${escapeHtml(valueOf(record, "currentAppName", ""))}" type="button">${t("feature.fileAssociations.changeOpenWith")}</button></span></div>`).join("") || `<div class="empty">${t("feature.fileAssociations.noResults")}</div>`}</div></section>
-      <section class="panel"><h2>${t("feature.fileAssociations.plan")}</h2><div data-testid="file-associations-plan-preview">${state.plan ? renderObjectTable(state.plan, ["planId", "targetAppName", "targetExecutable", "backupPath", "warnings", "changes"]) : `<div class="empty">${t("feature.fileAssociations.noPlan")}</div>`}</div><div data-testid="file-associations-rollback-info">${state.backups.length ? renderObjectTable(state.backups[0], ["backupName", "createdAt", "path"]) : `<div class="empty">${t("toast.noBackupAvailable")}</div>`}</div>${state.applyResultMessage ? `<p>${escapeHtml(state.applyResultMessage)}</p>` : ""}</section>
+      <section class="panel"><h2>${t("feature.fileAssociations.plan")}</h2><div data-testid="file-associations-plan-preview">${state.plan ? renderObjectTable(state.plan, ["planId", "targetAppName", "targetExecutable", "backupPath", "warnings", "changes"]) : `<div class="empty">${t("feature.fileAssociations.noPlan")}</div>`}</div><div data-testid="file-associations-rollback-info">${state.backups.length ? renderObjectTable(state.backups[0], ["backupId", "createdAt", "backupPath", "extensions", "rollbackAvailable"]) : `<div class="empty">${t("toast.noBackupAvailable")}</div>`}</div>${renderAssociationResults(state)}</section>
     </div>
   `;
+}
+
+function renderAssociationResults(state: FileAssociationUiState): string {
+  const result = state.rollbackResult ?? state.applyResult;
+  return `<div data-testid="file-associations-operation-result">
+    ${state.operationError ? `<div class="error-state" data-testid="file-associations-operation-error">${escapeHtml(state.operationError)}</div>` : ""}
+    ${result ? `<div class="execution-result ${result.success ? "ok" : "warn"}">
+      <div class="metrics">
+        ${renderMetric("Status", result.success ? t("state.yes") : t("state.no"))}
+        ${renderMetric("Items", result.items.length)}
+        ${renderMetric("Backup", result.backupId || result.backupPath || t("state.notAvailable"))}
+      </div>
+      ${renderObjectTable(result, ["message", "backupId", "backupPath"])}
+      <div class="table-wrap"><table><thead><tr><th>Extension</th><th>Success</th><th>UserChoice</th><th>Message</th></tr></thead><tbody>${result.items.map((item) => `<tr><td>${escapeHtml(item.extension)}</td><td>${item.success ? t("state.yes") : t("state.no")}</td><td>${item.requiresSystemSettings ? t("state.yes") : t("state.no")}</td><td>${escapeHtml(item.message)}</td></tr>`).join("")}</tbody></table></div>
+    </div>` : `<div class="empty">${state.applyResultMessage ? escapeHtml(state.applyResultMessage) : t("state.notChecked")}</div>`}
+  </div>`;
 }
 
 function renderAppCandidates(state: FileAssociationUiState): string {

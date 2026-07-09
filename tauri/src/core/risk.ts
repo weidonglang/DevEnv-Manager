@@ -90,7 +90,7 @@ export async function runRiskOperation(operation: RiskOperationView): Promise<un
   const host = ensureRiskHost();
   const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   host.innerHTML = `
-    <div class="risk-ux" role="dialog" aria-modal="true" aria-label="${operation.title}">
+    <div class="risk-ux" role="dialog" aria-modal="true" aria-label="${operation.title}" data-testid="global-risk-dialog">
       <div class="risk-ux__panel">
         <header><h2>${operation.title}</h2><button data-risk-close type="button">${t("risk.close")}</button></header>
         ${planPreview(operation)}
@@ -100,7 +100,7 @@ export async function runRiskOperation(operation: RiskOperationView): Promise<un
         ${tokenGate(operation)}
         <footer>
           <button data-risk-close type="button">${t("risk.cancel")}</button>
-          <button data-risk-execute class="danger" type="button">${t("risk.createTokenAndExecute")}</button>
+          <button data-risk-execute class="danger" type="button" data-testid="global-risk-result">${t("risk.createTokenAndExecute")}</button>
         </footer>
       </div>
     </div>
@@ -254,6 +254,7 @@ function ensureRiskHost(): HTMLElement {
   if (!host) {
     host = document.createElement("div");
     host.id = "risk-ux-host";
+    host.dataset.testid = "global-debug-status";
     document.body.appendChild(host);
   }
   return host;

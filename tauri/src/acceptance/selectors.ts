@@ -1,17 +1,17 @@
 export const acceptanceSelectors = {
   cleanup: {
-    diskOverviewSection: "cleanup-disk-overview-section",
-    diskOverviewRefresh: "cleanup-disk-overview-refresh",
+    diskOverviewSection: "cleanup-disk-overview-entry",
+    diskOverviewRefresh: "cleanup-disk-overview-action",
     diskOverviewResult: "cleanup-disk-overview-result",
-    duplicateFilesSection: "cleanup-duplicate-files-section",
-    duplicateFilesScan: "cleanup-duplicate-files-scan",
-    duplicateFilesResult: "cleanup-duplicate-files-result",
+    duplicateFilesSection: "cleanup-duplicate-large-files-entry",
+    duplicateFilesScan: "cleanup-duplicate-large-files-action",
+    duplicateFilesResult: "cleanup-duplicate-large-files-result",
     desktopArchiveSection: "cleanup-desktop-archive-section",
-    desktopArchivePlan: "cleanup-desktop-archive-plan",
-    desktopArchiveResult: "cleanup-desktop-archive-result",
+    desktopArchivePlan: "cleanup-desktop-archive-plan-action",
+    desktopArchiveResult: "cleanup-desktop-archive-execute-result",
     downloadsArchiveSection: "cleanup-downloads-archive-section",
-    downloadsArchivePlan: "cleanup-downloads-archive-plan",
-    downloadsArchiveResult: "cleanup-downloads-archive-result",
+    downloadsArchivePlan: "cleanup-downloads-archive-plan-action",
+    downloadsArchiveResult: "cleanup-downloads-archive-execute-result",
     inlineError: "cleanup-inline-error",
     operationResult: "cleanup-operation-result",
   },
@@ -43,8 +43,8 @@ export const acceptanceSelectors = {
     rollbackInfo: "file-associations-rollback-info",
   },
   quality: {
-    persistentError: "quality-persistent-error",
-    persistentResult: "quality-persistent-result",
+    persistentError: "global-persistent-error",
+    persistentResult: "global-persistent-result",
   },
 } as const;
 

@@ -53,8 +53,24 @@ function actionTestId(id: string): string {
   const aliases: Record<string, string> = {
     "create-port-plan": "ports-create-plan",
     "execute-port-plan": "ports-execute-plan",
-    "inspect-c-drive-rescue": "cleanup-disk-overview-refresh",
+    "inspect-c-drive-rescue": "cleanup-disk-overview-action",
+    "inspect-disk-overview": "cleanup-disk-overview-action",
+    "scan-duplicate-large-files": "cleanup-duplicate-large-files-action",
+    "create-desktop-archive-plan": "cleanup-desktop-archive-plan-action",
+    "execute-desktop-archive-plan": "cleanup-desktop-archive-execute-action",
+    "create-downloads-archive-plan": "cleanup-downloads-archive-plan-action",
+    "execute-downloads-archive-plan": "cleanup-downloads-archive-execute-action",
     "create-association-plan": "file-associations-create-plan",
+    "inspect-environment": "environment-inspect-action",
+    "create-java-plan": "environment-java-stabilize-plan",
+    "apply-java-plan": "environment-java-stabilize-result",
+    "run-doctor-report": "reports-run-doctor-action",
+    "export-doctor-markdown": "reports-export-markdown-action",
+    "export-doctor-json": "reports-export-json-action",
+    "open-latest-report-location": "reports-open-latest-export-action",
+    "copy-report-summary": "reports-copy-summary-action",
+    "create-doctor-repair-plan": "reports-repair-plan",
+    "execute-doctor-repair-plan": "reports-repair-result",
   };
   return aliases[id] ?? id;
 }
