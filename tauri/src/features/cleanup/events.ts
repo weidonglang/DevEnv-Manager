@@ -272,13 +272,32 @@ async function scanCLargeFiles(context: FeatureContext, state: CleanupWorkbenchS
 }
 
 async function scanDuplicateFiles(context: FeatureContext, state: CleanupWorkbenchState): Promise<void> {
+  state.duplicateScanRoot = context.root.querySelector<HTMLInputElement>("#cleanup-duplicate-scan-root")?.value.trim() ?? state.duplicateScanRoot;
+  const threshold = Number(context.root.querySelector<HTMLInputElement>("#cleanup-duplicate-min-size")?.value ?? state.duplicateScanMinSizeMb);
+  state.duplicateScanMinSizeMb = Number.isFinite(threshold) ? Math.max(1, Math.floor(threshold)) : 100;
+  state.duplicateScanStatus = "running";
+  state.duplicateGroups = [];
+  state.duplicateScanElapsedMs = 0;
+  state.duplicateScanCompletedAt = "";
+  delete state.errors.duplicateFiles;
   context.progress.start("Scanning duplicate large files");
+  context.root.innerHTML = renderCleanupWorkbench(state);
+  bindCleanupEvents(context, state);
+  const startedAt = performance.now();
   try {
-    state.duplicateGroups = await scanDuplicateLargeFiles("C:\\", 100);
+    // An empty root lets the backend choose a safe user folder. An explicit
+    // root is useful for focused scans and disposable smoke-test fixtures.
+    state.duplicateGroups = await scanDuplicateLargeFiles(state.duplicateScanRoot, state.duplicateScanMinSizeMb);
     state.duplicateGroupsPage = 1;
+    state.duplicateScanElapsedMs = Math.max(0, Math.round(performance.now() - startedAt));
+    state.duplicateScanCompletedAt = new Date().toLocaleString();
+    state.duplicateScanStatus = state.duplicateGroups.length ? "completedWithResults" : "completedEmpty";
     delete state.errors.duplicateFiles;
     context.progress.done("Duplicate scan complete");
   } catch (error) {
+    state.duplicateScanElapsedMs = Math.max(0, Math.round(performance.now() - startedAt));
+    state.duplicateScanCompletedAt = new Date().toLocaleString();
+    state.duplicateScanStatus = "failed";
     state.errors.duplicateFiles = errorMessage(error);
     context.progress.fail(state.errors.duplicateFiles);
   }

@@ -1,8 +1,12 @@
 import type { DoctorRepairPlan, DoctorRepairResult, DoctorReport } from "../../types";
 
+export type DoctorPlanStatus = "notCreated" | "creating" | "created" | "empty" | "failed" | "expired" | "executed";
+
 export type ReportsWorkbenchState = {
   doctor: DoctorReport | null;
   doctorPlan: DoctorRepairPlan | null;
+  doctorPlanStatus: DoctorPlanStatus;
+  doctorPlanUpdatedAt: string;
   doctorRepairResult: DoctorRepairResult | null;
   text: string;
   lastExport: string;
@@ -14,6 +18,8 @@ export type ReportsWorkbenchState = {
 export const reportsWorkbenchInitialState: ReportsWorkbenchState = {
   doctor: null,
   doctorPlan: null,
+  doctorPlanStatus: "notCreated",
+  doctorPlanUpdatedAt: "",
   doctorRepairResult: null,
   text: "",
   lastExport: "",
@@ -31,6 +37,8 @@ export function readPersistedReportsState(): ReportsWorkbenchState {
     return {
       ...reportsWorkbenchInitialState,
       doctor: parsed.doctor ?? null,
+      doctorPlanStatus: "notCreated",
+      doctorPlanUpdatedAt: "",
       doctorRepairResult: parsed.doctorRepairResult ?? null,
       text: parsed.text ?? "",
       lastExport: parsed.lastExport ?? "",
@@ -44,7 +52,7 @@ export function readPersistedReportsState(): ReportsWorkbenchState {
 }
 
 export function persistReportsState(state: ReportsWorkbenchState): void {
-  const safeState: ReportsWorkbenchState = { ...state, doctorPlan: null };
+  const safeState: ReportsWorkbenchState = { ...state, doctorPlan: null, doctorPlanStatus: "notCreated", doctorPlanUpdatedAt: "" };
   try {
     localStorage.setItem(REPORTS_STATE_KEY, JSON.stringify(safeState));
   } catch {

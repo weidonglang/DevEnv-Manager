@@ -1,5 +1,7 @@
 import type { CleanupArchitecture, CleanupPlan, CleanupResult, CleanupScanReport, DiskVolumeInfo, DuplicateGroup, ExpansionPlan, ExpansionResult, FolderUsageReport, LargeFileItem, MaintenanceOverview, MovePlan, MoveResult, PartitionLayoutReport, RollbackRecord } from "../../types";
 
+export type DuplicateScanStatus = "notStarted" | "running" | "completedWithResults" | "completedEmpty" | "failed";
+
 export type CleanupWorkbenchState = {
   scan: CleanupScanReport | null;
   architecture: CleanupArchitecture | null;
@@ -21,6 +23,11 @@ export type CleanupWorkbenchState = {
   largeFilesPage: number;
   duplicateGroups: DuplicateGroup[];
   duplicateGroupsPage: number;
+  duplicateScanStatus: DuplicateScanStatus;
+  duplicateScanRoot: string;
+  duplicateScanMinSizeMb: number;
+  duplicateScanElapsedMs: number;
+  duplicateScanCompletedAt: string;
   desktopArchivePlan: MovePlan | null;
   desktopArchiveResult: MoveResult | null;
   downloadsArchivePlan: MovePlan | null;
@@ -51,6 +58,11 @@ export const cleanupWorkbenchInitialState: CleanupWorkbenchState = {
   largeFilesPage: 1,
   duplicateGroups: [],
   duplicateGroupsPage: 1,
+  duplicateScanStatus: "notStarted",
+  duplicateScanRoot: "",
+  duplicateScanMinSizeMb: 100,
+  duplicateScanElapsedMs: 0,
+  duplicateScanCompletedAt: "",
   desktopArchivePlan: null,
   desktopArchiveResult: null,
   downloadsArchivePlan: null,

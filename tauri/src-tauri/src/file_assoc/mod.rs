@@ -1549,6 +1549,14 @@ mod tests {
         };
         plan.plan_fingerprint = plan_fingerprint(&plan);
         assert!(validate_plan_fingerprint(&plan).is_ok());
+        let serialized = serde_json::to_value(&plan).unwrap();
+        let change = &serialized["changes"][0];
+        assert_eq!(change["extension"], ".txt");
+        assert_eq!(change["before"]["currentProgId"], serde_json::Value::Null);
+        assert_eq!(change["after"]["appName"], "App");
+        assert_eq!(change["after"]["executable"], "app.exe");
+        assert_eq!(change["applyMode"], "openSystemSettings");
+        assert!(serialized["backupPath"].as_str().is_some());
         plan.target_app_name = "Other".to_string();
         assert!(validate_plan_fingerprint(&plan).is_err());
     }

@@ -263,6 +263,7 @@ export type PortResolutionPlan = {
   planId: string;
   pid: number;
   port: number;
+  protocol: string;
   processName: string;
   processPath: string;
   commandLine: string;
@@ -887,6 +888,16 @@ export type DoctorRepairPlan = {
   planId: string;
   beforeScore: number;
   actions: string[];
+  actionDetails: Array<{
+    actionId: string;
+    title: string;
+    reason: string;
+    evidence: string[];
+    riskLevel: string;
+    requiresBackup: boolean;
+    requiresToken: boolean;
+    nextStep: string;
+  }>;
   willCleanupPath: boolean;
   willConfigureEnvironment: boolean;
   backupName: string;

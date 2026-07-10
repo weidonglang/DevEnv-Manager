@@ -42,17 +42,35 @@ export function bindReportEvents(context: FeatureContext, state: ReportsWorkbenc
     bindReportEvents(context, state);
   });
   bindAction(context.root, "create-doctor-repair-plan", async () => {
+    state.actionResult = "";
+    state.actionError = "";
+    state.doctorPlan = null;
+    state.doctorRepairResult = null;
+    state.doctorPlanStatus = "creating";
+    state.doctorPlanUpdatedAt = new Date().toLocaleString();
     context.progress.start(t("feature.reports.creatingDoctorPlan"));
+    context.root.innerHTML = renderReportsWorkbench(state);
+    bindReportEvents(context, state);
     try {
       state.doctorPlan = await createDoctorRepairPlan();
-      state.doctorRepairResult = null;
+      state.doctorPlanStatus = state.doctorPlan.actions.length ? "created" : "empty";
+      state.doctorPlanUpdatedAt = new Date().toLocaleString();
+      state.actionResult = t("toast.planReady");
       if (!context.isCurrent()) return;
       context.progress.done(t("toast.planReady"));
       persistReportsState(state);
       context.root.innerHTML = renderReportsWorkbench(state);
       bindReportEvents(context, state);
     } catch (error) {
-      context.progress.fail(errorMessage(error));
+      state.doctorPlan = null;
+      state.doctorPlanStatus = "failed";
+      state.doctorPlanUpdatedAt = new Date().toLocaleString();
+      state.actionError = errorMessage(error);
+      persistReportsState(state);
+      context.progress.fail(state.actionError);
+      if (!context.isCurrent()) return;
+      context.root.innerHTML = renderReportsWorkbench(state);
+      bindReportEvents(context, state);
     }
   });
   bindAction(context.root, "execute-doctor-repair-plan", async () => {
@@ -86,10 +104,19 @@ export function bindReportEvents(context: FeatureContext, state: ReportsWorkbenc
       state.doctorRepairResult = result as ReportsWorkbenchState["doctorRepairResult"];
       state.doctor = state.doctorRepairResult?.report ?? state.doctor;
       state.doctorPlan = null;
+      state.doctorPlanStatus = "executed";
+      state.doctorPlanUpdatedAt = new Date().toLocaleString();
       state.actionResult = t("feature.reports.executeDoctorPlan");
       if (state.doctor) state.text = await doctorReportText(state.doctor, "markdown");
     } catch (error) {
       state.actionError = errorMessage(error);
+      if (isCancelledRiskAction(state.actionError)) {
+        state.doctorPlanStatus = "created";
+      } else {
+        state.doctorPlanStatus = isExpiredPlanError(state.actionError) ? "expired" : "failed";
+        state.doctorPlan = null;
+      }
+      state.doctorPlanUpdatedAt = new Date().toLocaleString();
     }
     persistReportsState(state);
     if (!context.isCurrent()) return;
@@ -132,6 +159,7 @@ export function bindReportEvents(context: FeatureContext, state: ReportsWorkbenc
 }
 
 export async function refreshReports(context: FeatureContext, state: ReportsWorkbenchState): Promise<void> {
+  state.actionError = "";
   context.progress.start(t("feature.reports.runningDoctor"));
   try {
     state.doctor = await runDoctorReport();
@@ -142,17 +170,28 @@ export async function refreshReports(context: FeatureContext, state: ReportsWork
     context.root.innerHTML = renderReportsWorkbench(state);
     bindReportEvents(context, state);
   } catch (error) {
-    context.progress.fail(errorMessage(error));
+    state.actionError = errorMessage(error);
+    persistReportsState(state);
+    context.progress.fail(state.actionError);
+    if (!context.isCurrent()) return;
+    context.root.innerHTML = renderReportsWorkbench(state);
+    bindReportEvents(context, state);
   }
 }
 
 async function exportWithProgress(context: FeatureContext, state: ReportsWorkbenchState, exporter: () => Promise<string>): Promise<void> {
+  state.actionError = "";
   context.progress.start(t("feature.reports.exporting"));
   try {
     showExport(context, state, await exporter());
     context.progress.done(state.lastExport || t("feature.reports.exportDone"));
   } catch (error) {
-    context.progress.fail(errorMessage(error));
+    state.actionError = errorMessage(error);
+    persistReportsState(state);
+    context.progress.fail(state.actionError);
+    if (!context.isCurrent()) return;
+    context.root.innerHTML = renderReportsWorkbench(state);
+    bindReportEvents(context, state);
   }
 }
 
@@ -177,8 +216,20 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+function isExpiredPlanError(message: string): boolean {
+  const normalized = message.toLowerCase();
+  return normalized.includes("expired") || normalized.includes("stale") || normalized.includes("already used") || normalized.includes("does not exist");
+}
+
+function isCancelledRiskAction(message: string): boolean {
+  const normalized = message.toLowerCase();
+  return normalized.includes("cancel") || normalized.includes("取消");
+}
+
 function ensureDoctor(context: FeatureContext, state: ReportsWorkbenchState): state is ReportsWorkbenchState & { doctor: NonNullable<ReportsWorkbenchState["doctor"]> } {
   if (state.doctor) return true;
+  state.actionError = t("toast.runDoctorFirst");
+  persistReportsState(state);
   context.toast(t("toast.runDoctorFirst"), true);
   if (!context.isCurrent()) return false;
   context.root.innerHTML = renderReportsWorkbench(state);

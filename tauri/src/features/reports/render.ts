@@ -65,7 +65,18 @@ export function renderReportsWorkbench(state: ReportsWorkbenchState): string {
 function renderDoctorRepair(state: ReportsWorkbenchState): string {
   const plan = state.doctorPlan;
   const result = state.doctorRepairResult;
-  return `${plan ? renderObjectTable(plan, ["planId", "beforeScore", "actions", "willCleanupPath", "willConfigureEnvironment", "backupName", "warnings"]) : `<div class="empty">${t("feature.reports.noDoctorPlan")}</div>`}${result ? renderObjectTable(result, ["beforeScore", "afterScore", "applied", "remaining"]) : ""}`;
+  return `<div data-testid="reports-doctor-plan-state">
+    ${renderObjectTable({ status: state.doctorPlanStatus, updatedAt: state.doctorPlanUpdatedAt || t("state.notChecked") }, ["status", "updatedAt"])}
+    ${state.doctorPlanStatus === "creating" ? `<div class="loading-state" role="status">${t("feature.reports.creatingDoctorPlan")}</div>` : ""}
+    ${state.actionError ? `<div class="error-state" data-testid="reports-doctor-plan-error">${escapeHtml(state.actionError)}</div>` : ""}
+    ${plan ? `${renderObjectTable(plan, ["planId", "beforeScore", "actions", "willCleanupPath", "willConfigureEnvironment", "backupName", "warnings"])}${renderDoctorActionDetails(plan.actionDetails)}` : state.doctorPlanStatus === "empty" ? `<div class="empty">Doctor completed: no supported repair actions are required.</div>` : state.doctorPlanStatus === "expired" ? `<div class="empty">The plan expired or became stale. Run Doctor and create a new plan.</div>` : state.doctorPlanStatus === "executed" ? `<div class="empty">The single-use plan was executed. The result is shown below.</div>` : state.doctorPlanStatus === "failed" ? `<div class="empty">Plan creation or execution failed. Review the persistent error above.</div>` : state.doctorPlanStatus === "creating" ? "" : `<div class="empty">${t("feature.reports.noDoctorPlan")}</div>`}
+    ${result ? renderObjectTable(result, ["beforeScore", "afterScore", "applied", "remaining"]) : ""}
+  </div>`;
+}
+
+function renderDoctorActionDetails(actions: NonNullable<ReportsWorkbenchState["doctorPlan"]>["actionDetails"]): string {
+  if (!actions.length) return "";
+  return `<div class="table-wrap"><table data-testid="reports-doctor-plan-actions"><thead><tr><th>Action</th><th>Reason</th><th>Evidence</th><th>Risk</th><th>Backup</th><th>Token</th><th>Next step</th></tr></thead><tbody>${actions.map((action) => `<tr><td>${escapeHtml(action.title)}<br><small>${escapeHtml(action.actionId)}</small></td><td>${escapeHtml(action.reason)}</td><td>${escapeHtml(action.evidence.join("; "))}</td><td>${escapeHtml(action.riskLevel)}</td><td>${action.requiresBackup ? t("state.yes") : t("state.no")}</td><td>${action.requiresToken ? t("state.yes") : t("state.no")}</td><td>${escapeHtml(action.nextStep)}</td></tr>`).join("")}</tbody></table></div>`;
 }
 
 function renderReportCoverageRow(name: string, detail: string, status: "available" | "view"): string {

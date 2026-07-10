@@ -1,5 +1,13 @@
 import type { EnvBackupRecord, EnvHealthCheck, EnvReliabilitySnapshot, EnvRepairPlan, EnvironmentBackupInfo, EnvironmentConfigPreview } from "../../types";
 
+export type EnvironmentPlanFailure = {
+  step: string;
+  command: string;
+  exitCode: string;
+  readableError: string;
+  nextStep: string;
+};
+
 export type EnvironmentWorkbenchState = {
   reliability: EnvReliabilitySnapshot | null;
   health: EnvHealthCheck[];
@@ -9,8 +17,9 @@ export type EnvironmentWorkbenchState = {
   plan: EnvRepairPlan | null;
   applyResult: string;
   selectedJdkRoot: string;
+  createPlanFailure: EnvironmentPlanFailure | null;
   checking: boolean;
-  errors: Partial<Record<"reliability" | "health" | "preview" | "envBackups" | "environmentBackups" | "applyResult", string>>;
+  errors: Partial<Record<"reliability" | "health" | "preview" | "envBackups" | "environmentBackups" | "createPlan" | "applyResult", string>>;
 };
 
 export const environmentWorkbenchInitialState: EnvironmentWorkbenchState = {
@@ -22,6 +31,7 @@ export const environmentWorkbenchInitialState: EnvironmentWorkbenchState = {
   plan: null,
   applyResult: "",
   selectedJdkRoot: "",
+  createPlanFailure: null,
   checking: false,
   errors: {},
 };

@@ -85,12 +85,37 @@ function renderDuplicateFiles(state: CleanupWorkbenchState): string {
   const paged = pageItems(state.duplicateGroups, state.duplicateGroupsPage, 10);
   return `<section class="panel" data-testid="cleanup-duplicate-large-files-entry">
     <div class="panel-head"><div><h2>Duplicate large files</h2><p>Read-only duplicate scan. It does not delete files.</p></div></div>
+    <div class="form-grid">
+      <input id="cleanup-duplicate-scan-root" data-testid="cleanup-duplicate-scan-root" value="${escapeHtml(state.duplicateScanRoot)}" placeholder="Scan folder (blank uses Downloads)" />
+      <input id="cleanup-duplicate-min-size" data-testid="cleanup-duplicate-min-size" type="number" min="1" step="1" value="${state.duplicateScanMinSizeMb}" aria-label="Minimum duplicate file size in MB" />
+    </div>
     <div class="toolbar">${renderActionButton("scan-duplicate-large-files", "Scan duplicate large files")}</div>
     ${state.errors.duplicateFiles ? `<p class="error-text" data-testid="cleanup-duplicate-large-files-error">${escapeHtml(state.errors.duplicateFiles)}</p>` : ""}
+    ${renderDuplicateScanStatus(state)}
     <div data-testid="cleanup-duplicate-large-files-result">
-      ${state.duplicateGroups.length ? `<div class="table-wrap"><table><thead><tr><th>Hash</th><th>Size</th><th>Files</th><th>Evidence</th></tr></thead><tbody>${paged.items.map(renderDuplicateGroup).join("")}</tbody></table></div>${renderPagination("cleanup-duplicate-large-files", paged.page, paged.totalPages, paged.total)}` : renderEmptyState("No duplicate scan yet", "Run the read-only scan to list duplicate groups.")}
+      ${state.duplicateScanStatus === "completedWithResults" ? `<div class="table-wrap"><table><thead><tr><th>Hash</th><th>Size</th><th>Files</th><th>Reclaimable</th><th>Evidence</th></tr></thead><tbody>${paged.items.map(renderDuplicateGroup).join("")}</tbody></table></div>${renderPagination("cleanup-duplicate-large-files", paged.page, paged.totalPages, paged.total)}` : state.duplicateScanStatus === "completedEmpty" ? `<div data-testid="cleanup-duplicate-large-files-scan-result">${renderEmptyState(t("feature.cleanup.noDuplicateGroups"), t("feature.cleanup.duplicateScanCompleteEmptyDetail"))}</div>` : state.duplicateScanStatus === "running" ? `<div class="loading-state" role="status">Scanning duplicate files...</div>` : state.duplicateScanStatus === "failed" ? renderEmptyState("Duplicate scan failed", "Review the persistent error above, adjust the folder, and retry.") : renderEmptyState("No duplicate scan yet", "Run the read-only scan to list duplicate groups.")}
     </div>
   </section>`;
+}
+
+function renderDuplicateScanStatus(state: CleanupWorkbenchState): string {
+  if (state.duplicateScanStatus === "notStarted") return "";
+  const status = state.duplicateScanStatus === "running"
+    ? "Scanning"
+    : state.duplicateScanStatus === "completedWithResults"
+      ? `Completed with ${state.duplicateGroups.length} duplicate group(s)`
+      : state.duplicateScanStatus === "completedEmpty"
+        ? "Scan complete - no duplicate groups found"
+        : "Scan failed";
+  const root = state.duplicateScanRoot || "Downloads (automatic safe default)";
+  const elapsed = state.duplicateScanElapsedMs ? `${state.duplicateScanElapsedMs} ms` : "In progress";
+  return `<dl class="kv-list" data-testid="cleanup-duplicate-scan-status">
+    <div><dt>Status</dt><dd>${escapeHtml(status)}</dd></div>
+    <div><dt>Scan folder</dt><dd>${escapeHtml(root)}</dd></div>
+    <div><dt>Minimum size</dt><dd>${state.duplicateScanMinSizeMb} MB</dd></div>
+    <div><dt>Duration</dt><dd>${escapeHtml(elapsed)}</dd></div>
+    ${state.duplicateScanCompletedAt ? `<div><dt>Completed at</dt><dd>${escapeHtml(state.duplicateScanCompletedAt)}</dd></div>` : ""}
+  </dl>`;
 }
 
 function renderDuplicateGroup(group: DuplicateGroup): string {
@@ -98,6 +123,7 @@ function renderDuplicateGroup(group: DuplicateGroup): string {
     <td title="${escapeHtml(group.hash)}">${escapeHtml(group.hash.slice(0, 16))}</td>
     <td>${formatBytes(group.size)}</td>
     <td>${group.files.length}</td>
+    <td>${formatBytes(group.reclaimableEstimate)}</td>
     <td><ul>${group.files.slice(0, 5).map((file) => `<li title="${escapeHtml(file.path)}">${escapeHtml(file.path)}${file.modifiedAt ? ` <small>${escapeHtml(file.modifiedAt)}</small>` : ""}<div class="row-actions compact"><button data-duplicate-file-open="${escapeHtml(file.path)}" type="button">${t("feature.cleanup.openLocation")}</button><button data-duplicate-file-copy="${escapeHtml(file.path)}" type="button">${t("feature.runtimes.copyPath")}</button></div></li>`).join("")}</ul></td>
   </tr>`;
 }

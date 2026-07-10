@@ -66,10 +66,24 @@ export function bindPortEvents(context: FeatureContext, state: PortsWorkbenchSta
         execute: (confirmationToken) => executePortResolutionPlan(state.plan!.planId, confirmationToken),
       });
       state.executionResult = result as PortsWorkbenchState["executionResult"];
+      state.plan = null;
+      try {
+        state.records = await scanPorts();
+        if (state.selectedKey && !selectedPortRecord(state.records, state.selectedKey)) {
+          state.selectedKey = null;
+          state.selectedPort = null;
+        }
+        state.scanError = "";
+      } catch (error) {
+        state.scanError = `Port verification refresh unavailable: ${errorMessage(error)}`;
+      }
     } catch (error) {
       state.planError = errorMessage(error);
     }
     renderAndBind(context, state);
+    window.requestAnimationFrame(() => {
+      context.root.querySelector<HTMLElement>("[data-testid='ports-execute-result']")?.scrollIntoView({ block: "start", behavior: "smooth" });
+    });
   });
   bindAction(context.root, "inspect-local-services", async () => {
     state.services = await inspectLocalServices();

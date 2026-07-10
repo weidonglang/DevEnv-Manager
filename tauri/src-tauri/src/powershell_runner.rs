@@ -252,20 +252,7 @@ pub fn native_command_message(result: &NativeCommandResult) -> String {
 }
 
 pub fn decode_output(bytes: &[u8]) -> String {
-    if bytes.len() >= 2 {
-        let little_endian = bytes[0] == 0xff && bytes[1] == 0xfe;
-        let nul_heavy =
-            bytes.len() > 4 && bytes.iter().skip(1).step_by(2).take(12).any(|b| *b == 0);
-        if little_endian || nul_heavy {
-            let start = if little_endian { 2 } else { 0 };
-            let units = bytes[start..]
-                .chunks_exact(2)
-                .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
-                .collect::<Vec<_>>();
-            return String::from_utf16_lossy(&units);
-        }
-    }
-    String::from_utf8_lossy(bytes).to_string()
+    crate::decode_command_stream(bytes)
 }
 
 fn kill_process_tree(pid: u32) -> bool {
@@ -301,6 +288,13 @@ mod tests {
     fn decodes_utf16le_output() {
         let bytes = [b'h', 0, b'i', 0, 0x0a, 0];
         assert_eq!(decode_output(&bytes), "hi\n");
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn decodes_windows_ansi_output() {
+        let bytes = [190, 220, 190, 248, 183, 195, 206, 202];
+        assert_eq!(decode_output(&bytes), "拒绝访问");
     }
 
     #[test]

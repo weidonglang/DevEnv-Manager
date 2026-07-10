@@ -361,6 +361,8 @@ export const zhCN = {
   "feature.cleanup.resultAvailableAfterExecute": "执行完成后会在下方显示。",
   "feature.cleanup.resultRecovery": "恢复方式",
   "feature.cleanup.resultRecoveryDetail": "可用时请使用回收站、报告摘要或回滚记录恢复。",
+  "feature.cleanup.noDuplicateGroups": "未发现重复大文件",
+  "feature.cleanup.duplicateScanCompleteEmptyDetail": "只读扫描已完成，未发现超过大小阈值的重复文件组。",
   "feature.cleanup.largeFiles": "大文件",
   "feature.cleanup.largeFilesDetail": "只用于人工查看，不会自动删除文件。",
   "feature.cleanup.largeFilesNotScanned": "尚未扫描大文件",

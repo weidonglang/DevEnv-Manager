@@ -25,19 +25,33 @@ export function bindFileAssociationEvents(context: FeatureContext, state: FileAs
   });
   bindAction(context.root, "search-association-app", async () => {
     syncInputs(context, state);
+    state.operationError = "";
+    state.appSearchError = "";
+    state.appSearch = null;
+    state.appSearchStatus = "loading";
     context.progress.start(t("feature.fileAssociations.search"));
+    context.root.innerHTML = renderFileAssociations(state);
+    bindFileAssociationEvents(context, state);
     try {
       state.appSearch = await searchAssociationApp(state.targetAppName, [...state.selectedExtensions][0] ?? "");
+      state.appSearchStatus = state.appSearch.candidates.length ? "results" : "empty";
       if (!context.isCurrent()) return;
       context.progress.done(t("state.available"));
       context.root.innerHTML = renderFileAssociations(state);
       bindFileAssociationEvents(context, state);
     } catch (error) {
-      context.progress.fail(errorMessage(error));
+      state.appSearchStatus = "failed";
+      state.appSearchError = errorMessage(error);
+      context.progress.fail(state.appSearchError);
+      if (!context.isCurrent()) return;
+      context.root.innerHTML = renderFileAssociations(state);
+      bindFileAssociationEvents(context, state);
     }
   });
   bindAction(context.root, "create-association-plan", async () => {
     syncInputs(context, state);
+    state.operationError = "";
+    state.plan = null;
     context.progress.start(t("feature.fileAssociations.createPlan"));
     try {
       state.plan = await createAssociationPlan({
@@ -51,7 +65,11 @@ export function bindFileAssociationEvents(context: FeatureContext, state: FileAs
       context.root.innerHTML = renderFileAssociations(state);
       bindFileAssociationEvents(context, state);
     } catch (error) {
-      context.progress.fail(errorMessage(error));
+      state.operationError = errorMessage(error);
+      context.progress.fail(state.operationError);
+      if (!context.isCurrent()) return;
+      context.root.innerHTML = renderFileAssociations(state);
+      bindFileAssociationEvents(context, state);
     }
   });
   bindAction(context.root, "apply-association-plan", async () => {

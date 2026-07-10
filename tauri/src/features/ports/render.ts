@@ -128,7 +128,7 @@ function renderPortPlan(state: PortsWorkbenchState): string {
   const plan = state.plan;
   if (!plan) return `<div class="empty">${t("feature.ports.noPlan")}</div>`;
   return `<div class="port-plan" data-testid="ports-plan-preview">
-    ${renderObjectTable(plan, ["planId", "riskLevel", "pid", "port", "processName", "processPath", "parentPid", "parentProcessName"])}
+    ${renderObjectTable(plan, ["planId", "riskLevel", "pid", "port", "protocol", "processName", "processPath", "commandLine", "parentPid", "parentProcessName"])}
     ${plan.serviceNames.length ? renderList(t("feature.ports.services"), plan.serviceNames) : ""}
     ${plan.relatedPorts.length ? renderList(t("feature.ports.relatedPorts"), plan.relatedPorts.map(String)) : ""}
     ${plan.recommendedActions.length ? renderList(t("feature.ports.recommendedActions"), plan.recommendedActions) : ""}

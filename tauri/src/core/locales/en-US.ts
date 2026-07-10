@@ -361,6 +361,8 @@ export const enUS = {
   "feature.cleanup.resultAvailableAfterExecute": "Displayed below after execution.",
   "feature.cleanup.resultRecovery": "Recovery",
   "feature.cleanup.resultRecoveryDetail": "Use the recycle bin, report summary, or rollback record when available.",
+  "feature.cleanup.noDuplicateGroups": "No duplicate large files found",
+  "feature.cleanup.duplicateScanCompleteEmptyDetail": "The read-only scan completed and found no duplicate groups above the size threshold.",
   "feature.cleanup.largeFiles": "Large files",
   "feature.cleanup.largeFilesDetail": "Manual review list only. Files are never deleted automatically.",
   "feature.cleanup.largeFilesNotScanned": "Large files not scanned",

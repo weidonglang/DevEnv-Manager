@@ -10,6 +10,8 @@ export function bindEnvironmentEvents(context: FeatureContext, state: Environmen
   bindAction(context.root, "inspect-environment", () => refreshEnvironment(context, state));
   context.root.querySelector<HTMLSelectElement>("#java-plan-jdk-path")?.addEventListener("change", (event) => {
     state.selectedJdkRoot = normalizeJdkRoot((event.currentTarget as HTMLSelectElement).value.trim());
+    state.createPlanFailure = null;
+    delete state.errors.createPlan;
     context.root.innerHTML = renderEnvironmentWorkbench(state);
     bindEnvironmentEvents(context, state);
   });
@@ -21,6 +23,8 @@ export function bindEnvironmentEvents(context: FeatureContext, state: Environmen
     }
     state.selectedJdkRoot = normalizeJdkRoot(selected);
     state.plan = null;
+    state.createPlanFailure = null;
+    delete state.errors.createPlan;
     context.toast(t("feature.environment.jdkRootSelected"));
     context.root.innerHTML = renderEnvironmentWorkbench(state);
     bindEnvironmentEvents(context, state);
@@ -28,18 +32,30 @@ export function bindEnvironmentEvents(context: FeatureContext, state: Environmen
   bindAction(context.root, "create-java-plan", async () => {
     const jdkPath = normalizeJdkRoot(state.selectedJdkRoot || context.root.querySelector<HTMLSelectElement>("#java-plan-jdk-path")?.value.trim() || "");
     if (!jdkPath) {
+      state.errors.createPlan = t("feature.environment.selectJdkRootFirst");
+      context.root.innerHTML = renderEnvironmentWorkbench(state);
+      bindEnvironmentEvents(context, state);
       context.toast(t("feature.environment.selectJdkRootFirst"), true);
       return;
     }
+    state.plan = null;
+    state.createPlanFailure = null;
+    delete state.errors.createPlan;
     context.progress.start(t("feature.environment.creatingJavaPlan"));
     try {
       state.plan = await createJavaStabilizePlan(jdkPath);
+      delete state.errors.createPlan;
       if (!context.isCurrent()) return;
       context.progress.done(t("toast.planReady"));
       context.root.innerHTML = renderEnvironmentWorkbench(state);
       bindEnvironmentEvents(context, state);
     } catch (error) {
-      context.progress.fail(errorMessage(error));
+      state.errors.createPlan = errorMessage(error);
+      state.createPlanFailure = environmentPlanFailure(state.errors.createPlan, jdkPath);
+      context.progress.fail(state.errors.createPlan);
+      if (!context.isCurrent()) return;
+      context.root.innerHTML = renderEnvironmentWorkbench(state);
+      bindEnvironmentEvents(context, state);
     }
   });
   bindAction(context.root, "apply-java-plan", async () => {
@@ -124,6 +140,19 @@ function normalizeJdkRoot(path: string): string {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function environmentPlanFailure(message: string, jdkPath: string): EnvironmentWorkbenchState["createPlanFailure"] {
+  const tool = message.match(/\b(java|javac|jar)\.exe\b/i)?.[0] ?? "JDK toolchain";
+  const exitCode = message.match(/exit(?: code)?\s*(?:Some\()?(-?\d+)/i)?.[1] ?? t("state.notAvailable");
+  const args = tool.toLowerCase() === "jar.exe" ? "" : " -version";
+  return {
+    step: "JDK compatibility probe",
+    command: tool === "JDK toolchain" ? `Validate ${jdkPath}` : `${jdkPath}\\bin\\${tool}${args}`,
+    exitCode,
+    readableError: message,
+    nextStep: "Confirm this is a JDK root containing runnable java.exe, javac.exe, and jar.exe. JDK 8 jar usage output is accepted without --help.",
+  };
 }
 
 function resultMessage(result: unknown, fallback: string): string {

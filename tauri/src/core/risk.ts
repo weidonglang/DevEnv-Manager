@@ -201,8 +201,12 @@ export async function runRiskOperation(operation: RiskOperationView): Promise<un
           if (panel) {
             panel.insertAdjacentHTML("beforeend", resultReport(result, operation));
             panel.insertAdjacentHTML("beforeend", rollbackPanel(operation));
+            panel.querySelector<HTMLElement>("[data-risk-result-report]")?.scrollIntoView({ block: "start", behavior: "smooth" });
           }
           executeButton.textContent = t("risk.executed");
+          host.querySelectorAll<HTMLButtonElement>("[data-risk-close]").forEach((button) => {
+            button.textContent = t("risk.close");
+          });
           finishDebug(riskLog, "success", result && typeof result === "object" && "message" in result ? String((result as { message: unknown }).message) : undefined, result);
           resolve(result);
         } catch (error) {

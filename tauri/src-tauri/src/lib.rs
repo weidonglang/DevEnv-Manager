@@ -21,7 +21,8 @@ use std::sync::{
     atomic::{AtomicBool, AtomicU64, Ordering},
     Mutex, OnceLock,
 };
-use std::time::Instant;
+use std::thread;
+use std::time::{Duration, Instant};
 use tauri::Emitter;
 use tempfile::Builder as TempBuilder;
 use zip::ZipArchive;
@@ -46,6 +47,21 @@ const MANAGED_PATHS: [&str; 8] = [
     r"%DEVENV_HOME%\tools\npm-global",
 ];
 const BLOCKED_PIDS: [u32; 2] = [0, 4];
+const PROTECTED_FORCE_KILL_PROCESS_NAMES: [&str; 11] = [
+    "system",
+    "registry",
+    "smss.exe",
+    "csrss.exe",
+    "wininit.exe",
+    "services.exe",
+    "lsass.exe",
+    "svchost.exe",
+    "winlogon.exe",
+    "spoolsv.exe",
+    "securityhealthservice.exe",
+];
+const PORT_PID_VERIFY_ATTEMPTS: usize = 20;
+const PORT_RELEASE_VERIFY_ATTEMPTS: usize = 4;
 const BLOCKED_NAMES: [&str; 9] = [
     "system",
     "idle",
@@ -401,6 +417,7 @@ struct PortResolutionPlan {
     plan_id: String,
     pid: u32,
     port: u16,
+    protocol: String,
     process_name: String,
     process_path: String,
     command_line: String,
@@ -592,10 +609,24 @@ struct DoctorRepairResult {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
+struct DoctorRepairActionDetail {
+    action_id: String,
+    title: String,
+    reason: String,
+    evidence: Vec<String>,
+    risk_level: String,
+    requires_backup: bool,
+    requires_token: bool,
+    next_step: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 struct DoctorRepairPlan {
     plan_id: String,
     before_score: u8,
     actions: Vec<String>,
+    action_details: Vec<DoctorRepairActionDetail>,
     will_cleanup_path: bool,
     will_configure_environment: bool,
     backup_name: String,
@@ -4512,6 +4543,12 @@ fn create_port_resolution_plan_blocking(pid: u32, port: u16) -> Result<PortResol
                 .to_string(),
         );
     }
+    validate_force_kill_target(
+        record.pid,
+        &record.process_name,
+        &record.process_path,
+        &record.service_names,
+    )?;
     if matches!(port, 3306 | 5432 | 6379 | 27017 | 9200 | 1433) || record.risk_level == "high" {
         warnings.push("sensitive_service_port".to_string());
     }
@@ -4520,6 +4557,7 @@ fn create_port_resolution_plan_blocking(pid: u32, port: u16) -> Result<PortResol
         plan_id: plan_id.clone(),
         pid,
         port,
+        protocol: record.protocol.clone(),
         process_name: record.process_name.clone(),
         process_path: record.process_path.clone(),
         command_line: record.command_line.clone(),
@@ -4570,26 +4608,32 @@ fn execute_port_resolution_plan_blocking(
     {
         return Err("Port owner changed; execution refused".to_string());
     }
+    validate_force_kill_target(
+        plan.pid,
+        &plan.process_name,
+        &plan.process_path,
+        &plan.service_names,
+    )?;
     let pid = plan.pid.to_string();
-    let kill = powershell_runner::run_probe_command("taskkill", &["/PID", &pid, "/T"], 10)
+    let kill = powershell_runner::run_probe_command("taskkill", &["/PID", &pid, "/T", "/F"], 10)
         .map_err(|err| format!("Failed to run taskkill: {err}"))?;
-    let remaining = scan_ports_blocking().unwrap_or_default();
-    let remaining_owners = remaining
-        .into_iter()
-        .filter(|item| item.local_port == plan.port && item.state.eq_ignore_ascii_case("LISTENING"))
-        .collect::<Vec<_>>();
-    let pid_exited = process_name(&sysinfo::System::new_all(), plan.pid).is_empty();
+    let pid_exited = retry_until(
+        PORT_PID_VERIFY_ATTEMPTS,
+        Duration::from_millis(100),
+        || !process_is_running(plan.pid),
+    );
+    let remaining_owners = wait_for_port_release(plan.port)?;
     let port_released = remaining_owners.is_empty();
     let requires_admin = port_failure_requires_admin(&kill);
-    let failure_reason = if kill.success && port_released {
+    let failure_reason = if kill.success && pid_exited && port_released {
         String::new()
     } else {
         port_failure_reason(&kill, pid_exited, port_released)
     };
     let next_steps = port_resolution_next_steps(&plan, kill.success, pid_exited, port_released, requires_admin);
     Ok(PortResolutionResult {
-        success: kill.success && port_released,
-        message: if kill.success && port_released {
+        success: kill.success && pid_exited && port_released,
+        message: if kill.success && pid_exited && port_released {
             format!("端口 {} 已释放", plan.port)
         } else {
             "端口释放未完成，请查看失败原因和下一步建议".to_string()
@@ -4606,6 +4650,60 @@ fn execute_port_resolution_plan_blocking(
         release_checked_at: unix_timestamp().to_string(),
         remaining_owners,
     })
+}
+
+fn validate_force_kill_target(
+    pid: u32,
+    process_name: &str,
+    process_path: &str,
+    service_names: &[String],
+) -> Result<(), String> {
+    if BLOCKED_PIDS.contains(&pid) {
+        return Err(format!("PID {pid} is protected and cannot enter force-kill execution"));
+    }
+    if !service_names.is_empty() {
+        return Err("service_owned_port: force-kill execution is not allowed".to_string());
+    }
+    let normalized_name = process_name.trim().to_ascii_lowercase();
+    if PROTECTED_FORCE_KILL_PROCESS_NAMES.contains(&normalized_name.as_str()) {
+        return Err(format!("Protected process {process_name} cannot enter force-kill execution"));
+    }
+    if process_path.trim().is_empty() {
+        return Err("Process path is unavailable; force-kill execution is refused".to_string());
+    }
+    Ok(())
+}
+
+fn retry_until<F>(attempts: usize, delay: Duration, mut predicate: F) -> bool
+where
+    F: FnMut() -> bool,
+{
+    for attempt in 0..attempts.max(1) {
+        if predicate() {
+            return true;
+        }
+        if attempt + 1 < attempts {
+            thread::sleep(delay);
+        }
+    }
+    false
+}
+
+fn wait_for_port_release(port: u16) -> Result<Vec<PortRecord>, String> {
+    let mut remaining_owners = Vec::new();
+    for attempt in 0..PORT_RELEASE_VERIFY_ATTEMPTS {
+        remaining_owners = scan_ports_blocking()?
+            .into_iter()
+            .filter(|item| item.local_port == port && item.state.eq_ignore_ascii_case("LISTENING"))
+            .collect();
+        if remaining_owners.is_empty() {
+            return Ok(remaining_owners);
+        }
+        if attempt + 1 < PORT_RELEASE_VERIFY_ATTEMPTS {
+            thread::sleep(Duration::from_millis(200));
+        }
+    }
+    Ok(remaining_owners)
 }
 
 fn port_failure_requires_admin(result: &powershell_runner::NativeCommandResult) -> bool {
@@ -8927,6 +9025,7 @@ async fn create_doctor_repair_plan() -> Result<DoctorRepairPlan, String> {
 fn create_doctor_repair_plan_blocking() -> Result<DoctorRepairPlan, String> {
     let before = run_doctor_blocking()?;
     let actions = doctor_repair_actions(&before);
+    let action_details = doctor_repair_action_details(&before, &actions);
     let will_cleanup_path = actions.iter().any(|item| item == "cleanup_path");
     let will_configure_environment = actions.iter().any(|item| item == "configure_env");
     let actions_fingerprint = doctor_actions_fingerprint(&actions, before.score);
@@ -8944,6 +9043,7 @@ fn create_doctor_repair_plan_blocking() -> Result<DoctorRepairPlan, String> {
         plan_id: plan_id.clone(),
         before_score: before.score,
         actions,
+        action_details,
         will_cleanup_path,
         will_configure_environment,
         backup_name: format!("doctor-repair-env-backup-{}", unix_timestamp()),
@@ -8963,6 +9063,57 @@ fn create_doctor_repair_plan_blocking() -> Result<DoctorRepairPlan, String> {
             },
         );
     Ok(plan)
+}
+
+fn doctor_repair_action_details(
+    report: &DoctorReport,
+    actions: &[String],
+) -> Vec<DoctorRepairActionDetail> {
+    actions
+        .iter()
+        .map(|action| {
+            let checks = report
+                .checks
+                .iter()
+                .filter(|check| check.fix_action.as_deref() == Some(action.as_str()))
+                .collect::<Vec<_>>();
+            let title = checks
+                .first()
+                .map(|check| check.title.clone())
+                .unwrap_or_else(|| action.clone());
+            let reason = checks
+                .iter()
+                .map(|check| check.detail.clone())
+                .find(|detail| !detail.trim().is_empty())
+                .unwrap_or_else(|| "Doctor identified a repairable issue.".to_string());
+            let evidence = checks
+                .iter()
+                .map(|check| format!("{}: {}", check.title, check.detail))
+                .collect::<Vec<_>>();
+            let risk_level = checks
+                .iter()
+                .map(|check| check.severity.as_str())
+                .max_by_key(|severity| match *severity {
+                    "critical" => 4,
+                    "high" => 3,
+                    "medium" | "warning" => 2,
+                    _ => 1,
+                })
+                .unwrap_or("high")
+                .to_string();
+            DoctorRepairActionDetail {
+                action_id: action.clone(),
+                title,
+                reason,
+                evidence,
+                risk_level,
+                requires_backup: true,
+                requires_token: true,
+                next_step: "Review the evidence, backup name, and risk confirmation before execution."
+                    .to_string(),
+            }
+        })
+        .collect()
 }
 
 fn doctor_repair_actions(report: &DoctorReport) -> Vec<String> {
@@ -12470,6 +12621,12 @@ fn process_name(system: &sysinfo::System, pid: u32) -> String {
         })
 }
 
+fn process_is_running(pid: u32) -> bool {
+    sysinfo::System::new_all()
+        .process(sysinfo::Pid::from_u32(pid))
+        .is_some()
+}
+
 fn classify_source(path: &str) -> String {
     let lower = path.to_ascii_lowercase();
     if lower.contains("\\devenvmanager\\") {
@@ -12654,14 +12811,7 @@ fn windows_service_map() -> std::collections::HashMap<u32, Vec<String>> {
             };
             let services = columns
                 .get(2)
-                .map(|value| {
-                    value
-                        .split(',')
-                        .map(str::trim)
-                        .filter(|item| !item.is_empty() && !item.eq_ignore_ascii_case("N/A"))
-                        .map(str::to_string)
-                        .collect::<Vec<_>>()
-                })
+                .map(|value| tasklist_service_names(value))
                 .unwrap_or_default();
             if !services.is_empty() {
                 result.insert(pid, services);
@@ -12669,6 +12819,21 @@ fn windows_service_map() -> std::collections::HashMap<u32, Vec<String>> {
         }
     }
     result
+}
+
+fn tasklist_service_names(value: &str) -> Vec<String> {
+    value
+        .split(',')
+        .map(str::trim)
+        .filter(|item| {
+            !item.is_empty()
+                && !matches!(
+                    item.to_ascii_lowercase().as_str(),
+                    "n/a" | "none" | "-" | "不适用" | "暂缺" | "无"
+                )
+        })
+        .map(str::to_string)
+        .collect()
 }
 
 fn parse_csv_line(line: &str) -> Vec<String> {
@@ -15159,6 +15324,102 @@ mod tests {
         assert_eq!(signature.identity, "Tomcat");
         assert_eq!(signature.risk_level, "high");
         assert!(signature.recommendation.contains("Windows 服务托管"));
+    }
+
+    #[test]
+    fn tasklist_no_service_markers_are_not_service_names() {
+        for marker in ["N/A", "n/a", "None", "-", "不适用", "暂缺", "无"] {
+            assert!(tasklist_service_names(marker).is_empty(), "marker={marker}");
+        }
+        assert_eq!(
+            tasklist_service_names("Dnscache, EventLog"),
+            vec!["Dnscache".to_string(), "EventLog".to_string()]
+        );
+    }
+
+    #[test]
+    fn missing_process_is_not_reported_as_running() {
+        assert!(!process_is_running(u32::MAX));
+    }
+
+    #[test]
+    fn force_kill_rejects_system_protected_and_service_owned_targets() {
+        assert!(validate_force_kill_target(4, "System", r"C:\\Windows\\System32\\ntoskrnl.exe", &[]).is_err());
+        for process_name in ["System", "lsass.exe", "svchost.exe", "spoolsv.exe"] {
+            assert!(
+                validate_force_kill_target(
+                    1234,
+                    process_name,
+                    &format!(r"C:\\Windows\\System32\\{process_name}"),
+                    &[],
+                )
+                .is_err(),
+                "process_name={process_name}"
+            );
+        }
+        assert!(validate_force_kill_target(
+            1234,
+            "python.exe",
+            r"C:\\Python313\\python.exe",
+            &["ExampleService".to_string()],
+        )
+        .is_err());
+        assert!(validate_force_kill_target(
+            1234,
+            "python.exe",
+            r"C:\\Python313\\python.exe",
+            &[],
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn pid_exit_verification_retries_are_bounded() {
+        let mut calls = 0;
+        let exited = retry_until(5, Duration::ZERO, || {
+            calls += 1;
+            calls == 3
+        });
+        assert!(exited);
+        assert_eq!(calls, 3);
+    }
+
+    #[test]
+    fn port_release_verification_retries_are_bounded() {
+        let mut calls = 0;
+        let released = retry_until(4, Duration::ZERO, || {
+            calls += 1;
+            false
+        });
+        assert!(!released);
+        assert_eq!(calls, 4);
+    }
+
+    #[test]
+    fn doctor_plan_details_include_evidence_and_safety_requirements() {
+        let report = DoctorReport {
+            score: 70,
+            summary: "PATH needs attention".to_string(),
+            checks: vec![DoctorCheck {
+                id: "path".to_string(),
+                title: "PATH check".to_string(),
+                category: "environment".to_string(),
+                status: "warning".to_string(),
+                severity: "high".to_string(),
+                detail: "Duplicate PATH entry".to_string(),
+                fix_action: Some("cleanup_path".to_string()),
+            }],
+            suggestions: Vec::new(),
+            generated_at: "1".to_string(),
+        };
+        let details = doctor_repair_action_details(&report, &["cleanup_path".to_string()]);
+        assert_eq!(details.len(), 1);
+        assert_eq!(details[0].action_id, "cleanup_path");
+        assert_eq!(details[0].risk_level, "high");
+        assert!(details[0].requires_backup);
+        assert!(details[0].requires_token);
+        assert!(details[0].evidence[0].contains("Duplicate PATH entry"));
+        assert!(!details[0].next_step.is_empty());
     }
 
     #[test]

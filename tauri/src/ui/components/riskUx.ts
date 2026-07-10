@@ -50,9 +50,9 @@ export function resultReport(result: unknown, operation?: RiskOperationView): st
   }
   const resultRows = resultToRows(result);
   if (resultRows.length) {
-    return `<section class="risk-section"><h3>${t("risk.result")}</h3>${rows(resultRows)}</section>`;
+    return `<section class="risk-section" data-risk-result-report><h3>${t("risk.result")}</h3>${rows(resultRows)}</section>`;
   }
-  return `<section class="risk-section"><h3>${t("risk.result")}</h3><p>${escapeHtml(formatPrimitive(result))}</p></section>`;
+  return `<section class="risk-section" data-risk-result-report><h3>${t("risk.result")}</h3><p>${escapeHtml(formatPrimitive(result))}</p></section>`;
 }
 
 export function errorReport(message: string): string {

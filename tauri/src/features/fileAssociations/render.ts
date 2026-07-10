@@ -33,11 +33,43 @@ export function renderFileAssociations(state: FileAssociationUiState): string {
           ${renderActionButton("export-association-report", t("feature.fileAssociations.export"))}
         </div>
       </section>
-      <section class="panel"><h2>${t("feature.fileAssociations.candidates")}</h2>${state.appSearch ? renderAppCandidates(state) : `<div class="empty">${t("feature.fileAssociations.searchEmpty")}</div>`}</section>
+      <section class="panel" data-testid="file-associations-app-search-result"><h2>${t("feature.fileAssociations.candidates")}</h2>${renderAppSearchState(state)}</section>
       <section class="panel"><h2>${t("feature.fileAssociations.records")}</h2><div class="data-table" data-testid="file-associations-records-table">${records.slice(0, 40).map((record) => `<div class="data-row"><span>${escapeHtml(valueOf(record, "extension"))}</span><span>${escapeHtml(valueOf(record, "currentAppName"))}</span><span>${escapeHtml(valueOf(record, "risk"))}</span><span>${escapeHtml(valueOf(record, "source"))}</span><span><button data-assoc-extension="${escapeHtml(valueOf(record, "extension"))}" data-assoc-app="${escapeHtml(valueOf(record, "currentAppName", ""))}" type="button">${t("feature.fileAssociations.changeOpenWith")}</button></span></div>`).join("") || `<div class="empty">${t("feature.fileAssociations.noResults")}</div>`}</div></section>
-      <section class="panel"><h2>${t("feature.fileAssociations.plan")}</h2>${state.selectionResult ? `<div class="small-note" data-testid="file-associations-selection-result">${escapeHtml(state.selectionResult)}</div>` : ""}<div data-testid="file-associations-plan-preview">${state.plan ? renderObjectTable(state.plan, ["planId", "targetAppName", "targetExecutable", "backupPath", "warnings", "changes"]) : `<div class="empty">${t("feature.fileAssociations.noPlan")}</div>`}</div><div data-testid="file-associations-rollback-info">${state.backups.length ? renderObjectTable(state.backups[0], ["backupId", "createdAt", "backupPath", "extensions", "rollbackAvailable"]) : `<div class="empty">${t("toast.noBackupAvailable")}</div>`}</div>${renderAssociationResults(state)}</section>
+      <section class="panel"><h2>${t("feature.fileAssociations.plan")}</h2>${state.selectionResult ? `<div class="small-note" data-testid="file-associations-selection-result">${escapeHtml(state.selectionResult)}</div>` : ""}<div data-testid="file-associations-plan-preview">${state.plan ? renderAssociationPlan(state.plan) : `<div class="empty">${t("feature.fileAssociations.noPlan")}</div>`}</div><div data-testid="file-associations-rollback-info">${state.backups.length ? renderObjectTable(state.backups[0], ["backupId", "createdAt", "backupPath", "extensions", "rollbackAvailable"]) : `<div class="empty">${t("toast.noBackupAvailable")}</div>`}</div>${renderAssociationResults(state)}</section>
     </div>
   `;
+}
+
+function renderAssociationPlan(plan: NonNullable<FileAssociationUiState["plan"]>): string {
+  const risk = plan.changes.some((change) => change.risk === "highRisk" || change.risk === "protected")
+    ? "high"
+    : plan.changes.some((change) => change.risk !== "normal") ? "medium" : "low";
+  return `<div class="association-plan-detail">
+    ${renderObjectTable({
+      planId: plan.planId,
+      riskLevel: risk,
+      targetAppName: plan.targetAppName,
+      targetExecutable: plan.targetExecutable,
+      backupPath: plan.backupPath,
+      requiresConfirmationToken: plan.requiresConfirmationToken,
+      planFingerprint: plan.planFingerprint,
+    }, ["planId", "riskLevel", "targetAppName", "targetExecutable", "backupPath", "requiresConfirmationToken", "planFingerprint"])}
+    <div class="table-wrap"><table data-testid="file-associations-plan-changes-table"><thead><tr>
+      <th>Extension</th><th>Current default application</th><th>Current ProgID</th><th>Target application</th><th>Target executable</th><th>Modification location</th><th>UserChoice state</th><th>Risk</th><th>Rollback</th><th>Windows Settings confirmation</th><th>Warnings</th>
+    </tr></thead><tbody>${plan.changes.map((change) => `<tr>
+      <td>${escapeHtml(change.extension)}</td>
+      <td>${escapeHtml(change.before.currentAppName || t("state.notAvailable"))}</td>
+      <td>${escapeHtml(change.before.currentProgId || t("state.notAvailable"))}</td>
+      <td>${escapeHtml(change.after.appName)}</td>
+      <td>${escapeHtml(change.after.executable)}</td>
+      <td>${escapeHtml(associationModificationLocation(change.extension, change.applyMode))}</td>
+      <td>${escapeHtml(change.before.source === "userChoice" ? "UserChoice present" : `Source: ${change.before.source}`)}</td>
+      <td>${escapeHtml(change.risk)}</td>
+      <td>${escapeHtml(plan.backupPath ? `Available: ${plan.backupPath}` : "Not available")}</td>
+      <td>${change.applyMode === "openSystemSettings" || change.before.requiresSystemSettings ? t("state.yes") : t("state.no")}</td>
+      <td>${escapeHtml(change.warnings.join("; ") || t("state.notAvailable"))}</td>
+    </tr>`).join("")}</tbody></table></div>
+  </div>`;
 }
 
 function renderAssociationResults(state: FileAssociationUiState): string {
@@ -64,6 +96,26 @@ function renderAppCandidates(state: FileAssociationUiState): string {
     ${renderObjectTable(search, ["query", "normalizedQuery", "matchedDisplayName", "manualSelectionRequired", "message"])}
     <div class="data-table">${candidates.map((candidate) => `<button class="data-row" type="button" data-assoc-candidate-app="${escapeHtml(candidate.displayName)}" data-assoc-candidate-exe="${escapeHtml(candidate.executablePath)}"><span>${escapeHtml(candidate.displayName)}</span><span>${escapeHtml(candidate.executablePath)}</span><span>${escapeHtml(candidate.source)}</span><span>${escapeHtml(candidate.confidence)}</span></button>`).join("") || `<div class="empty">${t("feature.fileAssociations.searchEmpty")}</div>`}</div>
   </div>`;
+}
+
+function renderAppSearchState(state: FileAssociationUiState): string {
+  if (state.appSearchStatus === "loading") {
+    return `<div class="loading-state" role="status" data-testid="file-associations-app-search-loading">${t("feature.fileAssociations.search")}</div>`;
+  }
+  if (state.appSearchStatus === "failed") {
+    return `<div class="error-state" data-testid="file-associations-app-search-error">${escapeHtml(state.appSearchError || state.operationError)}</div>`;
+  }
+  if (state.appSearchStatus === "empty") {
+    return `<div data-testid="file-associations-app-search-empty">${state.appSearch ? renderAppCandidates(state) : `<div class="empty">${t("feature.fileAssociations.searchEmpty")}</div>`}</div>`;
+  }
+  if (state.appSearchStatus === "results" && state.appSearch) return renderAppCandidates(state);
+  return `<div class="empty">${t("feature.fileAssociations.searchEmpty")}</div>`;
+}
+
+function associationModificationLocation(extension: string, applyMode: string): string {
+  if (applyMode === "openSystemSettings") return "Windows Settings > Apps > Default apps";
+  if (applyMode === "blocked") return "Blocked - no registry write";
+  return `HKCU\\Software\\Classes\\${extension} and target ProgID command`;
 }
 
 function filteredRecords(state: FileAssociationUiState): unknown[] {
