@@ -13382,6 +13382,41 @@ pub(crate) fn decode_command_stream(bytes: &[u8]) -> String {
 
 #[cfg(windows)]
 fn decode_windows_ansi(bytes: &[u8]) -> Option<String> {
+    const CODE_PAGE_CANDIDATES: [(u32, i32); 7] = [
+        (0, 8),    // CP_ACP: prefer the machine's configured ANSI code page.
+        (1, 6),    // CP_OEMCP: native console tools commonly use the OEM code page.
+        (936, 0),  // Simplified Chinese (GBK).
+        (950, 0),  // Traditional Chinese (Big5).
+        (932, 0),  // Japanese (Shift-JIS).
+        (949, 0),  // Korean.
+        (1252, 0), // Western European.
+    ];
+
+    if bytes.is_empty() {
+        return Some(String::new());
+    }
+
+    let mut best: Option<(i32, String)> = None;
+    for (code_page, preference) in CODE_PAGE_CANDIDATES {
+        let Some(value) = decode_windows_code_page(bytes, code_page, true) else {
+            continue;
+        };
+        let score = decoded_text_score(&value) + preference;
+        if best
+            .as_ref()
+            .map(|(best_score, _)| score > *best_score)
+            .unwrap_or(true)
+        {
+            best = Some((score, value));
+        }
+    }
+
+    best.map(|(_, value)| value)
+        .or_else(|| decode_windows_code_page(bytes, 0, false))
+}
+
+#[cfg(windows)]
+fn decode_windows_code_page(bytes: &[u8], code_page: u32, strict: bool) -> Option<String> {
     #[link(name = "kernel32")]
     extern "system" {
         fn MultiByteToWideChar(
@@ -13396,10 +13431,12 @@ fn decode_windows_ansi(bytes: &[u8]) -> Option<String> {
     if bytes.is_empty() || bytes.len() > i32::MAX as usize {
         return Some(String::new());
     }
+    const MB_ERR_INVALID_CHARS: u32 = 0x0000_0008;
+    let flags = if strict { MB_ERR_INVALID_CHARS } else { 0 };
     let required = unsafe {
         MultiByteToWideChar(
-            0,
-            0,
+            code_page,
+            flags,
             bytes.as_ptr(),
             bytes.len() as i32,
             std::ptr::null_mut(),
@@ -13412,8 +13449,8 @@ fn decode_windows_ansi(bytes: &[u8]) -> Option<String> {
     let mut words = vec![0_u16; required as usize];
     let written = unsafe {
         MultiByteToWideChar(
-            0,
-            0,
+            code_page,
+            flags,
             bytes.as_ptr(),
             bytes.len() as i32,
             words.as_mut_ptr(),
@@ -13421,6 +13458,34 @@ fn decode_windows_ansi(bytes: &[u8]) -> Option<String> {
         )
     };
     (written > 0).then(|| String::from_utf16_lossy(&words[..written as usize]))
+}
+
+#[cfg(windows)]
+fn decoded_text_score(value: &str) -> i32 {
+    value
+        .chars()
+        .map(|character| {
+            if character == '\u{fffd}' {
+                -20
+            } else if character.is_control() && !matches!(character, '\r' | '\n' | '\t') {
+                -10
+            } else if character.is_ascii() {
+                1
+            } else if matches!(
+                character,
+                '\u{3400}'..='\u{4dbf}'
+                    | '\u{4e00}'..='\u{9fff}'
+                    | '\u{3040}'..='\u{30ff}'
+                    | '\u{ac00}'..='\u{d7af}'
+            ) {
+                3
+            } else if matches!(character, '\u{00a0}'..='\u{00ff}') {
+                -2
+            } else {
+                0
+            }
+        })
+        .sum()
 }
 
 #[cfg(not(windows))]
@@ -15605,6 +15670,22 @@ mod tests {
             .flat_map(u16::to_le_bytes)
             .collect::<Vec<_>>();
         assert_eq!(decode_command_stream(&bytes), "WSL 正常");
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn command_stream_decodes_gbk_independently_of_system_locale() {
+        let bytes = [190, 220, 190, 248, 183, 195, 206, 202];
+        assert_eq!(decode_command_stream(&bytes), "拒绝访问");
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn command_stream_preserves_cp1252_text() {
+        let bytes = [
+            b'A', b'c', b'c', 0xe8, b's', b' ', b'r', b'e', b'f', b'u', b's', 0xe9,
+        ];
+        assert_eq!(decode_command_stream(&bytes), "Accès refusé");
     }
 
     #[test]
