@@ -49,7 +49,7 @@ The golden pre-refactor baseline is commit `55f4a6cfc2d91582f20566b813d4706af4ef
 
 The aggregate acceptance report contains 212 cases: 181 passed, 0 failed, 26 safely skipped, and 5 manual or deferred. P0 and P1 failure counts are both zero.
 
-- Eleven skipped cases are read-only Tauri commands that require a running backend. Registration, frontend wiring, selectors, and response rendering were checked automatically; the installed Windows smoke covered the release-critical Dashboard, Cleanup, Ports, Reports, Environment, File Associations, Settings, and Update paths.
+- Eleven skipped cases are read-only Tauri commands that require a running backend. Registration, frontend wiring, selectors, and response rendering were checked automatically; the installed Windows smoke covered the release-critical Cleanup, Ports, Reports, Environment, File Associations, Settings, and Update paths.
 - Fifteen skipped cases are dry-run or plan commands that require app-specific state or a confirmation token. Static command/argument contracts and plan/result selectors passed; targeted installed smoke created Cleanup, archive, Doctor, Java, File Association, and Ports plans without applying unrelated system changes.
 - `ports.planExecuteAndVerify.safeSmoke` is manual in the generic safe runner because process termination must not target arbitrary processes. It was completed against a disposable Python listener, with PID exit, port release, and empty remaining-owner verification.
 - `toolchains.mysqlRepair.safeSmoke` remains manual because no disposable MySQL fixture was available. No production MySQL repair was attempted.
