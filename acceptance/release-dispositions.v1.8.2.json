@@ -1,0 +1,1213 @@
+{
+  "schemaVersion": 1,
+  "version": "1.8.2",
+  "summary": {
+    "total": 27,
+    "byPriority": {
+      "P0": 15,
+      "P1": 12
+    },
+    "byDisposition": {
+      "deferred-nonblocking": 2,
+      "split-required": 25
+    }
+  },
+  "features": [
+    {
+      "featureId": "cleanup.cDriveRescue",
+      "priority": "P0",
+      "targetVersion": "v1.8.2",
+      "oldFeature": true,
+      "currentStatus": "partial",
+      "currentEntry": {
+        "route": "cleanup",
+        "testIds": [
+          "cleanup-disk-overview-entry",
+          "cleanup-disk-overview-action",
+          "cleanup-disk-overview-result"
+        ]
+      },
+      "backendCommands": [
+        "inspect_maintenance_overview",
+        "inspect_partition_layout",
+        "inspect_desktop",
+        "inspect_downloads",
+        "storage_cleanup_architecture"
+      ],
+      "completedContent": [
+        "frontendEntryVisible",
+        "resultPanelVisible",
+        "reportContract",
+        "debugContract"
+      ],
+      "unfinishedContent": "Exact remaining sub-capabilities are not adjudicated.",
+      "userImpact": "Cannot claim complete old-feature migration until sub-capabilities are split and evidenced.",
+      "affectsStartup": false,
+      "affectsSafety": false,
+      "affectsData": false,
+      "affectsOldCoreCapability": true,
+      "automatedEvidence": [
+        "feature-manifest:cleanup.cDriveRescue"
+      ],
+      "realTauriEvidence": [],
+      "installedAppEvidence": [],
+      "releaseDisposition": "split-required",
+      "releaseReason": "Feature aggregates multiple historical capabilities; split before ready/blocker adjudication.",
+      "followUpIssue": "#125"
+    },
+    {
+      "featureId": "cleanup.desktopArchive.ui",
+      "priority": "P0",
+      "targetVersion": "v1.8.2",
+      "oldFeature": true,
+      "currentStatus": "partial",
+      "currentEntry": {
+        "route": "cleanup",
+        "testIds": [
+          "cleanup-desktop-archive-section",
+          "cleanup-desktop-archive-plan-action",
+          "cleanup-desktop-archive-plan-result",
+          "cleanup-desktop-archive-execute-action",
+          "cleanup-desktop-archive-execute-result",
+          "cleanup-desktop-archive-rollback"
+        ]
+      },
+      "backendCommands": [
+        "create_desktop_archive_plan",
+        "execute_desktop_archive_plan"
+      ],
+      "completedContent": [
+        "backendCommandRegistered",
+        "riskContract",
+        "resultPanelVisible",
+        "debugContract",
+        "reportContract"
+      ],
+      "unfinishedContent": "Exact remaining sub-capabilities are not adjudicated.",
+      "userImpact": "Cannot claim complete old-feature migration until sub-capabilities are split and evidenced.",
+      "affectsStartup": false,
+      "affectsSafety": true,
+      "affectsData": true,
+      "affectsOldCoreCapability": true,
+      "automatedEvidence": [
+        "feature-manifest:cleanup.desktopArchive.ui",
+        "installed-app-targeted-smoke"
+      ],
+      "realTauriEvidence": [
+        "targeted-real-tauri-smoke"
+      ],
+      "installedAppEvidence": [
+        "targeted-installed-app-smoke"
+      ],
+      "releaseDisposition": "split-required",
+      "releaseReason": "Feature aggregates multiple historical capabilities; split before ready/blocker adjudication.",
+      "followUpIssue": "#125"
+    },
+    {
+      "featureId": "cleanup.diskOverview.ui",
+      "priority": "P0",
+      "targetVersion": "v1.8.2",
+      "oldFeature": false,
+      "currentStatus": "partial",
+      "currentEntry": {
+        "route": "cleanup",
+        "testIds": [
+          "cleanup-disk-overview-entry",
+          "cleanup-disk-overview-action",
+          "cleanup-disk-overview-result"
+        ]
+      },
+      "backendCommands": [
+        "inspect_disk_overview"
+      ],
+      "completedContent": [
+        "backendCommandRegistered",
+        "resultPanelVisible",
+        "debugContract",
+        "reportContract"
+      ],
+      "unfinishedContent": "Exact remaining sub-capabilities are not adjudicated.",
+      "userImpact": "Cannot claim complete old-feature migration until sub-capabilities are split and evidenced.",
+      "affectsStartup": false,
+      "affectsSafety": false,
+      "affectsData": false,
+      "affectsOldCoreCapability": false,
+      "automatedEvidence": [
+        "feature-manifest:cleanup.diskOverview.ui",
+        "installed-app-targeted-smoke"
+      ],
+      "realTauriEvidence": [
+        "targeted-real-tauri-smoke"
+      ],
+      "installedAppEvidence": [
+        "targeted-installed-app-smoke"
+      ],
+      "releaseDisposition": "deferred-nonblocking",
+      "releaseReason": "No v1.7.0 command overlap was found; product owner must confirm this is a new enhancement.",
+      "followUpIssue": "#125"
+    },
+    {
+      "featureId": "cleanup.downloadsArchive.ui",
+      "priority": "P0",
+      "targetVersion": "v1.8.2",
+      "oldFeature": true,
+      "currentStatus": "partial",
+      "currentEntry": {
+        "route": "cleanup",
+        "testIds": [
+          "cleanup-downloads-archive-section",
+          "cleanup-downloads-archive-plan-action",
+          "cleanup-downloads-archive-plan-result",
+          "cleanup-downloads-archive-execute-action",
+          "cleanup-downloads-archive-execute-result",
+          "cleanup-downloads-archive-rollback"
+        ]
+      },
+      "backendCommands": [
+        "create_downloads_archive_plan",
+        "execute_downloads_archive_plan"
+      ],
+      "completedContent": [
+        "backendCommandRegistered",
+        "riskContract",
+        "resultPanelVisible",
+        "debugContract",
+        "reportContract"
+      ],
+      "unfinishedContent": "Exact remaining sub-capabilities are not adjudicated.",
+      "userImpact": "Cannot claim complete old-feature migration until sub-capabilities are split and evidenced.",
+      "affectsStartup": false,
+      "affectsSafety": true,
+      "affectsData": true,
+      "affectsOldCoreCapability": true,
+      "automatedEvidence": [
+        "feature-manifest:cleanup.downloadsArchive.ui",
+        "installed-app-targeted-smoke"
+      ],
+      "realTauriEvidence": [
+        "targeted-real-tauri-smoke"
+      ],
+      "installedAppEvidence": [
+        "targeted-installed-app-smoke"
+      ],
+      "releaseDisposition": "split-required",
+      "releaseReason": "Feature aggregates multiple historical capabilities; split before ready/blocker adjudication.",
+      "followUpIssue": "#125"
+    },
+    {
+      "featureId": "cleanup.duplicateLargeFiles.ui",
+      "priority": "P0",
+      "targetVersion": "v1.8.2",
+      "oldFeature": true,
+      "currentStatus": "partial",
+      "currentEntry": {
+        "route": "cleanup",
+        "testIds": [
+          "cleanup-duplicate-large-files-entry",
+          "cleanup-duplicate-large-files-action",
+          "cleanup-duplicate-large-files-result"
+        ]
+      },
+      "backendCommands": [
+        "scan_duplicate_large_files"
+      ],
+      "completedContent": [
+        "backendCommandRegistered",
+        "resultPanelVisible",
+        "noToastOnly",
+        "debugContract",
+        "reportContract"
+      ],
+      "unfinishedContent": "Exact remaining sub-capabilities are not adjudicated.",
+      "userImpact": "Cannot claim complete old-feature migration until sub-capabilities are split and evidenced.",
+      "affectsStartup": false,
+      "affectsSafety": false,
+      "affectsData": false,
+      "affectsOldCoreCapability": true,
+      "automatedEvidence": [
+        "feature-manifest:cleanup.duplicateLargeFiles.ui",
+        "installed-app-targeted-smoke"
+      ],
+      "realTauriEvidence": [
+        "targeted-real-tauri-smoke"
+      ],
+      "installedAppEvidence": [
+        "targeted-installed-app-smoke"
+      ],
+      "releaseDisposition": "split-required",
+      "releaseReason": "Feature aggregates multiple historical capabilities; split before ready/blocker adjudication.",
+      "followUpIssue": "#125"
+    },
+    {
+      "featureId": "cleanup.moveExpansionLargeFiles",
+      "priority": "P1",
+      "targetVersion": "v1.8.2",
+      "oldFeature": true,
+      "currentStatus": "partial",
+      "currentEntry": {
+        "route": "cleanup",
+        "testIds": [
+          "scan-large-files-c",
+          "create-move-plan",
+          "create-expansion-plan"
+        ]
+      },
+      "backendCommands": [
+        "scan_large_files",
+        "open_analysis_path",
+        "create_move_plan",
+        "execute_move_plan",
+        "rollback_move",
+        "create_c_drive_expansion_plan",
+        "execute_c_drive_expansion"
+      ],
+      "completedContent": [
+        "riskContract",
+        "resultPanelVisible",
+        "reportContract",
+        "debugContract"
+      ],
+      "unfinishedContent": "Exact remaining sub-capabilities are not adjudicated.",
+      "userImpact": "Cannot claim complete old-feature migration until sub-capabilities are split and evidenced.",
+      "affectsStartup": false,
+      "affectsSafety": true,
+      "affectsData": true,
+      "affectsOldCoreCapability": true,
+      "automatedEvidence": [
+        "feature-manifest:cleanup.moveExpansionLargeFiles"
+      ],
+      "realTauriEvidence": [],
+      "installedAppEvidence": [],
+      "releaseDisposition": "split-required",
+      "releaseReason": "Feature aggregates multiple historical capabilities; split before ready/blocker adjudication.",
+      "followUpIssue": "#125"
+    },
+    {
+      "featureId": "cleanup.planExecuteAndVerify",
+      "priority": "P0",
+      "targetVersion": "v1.8.2",
+      "oldFeature": true,
+      "currentStatus": "partial",
+      "currentEntry": {
+        "route": "cleanup",
+        "testIds": [
+          "scan-cleanup",
+          "create-cleanup-plan",
+          "execute-cleanup-plan",
+          "cleanup-operation-result"
+        ]
+      },
+      "backendCommands": [
+        "scan_cleanup_targets",
+        "create_cleanup_plan",
+        "clean_selected_targets",
+        "export_cleanup_report"
+      ],
+      "completedContent": [
+        "planPreviewVisible",
+        "resultPanelVisible",
+        "noToastOnly",
+        "reportContract",
+        "debugContract",
+        "riskContract"
+      ],
+      "unfinishedContent": "Exact remaining sub-capabilities are not adjudicated.",
+      "userImpact": "Cannot claim complete old-feature migration until sub-capabilities are split and evidenced.",
+      "affectsStartup": false,
+      "affectsSafety": true,
+      "affectsData": true,
+      "affectsOldCoreCapability": true,
+      "automatedEvidence": [
+        "feature-manifest:cleanup.planExecuteAndVerify",
+        "installed-app-targeted-smoke"
+      ],
+      "realTauriEvidence": [
+        "targeted-real-tauri-smoke"
+      ],
+      "installedAppEvidence": [
+        "targeted-installed-app-smoke"
+      ],
+      "releaseDisposition": "split-required",
+      "releaseReason": "Feature aggregates multiple historical capabilities; split before ready/blocker adjudication.",
+      "followUpIssue": "#125"
+    },
+    {
+      "featureId": "debug.panelAndExport",
+      "priority": "P1",
+      "targetVersion": "v1.8.2",
+      "oldFeature": false,
+      "currentStatus": "partial",
+      "currentEntry": {
+        "route": "settings",
+        "testIds": [
+          "settings-debug-section",
+          "settings-debug-export"
+        ]
+      },
+      "backendCommands": [
+        "powershell_runner_status"
+      ],
+      "completedContent": [
+        "debugContract",
+        "noBlankToast"
+      ],
+      "unfinishedContent": "Exact remaining sub-capabilities are not adjudicated.",
+      "userImpact": "Cannot claim complete old-feature migration until sub-capabilities are split and evidenced.",
+      "affectsStartup": false,
+      "affectsSafety": false,
+      "affectsData": false,
+      "affectsOldCoreCapability": false,
+      "automatedEvidence": [
+        "feature-manifest:debug.panelAndExport",
+        "installed-app-targeted-smoke"
+      ],
+      "realTauriEvidence": [
+        "targeted-real-tauri-smoke"
+      ],
+      "installedAppEvidence": [
+        "targeted-installed-app-smoke"
+      ],
+      "releaseDisposition": "deferred-nonblocking",
+      "releaseReason": "No v1.7.0 command overlap was found; product owner must confirm this is a new enhancement.",
+      "followUpIssue": "#125"
+    },
+    {
+      "featureId": "doctor.runAndRepair",
+      "priority": "P0",
+      "targetVersion": "v1.8.2",
+      "oldFeature": true,
+      "currentStatus": "partial",
+      "currentEntry": {
+        "route": "reports",
+        "testIds": [
+          "reports-doctor-section",
+          "reports-doctor-result"
+        ]
+      },
+      "backendCommands": [
+        "run_doctor",
+        "doctor_report_text",
+        "create_doctor_repair_plan",
+        "execute_doctor_repair_plan"
+      ],
+      "completedContent": [
+        "resultPanelVisible",
+        "riskContract",
+        "reportContract",
+        "debugContract"
+      ],
+      "unfinishedContent": "Exact remaining sub-capabilities are not adjudicated.",
+      "userImpact": "Cannot claim complete old-feature migration until sub-capabilities are split and evidenced.",
+      "affectsStartup": false,
+      "affectsSafety": true,
+      "affectsData": true,
+      "affectsOldCoreCapability": true,
+      "automatedEvidence": [
+        "feature-manifest:doctor.runAndRepair",
+        "installed-app-targeted-smoke"
+      ],
+      "realTauriEvidence": [
+        "targeted-real-tauri-smoke"
+      ],
+      "installedAppEvidence": [
+        "targeted-installed-app-smoke"
+      ],
+      "releaseDisposition": "split-required",
+      "releaseReason": "Feature aggregates multiple historical capabilities; split before ready/blocker adjudication.",
+      "followUpIssue": "#125"
+    },
+    {
+      "featureId": "environment.doctorAndJava",
+      "priority": "P0",
+      "targetVersion": "v1.8.2",
+      "oldFeature": true,
+      "currentStatus": "partial",
+      "currentEntry": {
+        "route": "environment",
+        "testIds": [
+          "environment-doctor-section",
+          "environment-operation-result"
+        ]
+      },
+      "backendCommands": [
+        "inspect_env_reliability",
+        "environment_health",
+        "preview_user_environment_configuration",
+        "create_java_stabilize_plan",
+        "apply_env_repair_plan",
+        "cleanup_path_entries"
+      ],
+      "completedContent": [
+        "resultPanelVisible",
+        "riskContract",
+        "reportContract",
+        "debugContract"
+      ],
+      "unfinishedContent": "Exact remaining sub-capabilities are not adjudicated.",
+      "userImpact": "Cannot claim complete old-feature migration until sub-capabilities are split and evidenced.",
+      "affectsStartup": false,
+      "affectsSafety": true,
+      "affectsData": true,
+      "affectsOldCoreCapability": true,
+      "automatedEvidence": [
+        "feature-manifest:environment.doctorAndJava",
+        "installed-app-targeted-smoke"
+      ],
+      "realTauriEvidence": [
+        "targeted-real-tauri-smoke"
+      ],
+      "installedAppEvidence": [
+        "targeted-installed-app-smoke"
+      ],
+      "releaseDisposition": "split-required",
+      "releaseReason": "Feature aggregates multiple historical capabilities; split before ready/blocker adjudication.",
+      "followUpIssue": "#125"
+    },
+    {
+      "featureId": "environment.pathEvidence",
+      "priority": "P0",
+      "targetVersion": "v1.8.2",
+      "oldFeature": true,
+      "currentStatus": "partial",
+      "currentEntry": {
+        "route": "environment",
+        "testIds": [
+          "environment-path-section",
+          "environment-operation-result"
+        ]
+      },
+      "backendCommands": [
+        "inspect_env_reliability",
+        "environment_health"
+      ],
+      "completedContent": [
+        "fieldContract",
+        "resultPanelVisible",
+        "reportContract",
+        "debugContract"
+      ],
+      "unfinishedContent": "Exact remaining sub-capabilities are not adjudicated.",
+      "userImpact": "Cannot claim complete old-feature migration until sub-capabilities are split and evidenced.",
+      "affectsStartup": false,
+      "affectsSafety": false,
+      "affectsData": false,
+      "affectsOldCoreCapability": true,
+      "automatedEvidence": [
+        "feature-manifest:environment.pathEvidence",
+        "installed-app-targeted-smoke"
+      ],
+      "realTauriEvidence": [
+        "targeted-real-tauri-smoke"
+      ],
+      "installedAppEvidence": [
+        "targeted-installed-app-smoke"
+      ],
+      "releaseDisposition": "split-required",
+      "releaseReason": "Feature aggregates multiple historical capabilities; split before ready/blocker adjudication.",
+      "followUpIssue": "#125"
+    },
+    {
+      "featureId": "fileAssociations.planApplyRollback",
+      "priority": "P0",
+      "targetVersion": "v1.8.2",
+      "oldFeature": true,
+      "currentStatus": "partial",
+      "currentEntry": {
+        "route": "fileAssociations",
+        "testIds": [
+          "file-associations-create-plan",
+          "file-associations-plan-preview",
+          "file-associations-rollback-info"
+        ]
+      },
+      "backendCommands": [
+        "create_file_association_plan",
+        "apply_file_association_plan",
+        "list_file_association_backups",
+        "rollback_file_association_backup"
+      ],
+      "completedContent": [
+        "riskContract",
+        "resultPanelVisible",
+        "noToastOnly",
+        "reportContract",
+        "debugContract"
+      ],
+      "unfinishedContent": "Exact remaining sub-capabilities are not adjudicated.",
+      "userImpact": "Cannot claim complete old-feature migration until sub-capabilities are split and evidenced.",
+      "affectsStartup": false,
+      "affectsSafety": true,
+      "affectsData": true,
+      "affectsOldCoreCapability": true,
+      "automatedEvidence": [
+        "feature-manifest:fileAssociations.planApplyRollback",
+        "installed-app-targeted-smoke"
+      ],
+      "realTauriEvidence": [
+        "targeted-real-tauri-smoke"
+      ],
+      "installedAppEvidence": [
+        "targeted-installed-app-smoke"
+      ],
+      "releaseDisposition": "split-required",
+      "releaseReason": "Feature aggregates multiple historical capabilities; split before ready/blocker adjudication.",
+      "followUpIssue": "#125"
+    },
+    {
+      "featureId": "learning.readOnlyCommandSandbox",
+      "priority": "P1",
+      "targetVersion": "v1.8.2",
+      "oldFeature": true,
+      "currentStatus": "partial",
+      "currentEntry": {
+        "route": "learning",
+        "testIds": [
+          "learning-center-section",
+          "learning-command-result"
+        ]
+      },
+      "backendCommands": [
+        "run_tool_command",
+        "inspect_command_safety"
+      ],
+      "completedContent": [
+        "dangerousCommandRejected",
+        "resultPanelVisible",
+        "debugContract"
+      ],
+      "unfinishedContent": "Exact remaining sub-capabilities are not adjudicated.",
+      "userImpact": "Cannot claim complete old-feature migration until sub-capabilities are split and evidenced.",
+      "affectsStartup": false,
+      "affectsSafety": true,
+      "affectsData": false,
+      "affectsOldCoreCapability": true,
+      "automatedEvidence": [
+        "feature-manifest:learning.readOnlyCommandSandbox"
+      ],
+      "realTauriEvidence": [],
+      "installedAppEvidence": [],
+      "releaseDisposition": "split-required",
+      "releaseReason": "Feature aggregates multiple historical capabilities; split before ready/blocker adjudication.",
+      "followUpIssue": "#125"
+    },
+    {
+      "featureId": "nav.commandPalette.entry",
+      "priority": "P1",
+      "targetVersion": "v1.8.2",
+      "oldFeature": true,
+      "currentStatus": "partial",
+      "currentEntry": {
+        "route": "global",
+        "testIds": [
+          "command-palette-open",
+          "command-palette-panel"
+        ]
+      },
+      "backendCommands": [
+        "inspect_command_safety"
+      ],
+      "completedContent": [
+        "selectorPresent",
+        "riskContract",
+        "debugContract"
+      ],
+      "unfinishedContent": "Exact remaining sub-capabilities are not adjudicated.",
+      "userImpact": "Cannot claim complete old-feature migration until sub-capabilities are split and evidenced.",
+      "affectsStartup": false,
+      "affectsSafety": false,
+      "affectsData": false,
+      "affectsOldCoreCapability": true,
+      "automatedEvidence": [
+        "feature-manifest:nav.commandPalette.entry"
+      ],
+      "realTauriEvidence": [],
+      "installedAppEvidence": [],
+      "releaseDisposition": "split-required",
+      "releaseReason": "Feature aggregates multiple historical capabilities; split before ready/blocker adjudication.",
+      "followUpIssue": "#125"
+    },
+    {
+      "featureId": "nav.dashboard.entry",
+      "priority": "P1",
+      "targetVersion": "v1.8.2",
+      "oldFeature": true,
+      "currentStatus": "partial",
+      "currentEntry": {
+        "route": "dashboard",
+        "testIds": [
+          "nav-dashboard",
+          "dashboard-summary-section"
+        ]
+      },
+      "backendCommands": [
+        "app_snapshot",
+        "environment_health",
+        "powershell_runner_status",
+        "scan_ports"
+      ],
+      "completedContent": [
+        "navigationEntry",
+        "frontendEntryVisible",
+        "backendCommandRegistered",
+        "noUnavailableFlood",
+        "debugContract"
+      ],
+      "unfinishedContent": "Exact remaining sub-capabilities are not adjudicated.",
+      "userImpact": "Cannot claim complete old-feature migration until sub-capabilities are split and evidenced.",
+      "affectsStartup": false,
+      "affectsSafety": false,
+      "affectsData": false,
+      "affectsOldCoreCapability": true,
+      "automatedEvidence": [
+        "feature-manifest:nav.dashboard.entry",
+        "installed-app-targeted-smoke"
+      ],
+      "realTauriEvidence": [
+        "targeted-real-tauri-smoke"
+      ],
+      "installedAppEvidence": [
+        "targeted-installed-app-smoke"
+      ],
+      "releaseDisposition": "split-required",
+      "releaseReason": "Feature aggregates multiple historical capabilities; split before ready/blocker adjudication.",
+      "followUpIssue": "#125"
+    },
+    {
+      "featureId": "ports.planExecuteAndVerify",
+      "priority": "P0",
+      "targetVersion": "v1.8.2",
+      "oldFeature": true,
+      "currentStatus": "partial",
+      "currentEntry": {
+        "route": "ports",
+        "testIds": [
+          "ports-create-plan",
+          "ports-plan-preview",
+          "ports-execute-plan",
+          "ports-execute-result"
+        ]
+      },
+      "backendCommands": [
+        "create_port_resolution_plan",
+        "execute_port_resolution_plan",
+        "inspect_local_services",
+        "stop_local_service",
+        "open_process_location"
+      ],
+      "completedContent": [
+        "riskContract",
+        "resultPanelVisible",
+        "noToastOnly",
+        "manualDisposablePortSmoke",
+        "debugContract",
+        "reportContract"
+      ],
+      "unfinishedContent": "Real process termination is only safe against a disposable test process.",
+      "userImpact": "Cannot claim complete old-feature migration until sub-capabilities are split and evidenced.",
+      "affectsStartup": false,
+      "affectsSafety": true,
+      "affectsData": true,
+      "affectsOldCoreCapability": true,
+      "automatedEvidence": [
+        "feature-manifest:ports.planExecuteAndVerify",
+        "installed-app-targeted-smoke"
+      ],
+      "realTauriEvidence": [
+        "targeted-real-tauri-smoke"
+      ],
+      "installedAppEvidence": [
+        "targeted-installed-app-smoke"
+      ],
+      "releaseDisposition": "split-required",
+      "releaseReason": "Feature aggregates multiple historical capabilities; split before ready/blocker adjudication.",
+      "followUpIssue": "#125"
+    },
+    {
+      "featureId": "ports.scanTableAndReasons",
+      "priority": "P0",
+      "targetVersion": "v1.8.2",
+      "oldFeature": true,
+      "currentStatus": "partial",
+      "currentEntry": {
+        "route": "ports",
+        "testIds": [
+          "ports-table-section",
+          "ports-row",
+          "ports-row-closeability-reason"
+        ]
+      },
+      "backendCommands": [
+        "scan_ports",
+        "port_history"
+      ],
+      "completedContent": [
+        "tableVisible",
+        "rowReasonVisible",
+        "reportContract",
+        "debugContract"
+      ],
+      "unfinishedContent": "Exact remaining sub-capabilities are not adjudicated.",
+      "userImpact": "Cannot claim complete old-feature migration until sub-capabilities are split and evidenced.",
+      "affectsStartup": false,
+      "affectsSafety": false,
+      "affectsData": false,
+      "affectsOldCoreCapability": true,
+      "automatedEvidence": [
+        "feature-manifest:ports.scanTableAndReasons",
+        "installed-app-targeted-smoke"
+      ],
+      "realTauriEvidence": [
+        "targeted-real-tauri-smoke"
+      ],
+      "installedAppEvidence": [
+        "targeted-installed-app-smoke"
+      ],
+      "releaseDisposition": "split-required",
+      "releaseReason": "Feature aggregates multiple historical capabilities; split before ready/blocker adjudication.",
+      "followUpIssue": "#125"
+    },
+    {
+      "featureId": "profiles.crudImportExportApply",
+      "priority": "P1",
+      "targetVersion": "v1.8.2",
+      "oldFeature": true,
+      "currentStatus": "partial",
+      "currentEntry": {
+        "route": "profiles",
+        "testIds": [
+          "profiles-list",
+          "profiles-result"
+        ]
+      },
+      "backendCommands": [
+        "list_config_profiles",
+        "save_config_profile",
+        "delete_config_profile",
+        "rename_config_profile",
+        "copy_config_profile",
+        "export_config_profiles",
+        "import_config_profiles",
+        "create_profile_apply_plan",
+        "execute_profile_apply_plan"
+      ],
+      "completedContent": [
+        "riskContract",
+        "resultPanelVisible",
+        "debugContract",
+        "reportContract"
+      ],
+      "unfinishedContent": "Exact remaining sub-capabilities are not adjudicated.",
+      "userImpact": "Cannot claim complete old-feature migration until sub-capabilities are split and evidenced.",
+      "affectsStartup": false,
+      "affectsSafety": true,
+      "affectsData": true,
+      "affectsOldCoreCapability": true,
+      "automatedEvidence": [
+        "feature-manifest:profiles.crudImportExportApply",
+        "installed-app-targeted-smoke"
+      ],
+      "realTauriEvidence": [
+        "targeted-real-tauri-smoke"
+      ],
+      "installedAppEvidence": [
+        "targeted-installed-app-smoke"
+      ],
+      "releaseDisposition": "split-required",
+      "releaseReason": "Feature aggregates multiple historical capabilities; split before ready/blocker adjudication.",
+      "followUpIssue": "#125"
+    },
+    {
+      "featureId": "projects.analysisAndVerify",
+      "priority": "P1",
+      "targetVersion": "v1.8.2",
+      "oldFeature": true,
+      "currentStatus": "partial",
+      "currentEntry": {
+        "route": "projects",
+        "testIds": [
+          "projects-analysis-section",
+          "projects-result"
+        ]
+      },
+      "backendCommands": [
+        "analyze_project",
+        "inspect_idea_project",
+        "verify_java_consumer_environment",
+        "verify_nacos_java_environment",
+        "verify_nexus_java_environment",
+        "inspect_project_port_configs"
+      ],
+      "completedContent": [
+        "resultPanelVisible",
+        "reportContract",
+        "debugContract"
+      ],
+      "unfinishedContent": "Exact remaining sub-capabilities are not adjudicated.",
+      "userImpact": "Cannot claim complete old-feature migration until sub-capabilities are split and evidenced.",
+      "affectsStartup": false,
+      "affectsSafety": false,
+      "affectsData": false,
+      "affectsOldCoreCapability": true,
+      "automatedEvidence": [
+        "feature-manifest:projects.analysisAndVerify"
+      ],
+      "realTauriEvidence": [],
+      "installedAppEvidence": [],
+      "releaseDisposition": "split-required",
+      "releaseReason": "Feature aggregates multiple historical capabilities; split before ready/blocker adjudication.",
+      "followUpIssue": "#125"
+    },
+    {
+      "featureId": "projects.configApply",
+      "priority": "P1",
+      "targetVersion": "v1.8.2",
+      "oldFeature": true,
+      "currentStatus": "partial",
+      "currentEntry": {
+        "route": "projects",
+        "testIds": [
+          "projects-config-plan",
+          "projects-apply-result"
+        ]
+      },
+      "backendCommands": [
+        "preview_project_configuration",
+        "apply_project_configuration",
+        "generate_vscode_config"
+      ],
+      "completedContent": [
+        "riskContract",
+        "resultPanelVisible",
+        "debugContract",
+        "reportContract"
+      ],
+      "unfinishedContent": "Exact remaining sub-capabilities are not adjudicated.",
+      "userImpact": "Cannot claim complete old-feature migration until sub-capabilities are split and evidenced.",
+      "affectsStartup": false,
+      "affectsSafety": true,
+      "affectsData": true,
+      "affectsOldCoreCapability": true,
+      "automatedEvidence": [
+        "feature-manifest:projects.configApply"
+      ],
+      "realTauriEvidence": [],
+      "installedAppEvidence": [],
+      "releaseDisposition": "split-required",
+      "releaseReason": "Feature aggregates multiple historical capabilities; split before ready/blocker adjudication.",
+      "followUpIssue": "#125"
+    },
+    {
+      "featureId": "reports.exports",
+      "priority": "P0",
+      "targetVersion": "v1.8.2",
+      "oldFeature": true,
+      "currentStatus": "partial",
+      "currentEntry": {
+        "route": "reports",
+        "testIds": [
+          "reports-export-section",
+          "reports-export-result"
+        ]
+      },
+      "backendCommands": [
+        "export_doctor_report",
+        "export_doctor_report_json",
+        "export_env_reliability_report",
+        "export_python_diagnostic_report",
+        "export_file_association_report",
+        "export_cleanup_report",
+        "export_port_report",
+        "export_project_report",
+        "open_analysis_path"
+      ],
+      "completedContent": [
+        "resultPanelVisible",
+        "reportContract",
+        "debugContract",
+        "noToastOnly"
+      ],
+      "unfinishedContent": "Exact remaining sub-capabilities are not adjudicated.",
+      "userImpact": "Cannot claim complete old-feature migration until sub-capabilities are split and evidenced.",
+      "affectsStartup": false,
+      "affectsSafety": false,
+      "affectsData": false,
+      "affectsOldCoreCapability": true,
+      "automatedEvidence": [
+        "feature-manifest:reports.exports",
+        "installed-app-targeted-smoke"
+      ],
+      "realTauriEvidence": [
+        "targeted-real-tauri-smoke"
+      ],
+      "installedAppEvidence": [
+        "targeted-installed-app-smoke"
+      ],
+      "releaseDisposition": "split-required",
+      "releaseReason": "Feature aggregates multiple historical capabilities; split before ready/blocker adjudication.",
+      "followUpIssue": "#125"
+    },
+    {
+      "featureId": "runtime.install.groups",
+      "priority": "P0",
+      "targetVersion": "v1.8.2",
+      "oldFeature": true,
+      "currentStatus": "partial",
+      "currentEntry": {
+        "route": "runtimes",
+        "testIds": [
+          "runtime-install-jdk-group",
+          "runtime-install-node-group",
+          "runtime-install-python-group",
+          "runtime-install-go-group",
+          "runtime-install-maven-group",
+          "runtime-install-gradle-group"
+        ]
+      },
+      "backendCommands": [
+        "jdk_distributions",
+        "install_jdk",
+        "install_node",
+        "install_python",
+        "install_go",
+        "install_maven_latest",
+        "install_gradle_latest"
+      ],
+      "completedContent": [
+        "selectorsPresent",
+        "riskContract",
+        "resultPanelVisible",
+        "debugContract",
+        "reportContract"
+      ],
+      "unfinishedContent": "Exact remaining sub-capabilities are not adjudicated.",
+      "userImpact": "Cannot claim complete old-feature migration until sub-capabilities are split and evidenced.",
+      "affectsStartup": false,
+      "affectsSafety": true,
+      "affectsData": false,
+      "affectsOldCoreCapability": true,
+      "automatedEvidence": [
+        "feature-manifest:runtime.install.groups"
+      ],
+      "realTauriEvidence": [],
+      "installedAppEvidence": [],
+      "releaseDisposition": "split-required",
+      "releaseReason": "Feature aggregates multiple historical capabilities; split before ready/blocker adjudication.",
+      "followUpIssue": "#130"
+    },
+    {
+      "featureId": "runtime.installed.actions",
+      "priority": "P0",
+      "targetVersion": "v1.8.2",
+      "oldFeature": true,
+      "currentStatus": "partial",
+      "currentEntry": {
+        "route": "runtimes",
+        "testIds": [
+          "runtime-installed-list",
+          "runtime-operation-result"
+        ]
+      },
+      "backendCommands": [
+        "discover_runtimes",
+        "inspect_runtime_strong_verification",
+        "switch_runtime",
+        "uninstall_runtime",
+        "open_analysis_path",
+        "open_apps_features"
+      ],
+      "completedContent": [
+        "noExternalDirectUninstall",
+        "managedActionsVisible",
+        "resultPanelVisible",
+        "debugContract",
+        "riskContract",
+        "reportContract"
+      ],
+      "unfinishedContent": "Exact remaining sub-capabilities are not adjudicated.",
+      "userImpact": "Cannot claim complete old-feature migration until sub-capabilities are split and evidenced.",
+      "affectsStartup": false,
+      "affectsSafety": true,
+      "affectsData": true,
+      "affectsOldCoreCapability": true,
+      "automatedEvidence": [
+        "feature-manifest:runtime.installed.actions"
+      ],
+      "realTauriEvidence": [],
+      "installedAppEvidence": [],
+      "releaseDisposition": "split-required",
+      "releaseReason": "Feature aggregates multiple historical capabilities; split before ready/blocker adjudication.",
+      "followUpIssue": "#130"
+    },
+    {
+      "featureId": "settings.themeLanguageSafety",
+      "priority": "P1",
+      "targetVersion": "v1.8.2",
+      "oldFeature": true,
+      "currentStatus": "partial",
+      "currentEntry": {
+        "route": "settings",
+        "testIds": [
+          "settings-theme-section",
+          "settings-debug-section"
+        ]
+      },
+      "backendCommands": [
+        "load_config",
+        "set_root_dir",
+        "set_auto_check_update",
+        "reset_ui_config",
+        "open_app_config_dir"
+      ],
+      "completedContent": [
+        "darkHighContrastManual",
+        "resultPanelVisible",
+        "debugContract"
+      ],
+      "unfinishedContent": "Exact remaining sub-capabilities are not adjudicated.",
+      "userImpact": "Cannot claim complete old-feature migration until sub-capabilities are split and evidenced.",
+      "affectsStartup": false,
+      "affectsSafety": true,
+      "affectsData": false,
+      "affectsOldCoreCapability": true,
+      "automatedEvidence": [
+        "feature-manifest:settings.themeLanguageSafety",
+        "installed-app-targeted-smoke"
+      ],
+      "realTauriEvidence": [
+        "targeted-real-tauri-smoke"
+      ],
+      "installedAppEvidence": [
+        "targeted-installed-app-smoke"
+      ],
+      "releaseDisposition": "split-required",
+      "releaseReason": "Feature aggregates multiple historical capabilities; split before ready/blocker adjudication.",
+      "followUpIssue": "#125"
+    },
+    {
+      "featureId": "toolchains.gitNodePythonMirrors",
+      "priority": "P1",
+      "targetVersion": "v1.8.2",
+      "oldFeature": true,
+      "currentStatus": "partial",
+      "currentEntry": {
+        "route": "toolchains",
+        "testIds": [
+          "toolchains-overview-section",
+          "toolchains-result"
+        ]
+      },
+      "backendCommands": [
+        "inspect_command_safety",
+        "run_toolchain_action",
+        "run_platform_action",
+        "run_chsrc_action",
+        "network_diagnostics",
+        "cache_entries"
+      ],
+      "completedContent": [
+        "riskContract",
+        "resultPanelVisible",
+        "debugContract",
+        "reportContract"
+      ],
+      "unfinishedContent": "Exact remaining sub-capabilities are not adjudicated.",
+      "userImpact": "Cannot claim complete old-feature migration until sub-capabilities are split and evidenced.",
+      "affectsStartup": false,
+      "affectsSafety": true,
+      "affectsData": false,
+      "affectsOldCoreCapability": true,
+      "automatedEvidence": [
+        "feature-manifest:toolchains.gitNodePythonMirrors"
+      ],
+      "realTauriEvidence": [],
+      "installedAppEvidence": [],
+      "releaseDisposition": "split-required",
+      "releaseReason": "Feature aggregates multiple historical capabilities; split before ready/blocker adjudication.",
+      "followUpIssue": "#125"
+    },
+    {
+      "featureId": "toolchains.mysqlRepair",
+      "priority": "P1",
+      "targetVersion": "v1.8.2",
+      "oldFeature": true,
+      "currentStatus": "partial",
+      "currentEntry": {
+        "route": "toolchains",
+        "testIds": [
+          "toolchains-mysql-section",
+          "toolchains-mysql-result"
+        ]
+      },
+      "backendCommands": [
+        "inspect_mysql_repair",
+        "create_mysql_repair_plan",
+        "execute_mysql_repair_plan",
+        "mysql_pending_execution_guard"
+      ],
+      "completedContent": [
+        "riskContract",
+        "resultPanelVisible",
+        "debugContract",
+        "reportContract"
+      ],
+      "unfinishedContent": "Real MySQL repair must remain manual unless a disposable MySQL fixture is available.",
+      "userImpact": "Cannot claim complete old-feature migration until sub-capabilities are split and evidenced.",
+      "affectsStartup": false,
+      "affectsSafety": true,
+      "affectsData": true,
+      "affectsOldCoreCapability": true,
+      "automatedEvidence": [
+        "feature-manifest:toolchains.mysqlRepair"
+      ],
+      "realTauriEvidence": [],
+      "installedAppEvidence": [],
+      "releaseDisposition": "split-required",
+      "releaseReason": "Feature aggregates multiple historical capabilities; split before ready/blocker adjudication.",
+      "followUpIssue": "#125"
+    },
+    {
+      "featureId": "update.checkDownloadMetadata",
+      "priority": "P1",
+      "targetVersion": "v1.8.2",
+      "oldFeature": true,
+      "currentStatus": "partial",
+      "currentEntry": {
+        "route": "settings",
+        "testIds": [
+          "settings-update-section",
+          "settings-update-result"
+        ]
+      },
+      "backendCommands": [
+        "check_for_updates",
+        "download_update",
+        "launch_update_installer"
+      ],
+      "completedContent": [
+        "riskContract",
+        "resultPanelVisible",
+        "debugContract",
+        "reportContract"
+      ],
+      "unfinishedContent": "Exact remaining sub-capabilities are not adjudicated.",
+      "userImpact": "Cannot claim complete old-feature migration until sub-capabilities are split and evidenced.",
+      "affectsStartup": false,
+      "affectsSafety": false,
+      "affectsData": false,
+      "affectsOldCoreCapability": true,
+      "automatedEvidence": [
+        "feature-manifest:update.checkDownloadMetadata",
+        "installed-app-targeted-smoke"
+      ],
+      "realTauriEvidence": [
+        "targeted-real-tauri-smoke"
+      ],
+      "installedAppEvidence": [
+        "targeted-installed-app-smoke"
+      ],
+      "releaseDisposition": "split-required",
+      "releaseReason": "Feature aggregates multiple historical capabilities; split before ready/blocker adjudication.",
+      "followUpIssue": "#125"
+    }
+  ]
+}

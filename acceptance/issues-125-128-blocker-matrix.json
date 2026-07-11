@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "version": "1.8.2",
+  "summary": {
+    "issues": 4,
+    "remainingBlockerLabels": 4
+  },
+  "issues": [
+    {
+      "issue": 125,
+      "title": "旧功能完整性核查",
+      "state": "OPEN",
+      "labels": [
+        "hotfix",
+        "regression",
+        "tracking",
+        "blocker",
+        "audit"
+      ],
+      "uncheckedItems": null,
+      "currentEvidence": "This migration matrix is the first structured replacement for the long checklist.",
+      "remainingProblem": "Migration completeness has not yet reached mapped=total with zero missing/degraded/deferred/unreviewed.",
+      "blocksV182": true,
+      "labelDisposition": "retain blocker pending product adjudication",
+      "followUpIssue": "#125"
+    },
+    {
+      "issue": 126,
+      "title": "Risk、toast、Debug",
+      "state": "OPEN",
+      "labels": [
+        "bug",
+        "hotfix",
+        "frontend",
+        "blocker",
+        "debugging",
+        "risk-ux"
+      ],
+      "uncheckedItems": 100,
+      "currentEvidence": "Toast-only, risk, debug, and durable-result automated gates pass for declared P0 coverage.",
+      "remainingProblem": "The issue checklist has not been reconciled with installed-app evidence or explicitly deferred scope.",
+      "blocksV182": true,
+      "labelDisposition": "retain blocker pending issue comment and checklist mapping",
+      "followUpIssue": "#126"
+    },
+    {
+      "issue": 127,
+      "title": "搜索、导航、C 盘急救",
+      "state": "OPEN",
+      "labels": [
+        "bug",
+        "hotfix",
+        "frontend",
+        "regression",
+        "blocker",
+        "navigation"
+      ],
+      "uncheckedItems": 57,
+      "currentEvidence": "Installed smoke covers Cleanup plans and page switching; frontend quality checks pass.",
+      "remainingProblem": "The full search/navigation/cleanup checklist has no per-item release disposition.",
+      "blocksV182": true,
+      "labelDisposition": "retain blocker pending issue comment and checklist mapping",
+      "followUpIssue": "#127"
+    },
+    {
+      "issue": 128,
+      "title": "Debug、token/plan mismatch、多运行时",
+      "state": "OPEN",
+      "labels": [
+        "hotfix",
+        "regression",
+        "blocker",
+        "debugging",
+        "risk-ux",
+        "runtime"
+      ],
+      "uncheckedItems": 156,
+      "currentEvidence": "Token/plan contracts and Debug timeline checks pass for declared coverage; Runtime redesign remains #130.",
+      "remainingProblem": "Runtime sub-capabilities and legacy command mappings are not individually adjudicated.",
+      "blocksV182": true,
+      "labelDisposition": "retain blocker pending split and product adjudication",
+      "followUpIssue": "#128 / #130"
+    }
+  ]
+}
