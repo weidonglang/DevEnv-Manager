@@ -52,17 +52,17 @@ The golden pre-refactor baseline is commit `55f4a6cfc2d91582f20566b813d4706af4ef
 
 The v1.7.0 installer was freshly downloaded and its SHA256 re-verified during #132 RC closure. Before rollback, back up `%LOCALAPPDATA%\DevEnvManager\settings.json`. Uninstall v1.8.2, install the verified v1.7.0 package, then confirm the saved root directory and update-source settings load normally.
 
-## Pre-final RC Candidate Evidence
+## Final RC Candidate Evidence
 
-- Filename: `DevEnv.Manager_1.8.2_x64-setup.exe`
-- Size: `2675025`
-- SHA256: `fe636863f9dd0784ad463c717f1d74466a54cc87b61760fc7b7b683f6d4fe407`
-- Built from commit: `d29d08a845e7ad2b5c0d2db24d8ad6d2fa56cac1` plus the reviewed v1.8.2 version metadata in this RC batch
-- Install verified: pending
-- Launch verified: pending
-- Upgrade from v1.7.0: pending
-- Rollback to v1.7.0: pending
+The following binaries were built from a clean detached worktree at commit `d0686455c0fb4971660456b093bd92aaa00a6df7` and are the only v1.8.2 assets accepted by the RC verification.
 
-This hash identifies the pre-final candidate built before the CI locale fix and release-metadata commit. It is retained only as traceable RC evidence and must not be used as the final release hash. Final NSIS and MSI metadata will be recorded after authorized upgrade and rollback verification and a clean rebuild from the final commit.
+| Asset | Size | SHA256 | Verification |
+|---|---:|---|---|
+| `DevEnv.Manager_1.8.2_x64-setup.exe` | 2,675,263 bytes | `858e128f42b774e41772da9c065596c116812355d90c7943636bfaedded321e7` | v1.7.0 upgrade, installed-app smoke, uninstall, and v1.7.0 rollback passed |
+| `DevEnv.Manager_1.8.2_x64_en-US.msi` | 4,517,888 bytes | `ca9f6f0346b68ec4901e18f2d2f499ba0aa053e2f23e6a4503d155d79ca95ac3` | install, installed-app launch, and uninstall passed; Windows Installer status 0 |
+
+Upgrade verification retained the root directory, update sources, theme, safety-disclaimer state, and one existing profile. Cleanup was limited to read-only scans and plan previews. File Associations was limited to search, executable selection, and plan preview. Environment changes, archive execution, cleanup deletion, and association apply were not executed.
+
+The disposable port test terminated only its own Python process and verified `pidExited = true`, `portReleased = true`, and no remaining owner. After NSIS and MSI verification, the machine was restored to the verified v1.7.0 installer. v1.7.0 started with the retained v1.8.2-compatible configuration and opened Environment Doctor, Ports, Space Analysis, File Associations, Runtime, and Update. The final installed version is v1.7.0.
 
 This PR must not create a tag, GitHub Release, or Gitee Release. Those actions require explicit final approval after review.

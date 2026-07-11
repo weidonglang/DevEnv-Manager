@@ -12,7 +12,8 @@
 - Gitee 国内镜像：https://gitee.com/weidonglang/DevEnv-Manager
 - GitHub Release：https://github.com/weidonglang/DevEnv-Manager/releases
 - Gitee Release：https://gitee.com/weidonglang/DevEnv-Manager/releases
-- v1.8.2 pre-final RC candidate SHA256：`fe636863f9dd0784ad463c717f1d74466a54cc87b61760fc7b7b683f6d4fe407`（不是最终发布哈希）
+- v1.8.2 verified RC NSIS SHA256：`858e128f42b774e41772da9c065596c116812355d90c7943636bfaedded321e7`
+- v1.8.2 verified RC MSI SHA256：`ca9f6f0346b68ec4901e18f2d2f499ba0aa053e2f23e6a4503d155d79ca95ac3`
 
 适合：
 
@@ -56,7 +57,7 @@ v1.8.2 is the first stability-recovery candidate after the Workbench frontend re
 - Adds automated feature acceptance, backend/frontend drift, selector, toast-only, and data-contract gates.
 - Keeps Runtime v1.9.0 redesign, profile history restore, and full Advanced mode policy/visual work deferred.
 
-Pre-final RC installer metadata is recorded in [docs/release-v1.8.2.md](docs/release-v1.8.2.md). It must be replaced after final rebuild and verification. No v1.8.2 tag or release is created by this PR.
+Verified RC installer metadata and upgrade/rollback evidence are recorded in [docs/release-v1.8.2.md](docs/release-v1.8.2.md). No v1.8.2 tag or release is created by this PR.
 
 ## 1.8.1 Stable
 

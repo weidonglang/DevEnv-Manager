@@ -2,16 +2,16 @@
   "schemaVersion": 2,
   "channel": "stable",
   "version": "1.8.2",
-  "date": "2026-07-10",
+  "date": "2026-07-11",
   "notes": [
-    "v1.8.2 最终发布前 RC 候选元数据：恢复并加固前端重构后的 Cleanup、Ports、Environment、Reports 和 File Associations，加入自动验收和真实 Tauri 验证。当前候选校验和不是最终发布校验和。Runtime 最终重构继续由 v1.9.0 / #130 跟踪。"
+    "v1.8.2 已验证 RC 候选：恢复并加固前端重构后的 Cleanup、Ports、Environment、Reports 和 File Associations，加入自动验收以及 NSIS/MSI 安装验证。Runtime 最终重构继续由 v1.9.0 / #130 跟踪。"
   ],
   "assets": [
     {
       "platform": "windows-x64",
       "fileName": "DevEnv.Manager_1.8.2_x64-setup.exe",
-      "size": 2675025,
-      "sha256": "fe636863f9dd0784ad463c717f1d74466a54cc87b61760fc7b7b683f6d4fe407",
+      "size": 2675263,
+      "sha256": "858e128f42b774e41772da9c065596c116812355d90c7943636bfaedded321e7",
       "primaryUrl": "https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.8.2/DevEnv.Manager_1.8.2_x64-setup.exe",
       "mirrors": [
         {
