@@ -80,8 +80,10 @@ The following binaries were built from a clean detached worktree at commit `d068
 
 | Asset | Size | SHA256 | Verification |
 |---|---:|---|---|
-| `DevEnv.Manager_1.8.2_x64-setup.exe` | 2,675,263 bytes | `858e128f42b774e41772da9c065596c116812355d90c7943636bfaedded321e7` | v1.7.0 upgrade, installed-app smoke, uninstall, and v1.7.0 rollback passed |
+| `DevEnv.Manager_1.8.2_x64-setup.exe` | 2,675,263 bytes | `858e128f42b774e41772da9c065596c116812355d90c7943636bfaedded321e7` | silent v1.7.0 upgrade, installed-app smoke, uninstall, and v1.7.0 rollback passed |
 | `DevEnv.Manager_1.8.2_x64_en-US.msi` | 4,517,888 bytes | `ca9f6f0346b68ec4901e18f2d2f499ba0aa053e2f23e6a4503d155d79ca95ac3` | install, installed-app launch, and uninstall passed; Windows Installer status 0 |
+
+The interactive NSIS flow recognized v1.7.0 and delegated to the old NSIS uninstaller, but desktop automation could not drive that nested installer window. The same verified NSIS asset completed the upgrade with `/S` and exit code 0. A fully interactive upgrade remains a final manual release check rather than completed automated evidence.
 
 Upgrade verification retained the root directory, update sources, theme, safety-disclaimer state, and one existing profile. Cleanup was limited to read-only scans and plan previews. File Associations was limited to search, executable selection, and plan preview. Environment changes, archive execution, cleanup deletion, and association apply were not executed.
 
