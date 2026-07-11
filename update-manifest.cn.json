@@ -1,28 +1,28 @@
 {
   "schemaVersion": 2,
   "channel": "stable",
-  "version": "1.8.1",
-  "date": "2026-07-08",
+  "version": "1.8.2",
+  "date": "2026-07-10",
   "notes": [
-    "v1.8.1 公开热修复：稳定 Workbench 导航、Dashboard 降级加载、端口搜索、计划/令牌反馈、Risk UX、Debug 导出、深色/高对比度可读性、运行时受管/外部边界，以及 Environment/Projects/Ports/Cleanup/Reports/Profiles 核心结果渲染。高级功能完整性继续进入 v1.8.2 / v1.9.0。"
+    "v1.8.2 最终发布前 RC 候选元数据：恢复并加固前端重构后的 Cleanup、Ports、Environment、Reports 和 File Associations，加入自动验收和真实 Tauri 验证。当前候选校验和不是最终发布校验和。Runtime 最终重构继续由 v1.9.0 / #130 跟踪。"
   ],
   "assets": [
     {
       "platform": "windows-x64",
-      "fileName": "DevEnv.Manager_1.8.1_x64-setup.exe",
-      "size": 2657072,
-      "sha256": "0020a53785094797c77e15ff811c62802669db9b657dcd168437e050b9747df0",
-      "primaryUrl": "https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.8.1/DevEnv.Manager_1.8.1_x64-setup.exe",
+      "fileName": "DevEnv.Manager_1.8.2_x64-setup.exe",
+      "size": 2675025,
+      "sha256": "fe636863f9dd0784ad463c717f1d74466a54cc87b61760fc7b7b683f6d4fe407",
+      "primaryUrl": "https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.8.2/DevEnv.Manager_1.8.2_x64-setup.exe",
       "mirrors": [
         {
           "name": "Gitee Release",
           "region": "cn",
-          "url": "https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.8.1/DevEnv.Manager_1.8.1_x64-setup.exe"
+          "url": "https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.8.2/DevEnv.Manager_1.8.2_x64-setup.exe"
         },
         {
           "name": "GitHub Release",
           "region": "global",
-          "url": "https://github.com/weidonglang/DevEnv-Manager/releases/download/v1.8.1/DevEnv.Manager_1.8.1_x64-setup.exe"
+          "url": "https://github.com/weidonglang/DevEnv-Manager/releases/download/v1.8.2/DevEnv.Manager_1.8.2_x64-setup.exe"
         }
       ]
     }

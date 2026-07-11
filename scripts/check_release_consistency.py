@@ -16,16 +16,21 @@ def read_json(path: str) -> dict:
 
 def main() -> int:
     package_version = read_json("tauri/package.json")["version"]
+    package_lock_version = read_json("tauri/package-lock.json")["version"]
     tauri_version = read_json("tauri/src-tauri/tauri.conf.json")["version"]
     cargo = tomllib.loads((ROOT / "tauri/src-tauri/Cargo.toml").read_text(encoding="utf-8"))
     cargo_version = cargo["package"]["version"]
     manifest_version = read_json("update-manifest.json")["version"]
     cn_manifest_version = read_json("update-manifest.cn.json")["version"]
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    readme_match = re.search(r"当前版本：\*\*([0-9]+\.[0-9]+\.[0-9]+)\s+Stable\*\*", readme)
+    readme_match = re.search(
+        r"当前版本：\*\*([0-9]+\.[0-9]+\.[0-9]+)(?:\s+(?:Stable|Release Candidate))?\*\*",
+        readme,
+    )
     readme_version = readme_match.group(1) if readme_match else ""
     versions = {
         "tauri/package.json": package_version,
+        "tauri/package-lock.json": package_lock_version,
         "tauri/src-tauri/Cargo.toml": cargo_version,
         "tauri/src-tauri/tauri.conf.json": tauri_version,
         "update-manifest.json": manifest_version,

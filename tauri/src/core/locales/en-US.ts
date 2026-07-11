@@ -3,7 +3,7 @@ export const enUS = {
   "app.localWorkbench": "Local environment workbench",
   "app.commandPalette": "Command Palette",
   "app.refresh": "Refresh",
-  "app.statusRelease": "v1.8.1 hotfix",
+  "app.statusRelease": "v1.8.2 release candidate",
   "app.riskStatus": "Risk actions require plan and token",
   "app.theme": "Theme",
   "app.theme.light": "Light",

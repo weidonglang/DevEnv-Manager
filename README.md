@@ -2,9 +2,9 @@
 
 [GitHub 主仓库](https://github.com/weidonglang/DevEnv-Manager) · [Gitee 国内镜像](https://gitee.com/weidonglang/DevEnv-Manager) · [GitHub Release](https://github.com/weidonglang/DevEnv-Manager/releases) · [Gitee Release](https://gitee.com/weidonglang/DevEnv-Manager/releases) · [完整操作手册](docs/user-guide.md) · [安全说明](docs/safety-and-disclaimer.md) · [问题反馈](https://github.com/weidonglang/DevEnv-Manager/issues)
 
-面向 Windows 的开发环境诊断器与安全操作面板。当前版本：**1.8.1 Stable**。
+面向 Windows 的开发环境诊断器与安全操作面板。当前版本：**1.8.2 Release Candidate**。
 
-1.8.1 是公开 hotfix 版本：先修复 Workbench 大面积“不可用”、Dashboard/端口扫描降级、异步导航回跳、计划/令牌操作无反馈、Risk UX 卡住、运行时受管/外部边界、深色/高对比度可读性和 Debug 导出等稳定性问题。剩余高级功能完整性继续进入 v1.8.2 / v1.9.0。
+1.8.2 是前端重构后的首个稳定性恢复候选版本：恢复并加固 Cleanup、Ports、Environment、Reports、File Associations 等核心工作流，加入自动验收与真实 Tauri 验证。Runtime 最终重构继续由 #130 / v1.9.0 跟踪。
 
 ## 下载与镜像
 
@@ -12,7 +12,7 @@
 - Gitee 国内镜像：https://gitee.com/weidonglang/DevEnv-Manager
 - GitHub Release：https://github.com/weidonglang/DevEnv-Manager/releases
 - Gitee Release：https://gitee.com/weidonglang/DevEnv-Manager/releases
-- SHA256：`0020a53785094797c77e15ff811c62802669db9b657dcd168437e050b9747df0`
+- v1.8.2 pre-final RC candidate SHA256：`fe636863f9dd0784ad463c717f1d74466a54cc87b61760fc7b7b683f6d4fe407`（不是最终发布哈希）
 
 适合：
 
@@ -44,6 +44,19 @@ DevEnv Manager 解决的是 Windows 上多个开发生态互相影响的问题�
 - 适合希望用图形界面查看诊断证据，同时保留 CLI 自动化入口的用户。
 - 不适合希望软件自动接管整台机器、清理任意个人文件或替代专业包管理器的场景。
 - 熟练使用 mise/asdf/Scoop/Chocolatey 且环境已经稳定的用户，可以只使用诊断能力。
+
+## 1.8.2 Release Candidate
+
+v1.8.2 is the first stability-recovery candidate after the Workbench frontend refactor:
+
+- Restores durable, structured Cleanup flows for disk overview, duplicate files, archives, plans, receipts, and rollback information.
+- Hardens Ports classification and token-gated termination with owner re-check, protected-process refusal, and bounded PID/port verification.
+- Expands File Associations search and plan evidence before any apply operation.
+- Makes Doctor, report export, Environment, and JDK 8 validation results persistent and auditable.
+- Adds automated feature acceptance, backend/frontend drift, selector, toast-only, and data-contract gates.
+- Keeps Runtime v1.9.0 redesign, profile history restore, and full Advanced mode policy/visual work deferred.
+
+Pre-final RC installer metadata is recorded in [docs/release-v1.8.2.md](docs/release-v1.8.2.md). It must be replaced after final rebuild and verification. No v1.8.2 tag or release is created by this PR.
 
 ## 1.8.1 Stable
 
