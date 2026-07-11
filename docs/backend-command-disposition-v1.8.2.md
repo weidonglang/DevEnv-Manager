@@ -1,186 +1,183 @@
-# Backend Command Disposition for v1.8.2
+# Backend Command Final Mapping for v1.8.2
 
-This is an initial command-by-command classification. `release-blocker` and `split-required` entries require product adjudication before release; they are not silently allowlisted.
+Every registered command has a capability mapping and one final classification.
 
 - Registered: 168
 - bootstrap: 3
-- diagnostic: 7
-- dynamic-wrapper: 6
+- compatibility-alias: 37
+- diagnostic: 11
+- direct-user-command: 98
+- dynamic-user-command: 7
 - internal-helper: 4
-- legacy-compatible: 10
-- user-facing: 138
-- disposition deferred-nonblocking: 7
-- disposition ready: 109
-- disposition release-blocker: 35
-- disposition split-required: 17
+- replacement-command: 8
 
-| Command | Category | User facing | Priority | Frontend | Dynamic | Manifest | Disposition | Exact reason |
-|---|---|---:|---|---|---|---|---|---|
-| `accept_safety_disclaimer` | user-facing | True | P1 | tauri/src/app/bootstrap.ts:354 |  |  | ready | Direct frontend invoke exists. |
-| `add_archive_plan_item` | user-facing | True | P1 |  |  |  | release-blocker | v1.7.0 frontend invoked this command, but no current exact/dynamic invoke was found. |
-| `analyze_project` | user-facing | True | P1 | tauri/src/features/projects/api.ts:5 |  | projects.analysisAndVerify | ready | Direct frontend invoke exists. |
-| `analyze_python_environment` | user-facing | True | P1 |  |  |  | release-blocker | v1.7.0 frontend invoked this command, but no current exact/dynamic invoke was found. |
-| `app_snapshot` | user-facing | True | P1 | tauri/src/features/dashboard/api.ts:5 |  | nav.dashboard.entry | ready | Direct frontend invoke exists. |
-| `apply_config_profile` | user-facing | True | P1 |  |  |  | release-blocker | v1.7.0 frontend invoked this command, but no current exact/dynamic invoke was found. |
-| `apply_env_repair_plan` | user-facing | True | P0 | tauri/src/features/environment/api.ts:29 |  | environment.doctorAndJava | ready | Direct frontend invoke exists. |
-| `apply_file_association_plan` | user-facing | True | P0 | tauri/src/features/fileAssociations/api.ts:28 |  | fileAssociations.planApplyRollback | ready | Direct frontend invoke exists. |
-| `apply_java_stabilize_plan` | legacy-compatible | False | P2 |  |  |  | split-required | Registered command has no current invoke and no v1.7.0 frontend invoke match; compatibility or obsolescence requires owner confirmation. |
-| `apply_managed_python_pip_repair` | legacy-compatible | False | P2 |  |  |  | split-required | Registered command has no current invoke and no v1.7.0 frontend invoke match; compatibility or obsolescence requires owner confirmation. |
-| `apply_project_configuration` | user-facing | True | P1 | tauri/src/features/projects/api.ts:34 |  | projects.configApply | ready | Direct frontend invoke exists. |
-| `apply_python_repair` | user-facing | True | P1 |  |  |  | release-blocker | v1.7.0 frontend invoked this command, but no current exact/dynamic invoke was found. |
-| `apply_user_environment_configuration` | user-facing | True | P1 |  |  |  | release-blocker | v1.7.0 frontend invoked this command, but no current exact/dynamic invoke was found. |
-| `cache_entries` | user-facing | True | P1 |  |  | toolchains.gitNodePythonMirrors | release-blocker | v1.7.0 frontend invoked this command, but no current exact/dynamic invoke was found. |
-| `cancel_maintenance_scan` | user-facing | True | P1 |  |  |  | release-blocker | v1.7.0 frontend invoked this command, but no current exact/dynamic invoke was found. |
-| `check_for_updates` | user-facing | True | P1 | tauri/src/features/dashboard/api.ts:22, tauri/src/features/settings/api.ts:29 |  | update.checkDownloadMetadata | ready | Direct frontend invoke exists. |
-| `clean_dev_cache` | user-facing | True | P1 | tauri/src/features/cleanup/api.ts:37 |  |  | ready | Direct frontend invoke exists. |
-| `clean_managed_download_cache` | legacy-compatible | False | P2 |  |  |  | split-required | Registered command has no current invoke and no v1.7.0 frontend invoke match; compatibility or obsolescence requires owner confirmation. |
-| `clean_selected_targets` | user-facing | True | P0 | tauri/src/features/cleanup/api.ts:29 |  | cleanup.planExecuteAndVerify | ready | Direct frontend invoke exists. |
-| `cleanup_path_entries` | user-facing | True | P0 | tauri/src/features/environment/api.ts:33 |  | environment.doctorAndJava | ready | Direct frontend invoke exists. |
-| `clear_download_cache` | user-facing | True | P1 | tauri/src/features/cleanup/api.ts:33 |  |  | ready | Direct frontend invoke exists. |
-| `config_profile_plan_id` | internal-helper | False | P2 |  |  |  | deferred-nonblocking | Supports validation or plan bookkeeping and is not a standalone user operation. |
-| `config_profile_requirements` | internal-helper | False | P1 |  |  |  | deferred-nonblocking | Supports validation or plan bookkeeping and is not a standalone user operation. |
-| `copy_config_profile` | user-facing | True | P1 | tauri/src/features/profiles/api.ts:41 |  | profiles.crudImportExportApply | ready | Direct frontend invoke exists. |
-| `create_c_drive_expansion_plan` | user-facing | True | P1 | tauri/src/features/cleanup/api.ts:57 |  | cleanup.moveExpansionLargeFiles | ready | Direct frontend invoke exists. |
-| `create_cleanup_plan` | user-facing | True | P0 | tauri/src/features/cleanup/api.ts:25 |  | cleanup.planExecuteAndVerify | ready | Direct frontend invoke exists. |
-| `create_confirmation_token` | user-facing | True | P1 | tauri/src/core/risk.ts:56 |  |  | ready | Direct frontend invoke exists. |
-| `create_desktop_archive_plan` | user-facing | True | P0 | tauri/src/features/cleanup/api.ts:85 |  | cleanup.desktopArchive.ui | ready | Direct frontend invoke exists. |
-| `create_doctor_repair_plan` | user-facing | True | P0 | tauri/src/features/reports/api.ts:21 |  | doctor.runAndRepair | ready | Direct frontend invoke exists. |
-| `create_downloads_archive_plan` | user-facing | True | P0 | tauri/src/features/cleanup/api.ts:93 |  | cleanup.downloadsArchive.ui | ready | Direct frontend invoke exists. |
-| `create_env_repair_plan` | legacy-compatible | False | P2 |  |  |  | split-required | Registered command has no current invoke and no v1.7.0 frontend invoke match; compatibility or obsolescence requires owner confirmation. |
-| `create_file_association_plan` | user-facing | True | P0 | tauri/src/features/fileAssociations/api.ts:24 |  | fileAssociations.planApplyRollback | ready | Direct frontend invoke exists. |
-| `create_java_stabilize_plan` | user-facing | True | P0 | tauri/src/features/environment/api.ts:25 |  | environment.doctorAndJava | ready | Direct frontend invoke exists. |
-| `create_junction_bridge_plan` | legacy-compatible | False | P2 |  |  |  | split-required | Registered command has no current invoke and no v1.7.0 frontend invoke match; compatibility or obsolescence requires owner confirmation. |
-| `create_managed_python_pip_repair_plan` | user-facing | True | P1 |  |  |  | release-blocker | v1.7.0 frontend invoked this command, but no current exact/dynamic invoke was found. |
-| `create_move_plan` | user-facing | True | P1 | tauri/src/features/cleanup/api.ts:41 |  | cleanup.moveExpansionLargeFiles | ready | Direct frontend invoke exists. |
-| `create_mysql_repair_plan` | user-facing | True | P1 | tauri/src/features/toolchains/api.ts:25 |  | toolchains.mysqlRepair | ready | Direct frontend invoke exists. |
-| `create_port_resolution_plan` | user-facing | True | P0 | tauri/src/features/ports/api.ts:13 |  | ports.planExecuteAndVerify | ready | Direct frontend invoke exists. |
-| `create_profile_apply_plan` | user-facing | True | P1 | tauri/src/features/profiles/api.ts:13 |  | profiles.crudImportExportApply | ready | Direct frontend invoke exists. |
-| `delete_config_profile` | user-facing | True | P1 | tauri/src/features/profiles/api.ts:33 |  | profiles.crudImportExportApply | ready | Direct frontend invoke exists. |
-| `discover_runtimes` | user-facing | True | P0 | tauri/src/features/runtimes/api.ts:5 |  | runtime.installed.actions | ready | Direct frontend invoke exists. |
-| `doctor_report_text` | user-facing | True | P0 | tauri/src/features/reports/api.ts:17 |  | doctor.runAndRepair | ready | Direct frontend invoke exists. |
-| `download_update` | user-facing | True | P1 |  |  | update.checkDownloadMetadata | release-blocker | v1.7.0 frontend invoked this command, but no current exact/dynamic invoke was found. |
-| `env_snapshot` | user-facing | True | P1 |  |  |  | release-blocker | v1.7.0 frontend invoked this command, but no current exact/dynamic invoke was found. |
-| `environment_health` | user-facing | True | P0 | tauri/src/features/dashboard/api.ts:9, tauri/src/features/environment/api.ts:9 |  | nav.dashboard.entry, environment.doctorAndJava, environment.pathEvidence | ready | Direct frontend invoke exists. |
-| `execute_c_drive_expansion` | user-facing | True | P1 | tauri/src/features/cleanup/api.ts:61 |  | cleanup.moveExpansionLargeFiles | ready | Direct frontend invoke exists. |
-| `execute_desktop_archive_plan` | user-facing | True | P0 | tauri/src/features/cleanup/api.ts:89 |  | cleanup.desktopArchive.ui | ready | Direct frontend invoke exists. |
-| `execute_doctor_repair_plan` | user-facing | True | P0 | tauri/src/features/reports/api.ts:25 |  | doctor.runAndRepair | ready | Direct frontend invoke exists. |
-| `execute_downloads_archive_plan` | user-facing | True | P0 | tauri/src/features/cleanup/api.ts:97 |  | cleanup.downloadsArchive.ui | ready | Direct frontend invoke exists. |
-| `execute_move_plan` | user-facing | True | P1 | tauri/src/features/cleanup/api.ts:45 |  | cleanup.moveExpansionLargeFiles | ready | Direct frontend invoke exists. |
-| `execute_mysql_repair_plan` | user-facing | True | P1 | tauri/src/features/toolchains/api.ts:29 |  | toolchains.mysqlRepair | ready | Direct frontend invoke exists. |
-| `execute_port_resolution_plan` | user-facing | True | P0 | tauri/src/features/ports/api.ts:17 |  | ports.planExecuteAndVerify | ready | Direct frontend invoke exists. |
-| `execute_profile_apply_plan` | user-facing | True | P1 | tauri/src/features/profiles/api.ts:17 |  | profiles.crudImportExportApply | ready | Direct frontend invoke exists. |
-| `export_cleanup_report` | user-facing | True | P0 | tauri/src/features/reports/api.ts:41 |  | reports.exports, cleanup.planExecuteAndVerify | ready | Direct frontend invoke exists. |
-| `export_config_profiles` | user-facing | True | P1 | tauri/src/features/profiles/api.ts:29 |  | profiles.crudImportExportApply | ready | Direct frontend invoke exists. |
-| `export_doctor_report` | user-facing | True | P0 | tauri/src/features/reports/api.ts:9 |  | reports.exports | ready | Direct frontend invoke exists. |
-| `export_doctor_report_json` | user-facing | True | P0 | tauri/src/features/reports/api.ts:13 |  | reports.exports | ready | Direct frontend invoke exists. |
-| `export_env_reliability_report` | user-facing | True | P0 | tauri/src/features/reports/api.ts:29 |  | reports.exports | ready | Direct frontend invoke exists. |
-| `export_file_association_report` | user-facing | True | P0 | tauri/src/features/fileAssociations/api.ts:44, tauri/src/features/reports/api.ts:37 |  | reports.exports | ready | Direct frontend invoke exists. |
-| `export_port_report` | user-facing | True | P0 | tauri/src/features/reports/api.ts:45 |  | reports.exports | ready | Direct frontend invoke exists. |
-| `export_project_report` | user-facing | True | P0 | tauri/src/features/reports/api.ts:49 |  | reports.exports | ready | Direct frontend invoke exists. |
-| `export_python_diagnostic_report` | user-facing | True | P0 | tauri/src/features/reports/api.ts:33 |  | reports.exports | ready | Direct frontend invoke exists. |
-| `feature_risk_registry` | bootstrap | False | P1 |  |  |  | deferred-nonblocking | Called during startup or the global risk/safety flow; no standalone page button is required. |
-| `generate_vscode_config` | legacy-compatible | False | P1 |  |  | projects.configApply | split-required | Registered command has no current invoke and no v1.7.0 frontend invoke match; compatibility or obsolescence requires owner confirmation. |
-| `get_feature_risk` | bootstrap | False | P2 |  |  |  | deferred-nonblocking | Called during startup or the global risk/safety flow; no standalone page button is required. |
-| `import_config_profiles` | user-facing | True | P1 | tauri/src/features/profiles/api.ts:25 |  | profiles.crudImportExportApply | ready | Direct frontend invoke exists. |
-| `inspect_agent_traces` | user-facing | True | P1 | tauri/src/features/projects/api.ts:26 |  |  | ready | Direct frontend invoke exists. |
-| `inspect_app_usage` | user-facing | True | P1 |  |  |  | release-blocker | v1.7.0 frontend invoked this command, but no current exact/dynamic invoke was found. |
-| `inspect_command_safety` | user-facing | True | P1 | tauri/src/features/toolchains/api.ts:41 |  | nav.commandPalette.entry, toolchains.gitNodePythonMirrors, learning.readOnlyCommandSandbox | ready | Direct frontend invoke exists. |
-| `inspect_desktop` | user-facing | True | P0 | tauri/src/features/cleanup/api.ts:69 |  | cleanup.cDriveRescue | ready | Direct frontend invoke exists. |
-| `inspect_disk_overview` | user-facing | True | P0 | tauri/src/features/cleanup/api.ts:17 |  | cleanup.diskOverview.ui | ready | Direct frontend invoke exists. |
-| `inspect_downloads` | user-facing | True | P0 | tauri/src/features/cleanup/api.ts:73 |  | cleanup.cDriveRescue | ready | Direct frontend invoke exists. |
-| `inspect_env_backup` | diagnostic | False | P2 |  |  |  | split-required | Read-only evidence command; current direct user entry was not identified and indirect coverage needs confirmation. |
-| `inspect_env_reliability` | user-facing | True | P0 | tauri/src/features/environment/api.ts:5 |  | environment.doctorAndJava, environment.pathEvidence | ready | Direct frontend invoke exists. |
-| `inspect_idea_project` | user-facing | True | P1 | tauri/src/features/projects/api.ts:17 |  | projects.analysisAndVerify | ready | Direct frontend invoke exists. |
-| `inspect_installed_software_usage` | diagnostic | False | P2 |  |  |  | split-required | Read-only evidence command; current direct user entry was not identified and indirect coverage needs confirmation. |
-| `inspect_java_environment` | user-facing | True | P1 |  |  |  | release-blocker | v1.7.0 frontend invoked this command, but no current exact/dynamic invoke was found. |
-| `inspect_local_services` | user-facing | True | P0 | tauri/src/features/ports/api.ts:21, tauri/src/features/toolchains/api.ts:17 |  | ports.planExecuteAndVerify | ready | Direct frontend invoke exists. |
-| `inspect_maintenance_overview` | user-facing | True | P0 | tauri/src/features/cleanup/api.ts:13 |  | cleanup.cDriveRescue | ready | Direct frontend invoke exists. |
-| `inspect_mysql_repair` | user-facing | True | P1 | tauri/src/features/toolchains/api.ts:21 |  | toolchains.mysqlRepair | ready | Direct frontend invoke exists. |
-| `inspect_partition_layout` | user-facing | True | P0 | tauri/src/features/cleanup/api.ts:53 |  | cleanup.cDriveRescue | ready | Direct frontend invoke exists. |
-| `inspect_platform_toolchains` | user-facing | True | P1 | tauri/src/features/toolchains/api.ts:9 |  |  | ready | Direct frontend invoke exists. |
-| `inspect_project_port_configs` | user-facing | True | P1 | tauri/src/features/projects/api.ts:13 |  | projects.analysisAndVerify | ready | Direct frontend invoke exists. |
-| `inspect_python_integrity` | user-facing | True | P1 |  |  |  | release-blocker | v1.7.0 frontend invoked this command, but no current exact/dynamic invoke was found. |
-| `inspect_runtime_strong_verification` | user-facing | True | P0 | tauri/src/features/runtimes/api.ts:13 |  | runtime.installed.actions | ready | Direct frontend invoke exists. |
-| `inspect_system_platforms` | user-facing | True | P1 | tauri/src/features/toolchains/api.ts:13 |  |  | ready | Direct frontend invoke exists. |
-| `inspect_toolchains` | user-facing | True | P1 | tauri/src/features/toolchains/api.ts:5 |  |  | ready | Direct frontend invoke exists. |
-| `install_go` | dynamic-wrapper | True | P0 |  | tauri/src/features/runtimes/events.ts, tauri/src/features/runtimes/events.ts | runtime.install.groups | ready | Recognized dynamic runtime wrapper supplies this command. |
-| `install_gradle_latest` | dynamic-wrapper | True | P0 |  | tauri/src/features/runtimes/api.ts, tauri/src/features/runtimes/events.ts, tauri/src/features/runtimes/events.ts | runtime.install.groups | ready | Recognized dynamic runtime wrapper supplies this command. |
-| `install_jdk` | dynamic-wrapper | True | P0 |  | tauri/src/features/runtimes/events.ts | runtime.install.groups | ready | Recognized dynamic runtime wrapper supplies this command. |
-| `install_maven_latest` | dynamic-wrapper | True | P0 |  | tauri/src/features/runtimes/events.ts | runtime.install.groups | ready | Recognized dynamic runtime wrapper supplies this command. |
-| `install_node` | dynamic-wrapper | True | P0 |  | tauri/src/features/runtimes/events.ts | runtime.install.groups | ready | Recognized dynamic runtime wrapper supplies this command. |
-| `install_python` | dynamic-wrapper | True | P0 |  | tauri/src/features/runtimes/events.ts | runtime.install.groups | ready | Recognized dynamic runtime wrapper supplies this command. |
-| `jdk_distributions` | user-facing | True | P0 | tauri/src/features/runtimes/api.ts:9 |  | runtime.install.groups | ready | Direct frontend invoke exists. |
-| `kill_process` | user-facing | True | P1 |  |  |  | release-blocker | v1.7.0 frontend invoked this command, but no current exact/dynamic invoke was found. |
-| `launch_update_installer` | user-facing | True | P1 |  |  | update.checkDownloadMetadata | release-blocker | v1.7.0 frontend invoked this command, but no current exact/dynamic invoke was found. |
-| `list_archive_plan_items` | user-facing | True | P1 |  |  |  | release-blocker | v1.7.0 frontend invoked this command, but no current exact/dynamic invoke was found. |
-| `list_config_profiles` | user-facing | True | P1 | tauri/src/features/profiles/api.ts:5 |  | profiles.crudImportExportApply | ready | Direct frontend invoke exists. |
-| `list_env_backups` | user-facing | True | P1 | tauri/src/features/environment/api.ts:17 |  |  | ready | Direct frontend invoke exists. |
-| `list_environment_backups` | user-facing | True | P1 | tauri/src/features/environment/api.ts:21 |  |  | ready | Direct frontend invoke exists. |
-| `list_file_association_backups` | user-facing | True | P0 | tauri/src/features/fileAssociations/api.ts:16 |  | fileAssociations.planApplyRollback | ready | Direct frontend invoke exists. |
-| `list_rollback_records` | user-facing | True | P1 | tauri/src/features/cleanup/api.ts:65 |  |  | ready | Direct frontend invoke exists. |
-| `load_config` | user-facing | True | P1 | tauri/src/app/bootstrap.ts:334, tauri/src/features/settings/api.ts:5 |  | settings.themeLanguageSafety | ready | Direct frontend invoke exists. |
-| `local_service_logs` | user-facing | True | P1 |  |  |  | release-blocker | v1.7.0 frontend invoked this command, but no current exact/dynamic invoke was found. |
-| `manage_local_service` | user-facing | True | P1 | tauri/src/features/toolchains/api.ts:33 |  |  | ready | Direct frontend invoke exists. |
-| `manage_system_platform` | user-facing | True | P1 | tauri/src/features/toolchains/api.ts:37 |  |  | ready | Direct frontend invoke exists. |
-| `mysql_pending_execution_guard` | internal-helper | False | P1 |  |  | toolchains.mysqlRepair | deferred-nonblocking | Supports validation or plan bookkeeping and is not a standalone user operation. |
-| `network_diagnostics` | user-facing | True | P1 |  |  | toolchains.gitNodePythonMirrors | release-blocker | v1.7.0 frontend invoked this command, but no current exact/dynamic invoke was found. |
-| `open_analysis_path` | user-facing | True | P0 | tauri/src/features/cleanup/api.ts:101, tauri/src/features/reports/api.ts:53, tauri/src/features/runtimes/api.ts:29 |  | runtime.installed.actions, reports.exports, cleanup.moveExpansionLargeFiles | ready | Direct frontend invoke exists. |
-| `open_app_config_dir` | user-facing | True | P1 | tauri/src/features/settings/api.ts:17 |  | settings.themeLanguageSafety | ready | Direct frontend invoke exists. |
-| `open_apps_features` | user-facing | True | P0 | tauri/src/features/runtimes/api.ts:33 |  | runtime.installed.actions | ready | Direct frontend invoke exists. |
-| `open_default_apps_settings` | user-facing | True | P0 | tauri/src/features/fileAssociations/api.ts:36 |  | fileAssociations.scanSearchRows | ready | Direct frontend invoke exists. |
-| `open_docker_desktop` | user-facing | True | P1 |  |  |  | release-blocker | v1.7.0 frontend invoked this command, but no current exact/dynamic invoke was found. |
-| `open_file_association_backup_dir` | user-facing | True | P1 |  |  |  | release-blocker | v1.7.0 frontend invoked this command, but no current exact/dynamic invoke was found. |
-| `open_file_type_settings` | user-facing | True | P0 | tauri/src/features/fileAssociations/api.ts:40 |  | fileAssociations.scanSearchRows | ready | Direct frontend invoke exists. |
-| `open_local_service_directory` | user-facing | True | P1 |  |  |  | release-blocker | v1.7.0 frontend invoked this command, but no current exact/dynamic invoke was found. |
-| `open_process_location` | user-facing | True | P0 | tauri/src/features/ports/api.ts:29 |  | ports.planExecuteAndVerify | ready | Direct frontend invoke exists. |
-| `open_python_alias_settings` | user-facing | True | P1 |  |  |  | release-blocker | v1.7.0 frontend invoked this command, but no current exact/dynamic invoke was found. |
-| `port_history` | user-facing | True | P0 | tauri/src/features/ports/api.ts:9 |  | ports.scanTableAndReasons | ready | Direct frontend invoke exists. |
-| `powershell_runner_status` | user-facing | True | P1 | tauri/src/features/dashboard/api.ts:13, tauri/src/features/settings/api.ts:25 |  | nav.dashboard.entry, debug.panelAndExport | ready | Direct frontend invoke exists. |
-| `preview_config_profiles` | user-facing | True | P1 | tauri/src/features/profiles/api.ts:21 |  |  | ready | Direct frontend invoke exists. |
-| `preview_project_configuration` | user-facing | True | P1 | tauri/src/features/projects/api.ts:9 |  | projects.configApply | ready | Direct frontend invoke exists. |
-| `preview_python_repair` | user-facing | True | P1 |  |  |  | release-blocker | v1.7.0 frontend invoked this command, but no current exact/dynamic invoke was found. |
-| `preview_user_environment_configuration` | user-facing | True | P0 | tauri/src/features/environment/api.ts:13 |  | environment.doctorAndJava | ready | Direct frontend invoke exists. |
-| `project_health` | legacy-compatible | False | P2 |  |  |  | split-required | Registered command has no current invoke and no v1.7.0 frontend invoke match; compatibility or obsolescence requires owner confirmation. |
-| `remove_archive_plan_item` | user-facing | True | P1 |  |  |  | release-blocker | v1.7.0 frontend invoked this command, but no current exact/dynamic invoke was found. |
-| `rename_config_profile` | user-facing | True | P1 | tauri/src/features/profiles/api.ts:37 |  | profiles.crudImportExportApply | ready | Direct frontend invoke exists. |
-| `repair_maven_gradle_registration` | legacy-compatible | False | P2 |  |  |  | split-required | Registered command has no current invoke and no v1.7.0 frontend invoke match; compatibility or obsolescence requires owner confirmation. |
-| `reset_ui_config` | user-facing | True | P1 | tauri/src/features/settings/api.ts:21 |  | settings.themeLanguageSafety | ready | Direct frontend invoke exists. |
-| `restore_env_backup` | user-facing | True | P1 |  |  |  | release-blocker | v1.7.0 frontend invoked this command, but no current exact/dynamic invoke was found. |
-| `restore_environment_backup` | user-facing | True | P1 |  |  |  | release-blocker | v1.7.0 frontend invoked this command, but no current exact/dynamic invoke was found. |
-| `restore_user_environment` | user-facing | True | P1 |  |  |  | release-blocker | v1.7.0 frontend invoked this command, but no current exact/dynamic invoke was found. |
-| `rollback_env_repair` | legacy-compatible | False | P2 |  |  |  | split-required | Registered command has no current invoke and no v1.7.0 frontend invoke match; compatibility or obsolescence requires owner confirmation. |
-| `rollback_file_association_backup` | user-facing | True | P0 | tauri/src/features/fileAssociations/api.ts:32 |  | fileAssociations.planApplyRollback | ready | Direct frontend invoke exists. |
-| `rollback_move` | user-facing | True | P1 | tauri/src/features/cleanup/api.ts:49 |  | cleanup.moveExpansionLargeFiles | ready | Direct frontend invoke exists. |
-| `run_chsrc_action` | user-facing | True | P1 |  |  | toolchains.gitNodePythonMirrors | release-blocker | v1.7.0 frontend invoked this command, but no current exact/dynamic invoke was found. |
-| `run_doctor` | user-facing | True | P0 | tauri/src/features/reports/api.ts:5 |  | doctor.runAndRepair | ready | Direct frontend invoke exists. |
-| `run_learning_check` | user-facing | True | P1 | tauri/src/features/toolchains/api.ts:45 |  |  | ready | Direct frontend invoke exists. |
-| `run_platform_action` | user-facing | True | P1 |  |  | toolchains.gitNodePythonMirrors | release-blocker | v1.7.0 frontend invoked this command, but no current exact/dynamic invoke was found. |
-| `run_project_action` | user-facing | True | P1 | tauri/src/features/projects/api.ts:30 |  |  | ready | Direct frontend invoke exists. |
-| `run_tool_command` | user-facing | True | P1 |  |  | learning.readOnlyCommandSandbox | release-blocker | v1.7.0 frontend invoked this command, but no current exact/dynamic invoke was found. |
-| `run_toolchain_action` | user-facing | True | P1 |  |  | toolchains.gitNodePythonMirrors | release-blocker | v1.7.0 frontend invoked this command, but no current exact/dynamic invoke was found. |
-| `safety_disclaimer` | bootstrap | False | P1 |  |  |  | deferred-nonblocking | Called during startup or the global risk/safety flow; no standalone page button is required. |
-| `save_config_profile` | user-facing | True | P1 | tauri/src/features/profiles/api.ts:9 |  | profiles.crudImportExportApply | ready | Direct frontend invoke exists. |
-| `scan_cleanup_targets` | user-facing | True | P0 | tauri/src/features/cleanup/api.ts:21 |  | cleanup.planExecuteAndVerify | ready | Direct frontend invoke exists. |
-| `scan_duplicate_large_files` | user-facing | True | P0 | tauri/src/features/cleanup/api.ts:81 |  | cleanup.duplicateLargeFiles.ui | ready | Direct frontend invoke exists. |
-| `scan_file_associations` | user-facing | True | P0 | tauri/src/features/fileAssociations/api.ts:12 |  | fileAssociations.scanSearchRows | ready | Direct frontend invoke exists. |
-| `scan_large_files` | user-facing | True | P1 | tauri/src/features/cleanup/api.ts:77 |  | cleanup.moveExpansionLargeFiles | ready | Direct frontend invoke exists. |
-| `scan_ports` | user-facing | True | P0 | tauri/src/features/dashboard/api.ts:26, tauri/src/features/ports/api.ts:5 |  | nav.dashboard.entry, ports.scanTableAndReasons | ready | Direct frontend invoke exists. |
-| `scan_storage_cleanup` | diagnostic | False | P2 |  |  |  | split-required | Read-only evidence command; current direct user entry was not identified and indirect coverage needs confirmation. |
-| `search_file_association_app` | user-facing | True | P0 | tauri/src/features/fileAssociations/api.ts:20 |  | fileAssociations.scanSearchRows | ready | Direct frontend invoke exists. |
-| `self_uninstall` | user-facing | True | P1 |  |  |  | release-blocker | v1.7.0 frontend invoked this command, but no current exact/dynamic invoke was found. |
-| `set_auto_check_update` | user-facing | True | P1 | tauri/src/features/settings/api.ts:13 |  | settings.themeLanguageSafety | ready | Direct frontend invoke exists. |
-| `set_root_dir` | user-facing | True | P1 | tauri/src/features/settings/api.ts:9 |  | settings.themeLanguageSafety | ready | Direct frontend invoke exists. |
-| `stop_local_service` | user-facing | True | P0 | tauri/src/features/ports/api.ts:25 |  | ports.planExecuteAndVerify | ready | Direct frontend invoke exists. |
-| `storage_cleanup_architecture` | user-facing | True | P0 | tauri/src/features/cleanup/api.ts:9 |  | cleanup.cDriveRescue | ready | Direct frontend invoke exists. |
-| `switch_runtime` | user-facing | True | P0 | tauri/src/features/runtimes/api.ts:21 |  | runtime.installed.actions | ready | Direct frontend invoke exists. |
-| `uninstall_external_runtime` | legacy-compatible | False | P2 |  |  |  | split-required | Registered command has no current invoke and no v1.7.0 frontend invoke match; compatibility or obsolescence requires owner confirmation. |
-| `uninstall_runtime` | user-facing | True | P0 | tauri/src/features/runtimes/api.ts:25 |  | runtime.installed.actions | ready | Direct frontend invoke exists. |
-| `update_project_port` | user-facing | True | P1 | tauri/src/features/projects/api.ts:38 |  |  | ready | Direct frontend invoke exists. |
-| `validate_directory_path` | internal-helper | False | P1 |  |  |  | deferred-nonblocking | Supports validation or plan bookkeeping and is not a standalone user operation. |
-| `verify_env_after_apply` | diagnostic | False | P2 |  |  |  | split-required | Read-only evidence command; current direct user entry was not identified and indirect coverage needs confirmation. |
-| `verify_external_jdk` | user-facing | True | P1 |  |  |  | release-blocker | v1.7.0 frontend invoked this command, but no current exact/dynamic invoke was found. |
-| `verify_java_consumer_environment` | user-facing | True | P1 |  |  | projects.analysisAndVerify | release-blocker | v1.7.0 frontend invoked this command, but no current exact/dynamic invoke was found. |
-| `verify_java_toolchain` | diagnostic | False | P2 |  |  |  | split-required | Read-only evidence command; current direct user entry was not identified and indirect coverage needs confirmation. |
-| `verify_maven_gradle_with_current_jdk` | diagnostic | False | P2 |  |  |  | split-required | Read-only evidence command; current direct user entry was not identified and indirect coverage needs confirmation. |
-| `verify_nacos_java_environment` | diagnostic | False | P1 |  |  | projects.analysisAndVerify | split-required | Read-only evidence command; current direct user entry was not identified and indirect coverage needs confirmation. |
-| `verify_nexus_java_environment` | user-facing | True | P1 |  |  | projects.analysisAndVerify | release-blocker | v1.7.0 frontend invoked this command, but no current exact/dynamic invoke was found. |
+| Command | Capability | Classification | Frontend/dynamic | Replacement chain | Disposition | Exact reason |
+|---|---|---|---|---|---|---|
+| `accept_safety_disclaimer` | `safety.disclaimer` | direct-user-command | tauri/src/app/bootstrap.ts:354 |  | ready | A current frontend invoke exposes this command. |
+| `add_archive_plan_item` | `cleanup.archive-plan` | compatibility-alias |  |  | code-blocker | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
+| `analyze_project` | `projects.analysis` | direct-user-command | tauri/src/features/projects/api.ts:5 |  | ready | A current frontend invoke exposes this command. |
+| `analyze_python_environment` | `environment.python-health-repair` | compatibility-alias |  |  | code-blocker | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
+| `app_snapshot` | `dashboard.snapshot` | direct-user-command | tauri/src/features/dashboard/api.ts:5 |  | ready | A current frontend invoke exposes this command. |
+| `apply_config_profile` | `profiles.apply` | compatibility-alias |  | create_profile_apply_plan, execute_profile_apply_plan | evidence-blocker | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
+| `apply_env_repair_plan` | `environment.java-stabilize` | direct-user-command | tauri/src/features/environment/api.ts:29 |  | evidence-blocker | A current frontend invoke exposes this command. |
+| `apply_file_association_plan` | `file-associations.apply` | direct-user-command | tauri/src/features/fileAssociations/api.ts:28 |  | ready | A current frontend invoke exposes this command. |
+| `apply_java_stabilize_plan` | `legacy-environment.java-stabilize-plan` | compatibility-alias |  |  | product-decision-required | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
+| `apply_managed_python_pip_repair` | `environment.python-health-repair` | compatibility-alias |  |  | code-blocker | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
+| `apply_project_configuration` | `projects.configuration` | direct-user-command | tauri/src/features/projects/api.ts:34 |  | evidence-blocker | A current frontend invoke exposes this command. |
+| `apply_python_repair` | `environment.python-health-repair` | compatibility-alias |  |  | code-blocker | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
+| `apply_user_environment_configuration` | `environment.configure` | replacement-command |  | configure_user_environment | evidence-blocker | This command participates in an explicit old-to-new replacement chain. |
+| `cache_entries` | `toolchains.network-cache` | compatibility-alias |  |  | code-blocker | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
+| `cancel_maintenance_scan` | `cleanup.scan-plan-execute` | compatibility-alias |  | clean_selected_targets, create_cleanup_plan, scan_cleanup_targets | ready | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
+| `check_for_updates` | `update.check` | direct-user-command | tauri/src/features/dashboard/api.ts:22, tauri/src/features/settings/api.ts:29 |  | ready | A current frontend invoke exposes this command. |
+| `clean_dev_cache` | `cleanup.dev-cache` | direct-user-command | tauri/src/features/cleanup/api.ts:37 |  | evidence-blocker | A current frontend invoke exposes this command. |
+| `clean_managed_download_cache` | `cleanup.download-cache` | compatibility-alias |  | clear_download_cache | evidence-blocker | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
+| `clean_selected_targets` | `cleanup.scan-plan-execute` | direct-user-command | tauri/src/features/cleanup/api.ts:29 |  | ready | A current frontend invoke exposes this command. |
+| `cleanup_path_entries` | `environment.path-cleanup` | direct-user-command | tauri/src/features/environment/api.ts:33 |  | evidence-blocker | A current frontend invoke exposes this command. |
+| `clear_download_cache` | `cleanup.download-cache` | direct-user-command | tauri/src/features/cleanup/api.ts:33 |  | evidence-blocker | A current frontend invoke exposes this command. |
+| `config_profile_plan_id` | `legacy-profiles.config-profile-plan-id` | internal-helper |  |  | ready | This command supports validation or plan bookkeeping and is not a standalone user goal. |
+| `config_profile_requirements` | `profiles.preview` | internal-helper |  |  | ready | This command supports validation or plan bookkeeping and is not a standalone user goal. |
+| `copy_config_profile` | `legacy-profiles.copy-config-profile` | direct-user-command | tauri/src/features/profiles/api.ts:41 |  | product-decision-required | A current frontend invoke exposes this command. |
+| `create_c_drive_expansion_plan` | `cleanup.partition-expansion` | direct-user-command | tauri/src/features/cleanup/api.ts:57 |  | evidence-blocker | A current frontend invoke exposes this command. |
+| `create_cleanup_plan` | `cleanup.scan-plan-execute` | direct-user-command | tauri/src/features/cleanup/api.ts:25 |  | ready | A current frontend invoke exposes this command. |
+| `create_confirmation_token` | `safety.risk-confirmation` | direct-user-command | tauri/src/core/risk.ts:56 |  | ready | A current frontend invoke exposes this command. |
+| `create_desktop_archive_plan` | `cleanup.desktop-archive` | direct-user-command | tauri/src/features/cleanup/api.ts:85 |  | ready | A current frontend invoke exposes this command. |
+| `create_doctor_repair_plan` | `doctor.repair` | replacement-command | tauri/src/features/reports/api.ts:21 | repair_doctor_safe | ready | This command participates in an explicit old-to-new replacement chain. |
+| `create_downloads_archive_plan` | `cleanup.downloads-archive` | direct-user-command | tauri/src/features/cleanup/api.ts:93 |  | ready | A current frontend invoke exposes this command. |
+| `create_env_repair_plan` | `environment.java-stabilize` | compatibility-alias |  | apply_env_repair_plan, create_java_stabilize_plan | evidence-blocker | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
+| `create_file_association_plan` | `file-associations.apply` | direct-user-command | tauri/src/features/fileAssociations/api.ts:24 |  | ready | A current frontend invoke exposes this command. |
+| `create_java_stabilize_plan` | `environment.java-stabilize` | direct-user-command | tauri/src/features/environment/api.ts:25 |  | evidence-blocker | A current frontend invoke exposes this command. |
+| `create_junction_bridge_plan` | `cleanup.move-rollback` | compatibility-alias |  | create_move_plan, execute_move_plan, list_rollback_records, rollback_move | evidence-blocker | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
+| `create_managed_python_pip_repair_plan` | `environment.python-health-repair` | compatibility-alias |  |  | code-blocker | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
+| `create_move_plan` | `cleanup.move-rollback` | direct-user-command | tauri/src/features/cleanup/api.ts:41 |  | evidence-blocker | A current frontend invoke exposes this command. |
+| `create_mysql_repair_plan` | `mysql.repair` | direct-user-command | tauri/src/features/toolchains/api.ts:25 |  | evidence-blocker | A current frontend invoke exposes this command. |
+| `create_port_resolution_plan` | `ports.release` | direct-user-command | tauri/src/features/ports/api.ts:13 |  | ready | A current frontend invoke exposes this command. |
+| `create_profile_apply_plan` | `profiles.apply` | replacement-command | tauri/src/features/profiles/api.ts:13 | apply_config_profile, install_profile_missing | evidence-blocker | This command participates in an explicit old-to-new replacement chain. |
+| `delete_config_profile` | `profiles.delete` | direct-user-command | tauri/src/features/profiles/api.ts:33 |  | ready | A current frontend invoke exposes this command. |
+| `discover_runtimes` | `runtime.discover` | direct-user-command | tauri/src/features/runtimes/api.ts:5 |  | ready | A current frontend invoke exposes this command. |
+| `doctor_report_text` | `doctor.run` | direct-user-command | tauri/src/features/reports/api.ts:17 |  | ready | A current frontend invoke exposes this command. |
+| `download_update` | `update.download-install` | compatibility-alias |  |  | code-blocker | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
+| `env_snapshot` | `environment.snapshot` | compatibility-alias |  | environment_health, inspect_env_reliability | ready | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
+| `environment_health` | `environment.snapshot` | direct-user-command | tauri/src/features/dashboard/api.ts:9, tauri/src/features/environment/api.ts:9 |  | ready | A current frontend invoke exposes this command. |
+| `execute_c_drive_expansion` | `cleanup.partition-expansion` | direct-user-command | tauri/src/features/cleanup/api.ts:61 |  | evidence-blocker | A current frontend invoke exposes this command. |
+| `execute_desktop_archive_plan` | `cleanup.desktop-archive` | direct-user-command | tauri/src/features/cleanup/api.ts:89 |  | ready | A current frontend invoke exposes this command. |
+| `execute_doctor_repair_plan` | `doctor.repair` | replacement-command | tauri/src/features/reports/api.ts:25 | repair_doctor_safe | ready | This command participates in an explicit old-to-new replacement chain. |
+| `execute_downloads_archive_plan` | `cleanup.downloads-archive` | direct-user-command | tauri/src/features/cleanup/api.ts:97 |  | ready | A current frontend invoke exposes this command. |
+| `execute_move_plan` | `cleanup.move-rollback` | direct-user-command | tauri/src/features/cleanup/api.ts:45 |  | evidence-blocker | A current frontend invoke exposes this command. |
+| `execute_mysql_repair_plan` | `mysql.repair` | direct-user-command | tauri/src/features/toolchains/api.ts:29 |  | evidence-blocker | A current frontend invoke exposes this command. |
+| `execute_port_resolution_plan` | `ports.release` | direct-user-command | tauri/src/features/ports/api.ts:17 |  | ready | A current frontend invoke exposes this command. |
+| `execute_profile_apply_plan` | `profiles.apply` | replacement-command | tauri/src/features/profiles/api.ts:17 | apply_config_profile, install_profile_missing | evidence-blocker | This command participates in an explicit old-to-new replacement chain. |
+| `export_cleanup_report` | `reports.export` | direct-user-command | tauri/src/features/reports/api.ts:41 |  | ready | A current frontend invoke exposes this command. |
+| `export_config_profiles` | `profiles.import-export` | direct-user-command | tauri/src/features/profiles/api.ts:29 |  | ready | A current frontend invoke exposes this command. |
+| `export_doctor_report` | `doctor.report` | direct-user-command | tauri/src/features/reports/api.ts:9 |  | ready | A current frontend invoke exposes this command. |
+| `export_doctor_report_json` | `doctor.report` | direct-user-command | tauri/src/features/reports/api.ts:13 |  | ready | A current frontend invoke exposes this command. |
+| `export_env_reliability_report` | `reports.export` | direct-user-command | tauri/src/features/reports/api.ts:29 |  | ready | A current frontend invoke exposes this command. |
+| `export_file_association_report` | `reports.export` | direct-user-command | tauri/src/features/fileAssociations/api.ts:44, tauri/src/features/reports/api.ts:37 |  | ready | A current frontend invoke exposes this command. |
+| `export_port_report` | `reports.export` | direct-user-command | tauri/src/features/reports/api.ts:45 |  | ready | A current frontend invoke exposes this command. |
+| `export_project_report` | `reports.export` | direct-user-command | tauri/src/features/reports/api.ts:49 |  | ready | A current frontend invoke exposes this command. |
+| `export_python_diagnostic_report` | `reports.export` | direct-user-command | tauri/src/features/reports/api.ts:33 |  | ready | A current frontend invoke exposes this command. |
+| `feature_risk_registry` | `safety.risk-confirmation` | bootstrap |  |  | ready | This command belongs to application startup or global safety initialization. |
+| `generate_vscode_config` | `projects.configuration` | compatibility-alias |  | apply_project_configuration, preview_project_configuration | evidence-blocker | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
+| `get_feature_risk` | `safety.risk-confirmation` | bootstrap |  |  | ready | This command belongs to application startup or global safety initialization. |
+| `import_config_profiles` | `profiles.import-export` | direct-user-command | tauri/src/features/profiles/api.ts:25 |  | ready | A current frontend invoke exposes this command. |
+| `inspect_agent_traces` | `debug.agent-traces` | direct-user-command | tauri/src/features/projects/api.ts:26 |  | ready | A current frontend invoke exposes this command. |
+| `inspect_app_usage` | `cleanup.application-usage` | diagnostic |  |  | ready | This read-only command supplies evidence to a broader user flow. |
+| `inspect_command_safety` | `toolchains.command-safety` | direct-user-command | tauri/src/features/toolchains/api.ts:41 |  | ready | A current frontend invoke exposes this command. |
+| `inspect_desktop` | `cleanup.folder-analysis` | direct-user-command | tauri/src/features/cleanup/api.ts:69 |  | ready | A current frontend invoke exposes this command. |
+| `inspect_disk_overview` | `legacy-cleanup.disk-overview` | direct-user-command | tauri/src/features/cleanup/api.ts:17 |  | product-decision-required | A current frontend invoke exposes this command. |
+| `inspect_downloads` | `cleanup.folder-analysis` | direct-user-command | tauri/src/features/cleanup/api.ts:73 |  | ready | A current frontend invoke exposes this command. |
+| `inspect_env_backup` | `environment.backups` | diagnostic |  |  | ready | This read-only command supplies evidence to a broader user flow. |
+| `inspect_env_reliability` | `environment.snapshot` | direct-user-command | tauri/src/features/environment/api.ts:5 |  | ready | A current frontend invoke exposes this command. |
+| `inspect_idea_project` | `projects.idea-analysis` | direct-user-command | tauri/src/features/projects/api.ts:17 |  | ready | A current frontend invoke exposes this command. |
+| `inspect_installed_software_usage` | `cleanup.application-usage` | diagnostic |  |  | ready | This read-only command supplies evidence to a broader user flow. |
+| `inspect_java_environment` | `environment.snapshot` | diagnostic |  |  | ready | This read-only command supplies evidence to a broader user flow. |
+| `inspect_local_services` | `services.inspect` | direct-user-command | tauri/src/features/ports/api.ts:21, tauri/src/features/toolchains/api.ts:17 |  | ready | A current frontend invoke exposes this command. |
+| `inspect_maintenance_overview` | `cleanup.overview` | direct-user-command | tauri/src/features/cleanup/api.ts:13 |  | ready | A current frontend invoke exposes this command. |
+| `inspect_mysql_repair` | `mysql.repair` | direct-user-command | tauri/src/features/toolchains/api.ts:21 |  | evidence-blocker | A current frontend invoke exposes this command. |
+| `inspect_partition_layout` | `cleanup.partition-expansion` | direct-user-command | tauri/src/features/cleanup/api.ts:53 |  | evidence-blocker | A current frontend invoke exposes this command. |
+| `inspect_platform_toolchains` | `platforms.inspect` | direct-user-command | tauri/src/features/toolchains/api.ts:9 |  | ready | A current frontend invoke exposes this command. |
+| `inspect_project_port_configs` | `projects.port-config` | direct-user-command | tauri/src/features/projects/api.ts:13 |  | evidence-blocker | A current frontend invoke exposes this command. |
+| `inspect_python_integrity` | `environment.python-health-repair` | diagnostic |  |  | ready | This read-only command supplies evidence to a broader user flow. |
+| `inspect_runtime_strong_verification` | `runtime.verify` | direct-user-command | tauri/src/features/runtimes/api.ts:13 |  | ready | A current frontend invoke exposes this command. |
+| `inspect_system_platforms` | `platforms.inspect` | direct-user-command | tauri/src/features/toolchains/api.ts:13 |  | ready | A current frontend invoke exposes this command. |
+| `inspect_toolchains` | `toolchains.inspect` | direct-user-command | tauri/src/features/toolchains/api.ts:5 |  | ready | A current frontend invoke exposes this command. |
+| `install_go` | `runtime.install` | dynamic-user-command | tauri/src/features/runtimes/events.ts, tauri/src/features/runtimes/events.ts |  | evidence-blocker | A recognized dynamic invoke wrapper exposes this command. |
+| `install_gradle_latest` | `runtime.install` | dynamic-user-command | tauri/src/features/runtimes/api.ts, tauri/src/features/runtimes/events.ts, tauri/src/features/runtimes/events.ts |  | evidence-blocker | A recognized dynamic invoke wrapper exposes this command. |
+| `install_jdk` | `runtime.install` | dynamic-user-command | tauri/src/features/runtimes/events.ts |  | evidence-blocker | A recognized dynamic invoke wrapper exposes this command. |
+| `install_maven_latest` | `runtime.install` | dynamic-user-command | tauri/src/features/runtimes/events.ts |  | evidence-blocker | A recognized dynamic invoke wrapper exposes this command. |
+| `install_node` | `runtime.install` | dynamic-user-command | tauri/src/features/runtimes/events.ts |  | evidence-blocker | A recognized dynamic invoke wrapper exposes this command. |
+| `install_python` | `runtime.install` | dynamic-user-command | tauri/src/features/runtimes/events.ts |  | evidence-blocker | A recognized dynamic invoke wrapper exposes this command. |
+| `jdk_distributions` | `runtime.discover` | direct-user-command | tauri/src/features/runtimes/api.ts:9 |  | ready | A current frontend invoke exposes this command. |
+| `kill_process` | `ports.release` | compatibility-alias |  | create_port_resolution_plan, execute_port_resolution_plan | ready | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
+| `launch_update_installer` | `update.download-install` | compatibility-alias |  |  | code-blocker | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
+| `list_archive_plan_items` | `cleanup.archive-plan` | diagnostic |  |  | ready | This read-only command supplies evidence to a broader user flow. |
+| `list_config_profiles` | `profiles.list` | direct-user-command | tauri/src/features/profiles/api.ts:5 |  | ready | A current frontend invoke exposes this command. |
+| `list_env_backups` | `environment.backups` | direct-user-command | tauri/src/features/environment/api.ts:17 |  | ready | A current frontend invoke exposes this command. |
+| `list_environment_backups` | `environment.backups` | direct-user-command | tauri/src/features/environment/api.ts:21 |  | ready | A current frontend invoke exposes this command. |
+| `list_file_association_backups` | `file-associations.backup-rollback` | direct-user-command | tauri/src/features/fileAssociations/api.ts:16 |  | evidence-blocker | A current frontend invoke exposes this command. |
+| `list_rollback_records` | `cleanup.move-rollback` | direct-user-command | tauri/src/features/cleanup/api.ts:65 |  | evidence-blocker | A current frontend invoke exposes this command. |
+| `load_config` | `settings.load` | direct-user-command | tauri/src/app/bootstrap.ts:334, tauri/src/features/settings/api.ts:5 |  | ready | A current frontend invoke exposes this command. |
+| `local_service_logs` | `services.logs` | compatibility-alias |  |  | code-blocker | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
+| `manage_local_service` | `services.manage` | direct-user-command | tauri/src/features/toolchains/api.ts:33 |  | code-blocker | A current frontend invoke exposes this command. |
+| `manage_system_platform` | `platforms.manage` | direct-user-command | tauri/src/features/toolchains/api.ts:37 |  | code-blocker | A current frontend invoke exposes this command. |
+| `mysql_pending_execution_guard` | `mysql.repair` | internal-helper |  |  | ready | This command supports validation or plan bookkeeping and is not a standalone user goal. |
+| `network_diagnostics` | `toolchains.network-cache` | compatibility-alias |  |  | code-blocker | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
+| `open_analysis_path` | `system.open-path` | direct-user-command | tauri/src/features/cleanup/api.ts:101, tauri/src/features/reports/api.ts:53, tauri/src/features/runtimes/api.ts:29 |  | ready | A current frontend invoke exposes this command. |
+| `open_app_config_dir` | `settings.config-directory` | direct-user-command | tauri/src/features/settings/api.ts:17 |  | ready | A current frontend invoke exposes this command. |
+| `open_apps_features` | `system.apps-features` | direct-user-command | tauri/src/features/runtimes/api.ts:33 |  | ready | A current frontend invoke exposes this command. |
+| `open_default_apps_settings` | `file-associations.settings` | direct-user-command | tauri/src/features/fileAssociations/api.ts:36 |  | ready | A current frontend invoke exposes this command. |
+| `open_docker_desktop` | `platforms.docker` | compatibility-alias |  |  | code-blocker | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
+| `open_file_association_backup_dir` | `file-associations.backup-rollback` | compatibility-alias |  | list_file_association_backups, rollback_file_association_backup | evidence-blocker | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
+| `open_file_type_settings` | `file-associations.settings` | direct-user-command | tauri/src/features/fileAssociations/api.ts:40 |  | ready | A current frontend invoke exposes this command. |
+| `open_local_service_directory` | `services.directory` | compatibility-alias |  |  | code-blocker | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
+| `open_process_location` | `ports.process-location` | direct-user-command | tauri/src/features/ports/api.ts:29 |  | ready | A current frontend invoke exposes this command. |
+| `open_python_alias_settings` | `environment.python-alias-settings` | compatibility-alias |  |  | code-blocker | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
+| `port_history` | `ports.scan-history` | direct-user-command | tauri/src/features/ports/api.ts:9 |  | ready | A current frontend invoke exposes this command. |
+| `powershell_runner_status` | `legacy-workbench.powershell-runner-status` | direct-user-command | tauri/src/features/dashboard/api.ts:13, tauri/src/features/settings/api.ts:25 |  | product-decision-required | A current frontend invoke exposes this command. |
+| `preview_config_profiles` | `profiles.preview` | direct-user-command | tauri/src/features/profiles/api.ts:21 |  | ready | A current frontend invoke exposes this command. |
+| `preview_project_configuration` | `projects.configuration` | direct-user-command | tauri/src/features/projects/api.ts:9 |  | evidence-blocker | A current frontend invoke exposes this command. |
+| `preview_python_repair` | `environment.python-health-repair` | compatibility-alias |  |  | code-blocker | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
+| `preview_user_environment_configuration` | `environment.configure` | replacement-command | tauri/src/features/environment/api.ts:13 | configure_user_environment | evidence-blocker | This command participates in an explicit old-to-new replacement chain. |
+| `project_health` | `projects.analysis` | compatibility-alias |  | analyze_project | ready | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
+| `remove_archive_plan_item` | `cleanup.archive-plan` | compatibility-alias |  |  | code-blocker | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
+| `rename_config_profile` | `legacy-profiles.rename-config-profile` | direct-user-command | tauri/src/features/profiles/api.ts:37 |  | product-decision-required | A current frontend invoke exposes this command. |
+| `repair_maven_gradle_registration` | `legacy-workbench.repair-maven-gradle-registration` | compatibility-alias |  |  | product-decision-required | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
+| `reset_ui_config` | `settings.reset-ui` | direct-user-command | tauri/src/features/settings/api.ts:21 |  | ready | A current frontend invoke exposes this command. |
+| `restore_env_backup` | `environment.restore` | compatibility-alias |  |  | code-blocker | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
+| `restore_environment_backup` | `environment.restore` | replacement-command |  | restore_user_environment | code-blocker | This command participates in an explicit old-to-new replacement chain. |
+| `restore_user_environment` | `environment.restore` | compatibility-alias |  | restore_environment_backup | code-blocker | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
+| `rollback_env_repair` | `environment.java-stabilize` | compatibility-alias |  | apply_env_repair_plan, create_java_stabilize_plan | evidence-blocker | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
+| `rollback_file_association_backup` | `file-associations.backup-rollback` | direct-user-command | tauri/src/features/fileAssociations/api.ts:32 |  | evidence-blocker | A current frontend invoke exposes this command. |
+| `rollback_move` | `cleanup.move-rollback` | direct-user-command | tauri/src/features/cleanup/api.ts:49 |  | evidence-blocker | A current frontend invoke exposes this command. |
+| `run_chsrc_action` | `toolchains.mirrors` | compatibility-alias |  |  | code-blocker | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
+| `run_doctor` | `doctor.run` | direct-user-command | tauri/src/features/reports/api.ts:5 |  | ready | A current frontend invoke exposes this command. |
+| `run_learning_check` | `learning.center` | direct-user-command | tauri/src/features/toolchains/api.ts:45 |  | ready | A current frontend invoke exposes this command. |
+| `run_platform_action` | `platforms.manage` | compatibility-alias |  | manage_system_platform | code-blocker | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
+| `run_project_action` | `projects.actions` | direct-user-command | tauri/src/features/projects/api.ts:30 |  | ready | A current frontend invoke exposes this command. |
+| `run_tool_command` | `toolchains.command-safety` | compatibility-alias |  | inspect_command_safety | ready | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
+| `run_toolchain_action` | `toolchains.actions` | compatibility-alias |  |  | code-blocker | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
+| `safety_disclaimer` | `safety.disclaimer` | bootstrap |  |  | ready | This command belongs to application startup or global safety initialization. |
+| `save_config_profile` | `profiles.save` | direct-user-command | tauri/src/features/profiles/api.ts:9 |  | ready | A current frontend invoke exposes this command. |
+| `scan_cleanup_targets` | `cleanup.scan-plan-execute` | direct-user-command | tauri/src/features/cleanup/api.ts:21 |  | ready | A current frontend invoke exposes this command. |
+| `scan_duplicate_large_files` | `cleanup.folder-analysis` | direct-user-command | tauri/src/features/cleanup/api.ts:81 |  | ready | A current frontend invoke exposes this command. |
+| `scan_file_associations` | `file-associations.scan` | direct-user-command | tauri/src/features/fileAssociations/api.ts:12 |  | ready | A current frontend invoke exposes this command. |
+| `scan_large_files` | `cleanup.folder-analysis` | direct-user-command | tauri/src/features/cleanup/api.ts:77 |  | ready | A current frontend invoke exposes this command. |
+| `scan_ports` | `ports.scan-history` | direct-user-command | tauri/src/features/dashboard/api.ts:26, tauri/src/features/ports/api.ts:5 |  | ready | A current frontend invoke exposes this command. |
+| `scan_storage_cleanup` | `cleanup.scan-plan-execute` | diagnostic |  |  | ready | This read-only command supplies evidence to a broader user flow. |
+| `search_file_association_app` | `legacy-file-associations.search-file-association-app` | direct-user-command | tauri/src/features/fileAssociations/api.ts:20 |  | product-decision-required | A current frontend invoke exposes this command. |
+| `self_uninstall` | `system.self-uninstall` | compatibility-alias |  |  | code-blocker | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
+| `set_auto_check_update` | `settings.auto-update` | direct-user-command | tauri/src/features/settings/api.ts:13 |  | ready | A current frontend invoke exposes this command. |
+| `set_root_dir` | `settings.root` | direct-user-command | tauri/src/features/settings/api.ts:9 |  | ready | A current frontend invoke exposes this command. |
+| `stop_local_service` | `services.manage` | direct-user-command | tauri/src/features/ports/api.ts:25 |  | code-blocker | A current frontend invoke exposes this command. |
+| `storage_cleanup_architecture` | `cleanup.overview` | direct-user-command | tauri/src/features/cleanup/api.ts:9 |  | ready | A current frontend invoke exposes this command. |
+| `switch_runtime` | `runtime.switch` | direct-user-command | tauri/src/features/runtimes/api.ts:21 |  | evidence-blocker | A current frontend invoke exposes this command. |
+| `uninstall_external_runtime` | `runtime.uninstall` | compatibility-alias |  | uninstall_runtime | evidence-blocker | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
+| `uninstall_runtime` | `runtime.uninstall` | direct-user-command | tauri/src/features/runtimes/api.ts:25 |  | evidence-blocker | A current frontend invoke exposes this command. |
+| `update_project_port` | `projects.port-config` | direct-user-command | tauri/src/features/projects/api.ts:38 |  | evidence-blocker | A current frontend invoke exposes this command. |
+| `validate_directory_path` | `settings.root` | internal-helper |  |  | ready | This command supports validation or plan bookkeeping and is not a standalone user goal. |
+| `verify_env_after_apply` | `environment.java-stabilize` | diagnostic |  |  | ready | This read-only command supplies evidence to a broader user flow. |
+| `verify_external_jdk` | `runtime.external-jdk-verify` | diagnostic |  |  | ready | This read-only command supplies evidence to a broader user flow. |
+| `verify_java_consumer_environment` | `projects.java-consumer-verify` | replacement-command | tauri/src/features/projects/api.ts:20 | verify_nacos_java_environment | ready | This command participates in an explicit old-to-new replacement chain. |
+| `verify_java_toolchain` | `runtime.verify` | diagnostic |  |  | ready | This read-only command supplies evidence to a broader user flow. |
+| `verify_maven_gradle_with_current_jdk` | `runtime.verify` | diagnostic |  |  | ready | This read-only command supplies evidence to a broader user flow. |
+| `verify_nacos_java_environment` | `projects.java-consumer-verify` | compatibility-alias |  | verify_java_consumer_environment | ready | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
+| `verify_nexus_java_environment` | `projects.java-consumer-verify` | dynamic-user-command | tauri/src/features/projects/api.ts:20 |  | ready | A recognized dynamic invoke wrapper exposes this command. |

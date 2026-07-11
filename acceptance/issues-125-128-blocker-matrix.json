@@ -18,10 +18,10 @@
         "audit"
       ],
       "uncheckedItems": null,
-      "currentEvidence": "This migration matrix is the first structured replacement for the long checklist.",
-      "remainingProblem": "Migration completeness has not yet reached mapped=total with zero missing/degraded/deferred/unreviewed.",
+      "currentEvidence": "All 237 raw sources are accounted for as 87 normalized capabilities; unreviewed and unaccounted counts are zero.",
+      "remainingProblem": "16 code blockers, 16 evidence blockers, and 5 product decisions remain.",
       "blocksV182": true,
-      "labelDisposition": "retain blocker pending product adjudication",
+      "labelDisposition": "retain blocker pending product approval and approved blocker implementation batch",
       "followUpIssue": "#125"
     },
     {
@@ -81,5 +81,27 @@
       "labelDisposition": "retain blocker pending split and product adjudication",
       "followUpIssue": "#128 / #130"
     }
-  ]
+  ],
+  "adjudicationSummary": {
+    "total": 87,
+    "byImplementationStatus": {
+      "degraded": 16,
+      "enhanced": 13,
+      "equivalent": 53,
+      "missing": 5
+    },
+    "byEvidenceStatus": {
+      "evidence-required": 21,
+      "not-safely-testable": 16,
+      "verified-automated": 25,
+      "verified-installed": 24,
+      "verified-real-tauri": 1
+    },
+    "byReleaseDisposition": {
+      "code-blocker": 16,
+      "evidence-blocker": 16,
+      "product-decision-required": 5,
+      "ready": 50
+    }
+  }
 }

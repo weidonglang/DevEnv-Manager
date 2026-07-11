@@ -1,0 +1,1790 @@
+{
+  "schemaVersion": 1,
+  "version": "1.8.2",
+  "formalManifestChanged": false,
+  "summary": {
+    "partialParents": 27,
+    "parentsWithProposal": 27,
+    "atomicChildren": 111,
+    "unresolvedParents": 0
+  },
+  "children": [
+    {
+      "newFeatureId": "cleanup.cDriveRescue.inspectMaintenanceOverview",
+      "parentFeatureId": "cleanup.cDriveRescue",
+      "oldCapabilityIds": [
+        "cleanup.overview"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Inspect Maintenance Overview step within cleanup.cDriveRescue",
+      "commands": [
+        "inspect_maintenance_overview"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "cleanup.cDriveRescue.inspectPartitionLayout",
+      "parentFeatureId": "cleanup.cDriveRescue",
+      "oldCapabilityIds": [
+        "cleanup.partition-expansion"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Inspect Partition Layout step within cleanup.cDriveRescue",
+      "commands": [
+        "inspect_partition_layout"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "cleanup.cDriveRescue.inspectDesktop",
+      "parentFeatureId": "cleanup.cDriveRescue",
+      "oldCapabilityIds": [
+        "cleanup.folder-analysis"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Inspect Desktop step within cleanup.cDriveRescue",
+      "commands": [
+        "inspect_desktop"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "cleanup.cDriveRescue.inspectDownloads",
+      "parentFeatureId": "cleanup.cDriveRescue",
+      "oldCapabilityIds": [
+        "cleanup.folder-analysis"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Inspect Downloads step within cleanup.cDriveRescue",
+      "commands": [
+        "inspect_downloads"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "cleanup.cDriveRescue.storageCleanupArchitecture",
+      "parentFeatureId": "cleanup.cDriveRescue",
+      "oldCapabilityIds": [
+        "cleanup.overview"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Storage Cleanup Architecture step within cleanup.cDriveRescue",
+      "commands": [
+        "storage_cleanup_architecture"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "cleanup.desktopArchive.ui.createDesktopArchivePlan",
+      "parentFeatureId": "cleanup.desktopArchive.ui",
+      "oldCapabilityIds": [
+        "cleanup.desktop-archive"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Create Desktop Archive Plan step within cleanup.desktopArchive.ui",
+      "commands": [
+        "create_desktop_archive_plan"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-installed",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "cleanup.desktopArchive.ui.executeDesktopArchivePlan",
+      "parentFeatureId": "cleanup.desktopArchive.ui",
+      "oldCapabilityIds": [
+        "cleanup.desktop-archive"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Execute Desktop Archive Plan step within cleanup.desktopArchive.ui",
+      "commands": [
+        "execute_desktop_archive_plan"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "cleanup.diskOverview.ui.inspectDiskOverview",
+      "parentFeatureId": "cleanup.diskOverview.ui",
+      "oldCapabilityIds": [],
+      "priority": "P0",
+      "userGoal": "Complete the Inspect Disk Overview step within cleanup.diskOverview.ui",
+      "commands": [
+        "inspect_disk_overview"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-installed",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "cleanup.downloadsArchive.ui.createDownloadsArchivePlan",
+      "parentFeatureId": "cleanup.downloadsArchive.ui",
+      "oldCapabilityIds": [
+        "cleanup.downloads-archive"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Create Downloads Archive Plan step within cleanup.downloadsArchive.ui",
+      "commands": [
+        "create_downloads_archive_plan"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-installed",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "cleanup.downloadsArchive.ui.executeDownloadsArchivePlan",
+      "parentFeatureId": "cleanup.downloadsArchive.ui",
+      "oldCapabilityIds": [
+        "cleanup.downloads-archive"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Execute Downloads Archive Plan step within cleanup.downloadsArchive.ui",
+      "commands": [
+        "execute_downloads_archive_plan"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "cleanup.duplicateLargeFiles.ui.scanDuplicateLargeFiles",
+      "parentFeatureId": "cleanup.duplicateLargeFiles.ui",
+      "oldCapabilityIds": [
+        "cleanup.folder-analysis"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Scan Duplicate Large Files step within cleanup.duplicateLargeFiles.ui",
+      "commands": [
+        "scan_duplicate_large_files"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-installed",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "cleanup.moveExpansionLargeFiles.scanLargeFiles",
+      "parentFeatureId": "cleanup.moveExpansionLargeFiles",
+      "oldCapabilityIds": [
+        "cleanup.folder-analysis"
+      ],
+      "priority": "P1",
+      "userGoal": "Complete the Scan Large Files step within cleanup.moveExpansionLargeFiles",
+      "commands": [
+        "scan_large_files"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "cleanup.moveExpansionLargeFiles.openAnalysisPath",
+      "parentFeatureId": "cleanup.moveExpansionLargeFiles",
+      "oldCapabilityIds": [
+        "system.open-path"
+      ],
+      "priority": "P1",
+      "userGoal": "Complete the Open Analysis Path step within cleanup.moveExpansionLargeFiles",
+      "commands": [
+        "open_analysis_path"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "cleanup.moveExpansionLargeFiles.createMovePlan",
+      "parentFeatureId": "cleanup.moveExpansionLargeFiles",
+      "oldCapabilityIds": [
+        "cleanup.move-rollback"
+      ],
+      "priority": "P1",
+      "userGoal": "Complete the Create Move Plan step within cleanup.moveExpansionLargeFiles",
+      "commands": [
+        "create_move_plan"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "cleanup.moveExpansionLargeFiles.executeMovePlan",
+      "parentFeatureId": "cleanup.moveExpansionLargeFiles",
+      "oldCapabilityIds": [
+        "cleanup.move-rollback"
+      ],
+      "priority": "P1",
+      "userGoal": "Complete the Execute Move Plan step within cleanup.moveExpansionLargeFiles",
+      "commands": [
+        "execute_move_plan"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "cleanup.moveExpansionLargeFiles.rollbackMove",
+      "parentFeatureId": "cleanup.moveExpansionLargeFiles",
+      "oldCapabilityIds": [
+        "cleanup.move-rollback"
+      ],
+      "priority": "P1",
+      "userGoal": "Complete the Rollback Move step within cleanup.moveExpansionLargeFiles",
+      "commands": [
+        "rollback_move"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "cleanup.moveExpansionLargeFiles.createCDriveExpansionPlan",
+      "parentFeatureId": "cleanup.moveExpansionLargeFiles",
+      "oldCapabilityIds": [
+        "cleanup.partition-expansion"
+      ],
+      "priority": "P1",
+      "userGoal": "Complete the Create C Drive Expansion Plan step within cleanup.moveExpansionLargeFiles",
+      "commands": [
+        "create_c_drive_expansion_plan"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "cleanup.moveExpansionLargeFiles.executeCDriveExpansion",
+      "parentFeatureId": "cleanup.moveExpansionLargeFiles",
+      "oldCapabilityIds": [
+        "cleanup.partition-expansion"
+      ],
+      "priority": "P1",
+      "userGoal": "Complete the Execute C Drive Expansion step within cleanup.moveExpansionLargeFiles",
+      "commands": [
+        "execute_c_drive_expansion"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "cleanup.planExecuteAndVerify.scanCleanupTargets",
+      "parentFeatureId": "cleanup.planExecuteAndVerify",
+      "oldCapabilityIds": [
+        "cleanup.scan-plan-execute"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Scan Cleanup Targets step within cleanup.planExecuteAndVerify",
+      "commands": [
+        "scan_cleanup_targets"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-installed",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "cleanup.planExecuteAndVerify.createCleanupPlan",
+      "parentFeatureId": "cleanup.planExecuteAndVerify",
+      "oldCapabilityIds": [
+        "cleanup.scan-plan-execute"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Create Cleanup Plan step within cleanup.planExecuteAndVerify",
+      "commands": [
+        "create_cleanup_plan"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-installed",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "cleanup.planExecuteAndVerify.cleanSelectedTargets",
+      "parentFeatureId": "cleanup.planExecuteAndVerify",
+      "oldCapabilityIds": [
+        "cleanup.scan-plan-execute"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Clean Selected Targets step within cleanup.planExecuteAndVerify",
+      "commands": [
+        "clean_selected_targets"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "cleanup.planExecuteAndVerify.exportCleanupReport",
+      "parentFeatureId": "cleanup.planExecuteAndVerify",
+      "oldCapabilityIds": [
+        "reports.export"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Export Cleanup Report step within cleanup.planExecuteAndVerify",
+      "commands": [
+        "export_cleanup_report"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "debug.panelAndExport.powershellRunnerStatus",
+      "parentFeatureId": "debug.panelAndExport",
+      "oldCapabilityIds": [],
+      "priority": "P1",
+      "userGoal": "Complete the Powershell Runner Status step within debug.panelAndExport",
+      "commands": [
+        "powershell_runner_status"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-installed",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "doctor.runAndRepair.runDoctor",
+      "parentFeatureId": "doctor.runAndRepair",
+      "oldCapabilityIds": [
+        "doctor.run"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Run Doctor step within doctor.runAndRepair",
+      "commands": [
+        "run_doctor"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-installed",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "doctor.runAndRepair.doctorReportText",
+      "parentFeatureId": "doctor.runAndRepair",
+      "oldCapabilityIds": [
+        "doctor.run"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Doctor Report Text step within doctor.runAndRepair",
+      "commands": [
+        "doctor_report_text"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "doctor.runAndRepair.createDoctorRepairPlan",
+      "parentFeatureId": "doctor.runAndRepair",
+      "oldCapabilityIds": [
+        "doctor.repair"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Create Doctor Repair Plan step within doctor.runAndRepair",
+      "commands": [
+        "create_doctor_repair_plan"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-installed",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "doctor.runAndRepair.executeDoctorRepairPlan",
+      "parentFeatureId": "doctor.runAndRepair",
+      "oldCapabilityIds": [
+        "doctor.repair"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Execute Doctor Repair Plan step within doctor.runAndRepair",
+      "commands": [
+        "execute_doctor_repair_plan"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "environment.doctorAndJava.inspectEnvReliability",
+      "parentFeatureId": "environment.doctorAndJava",
+      "oldCapabilityIds": [
+        "environment.snapshot"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Inspect Env Reliability step within environment.doctorAndJava",
+      "commands": [
+        "inspect_env_reliability"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-installed",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "environment.doctorAndJava.environmentHealth",
+      "parentFeatureId": "environment.doctorAndJava",
+      "oldCapabilityIds": [
+        "environment.snapshot"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Environment Health step within environment.doctorAndJava",
+      "commands": [
+        "environment_health"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "environment.doctorAndJava.previewUserEnvironmentConfiguration",
+      "parentFeatureId": "environment.doctorAndJava",
+      "oldCapabilityIds": [
+        "environment.configure"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Preview User Environment Configuration step within environment.doctorAndJava",
+      "commands": [
+        "preview_user_environment_configuration"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "environment.doctorAndJava.createJavaStabilizePlan",
+      "parentFeatureId": "environment.doctorAndJava",
+      "oldCapabilityIds": [
+        "environment.java-stabilize"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Create Java Stabilize Plan step within environment.doctorAndJava",
+      "commands": [
+        "create_java_stabilize_plan"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-installed",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "environment.doctorAndJava.applyEnvRepairPlan",
+      "parentFeatureId": "environment.doctorAndJava",
+      "oldCapabilityIds": [
+        "environment.java-stabilize"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Apply Env Repair Plan step within environment.doctorAndJava",
+      "commands": [
+        "apply_env_repair_plan"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "environment.doctorAndJava.cleanupPathEntries",
+      "parentFeatureId": "environment.doctorAndJava",
+      "oldCapabilityIds": [
+        "environment.path-cleanup"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Cleanup Path Entries step within environment.doctorAndJava",
+      "commands": [
+        "cleanup_path_entries"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "environment.pathEvidence.inspectEnvReliability",
+      "parentFeatureId": "environment.pathEvidence",
+      "oldCapabilityIds": [
+        "environment.snapshot"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Inspect Env Reliability step within environment.pathEvidence",
+      "commands": [
+        "inspect_env_reliability"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-installed",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "environment.pathEvidence.environmentHealth",
+      "parentFeatureId": "environment.pathEvidence",
+      "oldCapabilityIds": [
+        "environment.snapshot"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Environment Health step within environment.pathEvidence",
+      "commands": [
+        "environment_health"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "fileAssociations.planApplyRollback.createFileAssociationPlan",
+      "parentFeatureId": "fileAssociations.planApplyRollback",
+      "oldCapabilityIds": [
+        "file-associations.apply"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Create File Association Plan step within fileAssociations.planApplyRollback",
+      "commands": [
+        "create_file_association_plan"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-installed",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "fileAssociations.planApplyRollback.applyFileAssociationPlan",
+      "parentFeatureId": "fileAssociations.planApplyRollback",
+      "oldCapabilityIds": [
+        "file-associations.apply"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Apply File Association Plan step within fileAssociations.planApplyRollback",
+      "commands": [
+        "apply_file_association_plan"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "fileAssociations.planApplyRollback.listFileAssociationBackups",
+      "parentFeatureId": "fileAssociations.planApplyRollback",
+      "oldCapabilityIds": [
+        "file-associations.backup-rollback"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the List File Association Backups step within fileAssociations.planApplyRollback",
+      "commands": [
+        "list_file_association_backups"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "fileAssociations.planApplyRollback.rollbackFileAssociationBackup",
+      "parentFeatureId": "fileAssociations.planApplyRollback",
+      "oldCapabilityIds": [
+        "file-associations.backup-rollback"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Rollback File Association Backup step within fileAssociations.planApplyRollback",
+      "commands": [
+        "rollback_file_association_backup"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "learning.readOnlyCommandSandbox.runToolCommand",
+      "parentFeatureId": "learning.readOnlyCommandSandbox",
+      "oldCapabilityIds": [
+        "toolchains.command-safety"
+      ],
+      "priority": "P1",
+      "userGoal": "Complete the Run Tool Command step within learning.readOnlyCommandSandbox",
+      "commands": [
+        "run_tool_command"
+      ],
+      "implementationStatus": "degraded",
+      "evidenceStatus": "evidence-required",
+      "releaseDisposition": "code-blocker",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "learning.readOnlyCommandSandbox.inspectCommandSafety",
+      "parentFeatureId": "learning.readOnlyCommandSandbox",
+      "oldCapabilityIds": [
+        "toolchains.command-safety"
+      ],
+      "priority": "P1",
+      "userGoal": "Complete the Inspect Command Safety step within learning.readOnlyCommandSandbox",
+      "commands": [
+        "inspect_command_safety"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "nav.commandPalette.entry.inspectCommandSafety",
+      "parentFeatureId": "nav.commandPalette.entry",
+      "oldCapabilityIds": [
+        "toolchains.command-safety"
+      ],
+      "priority": "P1",
+      "userGoal": "Complete the Inspect Command Safety step within nav.commandPalette.entry",
+      "commands": [
+        "inspect_command_safety"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "nav.dashboard.entry.appSnapshot",
+      "parentFeatureId": "nav.dashboard.entry",
+      "oldCapabilityIds": [
+        "dashboard.snapshot"
+      ],
+      "priority": "P1",
+      "userGoal": "Complete the App Snapshot step within nav.dashboard.entry",
+      "commands": [
+        "app_snapshot"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "nav.dashboard.entry.environmentHealth",
+      "parentFeatureId": "nav.dashboard.entry",
+      "oldCapabilityIds": [
+        "environment.snapshot"
+      ],
+      "priority": "P1",
+      "userGoal": "Complete the Environment Health step within nav.dashboard.entry",
+      "commands": [
+        "environment_health"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "nav.dashboard.entry.powershellRunnerStatus",
+      "parentFeatureId": "nav.dashboard.entry",
+      "oldCapabilityIds": [],
+      "priority": "P1",
+      "userGoal": "Complete the Powershell Runner Status step within nav.dashboard.entry",
+      "commands": [
+        "powershell_runner_status"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-installed",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "nav.dashboard.entry.scanPorts",
+      "parentFeatureId": "nav.dashboard.entry",
+      "oldCapabilityIds": [
+        "ports.scan-history"
+      ],
+      "priority": "P1",
+      "userGoal": "Complete the Scan Ports step within nav.dashboard.entry",
+      "commands": [
+        "scan_ports"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-installed",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "ports.planExecuteAndVerify.createPortResolutionPlan",
+      "parentFeatureId": "ports.planExecuteAndVerify",
+      "oldCapabilityIds": [
+        "ports.release"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Create Port Resolution Plan step within ports.planExecuteAndVerify",
+      "commands": [
+        "create_port_resolution_plan"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-installed",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "ports.planExecuteAndVerify.executePortResolutionPlan",
+      "parentFeatureId": "ports.planExecuteAndVerify",
+      "oldCapabilityIds": [
+        "ports.release"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Execute Port Resolution Plan step within ports.planExecuteAndVerify",
+      "commands": [
+        "execute_port_resolution_plan"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-installed",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "ports.planExecuteAndVerify.inspectLocalServices",
+      "parentFeatureId": "ports.planExecuteAndVerify",
+      "oldCapabilityIds": [
+        "services.inspect"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Inspect Local Services step within ports.planExecuteAndVerify",
+      "commands": [
+        "inspect_local_services"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "ports.planExecuteAndVerify.stopLocalService",
+      "parentFeatureId": "ports.planExecuteAndVerify",
+      "oldCapabilityIds": [
+        "services.manage"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Stop Local Service step within ports.planExecuteAndVerify",
+      "commands": [
+        "stop_local_service"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "ports.planExecuteAndVerify.openProcessLocation",
+      "parentFeatureId": "ports.planExecuteAndVerify",
+      "oldCapabilityIds": [
+        "ports.process-location"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Open Process Location step within ports.planExecuteAndVerify",
+      "commands": [
+        "open_process_location"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "ports.scanTableAndReasons.scanPorts",
+      "parentFeatureId": "ports.scanTableAndReasons",
+      "oldCapabilityIds": [
+        "ports.scan-history"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Scan Ports step within ports.scanTableAndReasons",
+      "commands": [
+        "scan_ports"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-installed",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "ports.scanTableAndReasons.portHistory",
+      "parentFeatureId": "ports.scanTableAndReasons",
+      "oldCapabilityIds": [
+        "ports.scan-history"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Port History step within ports.scanTableAndReasons",
+      "commands": [
+        "port_history"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "profiles.crudImportExportApply.listConfigProfiles",
+      "parentFeatureId": "profiles.crudImportExportApply",
+      "oldCapabilityIds": [
+        "profiles.list"
+      ],
+      "priority": "P1",
+      "userGoal": "Complete the List Config Profiles step within profiles.crudImportExportApply",
+      "commands": [
+        "list_config_profiles"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-installed",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "profiles.crudImportExportApply.saveConfigProfile",
+      "parentFeatureId": "profiles.crudImportExportApply",
+      "oldCapabilityIds": [
+        "profiles.save"
+      ],
+      "priority": "P1",
+      "userGoal": "Complete the Save Config Profile step within profiles.crudImportExportApply",
+      "commands": [
+        "save_config_profile"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "profiles.crudImportExportApply.deleteConfigProfile",
+      "parentFeatureId": "profiles.crudImportExportApply",
+      "oldCapabilityIds": [
+        "profiles.delete"
+      ],
+      "priority": "P1",
+      "userGoal": "Complete the Delete Config Profile step within profiles.crudImportExportApply",
+      "commands": [
+        "delete_config_profile"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "profiles.crudImportExportApply.renameConfigProfile",
+      "parentFeatureId": "profiles.crudImportExportApply",
+      "oldCapabilityIds": [],
+      "priority": "P1",
+      "userGoal": "Complete the Rename Config Profile step within profiles.crudImportExportApply",
+      "commands": [
+        "rename_config_profile"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "profiles.crudImportExportApply.copyConfigProfile",
+      "parentFeatureId": "profiles.crudImportExportApply",
+      "oldCapabilityIds": [],
+      "priority": "P1",
+      "userGoal": "Complete the Copy Config Profile step within profiles.crudImportExportApply",
+      "commands": [
+        "copy_config_profile"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "profiles.crudImportExportApply.exportConfigProfiles",
+      "parentFeatureId": "profiles.crudImportExportApply",
+      "oldCapabilityIds": [
+        "profiles.import-export"
+      ],
+      "priority": "P1",
+      "userGoal": "Complete the Export Config Profiles step within profiles.crudImportExportApply",
+      "commands": [
+        "export_config_profiles"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "profiles.crudImportExportApply.importConfigProfiles",
+      "parentFeatureId": "profiles.crudImportExportApply",
+      "oldCapabilityIds": [
+        "profiles.import-export"
+      ],
+      "priority": "P1",
+      "userGoal": "Complete the Import Config Profiles step within profiles.crudImportExportApply",
+      "commands": [
+        "import_config_profiles"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "profiles.crudImportExportApply.createProfileApplyPlan",
+      "parentFeatureId": "profiles.crudImportExportApply",
+      "oldCapabilityIds": [
+        "profiles.apply"
+      ],
+      "priority": "P1",
+      "userGoal": "Complete the Create Profile Apply Plan step within profiles.crudImportExportApply",
+      "commands": [
+        "create_profile_apply_plan"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "profiles.crudImportExportApply.executeProfileApplyPlan",
+      "parentFeatureId": "profiles.crudImportExportApply",
+      "oldCapabilityIds": [
+        "profiles.apply"
+      ],
+      "priority": "P1",
+      "userGoal": "Complete the Execute Profile Apply Plan step within profiles.crudImportExportApply",
+      "commands": [
+        "execute_profile_apply_plan"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "projects.analysisAndVerify.analyzeProject",
+      "parentFeatureId": "projects.analysisAndVerify",
+      "oldCapabilityIds": [
+        "projects.analysis"
+      ],
+      "priority": "P1",
+      "userGoal": "Complete the Analyze Project step within projects.analysisAndVerify",
+      "commands": [
+        "analyze_project"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "projects.analysisAndVerify.inspectIdeaProject",
+      "parentFeatureId": "projects.analysisAndVerify",
+      "oldCapabilityIds": [
+        "projects.idea-analysis"
+      ],
+      "priority": "P1",
+      "userGoal": "Complete the Inspect Idea Project step within projects.analysisAndVerify",
+      "commands": [
+        "inspect_idea_project"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "projects.analysisAndVerify.verifyJavaConsumerEnvironment",
+      "parentFeatureId": "projects.analysisAndVerify",
+      "oldCapabilityIds": [
+        "projects.java-consumer-verify"
+      ],
+      "priority": "P1",
+      "userGoal": "Complete the Verify Java Consumer Environment step within projects.analysisAndVerify",
+      "commands": [
+        "verify_java_consumer_environment"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "projects.analysisAndVerify.verifyNacosJavaEnvironment",
+      "parentFeatureId": "projects.analysisAndVerify",
+      "oldCapabilityIds": [
+        "projects.java-consumer-verify"
+      ],
+      "priority": "P1",
+      "userGoal": "Complete the Verify Nacos Java Environment step within projects.analysisAndVerify",
+      "commands": [
+        "verify_nacos_java_environment"
+      ],
+      "implementationStatus": "degraded",
+      "evidenceStatus": "evidence-required",
+      "releaseDisposition": "code-blocker",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "projects.analysisAndVerify.verifyNexusJavaEnvironment",
+      "parentFeatureId": "projects.analysisAndVerify",
+      "oldCapabilityIds": [
+        "projects.java-consumer-verify"
+      ],
+      "priority": "P1",
+      "userGoal": "Complete the Verify Nexus Java Environment step within projects.analysisAndVerify",
+      "commands": [
+        "verify_nexus_java_environment"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "projects.analysisAndVerify.inspectProjectPortConfigs",
+      "parentFeatureId": "projects.analysisAndVerify",
+      "oldCapabilityIds": [
+        "projects.port-config"
+      ],
+      "priority": "P1",
+      "userGoal": "Complete the Inspect Project Port Configs step within projects.analysisAndVerify",
+      "commands": [
+        "inspect_project_port_configs"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "projects.configApply.previewProjectConfiguration",
+      "parentFeatureId": "projects.configApply",
+      "oldCapabilityIds": [
+        "projects.configuration"
+      ],
+      "priority": "P1",
+      "userGoal": "Complete the Preview Project Configuration step within projects.configApply",
+      "commands": [
+        "preview_project_configuration"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "projects.configApply.applyProjectConfiguration",
+      "parentFeatureId": "projects.configApply",
+      "oldCapabilityIds": [
+        "projects.configuration"
+      ],
+      "priority": "P1",
+      "userGoal": "Complete the Apply Project Configuration step within projects.configApply",
+      "commands": [
+        "apply_project_configuration"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "projects.configApply.generateVscodeConfig",
+      "parentFeatureId": "projects.configApply",
+      "oldCapabilityIds": [
+        "projects.configuration"
+      ],
+      "priority": "P1",
+      "userGoal": "Complete the Generate Vscode Config step within projects.configApply",
+      "commands": [
+        "generate_vscode_config"
+      ],
+      "implementationStatus": "degraded",
+      "evidenceStatus": "evidence-required",
+      "releaseDisposition": "code-blocker",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "reports.exports.exportDoctorReport",
+      "parentFeatureId": "reports.exports",
+      "oldCapabilityIds": [
+        "doctor.report"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Export Doctor Report step within reports.exports",
+      "commands": [
+        "export_doctor_report"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-installed",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "reports.exports.exportDoctorReportJson",
+      "parentFeatureId": "reports.exports",
+      "oldCapabilityIds": [
+        "doctor.report"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Export Doctor Report Json step within reports.exports",
+      "commands": [
+        "export_doctor_report_json"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-installed",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "reports.exports.exportEnvReliabilityReport",
+      "parentFeatureId": "reports.exports",
+      "oldCapabilityIds": [
+        "reports.export"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Export Env Reliability Report step within reports.exports",
+      "commands": [
+        "export_env_reliability_report"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "reports.exports.exportPythonDiagnosticReport",
+      "parentFeatureId": "reports.exports",
+      "oldCapabilityIds": [
+        "reports.export"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Export Python Diagnostic Report step within reports.exports",
+      "commands": [
+        "export_python_diagnostic_report"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "reports.exports.exportFileAssociationReport",
+      "parentFeatureId": "reports.exports",
+      "oldCapabilityIds": [
+        "reports.export"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Export File Association Report step within reports.exports",
+      "commands": [
+        "export_file_association_report"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "reports.exports.exportCleanupReport",
+      "parentFeatureId": "reports.exports",
+      "oldCapabilityIds": [
+        "reports.export"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Export Cleanup Report step within reports.exports",
+      "commands": [
+        "export_cleanup_report"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "reports.exports.exportPortReport",
+      "parentFeatureId": "reports.exports",
+      "oldCapabilityIds": [
+        "reports.export"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Export Port Report step within reports.exports",
+      "commands": [
+        "export_port_report"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "reports.exports.exportProjectReport",
+      "parentFeatureId": "reports.exports",
+      "oldCapabilityIds": [
+        "reports.export"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Export Project Report step within reports.exports",
+      "commands": [
+        "export_project_report"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "reports.exports.openAnalysisPath",
+      "parentFeatureId": "reports.exports",
+      "oldCapabilityIds": [
+        "system.open-path"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Open Analysis Path step within reports.exports",
+      "commands": [
+        "open_analysis_path"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "runtime.install.groups.jdkDistributions",
+      "parentFeatureId": "runtime.install.groups",
+      "oldCapabilityIds": [
+        "runtime.discover",
+        "runtime.lifecycle"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Jdk Distributions step within runtime.install.groups",
+      "commands": [
+        "jdk_distributions"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "runtime.install.groups.installJdk",
+      "parentFeatureId": "runtime.install.groups",
+      "oldCapabilityIds": [
+        "runtime.install",
+        "runtime.lifecycle"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Install Jdk step within runtime.install.groups",
+      "commands": [
+        "install_jdk"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "runtime.install.groups.installNode",
+      "parentFeatureId": "runtime.install.groups",
+      "oldCapabilityIds": [
+        "runtime.install",
+        "runtime.lifecycle"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Install Node step within runtime.install.groups",
+      "commands": [
+        "install_node"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "runtime.install.groups.installPython",
+      "parentFeatureId": "runtime.install.groups",
+      "oldCapabilityIds": [
+        "runtime.install",
+        "runtime.lifecycle"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Install Python step within runtime.install.groups",
+      "commands": [
+        "install_python"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "runtime.install.groups.installGo",
+      "parentFeatureId": "runtime.install.groups",
+      "oldCapabilityIds": [
+        "runtime.install",
+        "runtime.lifecycle"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Install Go step within runtime.install.groups",
+      "commands": [
+        "install_go"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "runtime.install.groups.installMavenLatest",
+      "parentFeatureId": "runtime.install.groups",
+      "oldCapabilityIds": [
+        "runtime.install",
+        "runtime.lifecycle"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Install Maven Latest step within runtime.install.groups",
+      "commands": [
+        "install_maven_latest"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "runtime.install.groups.installGradleLatest",
+      "parentFeatureId": "runtime.install.groups",
+      "oldCapabilityIds": [
+        "runtime.install",
+        "runtime.lifecycle"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Install Gradle Latest step within runtime.install.groups",
+      "commands": [
+        "install_gradle_latest"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "runtime.installed.actions.discoverRuntimes",
+      "parentFeatureId": "runtime.installed.actions",
+      "oldCapabilityIds": [
+        "runtime.discover",
+        "runtime.lifecycle"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Discover Runtimes step within runtime.installed.actions",
+      "commands": [
+        "discover_runtimes"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "runtime.installed.actions.inspectRuntimeStrongVerification",
+      "parentFeatureId": "runtime.installed.actions",
+      "oldCapabilityIds": [
+        "runtime.lifecycle",
+        "runtime.verify"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Inspect Runtime Strong Verification step within runtime.installed.actions",
+      "commands": [
+        "inspect_runtime_strong_verification"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "runtime.installed.actions.switchRuntime",
+      "parentFeatureId": "runtime.installed.actions",
+      "oldCapabilityIds": [
+        "runtime.lifecycle",
+        "runtime.switch"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Switch Runtime step within runtime.installed.actions",
+      "commands": [
+        "switch_runtime"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "runtime.installed.actions.uninstallRuntime",
+      "parentFeatureId": "runtime.installed.actions",
+      "oldCapabilityIds": [
+        "runtime.lifecycle",
+        "runtime.uninstall"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Uninstall Runtime step within runtime.installed.actions",
+      "commands": [
+        "uninstall_runtime"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "runtime.installed.actions.openAnalysisPath",
+      "parentFeatureId": "runtime.installed.actions",
+      "oldCapabilityIds": [
+        "system.open-path"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Open Analysis Path step within runtime.installed.actions",
+      "commands": [
+        "open_analysis_path"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "runtime.installed.actions.openAppsFeatures",
+      "parentFeatureId": "runtime.installed.actions",
+      "oldCapabilityIds": [
+        "system.apps-features"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Open Apps Features step within runtime.installed.actions",
+      "commands": [
+        "open_apps_features"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "settings.themeLanguageSafety.loadConfig",
+      "parentFeatureId": "settings.themeLanguageSafety",
+      "oldCapabilityIds": [
+        "settings.load"
+      ],
+      "priority": "P1",
+      "userGoal": "Complete the Load Config step within settings.themeLanguageSafety",
+      "commands": [
+        "load_config"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-installed",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "settings.themeLanguageSafety.setRootDir",
+      "parentFeatureId": "settings.themeLanguageSafety",
+      "oldCapabilityIds": [
+        "settings.root"
+      ],
+      "priority": "P1",
+      "userGoal": "Complete the Set Root Dir step within settings.themeLanguageSafety",
+      "commands": [
+        "set_root_dir"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "settings.themeLanguageSafety.setAutoCheckUpdate",
+      "parentFeatureId": "settings.themeLanguageSafety",
+      "oldCapabilityIds": [
+        "settings.auto-update"
+      ],
+      "priority": "P1",
+      "userGoal": "Complete the Set Auto Check Update step within settings.themeLanguageSafety",
+      "commands": [
+        "set_auto_check_update"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "settings.themeLanguageSafety.resetUiConfig",
+      "parentFeatureId": "settings.themeLanguageSafety",
+      "oldCapabilityIds": [
+        "settings.reset-ui"
+      ],
+      "priority": "P1",
+      "userGoal": "Complete the Reset Ui Config step within settings.themeLanguageSafety",
+      "commands": [
+        "reset_ui_config"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "settings.themeLanguageSafety.openAppConfigDir",
+      "parentFeatureId": "settings.themeLanguageSafety",
+      "oldCapabilityIds": [
+        "settings.config-directory"
+      ],
+      "priority": "P1",
+      "userGoal": "Complete the Open App Config Dir step within settings.themeLanguageSafety",
+      "commands": [
+        "open_app_config_dir"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "toolchains.gitNodePythonMirrors.inspectCommandSafety",
+      "parentFeatureId": "toolchains.gitNodePythonMirrors",
+      "oldCapabilityIds": [
+        "toolchains.command-safety"
+      ],
+      "priority": "P1",
+      "userGoal": "Complete the Inspect Command Safety step within toolchains.gitNodePythonMirrors",
+      "commands": [
+        "inspect_command_safety"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "toolchains.gitNodePythonMirrors.runToolchainAction",
+      "parentFeatureId": "toolchains.gitNodePythonMirrors",
+      "oldCapabilityIds": [
+        "toolchains.actions"
+      ],
+      "priority": "P1",
+      "userGoal": "Complete the Run Toolchain Action step within toolchains.gitNodePythonMirrors",
+      "commands": [
+        "run_toolchain_action"
+      ],
+      "implementationStatus": "degraded",
+      "evidenceStatus": "evidence-required",
+      "releaseDisposition": "code-blocker",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "toolchains.gitNodePythonMirrors.runPlatformAction",
+      "parentFeatureId": "toolchains.gitNodePythonMirrors",
+      "oldCapabilityIds": [
+        "platforms.manage"
+      ],
+      "priority": "P1",
+      "userGoal": "Complete the Run Platform Action step within toolchains.gitNodePythonMirrors",
+      "commands": [
+        "run_platform_action"
+      ],
+      "implementationStatus": "degraded",
+      "evidenceStatus": "evidence-required",
+      "releaseDisposition": "code-blocker",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "toolchains.gitNodePythonMirrors.runChsrcAction",
+      "parentFeatureId": "toolchains.gitNodePythonMirrors",
+      "oldCapabilityIds": [
+        "toolchains.mirrors"
+      ],
+      "priority": "P1",
+      "userGoal": "Complete the Run Chsrc Action step within toolchains.gitNodePythonMirrors",
+      "commands": [
+        "run_chsrc_action"
+      ],
+      "implementationStatus": "degraded",
+      "evidenceStatus": "evidence-required",
+      "releaseDisposition": "code-blocker",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "toolchains.gitNodePythonMirrors.networkDiagnostics",
+      "parentFeatureId": "toolchains.gitNodePythonMirrors",
+      "oldCapabilityIds": [
+        "toolchains.network-cache"
+      ],
+      "priority": "P1",
+      "userGoal": "Complete the Network Diagnostics step within toolchains.gitNodePythonMirrors",
+      "commands": [
+        "network_diagnostics"
+      ],
+      "implementationStatus": "degraded",
+      "evidenceStatus": "evidence-required",
+      "releaseDisposition": "code-blocker",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "toolchains.gitNodePythonMirrors.cacheEntries",
+      "parentFeatureId": "toolchains.gitNodePythonMirrors",
+      "oldCapabilityIds": [
+        "toolchains.network-cache"
+      ],
+      "priority": "P1",
+      "userGoal": "Complete the Cache Entries step within toolchains.gitNodePythonMirrors",
+      "commands": [
+        "cache_entries"
+      ],
+      "implementationStatus": "degraded",
+      "evidenceStatus": "evidence-required",
+      "releaseDisposition": "code-blocker",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "toolchains.mysqlRepair.inspectMysqlRepair",
+      "parentFeatureId": "toolchains.mysqlRepair",
+      "oldCapabilityIds": [
+        "mysql.repair"
+      ],
+      "priority": "P1",
+      "userGoal": "Complete the Inspect Mysql Repair step within toolchains.mysqlRepair",
+      "commands": [
+        "inspect_mysql_repair"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "toolchains.mysqlRepair.createMysqlRepairPlan",
+      "parentFeatureId": "toolchains.mysqlRepair",
+      "oldCapabilityIds": [
+        "mysql.repair"
+      ],
+      "priority": "P1",
+      "userGoal": "Complete the Create Mysql Repair Plan step within toolchains.mysqlRepair",
+      "commands": [
+        "create_mysql_repair_plan"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "toolchains.mysqlRepair.executeMysqlRepairPlan",
+      "parentFeatureId": "toolchains.mysqlRepair",
+      "oldCapabilityIds": [
+        "mysql.repair"
+      ],
+      "priority": "P1",
+      "userGoal": "Complete the Execute Mysql Repair Plan step within toolchains.mysqlRepair",
+      "commands": [
+        "execute_mysql_repair_plan"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "toolchains.mysqlRepair.mysqlPendingExecutionGuard",
+      "parentFeatureId": "toolchains.mysqlRepair",
+      "oldCapabilityIds": [
+        "mysql.repair"
+      ],
+      "priority": "P1",
+      "userGoal": "Complete the Mysql Pending Execution Guard step within toolchains.mysqlRepair",
+      "commands": [
+        "mysql_pending_execution_guard"
+      ],
+      "implementationStatus": "not-applicable",
+      "evidenceStatus": "evidence-required",
+      "releaseDisposition": "evidence-blocker",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "update.checkDownloadMetadata.checkForUpdates",
+      "parentFeatureId": "update.checkDownloadMetadata",
+      "oldCapabilityIds": [
+        "update.check"
+      ],
+      "priority": "P1",
+      "userGoal": "Complete the Check For Updates step within update.checkDownloadMetadata",
+      "commands": [
+        "check_for_updates"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-installed",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "update.checkDownloadMetadata.downloadUpdate",
+      "parentFeatureId": "update.checkDownloadMetadata",
+      "oldCapabilityIds": [
+        "update.download-install"
+      ],
+      "priority": "P1",
+      "userGoal": "Complete the Download Update step within update.checkDownloadMetadata",
+      "commands": [
+        "download_update"
+      ],
+      "implementationStatus": "degraded",
+      "evidenceStatus": "evidence-required",
+      "releaseDisposition": "code-blocker",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "update.checkDownloadMetadata.launchUpdateInstaller",
+      "parentFeatureId": "update.checkDownloadMetadata",
+      "oldCapabilityIds": [
+        "update.download-install"
+      ],
+      "priority": "P1",
+      "userGoal": "Complete the Launch Update Installer step within update.checkDownloadMetadata",
+      "commands": [
+        "launch_update_installer"
+      ],
+      "implementationStatus": "degraded",
+      "evidenceStatus": "evidence-required",
+      "releaseDisposition": "code-blocker",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    }
+  ]
+}

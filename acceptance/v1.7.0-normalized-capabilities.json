@@ -1,0 +1,4198 @@
+{
+  "schemaVersion": 2,
+  "oldVersion": "1.7.0",
+  "targetVersion": "1.8.2",
+  "sourceSummary": {
+    "total": 237,
+    "mapped": 229,
+    "excluded": 8,
+    "unaccounted": 0,
+    "bySourceType": {
+      "data-action": 47,
+      "documentation-promise": 43,
+      "frontend-invoke": 136,
+      "page": 11
+    },
+    "byExclusionReason": {
+      "excluded-ui-mechanics": 4,
+      "excluded-internal": 4,
+      "excluded-duplicate-source": 0,
+      "excluded-obsolete-alias": 0
+    }
+  },
+  "summary": {
+    "total": 87,
+    "byImplementationStatus": {
+      "degraded": 16,
+      "enhanced": 13,
+      "equivalent": 53,
+      "missing": 5
+    },
+    "byEvidenceStatus": {
+      "evidence-required": 21,
+      "not-safely-testable": 16,
+      "verified-automated": 25,
+      "verified-installed": 24,
+      "verified-real-tauri": 1
+    },
+    "byReleaseDisposition": {
+      "code-blocker": 16,
+      "evidence-blocker": 16,
+      "product-decision-required": 5,
+      "ready": 50
+    }
+  },
+  "capabilities": [
+    {
+      "capabilityId": "bootstrap.retry",
+      "domain": "Bootstrap",
+      "userGoal": "Retry application initialization after a recoverable startup failure",
+      "v1.7.0Entry": [
+        "retry-app-init"
+      ],
+      "v1.7.0Steps": [
+        "Open dashboard",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Retry application initialization after a recoverable startup failure",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.action.retry-app-init"
+      ],
+      "v1.8.2Entry": [],
+      "v1.8.2Steps": [],
+      "v1.8.2Result": "No complete current user path evidenced",
+      "replacementCommands": [],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "cleanup.application-usage",
+      "domain": "Cleanup",
+      "userGoal": "Cleanup Application Usage",
+      "v1.7.0Entry": [
+        "inspect_app_usage"
+      ],
+      "v1.7.0Steps": [
+        "Open cleanup",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Cleanup Application Usage",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.command.inspect_app_usage"
+      ],
+      "v1.8.2Entry": [],
+      "v1.8.2Steps": [],
+      "v1.8.2Result": "No complete current user path evidenced",
+      "replacementCommands": [
+        "inspect_app_usage",
+        "inspect_installed_software_usage"
+      ],
+      "implementationStatus": "degraded",
+      "evidenceStatus": "evidence-required",
+      "releaseDisposition": "code-blocker",
+      "releaseReason": "The application-usage analyzers remain registered but have no Cleanup API call or rendered result section.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [],
+      "codeBlockerEvidence": {
+        "oldReproduction": [
+          "Use inspect_app_usage"
+        ],
+        "currentReproduction": [
+          "Open the mapped v1.8.2 domain and look for an equivalent result"
+        ],
+        "expected": "Cleanup Application Usage",
+        "actual": "The application-usage analyzers remain registered but have no Cleanup API call or rendered result section.",
+        "sourceLocations": [
+          "v1.7.0 frontend invoke"
+        ],
+        "userImpact": "The historical user goal may not be completable in v1.8.2.",
+        "minimalFix": "Expose the existing read-only reports in Cleanup."
+      },
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "cleanup.archive-plan",
+      "domain": "Cleanup",
+      "userGoal": "Cleanup Archive Plan",
+      "v1.7.0Entry": [
+        "add_archive_plan_item",
+        "archive-add",
+        "archive-remove",
+        "list_archive_plan_items",
+        "remove_archive_plan_item"
+      ],
+      "v1.7.0Steps": [
+        "Open dashboard",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Cleanup Archive Plan",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.action.archive-add",
+        "v17.action.archive-remove",
+        "v17.command.add_archive_plan_item",
+        "v17.command.list_archive_plan_items",
+        "v17.command.remove_archive_plan_item"
+      ],
+      "v1.8.2Entry": [],
+      "v1.8.2Steps": [],
+      "v1.8.2Result": "No complete current user path evidenced",
+      "replacementCommands": [
+        "add_archive_plan_item",
+        "list_archive_plan_items",
+        "remove_archive_plan_item"
+      ],
+      "implementationStatus": "degraded",
+      "evidenceStatus": "evidence-required",
+      "releaseDisposition": "code-blocker",
+      "releaseReason": "The generic v1.7 add/remove/list archive-plan workflow is absent; v1.8.2 only exposes specialized Desktop and Downloads archive plans.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [],
+      "codeBlockerEvidence": {
+        "oldReproduction": [
+          "Use add_archive_plan_item",
+          "Use archive-add",
+          "Use archive-remove",
+          "Use list_archive_plan_items",
+          "Use remove_archive_plan_item"
+        ],
+        "currentReproduction": [
+          "Open the mapped v1.8.2 domain and look for an equivalent result"
+        ],
+        "expected": "Cleanup Archive Plan",
+        "actual": "The generic v1.7 add/remove/list archive-plan workflow is absent; v1.8.2 only exposes specialized Desktop and Downloads archive plans.",
+        "sourceLocations": [
+          "v1.7.0 frontend action",
+          "v1.7.0 frontend invoke"
+        ],
+        "userImpact": "The historical user goal may not be completable in v1.8.2.",
+        "minimalFix": "Restore a generic archive selection UI or approve the narrower replacement."
+      },
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "cleanup.desktop-archive",
+      "domain": "Cleanup",
+      "userGoal": "Cleanup Desktop Archive",
+      "v1.7.0Entry": [
+        "create_desktop_archive_plan"
+      ],
+      "v1.7.0Steps": [
+        "Open cleanup",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Cleanup Desktop Archive",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.command.create_desktop_archive_plan"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/cleanup/api.ts:85",
+        "tauri/src/features/cleanup/api.ts:89"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "create_desktop_archive_plan",
+        "execute_desktop_archive_plan"
+      ],
+      "implementationStatus": "enhanced",
+      "evidenceStatus": "verified-installed",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/cleanup/api.ts:85",
+        "frontend:tauri/src/features/cleanup/api.ts:89"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "cleanup.dev-cache",
+      "domain": "Cleanup",
+      "userGoal": "Cleanup Dev Cache",
+      "v1.7.0Entry": [
+        "clean_dev_cache"
+      ],
+      "v1.7.0Steps": [
+        "Open toolchains",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Cleanup Dev Cache",
+      "v1.7.0Risk": "state-changing",
+      "sourceRecordIds": [
+        "v17.command.clean_dev_cache"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/cleanup/api.ts:37"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "clean_dev_cache"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "not-safely-testable",
+      "releaseDisposition": "evidence-blocker",
+      "releaseReason": "Implementation mapping exists, but the required installed or safely isolated execution evidence is incomplete.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/cleanup/api.ts:37"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": {
+        "fixture": "Dedicated temporary data or disposable VM snapshot",
+        "environment": "Windows real Tauri or installed application",
+        "steps": [
+          "Capture baseline",
+          "Run the mapped user path",
+          "Verify result against system state",
+          "Restore baseline"
+        ],
+        "safetyBoundary": "Do not modify real services, associations, environment, or user files outside the fixture.",
+        "passCriteria": "UI result, receipt, and observed system state agree.",
+        "recovery": "Delete temporary data or revert the VM snapshot."
+      }
+    },
+    {
+      "capabilityId": "cleanup.download-cache",
+      "domain": "Cleanup",
+      "userGoal": "Cleanup Download Cache",
+      "v1.7.0Entry": [
+        "clear_download_cache"
+      ],
+      "v1.7.0Steps": [
+        "Open toolchains",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Cleanup Download Cache",
+      "v1.7.0Risk": "state-changing",
+      "sourceRecordIds": [
+        "v17.command.clear_download_cache"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/cleanup/api.ts:33"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "clean_managed_download_cache",
+        "clear_download_cache"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "not-safely-testable",
+      "releaseDisposition": "evidence-blocker",
+      "releaseReason": "Implementation mapping exists, but the required installed or safely isolated execution evidence is incomplete.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/cleanup/api.ts:33"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": {
+        "fixture": "Dedicated temporary data or disposable VM snapshot",
+        "environment": "Windows real Tauri or installed application",
+        "steps": [
+          "Capture baseline",
+          "Run the mapped user path",
+          "Verify result against system state",
+          "Restore baseline"
+        ],
+        "safetyBoundary": "Do not modify real services, associations, environment, or user files outside the fixture.",
+        "passCriteria": "UI result, receipt, and observed system state agree.",
+        "recovery": "Delete temporary data or revert the VM snapshot."
+      }
+    },
+    {
+      "capabilityId": "cleanup.downloads-archive",
+      "domain": "Cleanup",
+      "userGoal": "Cleanup Downloads Archive",
+      "v1.7.0Entry": [
+        "create_downloads_archive_plan"
+      ],
+      "v1.7.0Steps": [
+        "Open cleanup",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Cleanup Downloads Archive",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.command.create_downloads_archive_plan"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/cleanup/api.ts:93",
+        "tauri/src/features/cleanup/api.ts:97"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "create_downloads_archive_plan",
+        "execute_downloads_archive_plan"
+      ],
+      "implementationStatus": "enhanced",
+      "evidenceStatus": "verified-installed",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/cleanup/api.ts:93",
+        "frontend:tauri/src/features/cleanup/api.ts:97"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "cleanup.folder-analysis",
+      "domain": "Cleanup",
+      "userGoal": "C 盘急救大师 Phase 3：桌面/下载分类、大文件 Top 100、按大小与 SHA256 的重复文件扫描，以及微信/QQ、浏览器缓存、网盘、剪辑软件、游戏库和 Windows 已安装软件占用分析；支持把普通文件加入只记录路径的归档计划，全部默认只读且不移动文件。",
+      "v1.7.0Entry": [
+        "dashboard",
+        "inspect_desktop",
+        "inspect_downloads",
+        "rescan-folder",
+        "scan_duplicate_large_files",
+        "scan_large_files"
+      ],
+      "v1.7.0Steps": [
+        "Open dashboard",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "C 盘急救大师 Phase 3：桌面/下载分类、大文件 Top 100、按大小与 SHA256 的重复文件扫描，以及微信/QQ、浏览器缓存、网盘、剪辑软件、游戏库和 Windows 已安装软件占用分析；支持把普通文件加入只记录路径的归档计划，全部默认只读且不移动文件。",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.action.rescan-folder",
+        "v17.command.inspect_desktop",
+        "v17.command.inspect_downloads",
+        "v17.command.scan_duplicate_large_files",
+        "v17.command.scan_large_files",
+        "v17.promise.036"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/cleanup/api.ts:69",
+        "tauri/src/features/cleanup/api.ts:73",
+        "tauri/src/features/cleanup/api.ts:77",
+        "tauri/src/features/cleanup/api.ts:81"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "inspect_desktop",
+        "inspect_downloads",
+        "scan_duplicate_large_files",
+        "scan_large_files"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-installed",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/cleanup/api.ts:69",
+        "frontend:tauri/src/features/cleanup/api.ts:73",
+        "frontend:tauri/src/features/cleanup/api.ts:77",
+        "frontend:tauri/src/features/cleanup/api.ts:81"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "cleanup.move-rollback",
+      "domain": "Cleanup",
+      "userGoal": "C 盘急救大师 Phase 4：空间搬家、桌面/下载归档、Junction 桥接、回滚记录和 C 盘真扩容安全向导；分区检测只读，扩容仅安全 A/B 模式可执行并要求三次确认。",
+      "v1.7.0Entry": [
+        "create_move_plan",
+        "dashboard",
+        "list_rollback_records",
+        "rollback-move",
+        "rollback_move"
+      ],
+      "v1.7.0Steps": [
+        "Open dashboard",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "C 盘急救大师 Phase 4：空间搬家、桌面/下载归档、Junction 桥接、回滚记录和 C 盘真扩容安全向导；分区检测只读，扩容仅安全 A/B 模式可执行并要求三次确认。",
+      "v1.7.0Risk": "state-changing",
+      "sourceRecordIds": [
+        "v17.action.rollback-move",
+        "v17.command.create_move_plan",
+        "v17.command.list_rollback_records",
+        "v17.command.rollback_move",
+        "v17.promise.037"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/cleanup/api.ts:41",
+        "tauri/src/features/cleanup/api.ts:45",
+        "tauri/src/features/cleanup/api.ts:49",
+        "tauri/src/features/cleanup/api.ts:65"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "create_junction_bridge_plan",
+        "create_move_plan",
+        "execute_move_plan",
+        "list_rollback_records",
+        "rollback_move"
+      ],
+      "implementationStatus": "enhanced",
+      "evidenceStatus": "not-safely-testable",
+      "releaseDisposition": "evidence-blocker",
+      "releaseReason": "Implementation mapping exists, but the required installed or safely isolated execution evidence is incomplete.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/cleanup/api.ts:41",
+        "frontend:tauri/src/features/cleanup/api.ts:45",
+        "frontend:tauri/src/features/cleanup/api.ts:49",
+        "frontend:tauri/src/features/cleanup/api.ts:65"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": {
+        "fixture": "Dedicated temporary data or disposable VM snapshot",
+        "environment": "Windows real Tauri or installed application",
+        "steps": [
+          "Capture baseline",
+          "Run the mapped user path",
+          "Verify result against system state",
+          "Restore baseline"
+        ],
+        "safetyBoundary": "Do not modify real services, associations, environment, or user files outside the fixture.",
+        "passCriteria": "UI result, receipt, and observed system state agree.",
+        "recovery": "Delete temporary data or revert the VM snapshot."
+      }
+    },
+    {
+      "capabilityId": "cleanup.overview",
+      "domain": "Cleanup",
+      "userGoal": "Cleanup Overview",
+      "v1.7.0Entry": [
+        "inspect_maintenance_overview",
+        "storage_cleanup_architecture"
+      ],
+      "v1.7.0Steps": [
+        "Open dashboard",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Cleanup Overview",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.command.inspect_maintenance_overview",
+        "v17.command.storage_cleanup_architecture"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/cleanup/api.ts:13",
+        "tauri/src/features/cleanup/api.ts:9"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "inspect_maintenance_overview",
+        "storage_cleanup_architecture"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-installed",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/cleanup/api.ts:13",
+        "frontend:tauri/src/features/cleanup/api.ts:9"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "cleanup.partition-expansion",
+      "domain": "Cleanup",
+      "userGoal": "Cleanup Partition Expansion",
+      "v1.7.0Entry": [
+        "create_c_drive_expansion_plan",
+        "execute_c_drive_expansion",
+        "inspect_partition_layout"
+      ],
+      "v1.7.0Steps": [
+        "Open cleanup",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Cleanup Partition Expansion",
+      "v1.7.0Risk": "state-changing",
+      "sourceRecordIds": [
+        "v17.command.create_c_drive_expansion_plan",
+        "v17.command.execute_c_drive_expansion",
+        "v17.command.inspect_partition_layout"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/cleanup/api.ts:53",
+        "tauri/src/features/cleanup/api.ts:57",
+        "tauri/src/features/cleanup/api.ts:61"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "create_c_drive_expansion_plan",
+        "execute_c_drive_expansion",
+        "inspect_partition_layout"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "not-safely-testable",
+      "releaseDisposition": "evidence-blocker",
+      "releaseReason": "Implementation mapping exists, but the required installed or safely isolated execution evidence is incomplete.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/cleanup/api.ts:53",
+        "frontend:tauri/src/features/cleanup/api.ts:57",
+        "frontend:tauri/src/features/cleanup/api.ts:61"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": {
+        "fixture": "Dedicated temporary data or disposable VM snapshot",
+        "environment": "Windows real Tauri or installed application",
+        "steps": [
+          "Capture baseline",
+          "Run the mapped user path",
+          "Verify result against system state",
+          "Restore baseline"
+        ],
+        "safetyBoundary": "Do not modify real services, associations, environment, or user files outside the fixture.",
+        "passCriteria": "UI result, receipt, and observed system state agree.",
+        "recovery": "Delete temporary data or revert the VM snapshot."
+      }
+    },
+    {
+      "capabilityId": "cleanup.scan-plan-execute",
+      "domain": "Cleanup",
+      "userGoal": "C 盘急救大师 Phase 2：执行“扫描 → 选择 → 计划预览 → 二次确认 → 重新校验 → 回收站清理 → 验证 → 报告”；开发缓存优先调用官方命令。",
+      "v1.7.0Entry": [
+        "cancel_maintenance_scan",
+        "clean_selected_targets",
+        "create_cleanup_plan",
+        "dashboard",
+        "scan_cleanup_targets"
+      ],
+      "v1.7.0Steps": [
+        "Open dashboard",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "C 盘急救大师 Phase 2：执行“扫描 → 选择 → 计划预览 → 二次确认 → 重新校验 → 回收站清理 → 验证 → 报告”；开发缓存优先调用官方命令。",
+      "v1.7.0Risk": "state-changing",
+      "sourceRecordIds": [
+        "v17.command.cancel_maintenance_scan",
+        "v17.command.clean_selected_targets",
+        "v17.command.create_cleanup_plan",
+        "v17.command.scan_cleanup_targets",
+        "v17.promise.035"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/cleanup/api.ts:21",
+        "tauri/src/features/cleanup/api.ts:25",
+        "tauri/src/features/cleanup/api.ts:29"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "cancel_maintenance_scan",
+        "clean_selected_targets",
+        "create_cleanup_plan",
+        "scan_cleanup_targets",
+        "scan_storage_cleanup"
+      ],
+      "implementationStatus": "enhanced",
+      "evidenceStatus": "verified-installed",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/cleanup/api.ts:21",
+        "frontend:tauri/src/features/cleanup/api.ts:25",
+        "frontend:tauri/src/features/cleanup/api.ts:29"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "cli.workflows",
+      "domain": "Cli",
+      "userGoal": "Run supported DevEnv diagnostic and plan workflows from the CLI",
+      "v1.7.0Entry": [
+        "dashboard"
+      ],
+      "v1.7.0Steps": [
+        "Open dashboard",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Run supported DevEnv diagnostic and plan workflows from the CLI",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.promise.041"
+      ],
+      "v1.8.2Entry": [],
+      "v1.8.2Steps": [],
+      "v1.8.2Result": "No complete current user path evidenced",
+      "replacementCommands": [],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "dashboard.snapshot",
+      "domain": "Dashboard",
+      "userGoal": "Dashboard Snapshot",
+      "v1.7.0Entry": [
+        "app_snapshot"
+      ],
+      "v1.7.0Steps": [
+        "Open dashboard",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Dashboard Snapshot",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.command.app_snapshot"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/dashboard/api.ts:5"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "app_snapshot"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-installed",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/dashboard/api.ts:5"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "debug.agent-traces",
+      "domain": "Debug",
+      "userGoal": "AI Agent / CLI 痕迹分析：用户主动触发后只读检查可验证路径与项目配置文件名，不读取会话正文、history、token 或密钥。",
+      "v1.7.0Entry": [
+        "dashboard",
+        "inspect_agent_traces"
+      ],
+      "v1.7.0Steps": [
+        "Open dashboard",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "AI Agent / CLI 痕迹分析：用户主动触发后只读检查可验证路径与项目配置文件名，不读取会话正文、history、token 或密钥。",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.command.inspect_agent_traces",
+        "v17.promise.040"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/projects/api.ts:26"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "inspect_agent_traces"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/projects/api.ts:26"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "doctor.repair",
+      "domain": "Doctor",
+      "userGoal": "Doctor Repair",
+      "v1.7.0Entry": [
+        "doctor-fix",
+        "repair_doctor_safe"
+      ],
+      "v1.7.0Steps": [
+        "Open dashboard",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Doctor Repair",
+      "v1.7.0Risk": "state-changing",
+      "sourceRecordIds": [
+        "v17.action.doctor-fix",
+        "v17.command.repair_doctor_safe"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/reports/api.ts:21",
+        "tauri/src/features/reports/api.ts:25"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "create_doctor_repair_plan",
+        "execute_doctor_repair_plan"
+      ],
+      "implementationStatus": "enhanced",
+      "evidenceStatus": "verified-installed",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/reports/api.ts:21",
+        "frontend:tauri/src/features/reports/api.ts:25"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "doctor.report",
+      "domain": "Doctor",
+      "userGoal": "Doctor Report",
+      "v1.7.0Entry": [
+        "copy-diagnostics",
+        "export_doctor_report",
+        "export_doctor_report_json"
+      ],
+      "v1.7.0Steps": [
+        "Open dashboard",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Doctor Report",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.action.copy-diagnostics",
+        "v17.command.export_doctor_report",
+        "v17.command.export_doctor_report_json"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/reports/api.ts:13",
+        "tauri/src/features/reports/api.ts:9"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "export_doctor_report",
+        "export_doctor_report_json"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-installed",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/reports/api.ts:13",
+        "frontend:tauri/src/features/reports/api.ts:9"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "doctor.run",
+      "domain": "Doctor",
+      "userGoal": "环境医生：按类别对齐展示诊断项和修复建议，可导出 Markdown/JSON 或复制脱敏报告。",
+      "v1.7.0Entry": [
+        "dashboard",
+        "doctor_report_text",
+        "run_doctor"
+      ],
+      "v1.7.0Steps": [
+        "Open ports",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "环境医生：按类别对齐展示诊断项和修复建议，可导出 Markdown/JSON 或复制脱敏报告。",
+      "v1.7.0Risk": "state-changing",
+      "sourceRecordIds": [
+        "v17.command.doctor_report_text",
+        "v17.command.run_doctor",
+        "v17.promise.014"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/reports/api.ts:17",
+        "tauri/src/features/reports/api.ts:5"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "doctor_report_text",
+        "run_doctor"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-installed",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/reports/api.ts:17",
+        "frontend:tauri/src/features/reports/api.ts:5"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "environment.backups",
+      "domain": "Environment",
+      "userGoal": "Environment Backups",
+      "v1.7.0Entry": [
+        "list_env_backups",
+        "list_environment_backups"
+      ],
+      "v1.7.0Steps": [
+        "Open environment",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Environment Backups",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.command.list_env_backups",
+        "v17.command.list_environment_backups"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/environment/api.ts:17",
+        "tauri/src/features/environment/api.ts:21"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "inspect_env_backup",
+        "list_env_backups",
+        "list_environment_backups"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/environment/api.ts:17",
+        "frontend:tauri/src/features/environment/api.ts:21"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "environment.configure",
+      "domain": "Environment",
+      "userGoal": "用户级环境变量管理：写入前展示 `DEVENV_HOME`、`JAVA_HOME`、PATH 差异；二次确认、回读验证、最多 20 份历史备份和指定恢复。",
+      "v1.7.0Entry": [
+        "apply_user_environment_configuration",
+        "configure_user_environment",
+        "dashboard",
+        "preview_user_environment_configuration"
+      ],
+      "v1.7.0Steps": [
+        "Open environment",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "用户级环境变量管理：写入前展示 `DEVENV_HOME`、`JAVA_HOME`、PATH 差异；二次确认、回读验证、最多 20 份历史备份和指定恢复。",
+      "v1.7.0Risk": "state-changing",
+      "sourceRecordIds": [
+        "v17.command.apply_user_environment_configuration",
+        "v17.command.configure_user_environment",
+        "v17.command.preview_user_environment_configuration",
+        "v17.promise.007",
+        "v17.promise.008"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/environment/api.ts:13"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "apply_user_environment_configuration",
+        "preview_user_environment_configuration"
+      ],
+      "implementationStatus": "enhanced",
+      "evidenceStatus": "not-safely-testable",
+      "releaseDisposition": "evidence-blocker",
+      "releaseReason": "Implementation mapping exists, but the required installed or safely isolated execution evidence is incomplete.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/environment/api.ts:13"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": {
+        "fixture": "Dedicated temporary data or disposable VM snapshot",
+        "environment": "Windows real Tauri or installed application",
+        "steps": [
+          "Capture baseline",
+          "Run the mapped user path",
+          "Verify result against system state",
+          "Restore baseline"
+        ],
+        "safetyBoundary": "Do not modify real services, associations, environment, or user files outside the fixture.",
+        "passCriteria": "UI result, receipt, and observed system state agree.",
+        "recovery": "Delete temporary data or revert the VM snapshot."
+      }
+    },
+    {
+      "capabilityId": "environment.java-stabilize",
+      "domain": "Environment",
+      "userGoal": "Java 稳定修复计划：后端生成一次性计划，写入真实绝对 `JAVA_HOME`，保留未知用户 PATH，去重并清理旧 DevEnv Manager 受管条目；执行前校验环境指纹，执行后重新验证。",
+      "v1.7.0Entry": [
+        "apply_env_repair_plan",
+        "create_java_stabilize_plan",
+        "dashboard",
+        "set-java-home-candidate"
+      ],
+      "v1.7.0Steps": [
+        "Open dashboard",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Java 稳定修复计划：后端生成一次性计划，写入真实绝对 `JAVA_HOME`，保留未知用户 PATH，去重并清理旧 DevEnv Manager 受管条目；执行前校验环境指纹，执行后重新验证。",
+      "v1.7.0Risk": "state-changing",
+      "sourceRecordIds": [
+        "v17.action.set-java-home-candidate",
+        "v17.command.apply_env_repair_plan",
+        "v17.command.create_java_stabilize_plan",
+        "v17.promise.010"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/environment/api.ts:25",
+        "tauri/src/features/environment/api.ts:29"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "apply_env_repair_plan",
+        "create_env_repair_plan",
+        "create_java_stabilize_plan",
+        "rollback_env_repair",
+        "verify_env_after_apply"
+      ],
+      "implementationStatus": "enhanced",
+      "evidenceStatus": "not-safely-testable",
+      "releaseDisposition": "evidence-blocker",
+      "releaseReason": "Implementation mapping exists, but the required installed or safely isolated execution evidence is incomplete.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/environment/api.ts:25",
+        "frontend:tauri/src/features/environment/api.ts:29"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": {
+        "fixture": "Dedicated temporary data or disposable VM snapshot",
+        "environment": "Windows real Tauri or installed application",
+        "steps": [
+          "Capture baseline",
+          "Run the mapped user path",
+          "Verify result against system state",
+          "Restore baseline"
+        ],
+        "safetyBoundary": "Do not modify real services, associations, environment, or user files outside the fixture.",
+        "passCriteria": "UI result, receipt, and observed system state agree.",
+        "recovery": "Delete temporary data or revert the VM snapshot."
+      }
+    },
+    {
+      "capabilityId": "environment.path-cleanup",
+      "domain": "Environment",
+      "userGoal": "Environment Path Cleanup",
+      "v1.7.0Entry": [
+        "cleanup_path_entries"
+      ],
+      "v1.7.0Steps": [
+        "Open cleanup",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Environment Path Cleanup",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.command.cleanup_path_entries"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/environment/api.ts:33"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "cleanup_path_entries"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "not-safely-testable",
+      "releaseDisposition": "evidence-blocker",
+      "releaseReason": "Implementation mapping exists, but the required installed or safely isolated execution evidence is incomplete.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/environment/api.ts:33"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": {
+        "fixture": "Dedicated temporary data or disposable VM snapshot",
+        "environment": "Windows real Tauri or installed application",
+        "steps": [
+          "Capture baseline",
+          "Run the mapped user path",
+          "Verify result against system state",
+          "Restore baseline"
+        ],
+        "safetyBoundary": "Do not modify real services, associations, environment, or user files outside the fixture.",
+        "passCriteria": "UI result, receipt, and observed system state agree.",
+        "recovery": "Delete temporary data or revert the VM snapshot."
+      }
+    },
+    {
+      "capabilityId": "environment.python-alias-settings",
+      "domain": "Environment",
+      "userGoal": "Environment Python Alias Settings",
+      "v1.7.0Entry": [
+        "open-python-alias-settings",
+        "open_python_alias_settings"
+      ],
+      "v1.7.0Steps": [
+        "Open dashboard",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Environment Python Alias Settings",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.action.open-python-alias-settings",
+        "v17.command.open_python_alias_settings"
+      ],
+      "v1.8.2Entry": [],
+      "v1.8.2Steps": [],
+      "v1.8.2Result": "No complete current user path evidenced",
+      "replacementCommands": [
+        "open_python_alias_settings"
+      ],
+      "implementationStatus": "degraded",
+      "evidenceStatus": "evidence-required",
+      "releaseDisposition": "code-blocker",
+      "releaseReason": "The Windows Python alias settings command remains registered but has no Environment action.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [],
+      "codeBlockerEvidence": {
+        "oldReproduction": [
+          "Use open-python-alias-settings",
+          "Use open_python_alias_settings"
+        ],
+        "currentReproduction": [
+          "Open the mapped v1.8.2 domain and look for an equivalent result"
+        ],
+        "expected": "Environment Python Alias Settings",
+        "actual": "The Windows Python alias settings command remains registered but has no Environment action.",
+        "sourceLocations": [
+          "v1.7.0 frontend action",
+          "v1.7.0 frontend invoke"
+        ],
+        "userImpact": "The historical user goal may not be completable in v1.8.2.",
+        "minimalFix": "Add the smallest explicit open-settings entry."
+      },
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "environment.python-health-repair",
+      "domain": "Environment",
+      "userGoal": "Python 完整性检查：安装后验证 `pip`、`venv`、`ssl`、`sqlite3`、`ctypes`，并将 `tkinter` 作为可选 GUI 组件提示；核心组件失败不会登记为已安装。",
+      "v1.7.0Entry": [
+        "analyze_python_environment",
+        "apply_python_repair",
+        "create_managed_python_pip_repair_plan",
+        "dashboard",
+        "inspect_python_integrity",
+        "preview_python_repair"
+      ],
+      "v1.7.0Steps": [
+        "Open environment",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Python 完整性检查：安装后验证 `pip`、`venv`、`ssl`、`sqlite3`、`ctypes`，并将 `tkinter` 作为可选 GUI 组件提示；核心组件失败不会登记为已安装。",
+      "v1.7.0Risk": "state-changing",
+      "sourceRecordIds": [
+        "v17.command.analyze_python_environment",
+        "v17.command.apply_python_repair",
+        "v17.command.create_managed_python_pip_repair_plan",
+        "v17.command.inspect_python_integrity",
+        "v17.command.preview_python_repair",
+        "v17.promise.005",
+        "v17.promise.012",
+        "v17.promise.013",
+        "v17.promise.015"
+      ],
+      "v1.8.2Entry": [],
+      "v1.8.2Steps": [],
+      "v1.8.2Result": "No complete current user path evidenced",
+      "replacementCommands": [
+        "analyze_python_environment",
+        "apply_managed_python_pip_repair",
+        "apply_python_repair",
+        "create_managed_python_pip_repair_plan",
+        "inspect_python_integrity",
+        "preview_python_repair"
+      ],
+      "implementationStatus": "degraded",
+      "evidenceStatus": "evidence-required",
+      "releaseDisposition": "code-blocker",
+      "releaseReason": "Python analysis, preview, and repair commands remain registered but the Environment page exposes only Java stabilization and PATH cleanup.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [],
+      "codeBlockerEvidence": {
+        "oldReproduction": [
+          "Use README",
+          "Use analyze_python_environment",
+          "Use apply_python_repair",
+          "Use create_managed_python_pip_repair_plan",
+          "Use inspect_python_integrity",
+          "Use preview_python_repair"
+        ],
+        "currentReproduction": [
+          "Open the mapped v1.8.2 domain and look for an equivalent result"
+        ],
+        "expected": "Python 完整性检查：安装后验证 `pip`、`venv`、`ssl`、`sqlite3`、`ctypes`，并将 `tkinter` 作为可选 GUI 组件提示；核心组件失败不会登记为已安装。",
+        "actual": "Python analysis, preview, and repair commands remain registered but the Environment page exposes only Java stabilization and PATH cleanup.",
+        "sourceLocations": [
+          "README.md:Python 修复闭环：安装前检查当前 `python` / `pip` / `py`、用户 PATH、Store 别名与多版本冲突；修复前展示一次性计划并保存环境备份。",
+          "README.md:Python 冲突分析：检测默认 `python`、`pip`、`py -0p`、注册表、Microsoft Store 执行别名风险。",
+          "README.md:Python 完整性检查：安装后验证 `pip`、`venv`、`ssl`、`sqlite3`、`ctypes`，并将 `tkinter` 作为可选 GUI 组件提示；核心组件失败不会登记为已安装。",
+          "README.md:pip 缺失修复计划：仅对 DevEnv Manager 受管 Python 生成 `ensurepip` 与 pip 升级计划；非受管 Python 只提示，不替用户改系统安装。",
+          "v1.7.0 frontend invoke"
+        ],
+        "userImpact": "The historical user goal may not be completable in v1.8.2.",
+        "minimalFix": "Restore Python diagnosis and guarded repair result panels."
+      },
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "environment.restore",
+      "domain": "Environment",
+      "userGoal": "环境备份恢复中心：列出环境备份、恢复前再次备份当前状态、恢复后广播环境变化并重新验证 Java/Python/Node。",
+      "v1.7.0Entry": [
+        "dashboard",
+        "restore-env-record",
+        "restore_env_backup",
+        "restore_environment_backup",
+        "restore_user_environment"
+      ],
+      "v1.7.0Steps": [
+        "Open dashboard",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "环境备份恢复中心：列出环境备份、恢复前再次备份当前状态、恢复后广播环境变化并重新验证 Java/Python/Node。",
+      "v1.7.0Risk": "state-changing",
+      "sourceRecordIds": [
+        "v17.action.restore-env-record",
+        "v17.command.restore_env_backup",
+        "v17.command.restore_environment_backup",
+        "v17.command.restore_user_environment",
+        "v17.promise.011"
+      ],
+      "v1.8.2Entry": [],
+      "v1.8.2Steps": [],
+      "v1.8.2Result": "No complete current user path evidenced",
+      "replacementCommands": [
+        "restore_env_backup",
+        "restore_environment_backup",
+        "restore_user_environment"
+      ],
+      "implementationStatus": "degraded",
+      "evidenceStatus": "evidence-required",
+      "releaseDisposition": "code-blocker",
+      "releaseReason": "The Environment page lists backup counts but does not expose a restore action for either backup model.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [],
+      "codeBlockerEvidence": {
+        "oldReproduction": [
+          "Use README",
+          "Use restore-env-record",
+          "Use restore_env_backup",
+          "Use restore_environment_backup",
+          "Use restore_user_environment"
+        ],
+        "currentReproduction": [
+          "Open the mapped v1.8.2 domain and look for an equivalent result"
+        ],
+        "expected": "环境备份恢复中心：列出环境备份、恢复前再次备份当前状态、恢复后广播环境变化并重新验证 Java/Python/Node。",
+        "actual": "The Environment page lists backup counts but does not expose a restore action for either backup model.",
+        "sourceLocations": [
+          "README.md:环境备份恢复中心：列出环境备份、恢复前再次备份当前状态、恢复后广播环境变化并重新验证 Java/Python/Node。",
+          "v1.7.0 frontend action",
+          "v1.7.0 frontend invoke"
+        ],
+        "userImpact": "The historical user goal may not be completable in v1.8.2.",
+        "minimalFix": "Add a backup selector and token-gated restore result flow."
+      },
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "environment.snapshot",
+      "domain": "Environment",
+      "userGoal": "环境可靠性中心：同时展示当前进程环境和 Windows 用户环境，显示 `JAVA_HOME` raw/expanded、PATH 命中顺序、重复/失效/受管条目、Java/Python/Node/Maven/Gradle 生效来源。",
+      "v1.7.0Entry": [
+        "dashboard",
+        "env_snapshot",
+        "environment_health",
+        "inspect_env_reliability",
+        "inspect_java_environment"
+      ],
+      "v1.7.0Steps": [
+        "Open environment",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "环境可靠性中心：同时展示当前进程环境和 Windows 用户环境，显示 `JAVA_HOME` raw/expanded、PATH 命中顺序、重复/失效/受管条目、Java/Python/Node/Maven/Gradle 生效来源。",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.command.env_snapshot",
+        "v17.command.environment_health",
+        "v17.command.inspect_env_reliability",
+        "v17.command.inspect_java_environment",
+        "v17.promise.009"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/dashboard/api.ts:9",
+        "tauri/src/features/environment/api.ts:5",
+        "tauri/src/features/environment/api.ts:9"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "env_snapshot",
+        "environment_health",
+        "inspect_env_reliability",
+        "inspect_java_environment"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-installed",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/dashboard/api.ts:9",
+        "frontend:tauri/src/features/environment/api.ts:5",
+        "frontend:tauri/src/features/environment/api.ts:9"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "file-associations.apply",
+      "domain": "File Associations",
+      "userGoal": "File Associations Apply",
+      "v1.7.0Entry": [
+        "apply_file_association_plan",
+        "create_file_association_plan"
+      ],
+      "v1.7.0Steps": [
+        "Open fileAssociations",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "File Associations Apply",
+      "v1.7.0Risk": "state-changing",
+      "sourceRecordIds": [
+        "v17.command.apply_file_association_plan",
+        "v17.command.create_file_association_plan"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/fileAssociations/api.ts:24",
+        "tauri/src/features/fileAssociations/api.ts:28"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "apply_file_association_plan",
+        "create_file_association_plan"
+      ],
+      "implementationStatus": "enhanced",
+      "evidenceStatus": "verified-installed",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/fileAssociations/api.ts:24",
+        "frontend:tauri/src/features/fileAssociations/api.ts:28"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "file-associations.backup-rollback",
+      "domain": "File Associations",
+      "userGoal": "File Associations Backup Rollback",
+      "v1.7.0Entry": [
+        "list_file_association_backups",
+        "open_file_association_backup_dir",
+        "rollback_file_association_backup"
+      ],
+      "v1.7.0Steps": [
+        "Open fileAssociations",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "File Associations Backup Rollback",
+      "v1.7.0Risk": "state-changing",
+      "sourceRecordIds": [
+        "v17.command.list_file_association_backups",
+        "v17.command.open_file_association_backup_dir",
+        "v17.command.rollback_file_association_backup"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/fileAssociations/api.ts:16",
+        "tauri/src/features/fileAssociations/api.ts:32"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "list_file_association_backups",
+        "open_file_association_backup_dir",
+        "rollback_file_association_backup"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "not-safely-testable",
+      "releaseDisposition": "evidence-blocker",
+      "releaseReason": "Implementation mapping exists, but the required installed or safely isolated execution evidence is incomplete.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/fileAssociations/api.ts:16",
+        "frontend:tauri/src/features/fileAssociations/api.ts:32"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": {
+        "fixture": "Dedicated temporary data or disposable VM snapshot",
+        "environment": "Windows real Tauri or installed application",
+        "steps": [
+          "Capture baseline",
+          "Run the mapped user path",
+          "Verify result against system state",
+          "Restore baseline"
+        ],
+        "safetyBoundary": "Do not modify real services, associations, environment, or user files outside the fixture.",
+        "passCriteria": "UI result, receipt, and observed system state agree.",
+        "recovery": "Delete temporary data or revert the VM snapshot."
+      }
+    },
+    {
+      "capabilityId": "file-associations.scan",
+      "domain": "File Associations",
+      "userGoal": "File Associations Scan",
+      "v1.7.0Entry": [
+        "scan_file_associations"
+      ],
+      "v1.7.0Steps": [
+        "Open fileAssociations",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "File Associations Scan",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.command.scan_file_associations"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/fileAssociations/api.ts:12"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "scan_file_associations"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-installed",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/fileAssociations/api.ts:12"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "file-associations.settings",
+      "domain": "File Associations",
+      "userGoal": "File Associations Settings",
+      "v1.7.0Entry": [
+        "open_default_apps_settings",
+        "open_file_type_settings"
+      ],
+      "v1.7.0Steps": [
+        "Open fileAssociations",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "File Associations Settings",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.command.open_default_apps_settings",
+        "v17.command.open_file_type_settings"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/fileAssociations/api.ts:36",
+        "tauri/src/features/fileAssociations/api.ts:40"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "open_default_apps_settings",
+        "open_file_type_settings"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/fileAssociations/api.ts:36",
+        "frontend:tauri/src/features/fileAssociations/api.ts:40"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "learning.center",
+      "domain": "Learning",
+      "userGoal": "学习中心：介绍 Scoop、mise、vfox、uv、chsrc 的官方入口和适用边界，只允许运行固定版本、位置与环境检查命令。",
+      "v1.7.0Entry": [
+        "dashboard",
+        "open-learning",
+        "run_learning_check"
+      ],
+      "v1.7.0Steps": [
+        "Open dashboard",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "学习中心：介绍 Scoop、mise、vfox、uv、chsrc 的官方入口和适用边界，只允许运行固定版本、位置与环境检查命令。",
+      "v1.7.0Risk": "state-changing",
+      "sourceRecordIds": [
+        "v17.action.open-learning",
+        "v17.command.run_learning_check",
+        "v17.promise.033"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/toolchains/api.ts:45"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "run_learning_check"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/toolchains/api.ts:45"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "mysql.repair",
+      "domain": "Mysql",
+      "userGoal": "MySQL 修复中心：只读发现遗失服务、`my.ini`、端口、Data 系统库与候选业务库；支持一次性注册/启动/备份/系统库修复计划，并强制执行备份门禁。",
+      "v1.7.0Entry": [
+        "create_mysql_repair_plan",
+        "dashboard",
+        "execute_mysql_repair_plan",
+        "inspect_mysql_repair"
+      ],
+      "v1.7.0Steps": [
+        "Open toolchains",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "MySQL 修复中心：只读发现遗失服务、`my.ini`、端口、Data 系统库与候选业务库；支持一次性注册/启动/备份/系统库修复计划，并强制执行备份门禁。",
+      "v1.7.0Risk": "state-changing",
+      "sourceRecordIds": [
+        "v17.command.create_mysql_repair_plan",
+        "v17.command.execute_mysql_repair_plan",
+        "v17.command.inspect_mysql_repair",
+        "v17.promise.032"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/toolchains/api.ts:21",
+        "tauri/src/features/toolchains/api.ts:25",
+        "tauri/src/features/toolchains/api.ts:29"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "create_mysql_repair_plan",
+        "execute_mysql_repair_plan",
+        "inspect_mysql_repair",
+        "mysql_pending_execution_guard"
+      ],
+      "implementationStatus": "enhanced",
+      "evidenceStatus": "not-safely-testable",
+      "releaseDisposition": "evidence-blocker",
+      "releaseReason": "Implementation mapping exists, but the required installed or safely isolated execution evidence is incomplete.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/toolchains/api.ts:21",
+        "frontend:tauri/src/features/toolchains/api.ts:25",
+        "frontend:tauri/src/features/toolchains/api.ts:29"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": {
+        "fixture": "Dedicated temporary data or disposable VM snapshot",
+        "environment": "Windows real Tauri or installed application",
+        "steps": [
+          "Capture baseline",
+          "Run the mapped user path",
+          "Verify result against system state",
+          "Restore baseline"
+        ],
+        "safetyBoundary": "Do not modify real services, associations, environment, or user files outside the fixture.",
+        "passCriteria": "UI result, receipt, and observed system state agree.",
+        "recovery": "Delete temporary data or revert the VM snapshot."
+      }
+    },
+    {
+      "capabilityId": "navigation.workbench",
+      "domain": "Navigation",
+      "userGoal": "Navigate to every v1.7.0 workbench domain",
+      "v1.7.0Entry": [
+        "doctor",
+        "environment",
+        "learning",
+        "maintenance",
+        "overview",
+        "platforms",
+        "ports",
+        "project",
+        "runtimes",
+        "toolbox",
+        "toolchains"
+      ],
+      "v1.7.0Steps": [
+        "Open doctor",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Navigate to every v1.7.0 workbench domain",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.page.doctor",
+        "v17.page.environment",
+        "v17.page.learning",
+        "v17.page.maintenance",
+        "v17.page.overview",
+        "v17.page.platforms",
+        "v17.page.ports",
+        "v17.page.project",
+        "v17.page.runtimes",
+        "v17.page.toolbox",
+        "v17.page.toolchains"
+      ],
+      "v1.8.2Entry": [],
+      "v1.8.2Steps": [],
+      "v1.8.2Result": "No complete current user path evidenced",
+      "replacementCommands": [],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-installed",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "platforms.docker",
+      "domain": "Platforms",
+      "userGoal": "Platforms Docker",
+      "v1.7.0Entry": [
+        "open_docker_desktop"
+      ],
+      "v1.7.0Steps": [
+        "Open cleanup",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Platforms Docker",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.command.open_docker_desktop"
+      ],
+      "v1.8.2Entry": [],
+      "v1.8.2Steps": [],
+      "v1.8.2Result": "No complete current user path evidenced",
+      "replacementCommands": [
+        "open_docker_desktop"
+      ],
+      "implementationStatus": "degraded",
+      "evidenceStatus": "evidence-required",
+      "releaseDisposition": "code-blocker",
+      "releaseReason": "The dedicated Docker Desktop opener remains registered without a frontend entry.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [],
+      "codeBlockerEvidence": {
+        "oldReproduction": [
+          "Use open_docker_desktop"
+        ],
+        "currentReproduction": [
+          "Open the mapped v1.8.2 domain and look for an equivalent result"
+        ],
+        "expected": "Platforms Docker",
+        "actual": "The dedicated Docker Desktop opener remains registered without a frontend entry.",
+        "sourceLocations": [
+          "v1.7.0 frontend invoke"
+        ],
+        "userImpact": "The historical user goal may not be completable in v1.8.2.",
+        "minimalFix": "Expose the read-only/open action or approve its replacement."
+      },
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "platforms.inspect",
+      "domain": "Platforms",
+      "userGoal": "Platforms Inspect",
+      "v1.7.0Entry": [
+        "inspect_platform_toolchains",
+        "inspect_system_platforms",
+        "refresh-platforms"
+      ],
+      "v1.7.0Steps": [
+        "Open dashboard",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Platforms Inspect",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.action.refresh-platforms",
+        "v17.command.inspect_platform_toolchains",
+        "v17.command.inspect_system_platforms"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/toolchains/api.ts:13",
+        "tauri/src/features/toolchains/api.ts:9"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "inspect_platform_toolchains",
+        "inspect_system_platforms"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/toolchains/api.ts:13",
+        "frontend:tauri/src/features/toolchains/api.ts:9"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "platforms.manage",
+      "domain": "Platforms",
+      "userGoal": "Docker Desktop 安装、更新、启动和关闭；WSL 更新、发行版安装、启动、停止和默认发行版管理。",
+      "v1.7.0Entry": [
+        "dashboard",
+        "manage_system_platform",
+        "run_platform_action",
+        "system-platform"
+      ],
+      "v1.7.0Steps": [
+        "Open dashboard",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Docker Desktop 安装、更新、启动和关闭；WSL 更新、发行版安装、启动、停止和默认发行版管理。",
+      "v1.7.0Risk": "state-changing",
+      "sourceRecordIds": [
+        "v17.action.system-platform",
+        "v17.command.manage_system_platform",
+        "v17.command.run_platform_action",
+        "v17.promise.030"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/toolchains/api.ts:37"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "manage_system_platform",
+        "run_platform_action"
+      ],
+      "implementationStatus": "degraded",
+      "evidenceStatus": "evidence-required",
+      "releaseDisposition": "code-blocker",
+      "releaseReason": "The visible platform-management button always sends action 'open', but manage_system_platform supports docker_install, docker_update, docker_shutdown, and WSL actions instead.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/toolchains/api.ts:37"
+      ],
+      "codeBlockerEvidence": {
+        "oldReproduction": [
+          "Use README",
+          "Use manage_system_platform",
+          "Use run_platform_action",
+          "Use system-platform"
+        ],
+        "currentReproduction": [
+          "Open the mapped v1.8.2 domain and look for an equivalent result"
+        ],
+        "expected": "Docker Desktop 安装、更新、启动和关闭；WSL 更新、发行版安装、启动、停止和默认发行版管理。",
+        "actual": "The visible platform-management button always sends action 'open', but manage_system_platform supports docker_install, docker_update, docker_shutdown, and WSL actions instead.",
+        "sourceLocations": [
+          "README.md:Docker Desktop 安装、更新、启动和关闭；WSL 更新、发行版安装、启动、停止和默认发行版管理。",
+          "v1.7.0 frontend action",
+          "v1.7.0 frontend invoke"
+        ],
+        "userImpact": "The historical user goal may not be completable in v1.8.2.",
+        "minimalFix": "Render supported platform actions and pass the selected action/value."
+      },
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "ports.process-location",
+      "domain": "Ports",
+      "userGoal": "Ports Process Location",
+      "v1.7.0Entry": [
+        "open-process-location",
+        "open_process_location"
+      ],
+      "v1.7.0Steps": [
+        "Open dashboard",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Ports Process Location",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.action.open-process-location",
+        "v17.command.open_process_location"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/ports/api.ts:29"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "open_process_location"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/ports/api.ts:29"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "ports.release",
+      "domain": "Ports",
+      "userGoal": "Ports Release",
+      "v1.7.0Entry": [
+        "kill-port",
+        "kill_process"
+      ],
+      "v1.7.0Steps": [
+        "Open dashboard",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Ports Release",
+      "v1.7.0Risk": "state-changing",
+      "sourceRecordIds": [
+        "v17.action.kill-port",
+        "v17.command.kill_process"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/ports/api.ts:13",
+        "tauri/src/features/ports/api.ts:17"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "create_port_resolution_plan",
+        "execute_port_resolution_plan",
+        "kill_process"
+      ],
+      "implementationStatus": "enhanced",
+      "evidenceStatus": "verified-installed",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/ports/api.ts:13",
+        "frontend:tauri/src/features/ports/api.ts:17"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "ports.scan-history",
+      "domain": "Ports",
+      "userGoal": "端口管理：固定列宽排序、智能搜索、实时新增占用提醒、进程/父进程/Windows 服务解释、7 天历史、安全结束进程，以及 Spring Boot、Tomcat、Vite、`.env` 项目端口识别和备份修改。",
+      "v1.7.0Entry": [
+        "dashboard",
+        "port-details",
+        "port_history",
+        "scan_ports"
+      ],
+      "v1.7.0Steps": [
+        "Open dashboard",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "端口管理：固定列宽排序、智能搜索、实时新增占用提醒、进程/父进程/Windows 服务解释、7 天历史、安全结束进程，以及 Spring Boot、Tomcat、Vite、`.env` 项目端口识别和备份修改。",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.action.port-details",
+        "v17.command.port_history",
+        "v17.command.scan_ports",
+        "v17.promise.029"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/dashboard/api.ts:26",
+        "tauri/src/features/ports/api.ts:5",
+        "tauri/src/features/ports/api.ts:9"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "port_history",
+        "scan_ports"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-installed",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/dashboard/api.ts:26",
+        "frontend:tauri/src/features/ports/api.ts:5",
+        "frontend:tauri/src/features/ports/api.ts:9"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "profiles.apply",
+      "domain": "Profiles",
+      "userGoal": "配置模板：保存当前 JDK/Python/Node/Maven/Gradle 组合和用户环境变量，导入前预览差异，并可自动补齐缺失版本后恢复。",
+      "v1.7.0Entry": [
+        "apply-profile",
+        "apply_config_profile",
+        "dashboard",
+        "install-apply-profile",
+        "install_profile_missing"
+      ],
+      "v1.7.0Steps": [
+        "Open dashboard",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "配置模板：保存当前 JDK/Python/Node/Maven/Gradle 组合和用户环境变量，导入前预览差异，并可自动补齐缺失版本后恢复。",
+      "v1.7.0Risk": "state-changing",
+      "sourceRecordIds": [
+        "v17.action.apply-profile",
+        "v17.action.install-apply-profile",
+        "v17.command.apply_config_profile",
+        "v17.command.install_profile_missing",
+        "v17.promise.016"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/profiles/api.ts:13",
+        "tauri/src/features/profiles/api.ts:17"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "apply_config_profile",
+        "create_profile_apply_plan",
+        "execute_profile_apply_plan"
+      ],
+      "implementationStatus": "enhanced",
+      "evidenceStatus": "not-safely-testable",
+      "releaseDisposition": "evidence-blocker",
+      "releaseReason": "Implementation mapping exists, but the required installed or safely isolated execution evidence is incomplete.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/profiles/api.ts:13",
+        "frontend:tauri/src/features/profiles/api.ts:17"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": {
+        "fixture": "Dedicated temporary data or disposable VM snapshot",
+        "environment": "Windows real Tauri or installed application",
+        "steps": [
+          "Capture baseline",
+          "Run the mapped user path",
+          "Verify result against system state",
+          "Restore baseline"
+        ],
+        "safetyBoundary": "Do not modify real services, associations, environment, or user files outside the fixture.",
+        "passCriteria": "UI result, receipt, and observed system state agree.",
+        "recovery": "Delete temporary data or revert the VM snapshot."
+      }
+    },
+    {
+      "capabilityId": "profiles.delete",
+      "domain": "Profiles",
+      "userGoal": "Profiles Delete",
+      "v1.7.0Entry": [
+        "delete-profile",
+        "delete_config_profile"
+      ],
+      "v1.7.0Steps": [
+        "Open dashboard",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Profiles Delete",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.action.delete-profile",
+        "v17.command.delete_config_profile"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/profiles/api.ts:33"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "delete_config_profile"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/profiles/api.ts:33"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "profiles.import-export",
+      "domain": "Profiles",
+      "userGoal": "Profiles Import Export",
+      "v1.7.0Entry": [
+        "export_config_profiles",
+        "import_config_profiles"
+      ],
+      "v1.7.0Steps": [
+        "Open ports",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Profiles Import Export",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.command.export_config_profiles",
+        "v17.command.import_config_profiles"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/profiles/api.ts:25",
+        "tauri/src/features/profiles/api.ts:29"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "export_config_profiles",
+        "import_config_profiles"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/profiles/api.ts:25",
+        "frontend:tauri/src/features/profiles/api.ts:29"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "profiles.list",
+      "domain": "Profiles",
+      "userGoal": "Profiles List",
+      "v1.7.0Entry": [
+        "list_config_profiles"
+      ],
+      "v1.7.0Steps": [
+        "Open profiles",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Profiles List",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.command.list_config_profiles"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/profiles/api.ts:5"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "list_config_profiles"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-installed",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/profiles/api.ts:5"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "profiles.preview",
+      "domain": "Profiles",
+      "userGoal": "Profiles Preview",
+      "v1.7.0Entry": [
+        "preview_config_profiles"
+      ],
+      "v1.7.0Steps": [
+        "Open profiles",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Profiles Preview",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.command.preview_config_profiles"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/profiles/api.ts:21"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "config_profile_requirements",
+        "preview_config_profiles"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/profiles/api.ts:21"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "profiles.save",
+      "domain": "Profiles",
+      "userGoal": "Profiles Save",
+      "v1.7.0Entry": [
+        "save_config_profile"
+      ],
+      "v1.7.0Steps": [
+        "Open profiles",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Profiles Save",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.command.save_config_profile"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/profiles/api.ts:9"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "save_config_profile"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/profiles/api.ts:9"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "projects.actions",
+      "domain": "Projects",
+      "userGoal": "Projects Actions",
+      "v1.7.0Entry": [
+        "project-run",
+        "run_project_action"
+      ],
+      "v1.7.0Steps": [
+        "Open dashboard",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Projects Actions",
+      "v1.7.0Risk": "state-changing",
+      "sourceRecordIds": [
+        "v17.action.project-run",
+        "v17.command.run_project_action"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/projects/api.ts:30"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "run_project_action"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/projects/api.ts:30"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "projects.analysis",
+      "domain": "Projects",
+      "userGoal": "Projects Analysis",
+      "v1.7.0Entry": [
+        "analyze_project"
+      ],
+      "v1.7.0Steps": [
+        "Open projects",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Projects Analysis",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.command.analyze_project"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/projects/api.ts:5"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "analyze_project",
+        "project_health"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/projects/api.ts:5"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "projects.configuration",
+      "domain": "Projects",
+      "userGoal": "项目启动向导：支持选择项目文件夹，自动规范化路径、检查目录、识别 Node/Python/Maven/Gradle/Rust/Tauri/.NET/Go 项目；生成可编辑的 VS Code/IDEA 配置预览，应用前备份文件和环境模板。",
+      "v1.7.0Entry": [
+        "apply_project_configuration",
+        "dashboard",
+        "preview_project_configuration"
+      ],
+      "v1.7.0Steps": [
+        "Open projects",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "项目启动向导：支持选择项目文件夹，自动规范化路径、检查目录、识别 Node/Python/Maven/Gradle/Rust/Tauri/.NET/Go 项目；生成可编辑的 VS Code/IDEA 配置预览，应用前备份文件和环境模板。",
+      "v1.7.0Risk": "state-changing",
+      "sourceRecordIds": [
+        "v17.command.apply_project_configuration",
+        "v17.command.preview_project_configuration",
+        "v17.promise.017"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/projects/api.ts:34",
+        "tauri/src/features/projects/api.ts:9"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "apply_project_configuration",
+        "generate_vscode_config",
+        "preview_project_configuration"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "not-safely-testable",
+      "releaseDisposition": "evidence-blocker",
+      "releaseReason": "Implementation mapping exists, but the required installed or safely isolated execution evidence is incomplete.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/projects/api.ts:34",
+        "frontend:tauri/src/features/projects/api.ts:9"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": {
+        "fixture": "Dedicated temporary data or disposable VM snapshot",
+        "environment": "Windows real Tauri or installed application",
+        "steps": [
+          "Capture baseline",
+          "Run the mapped user path",
+          "Verify result against system state",
+          "Restore baseline"
+        ],
+        "safetyBoundary": "Do not modify real services, associations, environment, or user files outside the fixture.",
+        "passCriteria": "UI result, receipt, and observed system state agree.",
+        "recovery": "Delete temporary data or revert the VM snapshot."
+      }
+    },
+    {
+      "capabilityId": "projects.idea-analysis",
+      "domain": "Projects",
+      "userGoal": "IDEA / IntelliJ 只读分析：读取 `.idea/misc.xml`、`.idea/modules.xml`、`.idea/compiler.xml` 和 `*.iml`，输出 Project SDK、language level、模块 SDK、编译目标与当前 `JAVA_HOME` 的匹配建议；不自动修改 IDEA 配置。",
+      "v1.7.0Entry": [
+        "dashboard",
+        "inspect_idea_project"
+      ],
+      "v1.7.0Steps": [
+        "Open projects",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "IDEA / IntelliJ 只读分析：读取 `.idea/misc.xml`、`.idea/modules.xml`、`.idea/compiler.xml` 和 `*.iml`，输出 Project SDK、language level、模块 SDK、编译目标与当前 `JAVA_HOME` 的匹配建议；不自动修改 IDEA 配置。",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.command.inspect_idea_project",
+        "v17.promise.018"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/projects/api.ts:17"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "inspect_idea_project"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/projects/api.ts:17"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "projects.java-consumer-verify",
+      "domain": "Projects",
+      "userGoal": "Java 消费者环境验证：Nacos、Nexus、Maven、Gradle、Spring Boot 或普通 bat/cmd 脚本可验证最新用户环境中的 `JAVA_HOME`、`java.exe`、`javac.exe`、PATH 首个 Java 和间接引用风险。",
+      "v1.7.0Entry": [
+        "dashboard",
+        "verify_java_consumer_environment",
+        "verify_nexus_java_environment"
+      ],
+      "v1.7.0Steps": [
+        "Open environment",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Java 消费者环境验证：Nacos、Nexus、Maven、Gradle、Spring Boot 或普通 bat/cmd 脚本可验证最新用户环境中的 `JAVA_HOME`、`java.exe`、`javac.exe`、PATH 首个 Java 和间接引用风险。",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.command.verify_java_consumer_environment",
+        "v17.command.verify_nexus_java_environment",
+        "v17.promise.019"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/projects/api.ts:20"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "verify_java_consumer_environment",
+        "verify_nacos_java_environment",
+        "verify_nexus_java_environment"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/projects/api.ts:20"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "projects.port-config",
+      "domain": "Projects",
+      "userGoal": "Projects Port Config",
+      "v1.7.0Entry": [
+        "inspect_project_port_configs",
+        "update-project-port",
+        "update_project_port"
+      ],
+      "v1.7.0Steps": [
+        "Open dashboard",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Projects Port Config",
+      "v1.7.0Risk": "state-changing",
+      "sourceRecordIds": [
+        "v17.action.update-project-port",
+        "v17.command.inspect_project_port_configs",
+        "v17.command.update_project_port"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/projects/api.ts:13",
+        "tauri/src/features/projects/api.ts:38"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "inspect_project_port_configs",
+        "update_project_port"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "not-safely-testable",
+      "releaseDisposition": "evidence-blocker",
+      "releaseReason": "Implementation mapping exists, but the required installed or safely isolated execution evidence is incomplete.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/projects/api.ts:13",
+        "frontend:tauri/src/features/projects/api.ts:38"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": {
+        "fixture": "Dedicated temporary data or disposable VM snapshot",
+        "environment": "Windows real Tauri or installed application",
+        "steps": [
+          "Capture baseline",
+          "Run the mapped user path",
+          "Verify result against system state",
+          "Restore baseline"
+        ],
+        "safetyBoundary": "Do not modify real services, associations, environment, or user files outside the fixture.",
+        "passCriteria": "UI result, receipt, and observed system state agree.",
+        "recovery": "Delete temporary data or revert the VM snapshot."
+      }
+    },
+    {
+      "capabilityId": "reports.export",
+      "domain": "Reports",
+      "userGoal": "Reports Export",
+      "v1.7.0Entry": [
+        "export-python-diagnostic",
+        "export_cleanup_report",
+        "export_env_reliability_report",
+        "export_file_association_report",
+        "export_python_diagnostic_report"
+      ],
+      "v1.7.0Steps": [
+        "Open dashboard",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Reports Export",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.action.export-python-diagnostic",
+        "v17.command.export_cleanup_report",
+        "v17.command.export_env_reliability_report",
+        "v17.command.export_file_association_report",
+        "v17.command.export_python_diagnostic_report"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/fileAssociations/api.ts:44",
+        "tauri/src/features/reports/api.ts:29",
+        "tauri/src/features/reports/api.ts:33",
+        "tauri/src/features/reports/api.ts:37",
+        "tauri/src/features/reports/api.ts:41",
+        "tauri/src/features/reports/api.ts:45",
+        "tauri/src/features/reports/api.ts:49"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "export_cleanup_report",
+        "export_env_reliability_report",
+        "export_file_association_report",
+        "export_port_report",
+        "export_project_report",
+        "export_python_diagnostic_report"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-installed",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/fileAssociations/api.ts:44",
+        "frontend:tauri/src/features/reports/api.ts:29",
+        "frontend:tauri/src/features/reports/api.ts:33",
+        "frontend:tauri/src/features/reports/api.ts:37",
+        "frontend:tauri/src/features/reports/api.ts:41",
+        "frontend:tauri/src/features/reports/api.ts:45",
+        "frontend:tauri/src/features/reports/api.ts:49"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "runner.background-execution",
+      "domain": "Runner",
+      "userGoal": "Run long Windows tasks without visible command windows or UI blocking",
+      "v1.7.0Entry": [
+        "dashboard"
+      ],
+      "v1.7.0Steps": [
+        "Open dashboard",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Run long Windows tasks without visible command windows or UI blocking",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.promise.043"
+      ],
+      "v1.8.2Entry": [],
+      "v1.8.2Steps": [],
+      "v1.8.2Result": "No complete current user path evidenced",
+      "replacementCommands": [],
+      "implementationStatus": "enhanced",
+      "evidenceStatus": "verified-real-tauri",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "runtime.discover",
+      "domain": "Runtime",
+      "userGoal": "统一工具注册表：为 JDK、Python、Node.js、Maven、Gradle、Git、Go、Rust、.NET 和生态工具提供统一能力元数据。",
+      "v1.7.0Entry": [
+        "dashboard",
+        "discover_runtimes",
+        "jdk_distributions"
+      ],
+      "v1.7.0Steps": [
+        "Open runtimes",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "统一工具注册表：为 JDK、Python、Node.js、Maven、Gradle、Git、Go、Rust、.NET 和生态工具提供统一能力元数据。",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.command.discover_runtimes",
+        "v17.command.jdk_distributions",
+        "v17.promise.023"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/runtimes/api.ts:5",
+        "tauri/src/features/runtimes/api.ts:9"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "discover_runtimes",
+        "jdk_distributions"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-installed",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
+      "followUpIssue": "#130",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/runtimes/api.ts:5",
+        "frontend:tauri/src/features/runtimes/api.ts:9"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "runtime.external-jdk-verify",
+      "domain": "Runtime",
+      "userGoal": "Runtime External Jdk Verify",
+      "v1.7.0Entry": [
+        "verify-external-jdk",
+        "verify_external_jdk"
+      ],
+      "v1.7.0Steps": [
+        "Open dashboard",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Runtime External Jdk Verify",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.action.verify-external-jdk",
+        "v17.command.verify_external_jdk"
+      ],
+      "v1.8.2Entry": [],
+      "v1.8.2Steps": [],
+      "v1.8.2Result": "No complete current user path evidenced",
+      "replacementCommands": [
+        "verify_external_jdk"
+      ],
+      "implementationStatus": "degraded",
+      "evidenceStatus": "evidence-required",
+      "releaseDisposition": "code-blocker",
+      "releaseReason": "External JDK verification remains registered but is not exposed by the Runtime workbench.",
+      "followUpIssue": "#130",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [],
+      "codeBlockerEvidence": {
+        "oldReproduction": [
+          "Use verify-external-jdk",
+          "Use verify_external_jdk"
+        ],
+        "currentReproduction": [
+          "Open the mapped v1.8.2 domain and look for an equivalent result"
+        ],
+        "expected": "Runtime External Jdk Verify",
+        "actual": "External JDK verification remains registered but is not exposed by the Runtime workbench.",
+        "sourceLocations": [
+          "v1.7.0 frontend action",
+          "v1.7.0 frontend invoke"
+        ],
+        "userImpact": "The historical user goal may not be completable in v1.8.2.",
+        "minimalFix": "Add a read-only external JDK verification result flow."
+      },
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "runtime.install",
+      "domain": "Runtime",
+      "userGoal": "下载安装过程展示进度：查询、下载、解压、静默安装、验证。",
+      "v1.7.0Entry": [
+        "dashboard",
+        "install_go",
+        "install_gradle_latest",
+        "install_jdk",
+        "install_maven_latest",
+        "install_node",
+        "install_python"
+      ],
+      "v1.7.0Steps": [
+        "Open runtimes",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "下载安装过程展示进度：查询、下载、解压、静默安装、验证。",
+      "v1.7.0Risk": "state-changing",
+      "sourceRecordIds": [
+        "v17.command.install_go",
+        "v17.command.install_gradle_latest",
+        "v17.command.install_jdk",
+        "v17.command.install_maven_latest",
+        "v17.command.install_node",
+        "v17.command.install_python",
+        "v17.promise.006",
+        "v17.promise.024"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/runtimes/api.ts",
+        "tauri/src/features/runtimes/events.ts"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "install_go",
+        "install_gradle_latest",
+        "install_jdk",
+        "install_maven_latest",
+        "install_node",
+        "install_python"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "not-safely-testable",
+      "releaseDisposition": "evidence-blocker",
+      "releaseReason": "Implementation mapping exists, but the required installed or safely isolated execution evidence is incomplete.",
+      "followUpIssue": "#130",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/runtimes/api.ts",
+        "frontend:tauri/src/features/runtimes/events.ts"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": {
+        "fixture": "Dedicated temporary data or disposable VM snapshot",
+        "environment": "Windows real Tauri or installed application",
+        "steps": [
+          "Capture baseline",
+          "Run the mapped user path",
+          "Verify result against system state",
+          "Restore baseline"
+        ],
+        "safetyBoundary": "Do not modify real services, associations, environment, or user files outside the fixture.",
+        "passCriteria": "UI result, receipt, and observed system state agree.",
+        "recovery": "Delete temporary data or revert the VM snapshot."
+      }
+    },
+    {
+      "capabilityId": "runtime.lifecycle",
+      "domain": "Runtime",
+      "userGoal": "Install, select, verify, and remove managed runtimes",
+      "v1.7.0Entry": [
+        "dashboard"
+      ],
+      "v1.7.0Steps": [
+        "Open dashboard",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Install, select, verify, and remove managed runtimes",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.promise.001"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/runtimes/api.ts",
+        "tauri/src/features/runtimes/api.ts:13",
+        "tauri/src/features/runtimes/api.ts:21",
+        "tauri/src/features/runtimes/api.ts:25",
+        "tauri/src/features/runtimes/api.ts:5",
+        "tauri/src/features/runtimes/api.ts:9",
+        "tauri/src/features/runtimes/events.ts"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "discover_runtimes",
+        "inspect_runtime_strong_verification",
+        "install_go",
+        "install_gradle_latest",
+        "install_jdk",
+        "install_maven_latest",
+        "install_node",
+        "install_python",
+        "jdk_distributions",
+        "switch_runtime",
+        "uninstall_external_runtime",
+        "uninstall_runtime",
+        "verify_java_toolchain",
+        "verify_maven_gradle_with_current_jdk"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "not-safely-testable",
+      "releaseDisposition": "evidence-blocker",
+      "releaseReason": "Implementation mapping exists, but the required installed or safely isolated execution evidence is incomplete.",
+      "followUpIssue": "#130",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/runtimes/api.ts",
+        "frontend:tauri/src/features/runtimes/api.ts:13",
+        "frontend:tauri/src/features/runtimes/api.ts:21",
+        "frontend:tauri/src/features/runtimes/api.ts:25",
+        "frontend:tauri/src/features/runtimes/api.ts:5",
+        "frontend:tauri/src/features/runtimes/api.ts:9",
+        "frontend:tauri/src/features/runtimes/events.ts"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": {
+        "fixture": "Dedicated temporary data or disposable VM snapshot",
+        "environment": "Windows real Tauri or installed application",
+        "steps": [
+          "Capture baseline",
+          "Run the mapped user path",
+          "Verify result against system state",
+          "Restore baseline"
+        ],
+        "safetyBoundary": "Do not modify real services, associations, environment, or user files outside the fixture.",
+        "passCriteria": "UI result, receipt, and observed system state agree.",
+        "recovery": "Delete temporary data or revert the VM snapshot."
+      }
+    },
+    {
+      "capabilityId": "runtime.switch",
+      "domain": "Runtime",
+      "userGoal": "Runtime Switch",
+      "v1.7.0Entry": [
+        "switch-build-tool",
+        "switch-go",
+        "switch-jdk",
+        "switch-node",
+        "switch-python",
+        "switch_runtime"
+      ],
+      "v1.7.0Steps": [
+        "Open dashboard",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Runtime Switch",
+      "v1.7.0Risk": "state-changing",
+      "sourceRecordIds": [
+        "v17.action.switch-build-tool",
+        "v17.action.switch-go",
+        "v17.action.switch-jdk",
+        "v17.action.switch-node",
+        "v17.action.switch-python",
+        "v17.command.switch_runtime"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/runtimes/api.ts:21"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "switch_runtime"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "not-safely-testable",
+      "releaseDisposition": "evidence-blocker",
+      "releaseReason": "Implementation mapping exists, but the required installed or safely isolated execution evidence is incomplete.",
+      "followUpIssue": "#130",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/runtimes/api.ts:21"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": {
+        "fixture": "Dedicated temporary data or disposable VM snapshot",
+        "environment": "Windows real Tauri or installed application",
+        "steps": [
+          "Capture baseline",
+          "Run the mapped user path",
+          "Verify result against system state",
+          "Restore baseline"
+        ],
+        "safetyBoundary": "Do not modify real services, associations, environment, or user files outside the fixture.",
+        "passCriteria": "UI result, receipt, and observed system state agree.",
+        "recovery": "Delete temporary data or revert the VM snapshot."
+      }
+    },
+    {
+      "capabilityId": "runtime.uninstall",
+      "domain": "Runtime",
+      "userGoal": "Runtime Uninstall",
+      "v1.7.0Entry": [
+        "uninstall-build-tool",
+        "uninstall-go",
+        "uninstall-jdk",
+        "uninstall-node",
+        "uninstall-python",
+        "uninstall_runtime"
+      ],
+      "v1.7.0Steps": [
+        "Open dashboard",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Runtime Uninstall",
+      "v1.7.0Risk": "state-changing",
+      "sourceRecordIds": [
+        "v17.action.uninstall-build-tool",
+        "v17.action.uninstall-go",
+        "v17.action.uninstall-jdk",
+        "v17.action.uninstall-node",
+        "v17.action.uninstall-python",
+        "v17.command.uninstall_runtime"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/runtimes/api.ts:25"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "uninstall_external_runtime",
+        "uninstall_runtime"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "not-safely-testable",
+      "releaseDisposition": "evidence-blocker",
+      "releaseReason": "Implementation mapping exists, but the required installed or safely isolated execution evidence is incomplete.",
+      "followUpIssue": "#130",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/runtimes/api.ts:25"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": {
+        "fixture": "Dedicated temporary data or disposable VM snapshot",
+        "environment": "Windows real Tauri or installed application",
+        "steps": [
+          "Capture baseline",
+          "Run the mapped user path",
+          "Verify result against system state",
+          "Restore baseline"
+        ],
+        "safetyBoundary": "Do not modify real services, associations, environment, or user files outside the fixture.",
+        "passCriteria": "UI result, receipt, and observed system state agree.",
+        "recovery": "Delete temporary data or revert the VM snapshot."
+      }
+    },
+    {
+      "capabilityId": "runtime.verify",
+      "domain": "Runtime",
+      "userGoal": "安装和切换后自动健康检查，验证命令和环境变量是否真的生效；JDK 会交叉核对 `JAVA_HOME`、PATH、`java`、`javac`、Maven 与 Gradle。",
+      "v1.7.0Entry": [
+        "dashboard",
+        "inspect_runtime_strong_verification"
+      ],
+      "v1.7.0Steps": [
+        "Open runtimes",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "安装和切换后自动健康检查，验证命令和环境变量是否真的生效；JDK 会交叉核对 `JAVA_HOME`、PATH、`java`、`javac`、Maven 与 Gradle。",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.command.inspect_runtime_strong_verification",
+        "v17.promise.003",
+        "v17.promise.004"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/runtimes/api.ts:13"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "inspect_runtime_strong_verification",
+        "verify_java_toolchain",
+        "verify_maven_gradle_with_current_jdk"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
+      "followUpIssue": "#130",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/runtimes/api.ts:13"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "safety.disclaimer",
+      "domain": "Safety",
+      "userGoal": "Safety Disclaimer",
+      "v1.7.0Entry": [
+        "accept_safety_disclaimer",
+        "copy-safety-disclaimer",
+        "safety_disclaimer"
+      ],
+      "v1.7.0Steps": [
+        "Open dashboard",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Safety Disclaimer",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.action.copy-safety-disclaimer",
+        "v17.command.accept_safety_disclaimer",
+        "v17.command.safety_disclaimer"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/app/bootstrap.ts:354"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "accept_safety_disclaimer",
+        "safety_disclaimer"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-installed",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/app/bootstrap.ts:354"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "safety.guide",
+      "domain": "Safety",
+      "userGoal": "Read complete risk, backup, privilege, and recovery guidance",
+      "v1.7.0Entry": [
+        "dashboard"
+      ],
+      "v1.7.0Steps": [
+        "Open dashboard",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Read complete risk, backup, privilege, and recovery guidance",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.promise.039"
+      ],
+      "v1.8.2Entry": [],
+      "v1.8.2Steps": [],
+      "v1.8.2Result": "No complete current user path evidenced",
+      "replacementCommands": [],
+      "implementationStatus": "enhanced",
+      "evidenceStatus": "verified-installed",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "safety.risk-confirmation",
+      "domain": "Safety",
+      "userGoal": "Safety Risk Confirmation",
+      "v1.7.0Entry": [
+        "create_confirmation_token"
+      ],
+      "v1.7.0Steps": [
+        "Open settings",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Safety Risk Confirmation",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.command.create_confirmation_token"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/core/risk.ts:56"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "create_confirmation_token",
+        "feature_risk_registry",
+        "get_feature_risk"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/core/risk.ts:56"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "services.directory",
+      "domain": "Services",
+      "userGoal": "Services Directory",
+      "v1.7.0Entry": [
+        "local-service-directory",
+        "open_local_service_directory"
+      ],
+      "v1.7.0Steps": [
+        "Open dashboard",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Services Directory",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.action.local-service-directory",
+        "v17.command.open_local_service_directory"
+      ],
+      "v1.8.2Entry": [],
+      "v1.8.2Steps": [],
+      "v1.8.2Result": "No complete current user path evidenced",
+      "replacementCommands": [
+        "open_local_service_directory"
+      ],
+      "implementationStatus": "degraded",
+      "evidenceStatus": "evidence-required",
+      "releaseDisposition": "code-blocker",
+      "releaseReason": "Local-service installation-directory access remains registered without a row-level UI action.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [],
+      "codeBlockerEvidence": {
+        "oldReproduction": [
+          "Use local-service-directory",
+          "Use open_local_service_directory"
+        ],
+        "currentReproduction": [
+          "Open the mapped v1.8.2 domain and look for an equivalent result"
+        ],
+        "expected": "Services Directory",
+        "actual": "Local-service installation-directory access remains registered without a row-level UI action.",
+        "sourceLocations": [
+          "v1.7.0 frontend action",
+          "v1.7.0 frontend invoke"
+        ],
+        "userImpact": "The historical user goal may not be completable in v1.8.2.",
+        "minimalFix": "Add a selected-service open-directory action."
+      },
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "services.inspect",
+      "domain": "Services",
+      "userGoal": "Services Inspect",
+      "v1.7.0Entry": [
+        "inspect_local_services"
+      ],
+      "v1.7.0Steps": [
+        "Open toolchains",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Services Inspect",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.command.inspect_local_services"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/ports/api.ts:21",
+        "tauri/src/features/toolchains/api.ts:17"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "inspect_local_services"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/ports/api.ts:21",
+        "frontend:tauri/src/features/toolchains/api.ts:17"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "services.logs",
+      "domain": "Services",
+      "userGoal": "Services Logs",
+      "v1.7.0Entry": [
+        "local-service-logs",
+        "local_service_logs"
+      ],
+      "v1.7.0Steps": [
+        "Open dashboard",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Services Logs",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.action.local-service-logs",
+        "v17.command.local_service_logs"
+      ],
+      "v1.8.2Entry": [],
+      "v1.8.2Steps": [],
+      "v1.8.2Result": "No complete current user path evidenced",
+      "replacementCommands": [
+        "local_service_logs"
+      ],
+      "implementationStatus": "degraded",
+      "evidenceStatus": "evidence-required",
+      "releaseDisposition": "code-blocker",
+      "releaseReason": "Local-service log inspection remains registered without a rendered log action or result area.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [],
+      "codeBlockerEvidence": {
+        "oldReproduction": [
+          "Use local-service-logs",
+          "Use local_service_logs"
+        ],
+        "currentReproduction": [
+          "Open the mapped v1.8.2 domain and look for an equivalent result"
+        ],
+        "expected": "Services Logs",
+        "actual": "Local-service log inspection remains registered without a rendered log action or result area.",
+        "sourceLocations": [
+          "v1.7.0 frontend action",
+          "v1.7.0 frontend invoke"
+        ],
+        "userImpact": "The historical user goal may not be completable in v1.8.2.",
+        "minimalFix": "Add a selected-service logs action and persistent output."
+      },
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "services.manage",
+      "domain": "Services",
+      "userGoal": "MySQL、PostgreSQL、Redis、MongoDB、Elasticsearch、SQL Server 服务检测、启动、停止、重启、日志和安装目录访问。",
+      "v1.7.0Entry": [
+        "dashboard",
+        "local-service-manage",
+        "manage_local_service",
+        "stop_local_service"
+      ],
+      "v1.7.0Steps": [
+        "Open dashboard",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "MySQL、PostgreSQL、Redis、MongoDB、Elasticsearch、SQL Server 服务检测、启动、停止、重启、日志和安装目录访问。",
+      "v1.7.0Risk": "state-changing",
+      "sourceRecordIds": [
+        "v17.action.local-service-manage",
+        "v17.command.manage_local_service",
+        "v17.command.stop_local_service",
+        "v17.promise.031"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/ports/api.ts:25",
+        "tauri/src/features/toolchains/api.ts:33"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "manage_local_service",
+        "stop_local_service"
+      ],
+      "implementationStatus": "degraded",
+      "evidenceStatus": "evidence-required",
+      "releaseDisposition": "code-blocker",
+      "releaseReason": "The service-management button operates on state.services[0] rather than a user-selected service.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/ports/api.ts:25",
+        "frontend:tauri/src/features/toolchains/api.ts:33"
+      ],
+      "codeBlockerEvidence": {
+        "oldReproduction": [
+          "Use README",
+          "Use local-service-manage",
+          "Use manage_local_service",
+          "Use stop_local_service"
+        ],
+        "currentReproduction": [
+          "Open the mapped v1.8.2 domain and look for an equivalent result"
+        ],
+        "expected": "MySQL、PostgreSQL、Redis、MongoDB、Elasticsearch、SQL Server 服务检测、启动、停止、重启、日志和安装目录访问。",
+        "actual": "The service-management button operates on state.services[0] rather than a user-selected service.",
+        "sourceLocations": [
+          "README.md:MySQL、PostgreSQL、Redis、MongoDB、Elasticsearch、SQL Server 服务检测、启动、停止、重启、日志和安装目录访问。",
+          "v1.7.0 frontend action",
+          "v1.7.0 frontend invoke"
+        ],
+        "userImpact": "The historical user goal may not be completable in v1.8.2.",
+        "minimalFix": "Add explicit row selection and bind the selected service/action."
+      },
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "settings.auto-update",
+      "domain": "Settings",
+      "userGoal": "Settings Auto Update",
+      "v1.7.0Entry": [
+        "set_auto_check_update"
+      ],
+      "v1.7.0Steps": [
+        "Open settings",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Settings Auto Update",
+      "v1.7.0Risk": "state-changing",
+      "sourceRecordIds": [
+        "v17.command.set_auto_check_update"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/settings/api.ts:13"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "set_auto_check_update"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-installed",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/settings/api.ts:13"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "settings.config-directory",
+      "domain": "Settings",
+      "userGoal": "Settings Config Directory",
+      "v1.7.0Entry": [
+        "open-app-config-dir",
+        "open_app_config_dir"
+      ],
+      "v1.7.0Steps": [
+        "Open dashboard",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Settings Config Directory",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.action.open-app-config-dir",
+        "v17.command.open_app_config_dir"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/settings/api.ts:17"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "open_app_config_dir"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/settings/api.ts:17"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "settings.load",
+      "domain": "Settings",
+      "userGoal": "Settings Load",
+      "v1.7.0Entry": [
+        "load_config"
+      ],
+      "v1.7.0Steps": [
+        "Open settings",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Settings Load",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.command.load_config"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/app/bootstrap.ts:334",
+        "tauri/src/features/settings/api.ts:5"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "load_config"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-installed",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/app/bootstrap.ts:334",
+        "frontend:tauri/src/features/settings/api.ts:5"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "settings.reset-ui",
+      "domain": "Settings",
+      "userGoal": "Settings Reset Ui",
+      "v1.7.0Entry": [
+        "reset-ui-config",
+        "reset_ui_config"
+      ],
+      "v1.7.0Steps": [
+        "Open dashboard",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Settings Reset Ui",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.action.reset-ui-config",
+        "v17.command.reset_ui_config"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/settings/api.ts:21"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "reset_ui_config"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/settings/api.ts:21"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "settings.root",
+      "domain": "Settings",
+      "userGoal": "安装根目录智能规范化：选择 `D:\\` 时自动使用 `D:\\DevEnvManager`，避免把文件散在盘符根目录。",
+      "v1.7.0Entry": [
+        "dashboard",
+        "set_root_dir"
+      ],
+      "v1.7.0Steps": [
+        "Open settings",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "安装根目录智能规范化：选择 `D:\\` 时自动使用 `D:\\DevEnvManager`，避免把文件散在盘符根目录。",
+      "v1.7.0Risk": "state-changing",
+      "sourceRecordIds": [
+        "v17.command.set_root_dir",
+        "v17.promise.002"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/settings/api.ts:9"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "set_root_dir",
+        "validate_directory_path"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-installed",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/settings/api.ts:9"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "system.apps-features",
+      "domain": "System",
+      "userGoal": "System Apps Features",
+      "v1.7.0Entry": [
+        "open-apps-features",
+        "open_apps_features"
+      ],
+      "v1.7.0Steps": [
+        "Open dashboard",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "System Apps Features",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.action.open-apps-features",
+        "v17.command.open_apps_features"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/runtimes/api.ts:33"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "open_apps_features"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/runtimes/api.ts:33"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "system.open-path",
+      "domain": "System",
+      "userGoal": "System Open Path",
+      "v1.7.0Entry": [
+        "open-analysis-path",
+        "open_analysis_path"
+      ],
+      "v1.7.0Steps": [
+        "Open dashboard",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "System Open Path",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.action.open-analysis-path",
+        "v17.command.open_analysis_path"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/cleanup/api.ts:101",
+        "tauri/src/features/reports/api.ts:53",
+        "tauri/src/features/runtimes/api.ts:29"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "open_analysis_path"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/cleanup/api.ts:101",
+        "frontend:tauri/src/features/reports/api.ts:53",
+        "frontend:tauri/src/features/runtimes/api.ts:29"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "system.self-uninstall",
+      "domain": "System",
+      "userGoal": "System Self Uninstall",
+      "v1.7.0Entry": [
+        "self_uninstall"
+      ],
+      "v1.7.0Steps": [
+        "Open dashboard",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "System Self Uninstall",
+      "v1.7.0Risk": "state-changing",
+      "sourceRecordIds": [
+        "v17.command.self_uninstall"
+      ],
+      "v1.8.2Entry": [],
+      "v1.8.2Steps": [],
+      "v1.8.2Result": "No complete current user path evidenced",
+      "replacementCommands": [
+        "self_uninstall"
+      ],
+      "implementationStatus": "degraded",
+      "evidenceStatus": "evidence-required",
+      "releaseDisposition": "code-blocker",
+      "releaseReason": "The v1.7 self-uninstall command remains registered but no current Settings entry invokes it.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [],
+      "codeBlockerEvidence": {
+        "oldReproduction": [
+          "Use self_uninstall"
+        ],
+        "currentReproduction": [
+          "Open the mapped v1.8.2 domain and look for an equivalent result"
+        ],
+        "expected": "System Self Uninstall",
+        "actual": "The v1.7 self-uninstall command remains registered but no current Settings entry invokes it.",
+        "sourceLocations": [
+          "v1.7.0 frontend invoke"
+        ],
+        "userImpact": "The historical user goal may not be completable in v1.8.2.",
+        "minimalFix": "Restore the guarded uninstall entry or explicitly remove the promise."
+      },
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "toolchains.actions",
+      "domain": "Toolchains",
+      "userGoal": "Toolchains Actions",
+      "v1.7.0Entry": [
+        "run_toolchain_action"
+      ],
+      "v1.7.0Steps": [
+        "Open toolchains",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Toolchains Actions",
+      "v1.7.0Risk": "state-changing",
+      "sourceRecordIds": [
+        "v17.command.run_toolchain_action"
+      ],
+      "v1.8.2Entry": [],
+      "v1.8.2Steps": [],
+      "v1.8.2Result": "No complete current user path evidenced",
+      "replacementCommands": [
+        "run_toolchain_action"
+      ],
+      "implementationStatus": "degraded",
+      "evidenceStatus": "evidence-required",
+      "releaseDisposition": "code-blocker",
+      "releaseReason": "run_toolchain_action remains registered, but the current Toolchains API exposes inspection only for ecosystem actions.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [],
+      "codeBlockerEvidence": {
+        "oldReproduction": [
+          "Use run_toolchain_action"
+        ],
+        "currentReproduction": [
+          "Open the mapped v1.8.2 domain and look for an equivalent result"
+        ],
+        "expected": "Toolchains Actions",
+        "actual": "run_toolchain_action remains registered, but the current Toolchains API exposes inspection only for ecosystem actions.",
+        "sourceLocations": [
+          "v1.7.0 frontend invoke"
+        ],
+        "userImpact": "The historical user goal may not be completable in v1.8.2.",
+        "minimalFix": "Expose supported actions with persistent results and risk handling."
+      },
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "toolchains.command-safety",
+      "domain": "Toolchains",
+      "userGoal": "命令面板安全模式：仅允许常见开发工具，拦截系统 Shell、磁盘、注册表、权限、服务和破坏性 Git 命令。",
+      "v1.7.0Entry": [
+        "dashboard",
+        "inspect_command_safety",
+        "run_tool_command"
+      ],
+      "v1.7.0Steps": [
+        "Open settings",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "命令面板安全模式：仅允许常见开发工具，拦截系统 Shell、磁盘、注册表、权限、服务和破坏性 Git 命令。",
+      "v1.7.0Risk": "state-changing",
+      "sourceRecordIds": [
+        "v17.command.inspect_command_safety",
+        "v17.command.run_tool_command",
+        "v17.promise.038"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/toolchains/api.ts:41"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "inspect_command_safety",
+        "run_tool_command"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/toolchains/api.ts:41"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "toolchains.dotnet",
+      "domain": "Toolchains",
+      "userGoal": "Inspect .NET SDKs and run project actions",
+      "v1.7.0Entry": [
+        "dashboard"
+      ],
+      "v1.7.0Steps": [
+        "Open dashboard",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Inspect .NET SDKs and run project actions",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.promise.026"
+      ],
+      "v1.8.2Entry": [],
+      "v1.8.2Steps": [],
+      "v1.8.2Result": "No complete current user path evidenced",
+      "replacementCommands": [],
+      "implementationStatus": "missing",
+      "evidenceStatus": "evidence-required",
+      "releaseDisposition": "product-decision-required",
+      "releaseReason": "The v1.7.0 documentation promise has no sufficiently precise current product mapping and needs owner adjudication.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "toolchains.git-ecosystem",
+      "domain": "Toolchains",
+      "userGoal": "Inspect and configure the Git and GitHub development toolchain",
+      "v1.7.0Entry": [
+        "dashboard"
+      ],
+      "v1.7.0Steps": [
+        "Open dashboard",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Inspect and configure the Git and GitHub development toolchain",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.promise.020"
+      ],
+      "v1.8.2Entry": [],
+      "v1.8.2Steps": [],
+      "v1.8.2Result": "No complete current user path evidenced",
+      "replacementCommands": [],
+      "implementationStatus": "missing",
+      "evidenceStatus": "evidence-required",
+      "releaseDisposition": "product-decision-required",
+      "releaseReason": "The v1.7.0 documentation promise has no sufficiently precise current product mapping and needs owner adjudication.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "toolchains.inspect",
+      "domain": "Toolchains",
+      "userGoal": "Toolchains Inspect",
+      "v1.7.0Entry": [
+        "inspect_toolchains"
+      ],
+      "v1.7.0Steps": [
+        "Open toolchains",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Toolchains Inspect",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.command.inspect_toolchains"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/toolchains/api.ts:5"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "inspect_toolchains"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/toolchains/api.ts:5"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "toolchains.mirrors",
+      "domain": "Toolchains",
+      "userGoal": "镜像加速中心：集中查看 npm、pip、GOPROXY、Maven、Gradle 和 Cargo 配置；可调用官方 RubyMetric/chsrc 进行固定目标的查看、测速、换源和恢复。",
+      "v1.7.0Entry": [
+        "dashboard",
+        "run_chsrc_action"
+      ],
+      "v1.7.0Steps": [
+        "Open toolchains",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "镜像加速中心：集中查看 npm、pip、GOPROXY、Maven、Gradle 和 Cargo 配置；可调用官方 RubyMetric/chsrc 进行固定目标的查看、测速、换源和恢复。",
+      "v1.7.0Risk": "state-changing",
+      "sourceRecordIds": [
+        "v17.command.run_chsrc_action",
+        "v17.promise.027"
+      ],
+      "v1.8.2Entry": [],
+      "v1.8.2Steps": [],
+      "v1.8.2Result": "No complete current user path evidenced",
+      "replacementCommands": [
+        "run_chsrc_action"
+      ],
+      "implementationStatus": "degraded",
+      "evidenceStatus": "evidence-required",
+      "releaseDisposition": "code-blocker",
+      "releaseReason": "run_chsrc_action remains registered, but the current Toolchains page has no chsrc source-management action.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [],
+      "codeBlockerEvidence": {
+        "oldReproduction": [
+          "Use README",
+          "Use run_chsrc_action"
+        ],
+        "currentReproduction": [
+          "Open the mapped v1.8.2 domain and look for an equivalent result"
+        ],
+        "expected": "镜像加速中心：集中查看 npm、pip、GOPROXY、Maven、Gradle 和 Cargo 配置；可调用官方 RubyMetric/chsrc 进行固定目标的查看、测速、换源和恢复。",
+        "actual": "run_chsrc_action remains registered, but the current Toolchains page has no chsrc source-management action.",
+        "sourceLocations": [
+          "README.md:镜像加速中心：集中查看 npm、pip、GOPROXY、Maven、Gradle 和 Cargo 配置；可调用官方 RubyMetric/chsrc 进行固定目标的查看、测速、换源和恢复。",
+          "v1.7.0 frontend invoke"
+        ],
+        "userImpact": "The historical user goal may not be completable in v1.8.2.",
+        "minimalFix": "Restore fixed-target chsrc inspect/change/restore controls."
+      },
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "toolchains.network-cache",
+      "domain": "Toolchains",
+      "userGoal": "网络诊断、下载缓存管理、命令面板、自身卸载入口。",
+      "v1.7.0Entry": [
+        "cache_entries",
+        "dashboard",
+        "network_diagnostics"
+      ],
+      "v1.7.0Steps": [
+        "Open toolchains",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "网络诊断、下载缓存管理、命令面板、自身卸载入口。",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.command.cache_entries",
+        "v17.command.network_diagnostics",
+        "v17.promise.042"
+      ],
+      "v1.8.2Entry": [],
+      "v1.8.2Steps": [],
+      "v1.8.2Result": "No complete current user path evidenced",
+      "replacementCommands": [
+        "cache_entries",
+        "network_diagnostics"
+      ],
+      "implementationStatus": "degraded",
+      "evidenceStatus": "evidence-required",
+      "releaseDisposition": "code-blocker",
+      "releaseReason": "network_diagnostics and cache_entries remain registered without current Toolchains entries or result panels.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [],
+      "codeBlockerEvidence": {
+        "oldReproduction": [
+          "Use README",
+          "Use cache_entries",
+          "Use network_diagnostics"
+        ],
+        "currentReproduction": [
+          "Open the mapped v1.8.2 domain and look for an equivalent result"
+        ],
+        "expected": "网络诊断、下载缓存管理、命令面板、自身卸载入口。",
+        "actual": "network_diagnostics and cache_entries remain registered without current Toolchains entries or result panels.",
+        "sourceLocations": [
+          "README.md:网络诊断、下载缓存管理、命令面板、自身卸载入口。",
+          "v1.7.0 frontend invoke"
+        ],
+        "userImpact": "The historical user goal may not be completable in v1.8.2.",
+        "minimalFix": "Expose the read-only diagnostics and guarded cache workflow."
+      },
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "toolchains.node-ecosystem",
+      "domain": "Toolchains",
+      "userGoal": "Inspect Node package-manager tools and registry configuration",
+      "v1.7.0Entry": [
+        "dashboard"
+      ],
+      "v1.7.0Steps": [
+        "Open dashboard",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Inspect Node package-manager tools and registry configuration",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.promise.021"
+      ],
+      "v1.8.2Entry": [],
+      "v1.8.2Steps": [],
+      "v1.8.2Result": "No complete current user path evidenced",
+      "replacementCommands": [],
+      "implementationStatus": "missing",
+      "evidenceStatus": "evidence-required",
+      "releaseDisposition": "product-decision-required",
+      "releaseReason": "The v1.7.0 documentation promise has no sufficiently precise current product mapping and needs owner adjudication.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "toolchains.python-ecosystem",
+      "domain": "Toolchains",
+      "userGoal": "Inspect Python ecosystem tools and package indexes",
+      "v1.7.0Entry": [
+        "dashboard"
+      ],
+      "v1.7.0Steps": [
+        "Open dashboard",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Inspect Python ecosystem tools and package indexes",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.promise.022"
+      ],
+      "v1.8.2Entry": [],
+      "v1.8.2Steps": [],
+      "v1.8.2Result": "No complete current user path evidenced",
+      "replacementCommands": [],
+      "implementationStatus": "missing",
+      "evidenceStatus": "evidence-required",
+      "releaseDisposition": "product-decision-required",
+      "releaseReason": "The v1.7.0 documentation promise has no sufficiently precise current product mapping and needs owner adjudication.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "toolchains.rust",
+      "domain": "Toolchains",
+      "userGoal": "Inspect and maintain rustup and Rust toolchains",
+      "v1.7.0Entry": [
+        "dashboard"
+      ],
+      "v1.7.0Steps": [
+        "Open dashboard",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Inspect and maintain rustup and Rust toolchains",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.promise.025"
+      ],
+      "v1.8.2Entry": [],
+      "v1.8.2Steps": [],
+      "v1.8.2Result": "No complete current user path evidenced",
+      "replacementCommands": [],
+      "implementationStatus": "missing",
+      "evidenceStatus": "evidence-required",
+      "releaseDisposition": "product-decision-required",
+      "releaseReason": "The v1.7.0 documentation promise has no sufficiently precise current product mapping and needs owner adjudication.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "update.check",
+      "domain": "Update",
+      "userGoal": "Update Check",
+      "v1.7.0Entry": [
+        "check-updates",
+        "check_for_updates"
+      ],
+      "v1.7.0Steps": [
+        "Open dashboard",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "Update Check",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.action.check-updates",
+        "v17.command.check_for_updates"
+      ],
+      "v1.8.2Entry": [
+        "tauri/src/features/dashboard/api.ts:22",
+        "tauri/src/features/settings/api.ts:29"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
+      "replacementCommands": [
+        "check_for_updates"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-installed",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [
+        "frontend:tauri/src/features/dashboard/api.ts:22",
+        "frontend:tauri/src/features/settings/api.ts:29"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": null
+    },
+    {
+      "capabilityId": "update.download-install",
+      "domain": "Update",
+      "userGoal": "程序内更新：每天最多自动检查一次，只读取固定更新清单，不上传遥测；下载包强制 SHA256 校验。",
+      "v1.7.0Entry": [
+        "dashboard",
+        "download-update",
+        "download_update",
+        "install-update",
+        "launch_update_installer"
+      ],
+      "v1.7.0Steps": [
+        "Open dashboard",
+        "Use the documented v1.7.0 entry"
+      ],
+      "v1.7.0Result": "程序内更新：每天最多自动检查一次，只读取固定更新清单，不上传遥测；下载包强制 SHA256 校验。",
+      "v1.7.0Risk": "read-only",
+      "sourceRecordIds": [
+        "v17.action.download-update",
+        "v17.action.install-update",
+        "v17.command.download_update",
+        "v17.command.launch_update_installer",
+        "v17.promise.034"
+      ],
+      "v1.8.2Entry": [],
+      "v1.8.2Steps": [],
+      "v1.8.2Result": "No complete current user path evidenced",
+      "replacementCommands": [
+        "download_update",
+        "launch_update_installer"
+      ],
+      "implementationStatus": "degraded",
+      "evidenceStatus": "evidence-required",
+      "releaseDisposition": "code-blocker",
+      "releaseReason": "Settings exposes update checking only; download_update and launch_update_installer have no current frontend invoke.",
+      "followUpIssue": "#125",
+      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "automatedEvidence": [],
+      "codeBlockerEvidence": {
+        "oldReproduction": [
+          "Use README",
+          "Use download-update",
+          "Use download_update",
+          "Use install-update",
+          "Use launch_update_installer"
+        ],
+        "currentReproduction": [
+          "Open the mapped v1.8.2 domain and look for an equivalent result"
+        ],
+        "expected": "程序内更新：每天最多自动检查一次，只读取固定更新清单，不上传遥测；下载包强制 SHA256 校验。",
+        "actual": "Settings exposes update checking only; download_update and launch_update_installer have no current frontend invoke.",
+        "sourceLocations": [
+          "README.md:程序内更新：每天最多自动检查一次，只读取固定更新清单，不上传遥测；下载包强制 SHA256 校验。",
+          "v1.7.0 frontend action",
+          "v1.7.0 frontend invoke"
+        ],
+        "userImpact": "The historical user goal may not be completable in v1.8.2.",
+        "minimalFix": "Restore download verification and installer-launch result flow."
+      },
+      "evidencePlan": null
+    }
+  ]
+}
