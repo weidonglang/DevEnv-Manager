@@ -45,6 +45,28 @@ The golden pre-refactor baseline is commit `55f4a6cfc2d91582f20566b813d4706af4ef
 - Advanced mode policy and remaining visual polish are not treated as complete in this release candidate.
 - MySQL repair execution remains manual unless a disposable MySQL fixture is available.
 
+## Release Verification Summary
+
+The aggregate acceptance report contains 212 cases: 181 passed, 0 failed, 26 safely skipped, and 5 manual or deferred. P0 and P1 failure counts are both zero.
+
+- Eleven skipped cases are read-only Tauri commands that require a running backend. Registration, frontend wiring, selectors, and response rendering were checked automatically; the installed Windows smoke covered the release-critical Dashboard, Cleanup, Ports, Reports, Environment, File Associations, Settings, and Update paths.
+- Fifteen skipped cases are dry-run or plan commands that require app-specific state or a confirmation token. Static command/argument contracts and plan/result selectors passed; targeted installed smoke created Cleanup, archive, Doctor, Java, File Association, and Ports plans without applying unrelated system changes.
+- `ports.planExecuteAndVerify.safeSmoke` is manual in the generic safe runner because process termination must not target arbitrary processes. It was completed against a disposable Python listener, with PID exit, port release, and empty remaining-owner verification.
+- `toolchains.mysqlRepair.safeSmoke` remains manual because no disposable MySQL fixture was available. No production MySQL repair was attempted.
+- `runtime.v19.fullRedesign` is deferred to #130, `profiles.historyRestore` is deferred until durable history storage exists, and `advanced.mode` remains a P2 visual/policy review item. These do not remove the v1.8.2 core paths listed in the feature comparison above.
+
+Final gates passed: 134 Rust tests, Clippy with warnings denied, the 107-module frontend production build, frontend acceptance with 80 stable selectors, repository hygiene, safety wording, frontend data/action/quality contracts, Tauri command contracts, and GitHub CI quality.
+
+The rollback evidence is anchored to the pre-upgrade baseline and final machine state:
+
+| Evidence | Before upgrade | After final rollback |
+|---|---:|---:|
+| Installed version | 1.7.0 | 1.7.0 |
+| Settings size | 950 bytes | 950 bytes |
+| Settings SHA256 | `8fd1d16130effb597ea451b0f93beb344b4e496bec98e51e5c118028dc3c2235` | `8fd1d16130effb597ea451b0f93beb344b4e496bec98e51e5c118028dc3c2235` |
+| Profiles | 1 | 1 |
+| Application process | closed | closed |
+
 ## Rollback Baseline
 
 - Download: https://github.com/weidonglang/DevEnv-Manager/releases/download/v1.7.0/DevEnv.Manager_1.7.0_x64-setup.exe
