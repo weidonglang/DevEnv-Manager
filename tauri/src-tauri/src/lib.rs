@@ -13479,8 +13479,10 @@ fn decoded_text_score(value: &str) -> i32 {
                     | '\u{ac00}'..='\u{d7af}'
             ) {
                 3
+            } else if character.is_alphabetic() {
+                1
             } else if matches!(character, '\u{00a0}'..='\u{00ff}') {
-                -2
+                -3
             } else {
                 0
             }
@@ -15686,6 +15688,14 @@ mod tests {
             b'A', b'c', b'c', 0xe8, b's', b' ', b'r', b'e', b'f', b'u', b's', 0xe9,
         ];
         assert_eq!(decode_command_stream(&bytes), "Accès refusé");
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn command_stream_scoring_prefers_cp1252_letters_over_oem_glyphs() {
+        let cp1252_score = decoded_text_score("Accès refusé") + 8;
+        let oem_score = decoded_text_score("AccΦs refusΘ") + 6;
+        assert!(cp1252_score > oem_score);
     }
 
     #[test]
