@@ -5,18 +5,18 @@
     "registered": 168,
     "byClassification": {
       "bootstrap": 3,
-      "compatibility-alias": 34,
-      "diagnostic": 11,
-      "direct-user-command": 101,
+      "compatibility-alias": 29,
+      "diagnostic": 9,
+      "direct-user-command": 108,
       "dynamic-user-command": 7,
       "internal-helper": 4,
       "replacement-command": 8
     },
     "byReleaseDisposition": {
-      "code-blocker": 22,
-      "evidence-blocker": 44,
+      "code-blocker": 13,
+      "evidence-blocker": 52,
       "product-decision-required": 7,
-      "ready": 95
+      "ready": 96
     },
     "unclassified": 0,
     "withoutCapabilityMapping": 0,
@@ -88,17 +88,22 @@
       "oldCommand": "analyze_python_environment",
       "currentCommand": "analyze_python_environment",
       "capabilityId": "environment.python-health-repair",
-      "frontendLocation": [],
+      "frontendLocation": [
+        "tauri/src/features/environment/api.ts:37"
+      ],
       "dynamicWrapper": [],
       "replacementChain": [],
-      "replacementResolution": "no-replacement-code-blocker",
-      "testEvidence": [],
-      "classification": "compatibility-alias",
-      "releaseDisposition": "code-blocker",
-      "exactReason": "The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval.",
-      "compatibilityConsumer": "v1.7.0 UI/CLI or external automation",
-      "compatibilityTest": "Required before removal",
-      "removalCondition": "Remove only after frontend, dynamic wrappers, scripts, tests, compatibility paths, and docs are all clear",
+      "replacementResolution": "not-required",
+      "testEvidence": [
+        "feature-manifest:environment.pythonAliasSettings",
+        "feature-manifest:environment.pythonHealthRepair"
+      ],
+      "classification": "direct-user-command",
+      "releaseDisposition": "evidence-blocker",
+      "exactReason": "A current frontend invoke exposes this command.",
+      "compatibilityConsumer": null,
+      "compatibilityTest": null,
+      "removalCondition": null,
       "followUpIssue": "#125"
     },
     {
@@ -150,7 +155,7 @@
       "currentCommand": "apply_env_repair_plan",
       "capabilityId": "environment.java-stabilize",
       "frontendLocation": [
-        "tauri/src/features/environment/api.ts:29"
+        "tauri/src/features/environment/api.ts:57"
       ],
       "dynamicWrapper": [],
       "replacementChain": [],
@@ -213,11 +218,15 @@
       "capabilityId": "environment.python-health-repair",
       "frontendLocation": [],
       "dynamicWrapper": [],
-      "replacementChain": [],
-      "replacementResolution": "no-replacement-code-blocker",
+      "replacementChain": [
+        "analyze_python_environment",
+        "apply_python_repair",
+        "preview_python_repair"
+      ],
+      "replacementResolution": "explicit-replacement",
       "testEvidence": [],
       "classification": "compatibility-alias",
-      "releaseDisposition": "code-blocker",
+      "releaseDisposition": "evidence-blocker",
       "exactReason": "The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval.",
       "compatibilityConsumer": "v1.7.0 UI/CLI or external automation",
       "compatibilityTest": "Required before removal",
@@ -251,17 +260,21 @@
       "oldCommand": "apply_python_repair",
       "currentCommand": "apply_python_repair",
       "capabilityId": "environment.python-health-repair",
-      "frontendLocation": [],
+      "frontendLocation": [
+        "tauri/src/features/environment/api.ts:45"
+      ],
       "dynamicWrapper": [],
       "replacementChain": [],
-      "replacementResolution": "no-replacement-code-blocker",
-      "testEvidence": [],
-      "classification": "compatibility-alias",
-      "releaseDisposition": "code-blocker",
-      "exactReason": "The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval.",
-      "compatibilityConsumer": "v1.7.0 UI/CLI or external automation",
-      "compatibilityTest": "Required before removal",
-      "removalCondition": "Remove only after frontend, dynamic wrappers, scripts, tests, compatibility paths, and docs are all clear",
+      "replacementResolution": "not-required",
+      "testEvidence": [
+        "feature-manifest:environment.pythonHealthRepair"
+      ],
+      "classification": "direct-user-command",
+      "releaseDisposition": "evidence-blocker",
+      "exactReason": "A current frontend invoke exposes this command.",
+      "compatibilityConsumer": null,
+      "compatibilityTest": null,
+      "removalCondition": null,
       "followUpIssue": "#125"
     },
     {
@@ -417,7 +430,7 @@
       "currentCommand": "cleanup_path_entries",
       "capabilityId": "environment.path-cleanup",
       "frontendLocation": [
-        "tauri/src/features/environment/api.ts:33"
+        "tauri/src/features/environment/api.ts:61"
       ],
       "dynamicWrapper": [],
       "replacementChain": [],
@@ -692,7 +705,7 @@
       "currentCommand": "create_java_stabilize_plan",
       "capabilityId": "environment.java-stabilize",
       "frontendLocation": [
-        "tauri/src/features/environment/api.ts:25"
+        "tauri/src/features/environment/api.ts:53"
       ],
       "dynamicWrapper": [],
       "replacementChain": [],
@@ -738,11 +751,15 @@
       "capabilityId": "environment.python-health-repair",
       "frontendLocation": [],
       "dynamicWrapper": [],
-      "replacementChain": [],
-      "replacementResolution": "no-replacement-code-blocker",
+      "replacementChain": [
+        "analyze_python_environment",
+        "apply_python_repair",
+        "preview_python_repair"
+      ],
+      "replacementResolution": "explicit-replacement",
       "testEvidence": [],
       "classification": "compatibility-alias",
-      "releaseDisposition": "code-blocker",
+      "releaseDisposition": "evidence-blocker",
       "exactReason": "The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval.",
       "compatibilityConsumer": "v1.7.0 UI/CLI or external automation",
       "compatibilityTest": "Required before removal",
@@ -1569,14 +1586,18 @@
       "oldCommand": null,
       "currentCommand": "inspect_env_backup",
       "capabilityId": "environment.backups",
-      "frontendLocation": [],
+      "frontendLocation": [
+        "tauri/src/features/environment/api.ts:25"
+      ],
       "dynamicWrapper": [],
       "replacementChain": [],
       "replacementResolution": "not-required",
-      "testEvidence": [],
-      "classification": "diagnostic",
+      "testEvidence": [
+        "feature-manifest:environment.restoreBackups"
+      ],
+      "classification": "direct-user-command",
       "releaseDisposition": "ready",
-      "exactReason": "This read-only command supplies evidence to a broader user flow.",
+      "exactReason": "A current frontend invoke exposes this command.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
@@ -1594,6 +1615,7 @@
       "replacementChain": [],
       "replacementResolution": "not-required",
       "testEvidence": [
+        "feature-manifest:environment.restoreBackups",
         "feature-manifest:environment.doctorAndJava",
         "feature-manifest:environment.pathEvidence"
       ],
@@ -2125,7 +2147,9 @@
       "dynamicWrapper": [],
       "replacementChain": [],
       "replacementResolution": "not-required",
-      "testEvidence": [],
+      "testEvidence": [
+        "feature-manifest:environment.restoreBackups"
+      ],
       "classification": "direct-user-command",
       "releaseDisposition": "ready",
       "exactReason": "A current frontend invoke exposes this command.",
@@ -2145,7 +2169,9 @@
       "dynamicWrapper": [],
       "replacementChain": [],
       "replacementResolution": "not-required",
-      "testEvidence": [],
+      "testEvidence": [
+        "feature-manifest:environment.restoreBackups"
+      ],
       "classification": "direct-user-command",
       "releaseDisposition": "ready",
       "exactReason": "A current frontend invoke exposes this command.",
@@ -2515,18 +2541,22 @@
       "oldCommand": "open_python_alias_settings",
       "currentCommand": "open_python_alias_settings",
       "capabilityId": "environment.python-alias-settings",
-      "frontendLocation": [],
+      "frontendLocation": [
+        "tauri/src/features/environment/api.ts:49"
+      ],
       "dynamicWrapper": [],
       "replacementChain": [],
-      "replacementResolution": "no-replacement-code-blocker",
-      "testEvidence": [],
-      "classification": "compatibility-alias",
-      "releaseDisposition": "code-blocker",
-      "exactReason": "The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval.",
-      "compatibilityConsumer": "v1.7.0 UI/CLI or external automation",
-      "compatibilityTest": "Required before removal",
-      "removalCondition": "Remove only after frontend, dynamic wrappers, scripts, tests, compatibility paths, and docs are all clear",
-      "followUpIssue": "#125"
+      "replacementResolution": "not-required",
+      "testEvidence": [
+        "feature-manifest:environment.pythonAliasSettings"
+      ],
+      "classification": "direct-user-command",
+      "releaseDisposition": "ready",
+      "exactReason": "A current frontend invoke exposes this command.",
+      "compatibilityConsumer": null,
+      "compatibilityTest": null,
+      "removalCondition": null,
+      "followUpIssue": null
     },
     {
       "command": "port_history",
@@ -2621,17 +2651,21 @@
       "oldCommand": "preview_python_repair",
       "currentCommand": "preview_python_repair",
       "capabilityId": "environment.python-health-repair",
-      "frontendLocation": [],
+      "frontendLocation": [
+        "tauri/src/features/environment/api.ts:41"
+      ],
       "dynamicWrapper": [],
       "replacementChain": [],
-      "replacementResolution": "no-replacement-code-blocker",
-      "testEvidence": [],
-      "classification": "compatibility-alias",
-      "releaseDisposition": "code-blocker",
-      "exactReason": "The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval.",
-      "compatibilityConsumer": "v1.7.0 UI/CLI or external automation",
-      "compatibilityTest": "Required before removal",
-      "removalCondition": "Remove only after frontend, dynamic wrappers, scripts, tests, compatibility paths, and docs are all clear",
+      "replacementResolution": "not-required",
+      "testEvidence": [
+        "feature-manifest:environment.pythonHealthRepair"
+      ],
+      "classification": "direct-user-command",
+      "releaseDisposition": "evidence-blocker",
+      "exactReason": "A current frontend invoke exposes this command.",
+      "compatibilityConsumer": null,
+      "compatibilityTest": null,
+      "removalCondition": null,
       "followUpIssue": "#125"
     },
     {
@@ -2763,17 +2797,21 @@
       "oldCommand": "restore_env_backup",
       "currentCommand": "restore_env_backup",
       "capabilityId": "environment.restore",
-      "frontendLocation": [],
+      "frontendLocation": [
+        "tauri/src/features/environment/api.ts:29"
+      ],
       "dynamicWrapper": [],
       "replacementChain": [],
-      "replacementResolution": "no-replacement-code-blocker",
-      "testEvidence": [],
-      "classification": "compatibility-alias",
-      "releaseDisposition": "code-blocker",
-      "exactReason": "The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval.",
-      "compatibilityConsumer": "v1.7.0 UI/CLI or external automation",
-      "compatibilityTest": "Required before removal",
-      "removalCondition": "Remove only after frontend, dynamic wrappers, scripts, tests, compatibility paths, and docs are all clear",
+      "replacementResolution": "not-required",
+      "testEvidence": [
+        "feature-manifest:environment.restoreBackups"
+      ],
+      "classification": "direct-user-command",
+      "releaseDisposition": "evidence-blocker",
+      "exactReason": "A current frontend invoke exposes this command.",
+      "compatibilityConsumer": null,
+      "compatibilityTest": null,
+      "removalCondition": null,
       "followUpIssue": "#125"
     },
     {
@@ -2781,15 +2819,19 @@
       "oldCommand": "restore_environment_backup",
       "currentCommand": "restore_environment_backup",
       "capabilityId": "environment.restore",
-      "frontendLocation": [],
+      "frontendLocation": [
+        "tauri/src/features/environment/api.ts:33"
+      ],
       "dynamicWrapper": [],
       "replacementChain": [
         "restore_user_environment"
       ],
       "replacementResolution": "explicit-replacement",
-      "testEvidence": [],
+      "testEvidence": [
+        "feature-manifest:environment.restoreBackups"
+      ],
       "classification": "replacement-command",
-      "releaseDisposition": "code-blocker",
+      "releaseDisposition": "evidence-blocker",
       "exactReason": "This command participates in an explicit old-to-new replacement chain.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
@@ -2809,7 +2851,7 @@
       "replacementResolution": "explicit-replacement",
       "testEvidence": [],
       "classification": "compatibility-alias",
-      "releaseDisposition": "code-blocker",
+      "releaseDisposition": "evidence-blocker",
       "exactReason": "The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval.",
       "compatibilityConsumer": "v1.7.0 UI/CLI or external automation",
       "compatibilityTest": "Required before removal",
@@ -3454,14 +3496,18 @@
       "oldCommand": "verify_external_jdk",
       "currentCommand": "verify_external_jdk",
       "capabilityId": "runtime.external-jdk-verify",
-      "frontendLocation": [],
+      "frontendLocation": [
+        "tauri/src/features/runtimes/api.ts:37"
+      ],
       "dynamicWrapper": [],
       "replacementChain": [],
       "replacementResolution": "not-required",
-      "testEvidence": [],
-      "classification": "diagnostic",
+      "testEvidence": [
+        "feature-manifest:runtime.externalJdkVerify"
+      ],
+      "classification": "direct-user-command",
       "releaseDisposition": "ready",
-      "exactReason": "This read-only command supplies evidence to a broader user flow.",
+      "exactReason": "A current frontend invoke exposes this command.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,

@@ -196,6 +196,10 @@ export const runtimeAcceptanceFixture: RuntimeWorkbenchState = {
   selectedRuntimeId: null,
   operationResult: "Runtime fixture operation result.",
   operationError: "",
+  externalJdkPath: "C:\\Program Files\\Java\\jdk-21",
+  externalJdkChecks: [],
+  externalJdkResult: "External JDK fixture is ready for verification.",
+  externalJdkError: "",
   page: 1,
 };
 

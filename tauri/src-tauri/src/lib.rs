@@ -665,6 +665,7 @@ struct PythonAnalysis {
     launcher_path: String,
     launcher_output: String,
     first_python_on_path: String,
+    first_python3_on_path: String,
     first_pip_on_path: String,
     python_m_pip_available: bool,
     managed_python_available: bool,
@@ -6457,6 +6458,7 @@ async fn analyze_python_environment() -> Result<PythonAnalysis, String> {
 
 fn analyze_python_environment_blocking() -> PythonAnalysis {
     let first_python_on_path = find_on_path("python").unwrap_or_default();
+    let first_python3_on_path = find_on_path("python3").unwrap_or_default();
     let first_pip_on_path = find_on_path("pip").unwrap_or_default();
     let current_python = detect_runtime("Python", "python", &["--version"]).map(|runtime| {
         let status = if runtime
@@ -6645,6 +6647,7 @@ fn analyze_python_environment_blocking() -> PythonAnalysis {
         launcher_path,
         launcher_output,
         first_python_on_path,
+        first_python3_on_path,
         first_pip_on_path,
         python_m_pip_available,
         managed_python_available,

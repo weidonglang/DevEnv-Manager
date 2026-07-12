@@ -20,6 +20,7 @@ export function renderRuntimeWorkbench(state: RuntimeWorkbenchState): string {
         ${renderRuntimeInstallGrid(state)}
         ${renderRuntimeOperationResult(state)}
       </section>
+      ${renderExternalJdkPanel(state, vm.rows)}
       <section class="panel">
         <h2>${t("feature.runtimes.installedVersions")}</h2>
         <div class="runtime-list" data-testid="runtime-installed-list">
@@ -30,6 +31,42 @@ export function renderRuntimeWorkbench(state: RuntimeWorkbenchState): string {
       ${renderRuntimeDetails(vm.rows.find((row) => row.id === state.selectedRuntimeId) ?? null)}
     </div>
   `;
+}
+
+function renderExternalJdkPanel(state: RuntimeWorkbenchState, rows: RuntimeRowViewModel[]): string {
+  const candidates = rows.filter((row) => row.backendKind === "jdk" && !row.managed);
+  const checks = state.externalJdkChecks;
+  const java = checks.find((check) => check.id === "java-version");
+  const javac = checks.find((check) => check.id === "javac-version");
+  const jar = checks.find((check) => check.id === "jar-version");
+  const classification = checks.length ? (java?.success && javac?.success && jar?.success ? "Full JDK" : java?.success ? "JRE/incomplete JDK" : "Not a usable Java runtime") : "Not verified";
+  return `<section class="panel" data-testid="runtime-external-jdk-section">
+    <div class="panel-head"><div><h2>External JDK verification</h2><p>Read-only verification for Java installations not managed by DevEnv Manager. This does not switch or uninstall the runtime.</p></div></div>
+    <div class="form-grid">
+      <select id="external-jdk-candidate" data-testid="runtime-external-jdk-select">
+        <option value="">Select a discovered external JDK</option>
+        ${candidates.map((candidate) => `<option value="${escapeHtml(candidate.runtimeRoot)}" ${state.externalJdkPath === candidate.runtimeRoot ? "selected" : ""}>${escapeHtml(candidate.version)} - ${escapeHtml(candidate.source)} - ${escapeHtml(candidate.runtimeRoot)}</option>`).join("")}
+        ${state.externalJdkPath && !candidates.some((candidate) => candidate.runtimeRoot === state.externalJdkPath) ? `<option value="${escapeHtml(state.externalJdkPath)}" selected>${escapeHtml(state.externalJdkPath)}</option>` : ""}
+      </select>
+      <input id="external-jdk-path" value="${escapeHtml(state.externalJdkPath)}" readonly placeholder="Select or choose a JDK root" />
+    </div>
+    <div class="toolbar">
+      ${renderActionButton("choose-external-jdk", "Choose JDK root")}
+      ${renderActionButton("verify-external-jdk", "Verify java, javac, and jar", "primary")}
+    </div>
+    <div data-testid="runtime-external-jdk-result">
+      ${state.externalJdkError ? `<div class="error-state">${escapeHtml(state.externalJdkError)}</div>` : ""}
+      ${checks.length ? `<dl class="kv-list">
+        <div><dt>Classification</dt><dd>${escapeHtml(classification)}</dd></div>
+        <div><dt>Suggested JAVA_HOME</dt><dd>${escapeHtml(state.externalJdkPath)}</dd></div>
+        <div><dt>java executable</dt><dd>${escapeHtml(`${state.externalJdkPath}\\bin\\java.exe`)}</dd></div>
+        <div><dt>javac executable</dt><dd>${escapeHtml(`${state.externalJdkPath}\\bin\\javac.exe`)}</dd></div>
+        <div><dt>jar executable</dt><dd>${escapeHtml(`${state.externalJdkPath}\\bin\\jar.exe`)}</dd></div>
+        ${checks.map((check) => `<div><dt>${escapeHtml(check.title)}</dt><dd>${check.success ? "PASS" : "FAIL"} - ${escapeHtml(check.detail)}</dd></div>`).join("")}
+      </dl>` : `<div class="empty">No external JDK has been verified.</div>`}
+      ${state.externalJdkResult ? `<div class="small-note">${escapeHtml(state.externalJdkResult)}</div>` : ""}
+    </div>
+  </section>`;
 }
 
 function renderRuntimeOperationResult(state: RuntimeWorkbenchState): string {

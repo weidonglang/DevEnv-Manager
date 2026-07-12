@@ -1,12 +1,52 @@
 import type { FeatureContext } from "../../app/featureContext";
+import { open } from "../../api/tauri";
 import { t } from "../../core/i18n";
 import { bindAction } from "../sharedView";
-import { discoverRuntimes, getJdkDistributions, inspectRuntimeStrongVerification, installRuntime, openAppsFeatures, openRuntimeDirectory, switchRuntime, uninstallRuntime } from "./api";
+import { discoverRuntimes, getJdkDistributions, inspectRuntimeStrongVerification, installRuntime, openAppsFeatures, openRuntimeDirectory, switchRuntime, uninstallRuntime, verifyExternalJdk } from "./api";
 import { renderRuntimeWorkbench } from "./render";
 import type { RuntimeWorkbenchState } from "./state";
 
 export function bindRuntimeEvents(context: FeatureContext, state: RuntimeWorkbenchState): void {
   bindAction(context.root, "refresh-runtimes", () => refreshRuntimes(context, state));
+  context.root.querySelector<HTMLSelectElement>("#external-jdk-candidate")?.addEventListener("change", (event) => {
+    state.externalJdkPath = (event.currentTarget as HTMLSelectElement).value;
+    state.externalJdkChecks = [];
+    state.externalJdkResult = "";
+    state.externalJdkError = "";
+    renderAndBind(context, state);
+  });
+  bindAction(context.root, "choose-external-jdk", async () => {
+    const selected = await open({ directory: true, multiple: false });
+    if (!selected || Array.isArray(selected)) return;
+    state.externalJdkPath = normalizeJdkRoot(selected);
+    state.externalJdkChecks = [];
+    state.externalJdkResult = "";
+    state.externalJdkError = "";
+    renderAndBind(context, state);
+  });
+  bindAction(context.root, "verify-external-jdk", async () => {
+    state.externalJdkChecks = [];
+    state.externalJdkResult = "";
+    state.externalJdkError = "";
+    if (!state.externalJdkPath) {
+      state.externalJdkError = "Select or choose an external JDK root first.";
+      renderAndBind(context, state);
+      return;
+    }
+    context.progress.start("Verifying external JDK");
+    try {
+      state.externalJdkChecks = await verifyExternalJdk(state.externalJdkPath);
+      const requiredPassed = state.externalJdkChecks.filter((check) => check.required).every((check) => check.success);
+      state.externalJdkResult = requiredPassed
+        ? `External JDK verified. JAVA_HOME can point to ${state.externalJdkPath}.`
+        : "External Java verification completed with missing or failed required tools.";
+      context.progress.done("External JDK verification completed");
+    } catch (error) {
+      state.externalJdkError = errorMessage(error);
+      context.progress.fail(state.externalJdkError);
+    }
+    renderAndBind(context, state);
+  });
   bindAction(context.root, "install-jdk", async () => {
     const version = context.root.querySelector<HTMLSelectElement>("#jdk-version")?.value || "21";
     const distribution = context.root.querySelector<HTMLSelectElement>("#jdk-distribution")?.value || "temurin";
@@ -254,6 +294,11 @@ function runtimeName(command: "install_node" | "install_python" | "install_go"):
   if (command === "install_node") return "Node.js";
   if (command === "install_python") return "Python";
   return "Go";
+}
+
+function normalizeJdkRoot(path: string): string {
+  const normalized = path.replace(/\//g, "\\").replace(/\\+$/, "");
+  return normalized.toLowerCase().endsWith("\\bin") ? normalized.slice(0, -4) : normalized;
 }
 
 function renderAndBind(context: FeatureContext, state: RuntimeWorkbenchState): void {

@@ -101,6 +101,14 @@ export type EnvBackupRecord = {
   pathEntryCount: number;
   sourcePlanId?: string;
 };
+export type EnvBackupDiff = {
+  backupName: string;
+  currentJavaHome?: string;
+  backupJavaHome?: string;
+  currentPathEntries: number;
+  backupPathEntries: number;
+  changedVariables: string[];
+};
 export type EnvReliabilitySnapshot = {
   generatedAt: string;
   userEnv: {
@@ -418,6 +426,7 @@ export type PythonAnalysis = {
   launcherPath: string;
   launcherOutput: string;
   firstPythonOnPath: string;
+  firstPython3OnPath: string;
   firstPipOnPath: string;
   pythonMPipAvailable: boolean;
   managedPythonAvailable: boolean;

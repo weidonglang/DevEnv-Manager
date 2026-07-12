@@ -23,23 +23,23 @@
   "summary": {
     "total": 87,
     "byImplementationStatus": {
-      "degraded": 14,
+      "degraded": 10,
       "enhanced": 13,
-      "equivalent": 55,
+      "equivalent": 59,
       "missing": 5
     },
     "byEvidenceStatus": {
-      "environment-blocked": 12,
-      "evidence-required": 25,
-      "verified-automated": 25,
+      "environment-blocked": 14,
+      "evidence-required": 21,
+      "verified-automated": 27,
       "verified-installed": 24,
       "verified-real-tauri": 1
     },
     "byReleaseDisposition": {
-      "code-blocker": 14,
-      "evidence-blocker": 18,
+      "code-blocker": 10,
+      "evidence-blocker": 20,
       "product-decision-required": 5,
-      "ready": 50
+      "ready": 52
     }
   },
   "capabilities": [
@@ -921,7 +921,8 @@
       ],
       "v1.8.2Entry": [
         "tauri/src/features/environment/api.ts:17",
-        "tauri/src/features/environment/api.ts:21"
+        "tauri/src/features/environment/api.ts:21",
+        "tauri/src/features/environment/api.ts:25"
       ],
       "v1.8.2Steps": [
         "Open the mapped Workbench domain",
@@ -941,7 +942,8 @@
       "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
       "automatedEvidence": [
         "frontend:tauri/src/features/environment/api.ts:17",
-        "frontend:tauri/src/features/environment/api.ts:21"
+        "frontend:tauri/src/features/environment/api.ts:21",
+        "frontend:tauri/src/features/environment/api.ts:25"
       ],
       "codeBlockerEvidence": null,
       "evidencePlan": null
@@ -1028,8 +1030,8 @@
         "v17.promise.010"
       ],
       "v1.8.2Entry": [
-        "tauri/src/features/environment/api.ts:25",
-        "tauri/src/features/environment/api.ts:29"
+        "tauri/src/features/environment/api.ts:53",
+        "tauri/src/features/environment/api.ts:57"
       ],
       "v1.8.2Steps": [
         "Open the mapped Workbench domain",
@@ -1050,8 +1052,8 @@
       "followUpIssue": "#125",
       "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
       "automatedEvidence": [
-        "frontend:tauri/src/features/environment/api.ts:25",
-        "frontend:tauri/src/features/environment/api.ts:29"
+        "frontend:tauri/src/features/environment/api.ts:53",
+        "frontend:tauri/src/features/environment/api.ts:57"
       ],
       "codeBlockerEvidence": null,
       "evidencePlan": {
@@ -1085,7 +1087,7 @@
         "v17.command.cleanup_path_entries"
       ],
       "v1.8.2Entry": [
-        "tauri/src/features/environment/api.ts:33"
+        "tauri/src/features/environment/api.ts:61"
       ],
       "v1.8.2Steps": [
         "Open the mapped Workbench domain",
@@ -1102,7 +1104,7 @@
       "followUpIssue": "#125",
       "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
       "automatedEvidence": [
-        "frontend:tauri/src/features/environment/api.ts:33"
+        "frontend:tauri/src/features/environment/api.ts:61"
       ],
       "codeBlockerEvidence": null,
       "evidencePlan": {
@@ -1137,36 +1139,27 @@
         "v17.action.open-python-alias-settings",
         "v17.command.open_python_alias_settings"
       ],
-      "v1.8.2Entry": [],
-      "v1.8.2Steps": [],
-      "v1.8.2Result": "No complete current user path evidenced",
+      "v1.8.2Entry": [
+        "tauri/src/features/environment/api.ts:49"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
       "replacementCommands": [
         "open_python_alias_settings"
       ],
-      "implementationStatus": "degraded",
-      "evidenceStatus": "evidence-required",
-      "releaseDisposition": "code-blocker",
-      "releaseReason": "The Windows Python alias settings command remains registered but has no Environment action.",
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
       "followUpIssue": "#125",
       "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
-      "automatedEvidence": [],
-      "codeBlockerEvidence": {
-        "oldReproduction": [
-          "Use open-python-alias-settings",
-          "Use open_python_alias_settings"
-        ],
-        "currentReproduction": [
-          "Open the mapped v1.8.2 domain and look for an equivalent result"
-        ],
-        "expected": "Environment Python Alias Settings",
-        "actual": "The Windows Python alias settings command remains registered but has no Environment action.",
-        "sourceLocations": [
-          "v1.7.0 frontend action",
-          "v1.7.0 frontend invoke"
-        ],
-        "userImpact": "The historical user goal may not be completable in v1.8.2.",
-        "minimalFix": "Add the smallest explicit open-settings entry."
-      },
+      "automatedEvidence": [
+        "frontend:tauri/src/features/environment/api.ts:49"
+      ],
+      "codeBlockerEvidence": null,
       "evidencePlan": null
     },
     {
@@ -1198,9 +1191,16 @@
         "v17.promise.013",
         "v17.promise.015"
       ],
-      "v1.8.2Entry": [],
-      "v1.8.2Steps": [],
-      "v1.8.2Result": "No complete current user path evidenced",
+      "v1.8.2Entry": [
+        "tauri/src/features/environment/api.ts:37",
+        "tauri/src/features/environment/api.ts:41",
+        "tauri/src/features/environment/api.ts:45"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
       "replacementCommands": [
         "analyze_python_environment",
         "apply_managed_python_pip_repair",
@@ -1209,38 +1209,31 @@
         "inspect_python_integrity",
         "preview_python_repair"
       ],
-      "implementationStatus": "degraded",
-      "evidenceStatus": "evidence-required",
-      "releaseDisposition": "code-blocker",
-      "releaseReason": "Python analysis, preview, and repair commands remain registered but the Environment page exposes only Java stabilization and PATH cleanup.",
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "environment-blocked",
+      "releaseDisposition": "evidence-blocker",
+      "releaseReason": "Implementation mapping exists, but the required installed or safely isolated execution evidence is incomplete.",
       "followUpIssue": "#125",
       "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
-      "automatedEvidence": [],
-      "codeBlockerEvidence": {
-        "oldReproduction": [
-          "Use README",
-          "Use analyze_python_environment",
-          "Use apply_python_repair",
-          "Use create_managed_python_pip_repair_plan",
-          "Use inspect_python_integrity",
-          "Use preview_python_repair"
+      "automatedEvidence": [
+        "frontend:tauri/src/features/environment/api.ts:37",
+        "frontend:tauri/src/features/environment/api.ts:41",
+        "frontend:tauri/src/features/environment/api.ts:45"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": {
+        "fixture": "Dedicated temporary data or disposable VM snapshot",
+        "environment": "Windows real Tauri or installed application",
+        "steps": [
+          "Capture baseline",
+          "Run the mapped user path",
+          "Verify result against system state",
+          "Restore baseline"
         ],
-        "currentReproduction": [
-          "Open the mapped v1.8.2 domain and look for an equivalent result"
-        ],
-        "expected": "Python 完整性检查：安装后验证 `pip`、`venv`、`ssl`、`sqlite3`、`ctypes`，并将 `tkinter` 作为可选 GUI 组件提示；核心组件失败不会登记为已安装。",
-        "actual": "Python analysis, preview, and repair commands remain registered but the Environment page exposes only Java stabilization and PATH cleanup.",
-        "sourceLocations": [
-          "README.md:Python 修复闭环：安装前检查当前 `python` / `pip` / `py`、用户 PATH、Store 别名与多版本冲突；修复前展示一次性计划并保存环境备份。",
-          "README.md:Python 冲突分析：检测默认 `python`、`pip`、`py -0p`、注册表、Microsoft Store 执行别名风险。",
-          "README.md:Python 完整性检查：安装后验证 `pip`、`venv`、`ssl`、`sqlite3`、`ctypes`，并将 `tkinter` 作为可选 GUI 组件提示；核心组件失败不会登记为已安装。",
-          "README.md:pip 缺失修复计划：仅对 DevEnv Manager 受管 Python 生成 `ensurepip` 与 pip 升级计划；非受管 Python 只提示，不替用户改系统安装。",
-          "v1.7.0 frontend invoke"
-        ],
-        "userImpact": "The historical user goal may not be completable in v1.8.2.",
-        "minimalFix": "Restore Python diagnosis and guarded repair result panels."
-      },
-      "evidencePlan": null
+        "safetyBoundary": "Do not modify real services, associations, environment, or user files outside the fixture.",
+        "passCriteria": "UI result, receipt, and observed system state agree.",
+        "recovery": "Delete temporary data or revert the VM snapshot."
+      }
     },
     {
       "capabilityId": "environment.restore",
@@ -1266,43 +1259,44 @@
         "v17.command.restore_user_environment",
         "v17.promise.011"
       ],
-      "v1.8.2Entry": [],
-      "v1.8.2Steps": [],
-      "v1.8.2Result": "No complete current user path evidenced",
+      "v1.8.2Entry": [
+        "tauri/src/features/environment/api.ts:29",
+        "tauri/src/features/environment/api.ts:33"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
       "replacementCommands": [
         "restore_env_backup",
         "restore_environment_backup",
         "restore_user_environment"
       ],
-      "implementationStatus": "degraded",
-      "evidenceStatus": "evidence-required",
-      "releaseDisposition": "code-blocker",
-      "releaseReason": "The Environment page lists backup counts but does not expose a restore action for either backup model.",
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "environment-blocked",
+      "releaseDisposition": "evidence-blocker",
+      "releaseReason": "Implementation mapping exists, but the required installed or safely isolated execution evidence is incomplete.",
       "followUpIssue": "#125",
       "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
-      "automatedEvidence": [],
-      "codeBlockerEvidence": {
-        "oldReproduction": [
-          "Use README",
-          "Use restore-env-record",
-          "Use restore_env_backup",
-          "Use restore_environment_backup",
-          "Use restore_user_environment"
+      "automatedEvidence": [
+        "frontend:tauri/src/features/environment/api.ts:29",
+        "frontend:tauri/src/features/environment/api.ts:33"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": {
+        "fixture": "Dedicated temporary data or disposable VM snapshot",
+        "environment": "Windows real Tauri or installed application",
+        "steps": [
+          "Capture baseline",
+          "Run the mapped user path",
+          "Verify result against system state",
+          "Restore baseline"
         ],
-        "currentReproduction": [
-          "Open the mapped v1.8.2 domain and look for an equivalent result"
-        ],
-        "expected": "环境备份恢复中心：列出环境备份、恢复前再次备份当前状态、恢复后广播环境变化并重新验证 Java/Python/Node。",
-        "actual": "The Environment page lists backup counts but does not expose a restore action for either backup model.",
-        "sourceLocations": [
-          "README.md:环境备份恢复中心：列出环境备份、恢复前再次备份当前状态、恢复后广播环境变化并重新验证 Java/Python/Node。",
-          "v1.7.0 frontend action",
-          "v1.7.0 frontend invoke"
-        ],
-        "userImpact": "The historical user goal may not be completable in v1.8.2.",
-        "minimalFix": "Add a backup selector and token-gated restore result flow."
-      },
-      "evidencePlan": null
+        "safetyBoundary": "Do not modify real services, associations, environment, or user files outside the fixture.",
+        "passCriteria": "UI result, receipt, and observed system state agree.",
+        "recovery": "Delete temporary data or revert the VM snapshot."
+      }
     },
     {
       "capabilityId": "environment.snapshot",
@@ -2702,36 +2696,27 @@
         "v17.action.verify-external-jdk",
         "v17.command.verify_external_jdk"
       ],
-      "v1.8.2Entry": [],
-      "v1.8.2Steps": [],
-      "v1.8.2Result": "No complete current user path evidenced",
+      "v1.8.2Entry": [
+        "tauri/src/features/runtimes/api.ts:37"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
       "replacementCommands": [
         "verify_external_jdk"
       ],
-      "implementationStatus": "degraded",
-      "evidenceStatus": "evidence-required",
-      "releaseDisposition": "code-blocker",
-      "releaseReason": "External JDK verification remains registered but is not exposed by the Runtime workbench.",
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
       "followUpIssue": "#130",
       "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
-      "automatedEvidence": [],
-      "codeBlockerEvidence": {
-        "oldReproduction": [
-          "Use verify-external-jdk",
-          "Use verify_external_jdk"
-        ],
-        "currentReproduction": [
-          "Open the mapped v1.8.2 domain and look for an equivalent result"
-        ],
-        "expected": "Runtime External Jdk Verify",
-        "actual": "External JDK verification remains registered but is not exposed by the Runtime workbench.",
-        "sourceLocations": [
-          "v1.7.0 frontend action",
-          "v1.7.0 frontend invoke"
-        ],
-        "userImpact": "The historical user goal may not be completable in v1.8.2.",
-        "minimalFix": "Add a read-only external JDK verification result flow."
-      },
+      "automatedEvidence": [
+        "frontend:tauri/src/features/runtimes/api.ts:37"
+      ],
+      "codeBlockerEvidence": null,
       "evidencePlan": null
     },
     {

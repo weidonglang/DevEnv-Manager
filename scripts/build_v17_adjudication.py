@@ -236,6 +236,7 @@ UNSAFE_EVIDENCE_CAPABILITIES = {
 
 ENVIRONMENT_BLOCKED_CAPABILITIES = {
     "environment.configure", "environment.java-stabilize", "environment.path-cleanup",
+    "environment.restore", "environment.python-health-repair",
     "file-associations.backup-rollback", "mysql.repair", "cleanup.partition-expansion",
     "runtime.install", "runtime.lifecycle", "runtime.switch", "runtime.uninstall",
     "system.self-uninstall", "update.download-install",

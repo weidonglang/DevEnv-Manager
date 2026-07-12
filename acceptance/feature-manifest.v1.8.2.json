@@ -299,6 +299,69 @@
           ]
         },
         {
+          "featureId": "runtime.externalJdkVerify",
+          "id": "runtime.externalJdkVerify",
+          "domain": "Runtime",
+          "userVisibleName": "External JDK read-only verification",
+          "name": "External JDK read-only verification",
+          "priority": "P1",
+          "targetVersion": "v1.8.2",
+          "status": "implemented",
+          "oldFeature": true,
+          "oldEntry": "Runtime > Verify external JDK",
+          "currentEntry": "Runtime > External JDK verification",
+          "frontendComponent": "RuntimeExternalJdkPanel",
+          "frontendEntry": {
+            "route": "runtimes",
+            "testIds": [
+              "runtime-external-jdk-section",
+              "runtime-external-jdk-select",
+              "runtime-external-jdk-result"
+            ]
+          },
+          "selectors": {
+            "entry": "runtime-external-jdk-section",
+            "primaryAction": "verify-external-jdk",
+            "result": "runtime-external-jdk-result",
+            "error": "runtime-external-jdk-result"
+          },
+          "backendCommands": [
+            "verify_external_jdk"
+          ],
+          "backendExists": true,
+          "frontendWired": true,
+          "riskLevel": "readOnly",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "requiresLoading": true,
+          "requiresResultArea": true,
+          "requiresErrorArea": true,
+          "requiresDebug": true,
+          "requiresReport": false,
+          "requiresRiskPlan": false,
+          "requiresToken": false,
+          "requiresVerify": true,
+          "requiresRollback": false,
+          "requiresPagination": false,
+          "requiresI18n": true,
+          "requiresDarkReadable": true,
+          "safeSmokeMode": "readOnly",
+          "manualOnlyReason": null,
+          "deferredReason": null,
+          "testModes": [
+            "static",
+            "frontend",
+            "safe"
+          ],
+          "manualAllowed": false,
+          "acceptanceChecks": [
+            "selectorsPresent",
+            "resultPanelVisible",
+            "debugContract",
+            "noReportNeeded"
+          ]
+        },
+        {
           "featureId": "runtime.v19.fullRedesign",
           "id": "runtime.v19.fullRedesign",
           "domain": "Runtime",
@@ -362,6 +425,206 @@
       "displayName": "Environment",
       "priority": "P0",
       "features": [
+        {
+          "featureId": "environment.pythonAliasSettings",
+          "id": "environment.pythonAliasSettings",
+          "domain": "Environment",
+          "userVisibleName": "Windows Python execution alias settings",
+          "name": "Windows Python execution alias settings",
+          "priority": "P1",
+          "targetVersion": "v1.8.2",
+          "status": "implemented",
+          "oldFeature": true,
+          "oldEntry": "Environment > Python aliases",
+          "currentEntry": "Environment > Python health > Execution aliases",
+          "frontendComponent": "EnvironmentPythonHealthPanel",
+          "frontendEntry": {
+            "route": "environment",
+            "testIds": [
+              "environment-python-health-section",
+              "environment-python-alias-result"
+            ]
+          },
+          "selectors": {
+            "entry": "environment-python-health-section",
+            "primaryAction": "open-python-alias-settings",
+            "result": "environment-python-alias-result",
+            "error": "environment-python-alias-result"
+          },
+          "backendCommands": [
+            "analyze_python_environment",
+            "open_python_alias_settings"
+          ],
+          "backendExists": true,
+          "frontendWired": true,
+          "riskLevel": "readOnly",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "requiresLoading": true,
+          "requiresResultArea": true,
+          "requiresErrorArea": true,
+          "requiresDebug": true,
+          "requiresReport": false,
+          "requiresRiskPlan": false,
+          "requiresToken": false,
+          "requiresVerify": true,
+          "requiresRollback": false,
+          "requiresPagination": false,
+          "requiresI18n": true,
+          "requiresDarkReadable": true,
+          "safeSmokeMode": "readOnly",
+          "manualOnlyReason": null,
+          "deferredReason": null,
+          "testModes": [
+            "static",
+            "frontend",
+            "safe"
+          ],
+          "manualAllowed": false,
+          "acceptanceChecks": [
+            "selectorsPresent",
+            "resultPanelVisible",
+            "debugContract",
+            "noReportNeeded"
+          ]
+        },
+        {
+          "featureId": "environment.pythonHealthRepair",
+          "id": "environment.pythonHealthRepair",
+          "domain": "Environment",
+          "userVisibleName": "Python health analysis and guarded repair",
+          "name": "Python health analysis and guarded repair",
+          "priority": "P0",
+          "targetVersion": "v1.8.2",
+          "status": "implemented",
+          "oldFeature": true,
+          "oldEntry": "Environment > Python repair",
+          "currentEntry": "Environment > Python health and repair",
+          "frontendComponent": "EnvironmentPythonHealthPanel",
+          "frontendEntry": {
+            "route": "environment",
+            "testIds": [
+              "environment-python-health-section",
+              "environment-python-analysis-result",
+              "environment-python-plan-preview",
+              "environment-python-repair-result"
+            ]
+          },
+          "selectors": {
+            "entry": "environment-python-health-section",
+            "primaryAction": "preview-python-repair",
+            "result": "environment-python-repair-result",
+            "error": "environment-python-repair-result"
+          },
+          "backendCommands": [
+            "analyze_python_environment",
+            "preview_python_repair",
+            "apply_python_repair"
+          ],
+          "backendExists": true,
+          "frontendWired": true,
+          "riskLevel": "high",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "requiresLoading": true,
+          "requiresResultArea": true,
+          "requiresErrorArea": true,
+          "requiresDebug": true,
+          "requiresReport": false,
+          "requiresRiskPlan": true,
+          "requiresToken": true,
+          "requiresVerify": true,
+          "requiresRollback": true,
+          "requiresPagination": false,
+          "requiresI18n": true,
+          "requiresDarkReadable": true,
+          "safeSmokeMode": "dryRun",
+          "manualOnlyReason": null,
+          "deferredReason": null,
+          "testModes": [
+            "static",
+            "frontend",
+            "safe"
+          ],
+          "manualAllowed": false,
+          "acceptanceChecks": [
+            "selectorsPresent",
+            "riskContract",
+            "resultPanelVisible",
+            "debugContract",
+            "noReportNeeded"
+          ]
+        },
+        {
+          "featureId": "environment.restoreBackups",
+          "id": "environment.restoreBackups",
+          "domain": "Environment",
+          "userVisibleName": "Environment backup preview and restore",
+          "name": "Environment backup preview and restore",
+          "priority": "P0",
+          "targetVersion": "v1.8.2",
+          "status": "implemented",
+          "oldFeature": true,
+          "oldEntry": "Environment > Restore backup",
+          "currentEntry": "Environment > Restore environment backup",
+          "frontendComponent": "EnvironmentRestorePanel",
+          "frontendEntry": {
+            "route": "environment",
+            "testIds": [
+              "environment-restore-section",
+              "environment-backup-select",
+              "environment-restore-plan-preview",
+              "environment-restore-result"
+            ]
+          },
+          "selectors": {
+            "entry": "environment-restore-section",
+            "primaryAction": "create-environment-restore-plan",
+            "result": "environment-restore-result",
+            "error": "environment-restore-result"
+          },
+          "backendCommands": [
+            "list_env_backups",
+            "inspect_env_backup",
+            "restore_env_backup",
+            "list_environment_backups",
+            "restore_environment_backup",
+            "inspect_env_reliability"
+          ],
+          "backendExists": true,
+          "frontendWired": true,
+          "riskLevel": "high",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "requiresLoading": true,
+          "requiresResultArea": true,
+          "requiresErrorArea": true,
+          "requiresDebug": true,
+          "requiresReport": false,
+          "requiresRiskPlan": true,
+          "requiresToken": true,
+          "requiresVerify": true,
+          "requiresRollback": true,
+          "requiresPagination": false,
+          "requiresI18n": true,
+          "requiresDarkReadable": true,
+          "safeSmokeMode": "dryRun",
+          "manualOnlyReason": null,
+          "deferredReason": null,
+          "testModes": [
+            "static",
+            "frontend",
+            "safe"
+          ],
+          "manualAllowed": false,
+          "acceptanceChecks": [
+            "selectorsPresent",
+            "riskContract",
+            "resultPanelVisible",
+            "debugContract",
+            "noReportNeeded"
+          ]
+        },
         {
           "featureId": "environment.doctorAndJava",
           "id": "environment.doctorAndJava",

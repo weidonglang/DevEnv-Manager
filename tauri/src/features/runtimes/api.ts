@@ -1,5 +1,5 @@
 import { invoke } from "../../core/invoke";
-import type { JdkDistribution, OperationResult, RuntimeInfo, RuntimeStrongVerificationReport } from "../../types";
+import type { JdkDistribution, OperationResult, RuntimeInfo, RuntimeStrongVerificationReport, ValidationCheck } from "../../types";
 
 export function discoverRuntimes(): Promise<RuntimeInfo[]> {
   return invoke<RuntimeInfo[]>("discover_runtimes");
@@ -31,4 +31,8 @@ export function openRuntimeDirectory(path: string): Promise<OperationResult> {
 
 export function openAppsFeatures(): Promise<OperationResult> {
   return invoke<OperationResult>("open_apps_features");
+}
+
+export function verifyExternalJdk(jdkPath: string): Promise<ValidationCheck[]> {
+  return invoke<ValidationCheck[]>("verify_external_jdk", { jdkPath });
 }

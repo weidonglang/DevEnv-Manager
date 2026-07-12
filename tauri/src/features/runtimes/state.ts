@@ -1,4 +1,4 @@
-import type { JdkDistribution, RuntimeInfo, RuntimeStrongVerificationReport } from "../../types";
+import type { JdkDistribution, RuntimeInfo, RuntimeStrongVerificationReport, ValidationCheck } from "../../types";
 
 export type RuntimeWorkbenchState = {
   runtimes: RuntimeInfo[];
@@ -7,6 +7,10 @@ export type RuntimeWorkbenchState = {
   selectedRuntimeId: string | null;
   operationResult: string;
   operationError: string;
+  externalJdkPath: string;
+  externalJdkChecks: ValidationCheck[];
+  externalJdkResult: string;
+  externalJdkError: string;
   page: number;
 };
 
@@ -17,5 +21,9 @@ export const runtimeWorkbenchInitialState: RuntimeWorkbenchState = {
   selectedRuntimeId: null,
   operationResult: "",
   operationError: "",
+  externalJdkPath: "",
+  externalJdkChecks: [],
+  externalJdkResult: "",
+  externalJdkError: "",
   page: 1,
 };
