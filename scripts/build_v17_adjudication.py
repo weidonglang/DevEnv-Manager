@@ -145,7 +145,7 @@ COMMAND_GROUPS = {
     "cleanup.scan-plan-execute": {"scan_cleanup_targets", "create_cleanup_plan", "clean_selected_targets", "cancel_maintenance_scan", "scan_storage_cleanup"},
     "cleanup.dev-cache": {"clean_dev_cache"},
     "cleanup.download-cache": {"clear_download_cache", "clean_managed_download_cache"},
-    "cleanup.archive-plan": {"add_archive_plan_item", "remove_archive_plan_item", "list_archive_plan_items"},
+    "cleanup.archive-plan": {"add_archive_plan_item", "remove_archive_plan_item", "list_archive_plan_items", "create_generic_archive_plan", "execute_generic_archive_plan"},
     "cleanup.folder-analysis": {"inspect_desktop", "inspect_downloads", "scan_large_files", "scan_duplicate_large_files"},
     "cleanup.move-rollback": {"create_move_plan", "execute_move_plan", "rollback_move", "list_rollback_records", "create_junction_bridge_plan"},
     "cleanup.desktop-archive": {"create_desktop_archive_plan", "execute_desktop_archive_plan"},
@@ -230,6 +230,7 @@ UNSAFE_EVIDENCE_CAPABILITIES = {
     "file-associations.apply", "file-associations.backup-rollback", "cleanup.scan-plan-execute",
     "cleanup.dev-cache", "cleanup.download-cache", "cleanup.move-rollback",
     "cleanup.desktop-archive", "cleanup.downloads-archive", "cleanup.partition-expansion",
+    "cleanup.archive-plan",
     "projects.configuration", "projects.port-config", "platforms.manage", "services.manage",
     "mysql.repair", "update.download-install",
 }

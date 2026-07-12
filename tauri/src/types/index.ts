@@ -1170,6 +1170,36 @@ export type ArchivePlanItem = {
   suggestion: string;
 };
 
+export type GenericArchivePlan = {
+  planId: string;
+  createdAt: string;
+  targetRoot: string;
+  estimatedBytes: number;
+  riskLevel: string;
+  entries: Array<{
+    id: string;
+    source: string;
+    target: string;
+    size: number;
+    sha256: string;
+    conflict: boolean;
+    conflictReason: string;
+  }>;
+  warnings: string[];
+};
+
+export type GenericArchiveResult = {
+  planId: string;
+  success: boolean;
+  movedItems: number;
+  movedBytes: number;
+  skippedItems: number;
+  failures: string[];
+  verifiedTargets: string[];
+  rollbackGuidance: string[];
+  receiptPath: string;
+};
+
 export type DuplicateGroup = {
   size: number;
   hash: string;

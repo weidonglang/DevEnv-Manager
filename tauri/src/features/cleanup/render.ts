@@ -45,6 +45,8 @@ export function renderCleanupWorkbench(state: CleanupWorkbenchState): string {
         </div>
       </section>
       ${renderCDriveRescue(state)}
+      ${renderApplicationUsage(state)}
+      ${renderGenericArchive(state)}
       ${renderDuplicateFiles(state)}
       ${renderDesktopArchiveSection(state)}
       ${renderDownloadsArchiveSection(state)}
@@ -53,6 +55,69 @@ export function renderCleanupWorkbench(state: CleanupWorkbenchState): string {
       <section class="panel"><h2>${t("feature.cleanup.plans")}</h2>${renderCleanupPlan(state)}${renderCleanupExecutionResult(state)}${state.moveOperationResult ? `<div class="small-note" data-testid="cleanup-move-operation-result">${escapeHtml(state.moveOperationResult)}</div>` : ""}${state.movePlan ? renderObjectTable(state.movePlan, ["planId", "source", "target", "mode", "warnings"]) : ""}${state.expansionPlan ? renderObjectTable(state.expansionPlan, ["planId", "mode", "canExecute", "requiresAdmin", "estimatedAddedBytes", "backupRequired", "explanation"]) : ""}${state.expansionResult ? renderObjectTable(state.expansionResult, ["planId", "success", "beforeFree", "afterFree", "output"]) : ""}</section>
     </div>
   `;
+}
+
+function renderApplicationUsage(state: CleanupWorkbenchState): string {
+  const report = state.appUsage;
+  const appItems = report ? [
+    ...(report.wechat ? [report.wechat] : []),
+    ...(report.qq ? [report.qq] : []),
+    ...report.browsers,
+    ...report.netDisks,
+    ...report.videoEditors,
+    ...report.gamePlatforms,
+  ] : [];
+  return `<section class="panel" data-testid="cleanup-application-usage-section">
+    <div class="panel-head"><div><h2>Application storage usage</h2><p>Read-only estimates from known application data locations and Windows uninstall metadata. This never uninstalls applications or deletes install directories.</p></div></div>
+    <div class="toolbar">${renderActionButton("inspect-application-usage", "Scan application usage", "primary")}</div>
+    ${state.errors.appUsage ? `<div class="error-state" data-testid="cleanup-application-usage-error">${escapeHtml(state.errors.appUsage)}</div>` : ""}
+    <div data-testid="cleanup-application-usage-result">
+      ${report ? `<div class="table-wrap"><table><thead><tr><th>Application</th><th>Path</th><th>Estimated size</th><th>Evidence</th><th>Access</th></tr></thead><tbody>
+        ${appItems.map((item) => `<tr><td>${escapeHtml(item.name)}</td><td>${escapeHtml(item.path || "Not detected")}</td><td>${formatBytes(item.size)}</td><td>Known application data location${item.warnings.length ? `; ${escapeHtml(item.warnings.join("; "))}` : ""}</td><td>${item.path ? `<button data-app-usage-open="${escapeHtml(item.path)}" type="button">Open location</button>` : "Not available"}</td></tr>`).join("")}
+        ${report.installedSoftware.map((item) => `<tr><td>${escapeHtml(item.name)}${item.publisher ? ` - ${escapeHtml(item.publisher)}` : ""}</td><td>${escapeHtml(item.installLocation || "Not reported")}</td><td>${formatBytes(item.estimatedSize)}</td><td>Windows uninstall registry; ${escapeHtml(item.suggestion)}</td><td>${item.installLocation ? `<button data-app-usage-open="${escapeHtml(item.installLocation)}" type="button">Open location</button>` : "Location unavailable"}</td></tr>`).join("")}
+      </tbody></table></div>` : renderEmptyState("Application usage not scanned", "Run the read-only scan to list detected application and installed-software evidence.")}
+    </div>
+    <div class="small-note"><strong>Protected boundary</strong><p>System applications, browser credentials, chat databases, and protected paths are reported only at a safe summary level. Use Windows Apps & Features for uninstall decisions.</p></div>
+  </section>`;
+}
+
+function renderGenericArchive(state: CleanupWorkbenchState): string {
+  const plan = state.archivePlan;
+  const result = state.archiveResult;
+  return `<section class="panel" data-testid="cleanup-generic-archive-section">
+    <div class="panel-head"><div><h2>Selected-file archive plan</h2><p>Add allowed regular files, preview source-to-target mappings and conflicts, then confirm execution. Desktop and Downloads bulk archive plans remain separate.</p></div></div>
+    <div class="form-grid">
+      <input id="cleanup-archive-source" value="${escapeHtml(state.archiveSource)}" readonly placeholder="Choose an allowed file" />
+      <input id="cleanup-archive-source-label" value="${escapeHtml(state.archiveSourceLabel)}" placeholder="Evidence/source label" />
+      <input id="cleanup-archive-target-drive" value="${escapeHtml(state.archiveTargetDrive)}" placeholder="Target drive, for example D" />
+    </div>
+    <div class="toolbar">
+      ${renderActionButton("choose-archive-file", "Choose file")}
+      ${renderActionButton("add-archive-plan-item", "Add to archive list")}
+      ${renderActionButton("refresh-archive-plan-items", "Refresh list")}
+      ${renderActionButton("create-generic-archive-plan", "Create execution preview", "primary")}
+      ${renderActionButton("execute-generic-archive-plan", "Execute selected-file archive", "danger")}
+    </div>
+    ${state.errors.archive ? `<div class="error-state" data-testid="cleanup-generic-archive-error">${escapeHtml(state.errors.archive)}</div>` : ""}
+    <div data-testid="cleanup-generic-archive-items">${state.archiveItems.length ? `<div class="table-wrap"><table><thead><tr><th>Source</th><th>Size</th><th>Evidence</th><th>Added</th><th>Action</th></tr></thead><tbody>${state.archiveItems.map((item) => `<tr><td>${escapeHtml(item.path)}</td><td>${formatBytes(item.size)}</td><td>${escapeHtml(item.source)}</td><td>${escapeHtml(item.addedAt)}</td><td><button data-archive-remove="${escapeHtml(item.id)}" type="button">Remove</button></td></tr>`).join("")}</tbody></table></div>` : renderEmptyState("Archive list is empty", "Choose an allowed regular file and add it to the list.")}</div>
+    <div data-testid="cleanup-generic-archive-plan-preview">${plan ? `<dl class="kv-list">
+      <div><dt>Plan ID</dt><dd>${escapeHtml(plan.planId)}</dd></div>
+      <div><dt>Target root</dt><dd>${escapeHtml(plan.targetRoot)}</dd></div>
+      <div><dt>Estimated bytes</dt><dd>${formatBytes(plan.estimatedBytes)}</dd></div>
+      <div><dt>Risk</dt><dd>${escapeHtml(plan.riskLevel)}</dd></div>
+      ${plan.entries.map((entry) => `<div><dt>${escapeHtml(entry.source)}</dt><dd>${escapeHtml(entry.target)} - SHA-256 ${escapeHtml(entry.sha256)}${entry.conflict ? ` - CONFLICT: ${escapeHtml(entry.conflictReason)}` : " - ready"}</dd></div>`).join("")}
+      <div><dt>Warnings</dt><dd>${escapeHtml(plan.warnings.join("; "))}</dd></div>
+    </dl>` : renderEmptyState("No execution preview", "Create a plan to validate paths, target conflicts, and estimated size.")}</div>
+    <div data-testid="cleanup-generic-archive-result">${result ? `<dl class="kv-list">
+      <div><dt>Status</dt><dd>${result.success ? "Verified" : "Completed with failures"}</dd></div>
+      <div><dt>Moved</dt><dd>${result.movedItems} item(s), ${formatBytes(result.movedBytes)}</dd></div>
+      <div><dt>Skipped</dt><dd>${result.skippedItems}</dd></div>
+      <div><dt>Verified targets</dt><dd>${escapeHtml(result.verifiedTargets.join("; ") || "none")}</dd></div>
+      <div><dt>Failures</dt><dd>${escapeHtml(result.failures.join("; ") || "none")}</dd></div>
+      <div><dt>Receipt</dt><dd>${escapeHtml(result.receiptPath)}</dd></div>
+      <div><dt>Rollback guidance</dt><dd>${escapeHtml(result.rollbackGuidance.join("; ") || "No files moved")}</dd></div>
+    </dl>` : renderEmptyState("No archive execution result", "Execution verification and rollback guidance appear here.")}</div>
+  </section>`;
 }
 
 function renderCDriveRescue(state: CleanupWorkbenchState): string {

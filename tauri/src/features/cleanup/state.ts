@@ -1,4 +1,4 @@
-import type { CleanupArchitecture, CleanupPlan, CleanupResult, CleanupScanReport, DiskVolumeInfo, DuplicateGroup, ExpansionPlan, ExpansionResult, FolderUsageReport, LargeFileItem, MaintenanceOverview, MovePlan, MoveResult, PartitionLayoutReport, RollbackRecord } from "../../types";
+import type { AppUsageReport, ArchivePlanItem, CleanupArchitecture, CleanupPlan, CleanupResult, CleanupScanReport, DiskVolumeInfo, DuplicateGroup, ExpansionPlan, ExpansionResult, FolderUsageReport, GenericArchivePlan, GenericArchiveResult, LargeFileItem, MaintenanceOverview, MovePlan, MoveResult, PartitionLayoutReport, RollbackRecord } from "../../types";
 
 export type DuplicateScanStatus = "notStarted" | "running" | "completedWithResults" | "completedEmpty" | "failed";
 
@@ -32,6 +32,13 @@ export type CleanupWorkbenchState = {
   desktopArchiveResult: MoveResult | null;
   downloadsArchivePlan: MovePlan | null;
   downloadsArchiveResult: MoveResult | null;
+  appUsage: AppUsageReport | null;
+  archiveItems: ArchivePlanItem[];
+  archivePlan: GenericArchivePlan | null;
+  archiveResult: GenericArchiveResult | null;
+  archiveSource: string;
+  archiveSourceLabel: string;
+  archiveTargetDrive: string;
   rollbackRecords: RollbackRecord[];
   selectedIds: string[];
   errors: Record<string, string>;
@@ -67,6 +74,13 @@ export const cleanupWorkbenchInitialState: CleanupWorkbenchState = {
   desktopArchiveResult: null,
   downloadsArchivePlan: null,
   downloadsArchiveResult: null,
+  appUsage: null,
+  archiveItems: [],
+  archivePlan: null,
+  archiveResult: null,
+  archiveSource: "",
+  archiveSourceLabel: "manual selection",
+  archiveTargetDrive: "D",
   rollbackRecords: [],
   selectedIds: [],
   errors: {},

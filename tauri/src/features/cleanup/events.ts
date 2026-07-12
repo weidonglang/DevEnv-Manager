@@ -2,13 +2,106 @@ import type { FeatureContext } from "../../app/featureContext";
 import { open } from "../../api/tauri";
 import { bindAction, valueOf } from "../sharedView";
 import { t } from "../../core/i18n";
-import type { CleanupArchitecture, CleanupScanReport, DiskVolumeInfo, DuplicateGroup, ExpansionResult, FolderUsageReport, LargeFileItem, MaintenanceOverview, MoveResult, PartitionLayoutReport, RollbackRecord } from "../../types";
-import { cleanDevCache, cleanSelectedTargets, clearDownloadCache, createCDriveExpansionPlan, createCleanupPlan, createDesktopArchivePlan, createDownloadsArchivePlan, createMovePlan, executeCDriveExpansion, executeDesktopArchivePlan, executeDownloadsArchivePlan, executeMovePlan, inspectDesktop, inspectDiskOverview, inspectDownloads, inspectMaintenanceOverview, inspectPartitionLayout, listRollbackRecords, openAnalysisPath, rollbackMove, scanCleanupTargets, scanDuplicateLargeFiles, scanLargeFiles, storageCleanupArchitecture } from "./api";
+import type { ArchivePlanItem, CleanupArchitecture, CleanupScanReport, DiskVolumeInfo, DuplicateGroup, ExpansionResult, FolderUsageReport, LargeFileItem, MaintenanceOverview, MoveResult, PartitionLayoutReport, RollbackRecord } from "../../types";
+import { addArchivePlanItem, cleanDevCache, cleanSelectedTargets, clearDownloadCache, createCDriveExpansionPlan, createCleanupPlan, createDesktopArchivePlan, createDownloadsArchivePlan, createGenericArchivePlan, createMovePlan, executeCDriveExpansion, executeDesktopArchivePlan, executeDownloadsArchivePlan, executeGenericArchivePlan, executeMovePlan, inspectAppUsage, inspectDesktop, inspectDiskOverview, inspectDownloads, inspectInstalledSoftwareUsage, inspectMaintenanceOverview, inspectPartitionLayout, listArchivePlanItems, listRollbackRecords, openAnalysisPath, removeArchivePlanItem, rollbackMove, scanCleanupTargets, scanDuplicateLargeFiles, scanLargeFiles, storageCleanupArchitecture } from "./api";
 import { renderCleanupWorkbench } from "./render";
 import type { CleanupWorkbenchState } from "./state";
 
 export function bindCleanupEvents(context: FeatureContext, state: CleanupWorkbenchState): void {
   bindCleanupCandidateSelection(context, state);
+  bindAction(context.root, "inspect-application-usage", async () => {
+    delete state.errors.appUsage;
+    context.progress.start("Scanning application storage usage");
+    try {
+      const [report, installedSoftware] = await Promise.all([inspectAppUsage(), inspectInstalledSoftwareUsage()]);
+      state.appUsage = { ...report, installedSoftware };
+      context.progress.done("Application usage scan completed");
+    } catch (error) {
+      state.errors.appUsage = errorMessage(error);
+      context.progress.fail(state.errors.appUsage);
+    }
+    renderAndBind(context, state);
+  });
+  bindAction(context.root, "choose-archive-file", async () => {
+    const selected = await open({ directory: false, multiple: false });
+    if (!selected || Array.isArray(selected)) return;
+    state.archiveSource = selected;
+    delete state.errors.archive;
+    renderAndBind(context, state);
+  });
+  bindAction(context.root, "add-archive-plan-item", async () => {
+    syncArchiveInputs(context, state);
+    if (!state.archiveSource) {
+      state.errors.archive = "Choose a regular file before adding an archive item.";
+      renderAndBind(context, state);
+      return;
+    }
+    try {
+      await addArchivePlanItem(state.archiveSource, state.archiveSourceLabel);
+      state.archiveItems = await listArchivePlanItems();
+      state.archivePlan = null;
+      state.archiveResult = null;
+      state.archiveSource = "";
+      delete state.errors.archive;
+    } catch (error) {
+      state.errors.archive = errorMessage(error);
+    }
+    renderAndBind(context, state);
+  });
+  bindAction(context.root, "refresh-archive-plan-items", async () => {
+    try {
+      state.archiveItems = await listArchivePlanItems();
+      delete state.errors.archive;
+    } catch (error) {
+      state.errors.archive = errorMessage(error);
+    }
+    renderAndBind(context, state);
+  });
+  bindAction(context.root, "create-generic-archive-plan", async () => {
+    syncArchiveInputs(context, state);
+    state.archivePlan = null;
+    state.archiveResult = null;
+    try {
+      state.archivePlan = await createGenericArchivePlan(state.archiveTargetDrive);
+      delete state.errors.archive;
+    } catch (error) {
+      state.errors.archive = errorMessage(error);
+    }
+    renderAndBind(context, state);
+  });
+  bindAction(context.root, "execute-generic-archive-plan", async () => {
+    state.archiveResult = null;
+    const plan = state.archivePlan;
+    if (!plan) {
+      state.errors.archive = "Create and review a selected-file archive preview first.";
+      renderAndBind(context, state);
+      return;
+    }
+    try {
+      const result = await context.risk.run({
+        command: "execute_generic_archive_plan",
+        planId: plan.planId,
+        riskLevel: "high",
+        title: "Execute selected-file archive plan",
+        summary: "Copies each previewed file to the non-system target, verifies it, then removes the source without overwriting conflicts.",
+        before: [
+          { label: "Target root", value: plan.targetRoot },
+          { label: "Files", value: String(plan.entries.length) },
+          { label: "Estimated bytes", value: String(plan.estimatedBytes) },
+          { label: "Conflicts", value: String(plan.entries.filter((entry) => entry.conflict).length) },
+        ],
+        warnings: plan.warnings,
+        execute: (confirmationToken) => executeGenericArchivePlan(plan.planId, confirmationToken),
+      });
+      state.archiveResult = result as CleanupWorkbenchState["archiveResult"];
+      state.archivePlan = null;
+      state.archiveItems = await listArchivePlanItems();
+      delete state.errors.archive;
+    } catch (error) {
+      state.errors.archive = errorMessage(error);
+    }
+    renderAndBind(context, state);
+  });
   bindAction(context.root, "scan-cleanup", () => refreshCleanup(context, state));
   bindAction(context.root, "create-cleanup-plan", async () => {
     const selectedIds = selectedCleanableIds(state);
@@ -193,12 +286,13 @@ function syncMoveInputs(context: FeatureContext, state: CleanupWorkbenchState): 
 }
 
 export async function refreshCleanup(context: FeatureContext, state: CleanupWorkbenchState): Promise<void> {
-  const [architecture, overview, diskOverview, scan, rollbackRecords] = await Promise.allSettled([
+  const [architecture, overview, diskOverview, scan, rollbackRecords, archiveItems] = await Promise.allSettled([
     storageCleanupArchitecture(),
     inspectMaintenanceOverview(),
     inspectDiskOverview(),
     scanCleanupTargets(),
     listRollbackRecords(),
+    listArchivePlanItems(),
   ]);
   if (!context.isCurrent()) return;
   state.errors = {};
@@ -207,11 +301,18 @@ export async function refreshCleanup(context: FeatureContext, state: CleanupWork
   applySettled(state, "diskOverview", diskOverview);
   applySettled(state, "scan", scan);
   applySettled(state, "rollbackRecords", rollbackRecords);
+  applySettled(state, "archiveItems", archiveItems);
   state.selectedIds = defaultSelectedIds(state);
   state.plan = null;
   state.cleanupResult = null;
   context.root.innerHTML = renderCleanupWorkbench(state);
   bindCleanupEvents(context, state);
+}
+
+function syncArchiveInputs(context: FeatureContext, state: CleanupWorkbenchState): void {
+  state.archiveSource = context.root.querySelector<HTMLInputElement>("#cleanup-archive-source")?.value.trim() || state.archiveSource;
+  state.archiveSourceLabel = context.root.querySelector<HTMLInputElement>("#cleanup-archive-source-label")?.value.trim() || "manual selection";
+  state.archiveTargetDrive = context.root.querySelector<HTMLInputElement>("#cleanup-archive-target-drive")?.value.trim() || state.archiveTargetDrive;
 }
 
 function defaultSelectedIds(state: CleanupWorkbenchState): string[] {
@@ -427,6 +528,31 @@ function findCandidate(state: CleanupWorkbenchState, id: string) {
 }
 
 function bindCleanupUtilityActions(context: FeatureContext, state: CleanupWorkbenchState): void {
+  context.root.querySelectorAll<HTMLButtonElement>("[data-archive-remove]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      try {
+        await removeArchivePlanItem(button.dataset.archiveRemove || "");
+        state.archiveItems = await listArchivePlanItems();
+        state.archivePlan = null;
+        state.archiveResult = null;
+        delete state.errors.archive;
+      } catch (error) {
+        state.errors.archive = errorMessage(error);
+      }
+      renderAndBind(context, state);
+    });
+  });
+  context.root.querySelectorAll<HTMLButtonElement>("[data-app-usage-open]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      try {
+        const result = await openAnalysisPath(button.dataset.appUsageOpen || "");
+        state.moveOperationResult = result.message;
+      } catch (error) {
+        state.errors.appUsage = errorMessage(error);
+      }
+      renderAndBind(context, state);
+    });
+  });
   context.root.querySelectorAll<HTMLButtonElement>("[data-large-file-open]").forEach((button) => {
     button.addEventListener("click", async () => {
       try {
@@ -515,12 +641,19 @@ function applySettled(state: CleanupWorkbenchState, key: "partition", result: Pr
 function applySettled(state: CleanupWorkbenchState, key: "desktop", result: PromiseSettledResult<FolderUsageReport>): void;
 function applySettled(state: CleanupWorkbenchState, key: "downloads", result: PromiseSettledResult<FolderUsageReport>): void;
 function applySettled(state: CleanupWorkbenchState, key: "duplicateGroups", result: PromiseSettledResult<DuplicateGroup[]>): void;
+function applySettled(state: CleanupWorkbenchState, key: "archiveItems", result: PromiseSettledResult<ArchivePlanItem[]>): void;
 function applySettled(state: CleanupWorkbenchState, key: keyof CleanupWorkbenchState, result: PromiseSettledResult<unknown>): void {
   if (result.status === "fulfilled") {
     (state as unknown as Record<string, unknown>)[key] = result.value;
   } else {
     state.errors[String(key)] = errorMessage(result.reason);
   }
+}
+
+function renderAndBind(context: FeatureContext, state: CleanupWorkbenchState): void {
+  if (!context.isCurrent()) return;
+  context.root.innerHTML = renderCleanupWorkbench(state);
+  bindCleanupEvents(context, state);
 }
 
 function errorMessage(error: unknown): string {

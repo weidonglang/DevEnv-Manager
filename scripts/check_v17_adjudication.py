@@ -4,6 +4,8 @@ import json
 from collections import Counter
 from pathlib import Path
 
+import build_v17_release_matrices as baseline
+
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -56,7 +58,9 @@ def main() -> None:
     proposed_old_capabilities = {capability_id for child in children for capability_id in child["oldCapabilityIds"]}
     assert expected_old_capabilities <= proposed_old_capabilities
 
-    assert backend["summary"]["registered"] == 168
+    registered_commands = baseline.current_inventory()["registered"]
+    assert backend["summary"]["registered"] == len(registered_commands)
+    assert {command["command"] for command in commands} == set(registered_commands)
     assert backend["summary"]["unclassified"] == 0
     assert backend["summary"]["withoutCapabilityMapping"] == 0
     assert backend["summary"]["replacementChainsUnresolved"] == 0

@@ -2,21 +2,21 @@
   "schemaVersion": 2,
   "version": "1.8.2",
   "summary": {
-    "registered": 168,
+    "registered": 170,
     "byClassification": {
       "bootstrap": 3,
-      "compatibility-alias": 29,
-      "diagnostic": 9,
-      "direct-user-command": 108,
+      "compatibility-alias": 27,
+      "diagnostic": 6,
+      "direct-user-command": 115,
       "dynamic-user-command": 7,
       "internal-helper": 4,
       "replacement-command": 8
     },
     "byReleaseDisposition": {
-      "code-blocker": 13,
-      "evidence-blocker": 52,
+      "code-blocker": 11,
+      "evidence-blocker": 57,
       "product-decision-required": 7,
-      "ready": 96
+      "ready": 95
     },
     "unclassified": 0,
     "withoutCapabilityMapping": 0,
@@ -48,17 +48,21 @@
       "oldCommand": "add_archive_plan_item",
       "currentCommand": "add_archive_plan_item",
       "capabilityId": "cleanup.archive-plan",
-      "frontendLocation": [],
+      "frontendLocation": [
+        "tauri/src/features/cleanup/api.ts:117"
+      ],
       "dynamicWrapper": [],
       "replacementChain": [],
-      "replacementResolution": "no-replacement-code-blocker",
-      "testEvidence": [],
-      "classification": "compatibility-alias",
-      "releaseDisposition": "code-blocker",
-      "exactReason": "The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval.",
-      "compatibilityConsumer": "v1.7.0 UI/CLI or external automation",
-      "compatibilityTest": "Required before removal",
-      "removalCondition": "Remove only after frontend, dynamic wrappers, scripts, tests, compatibility paths, and docs are all clear",
+      "replacementResolution": "not-required",
+      "testEvidence": [
+        "feature-manifest:cleanup.genericArchivePlan"
+      ],
+      "classification": "direct-user-command",
+      "releaseDisposition": "evidence-blocker",
+      "exactReason": "A current frontend invoke exposes this command.",
+      "compatibilityConsumer": null,
+      "compatibilityTest": null,
+      "removalCondition": null,
       "followUpIssue": "#125"
     },
     {
@@ -700,6 +704,28 @@
       "followUpIssue": null
     },
     {
+      "command": "create_generic_archive_plan",
+      "oldCommand": null,
+      "currentCommand": "create_generic_archive_plan",
+      "capabilityId": "cleanup.archive-plan",
+      "frontendLocation": [
+        "tauri/src/features/cleanup/api.ts:125"
+      ],
+      "dynamicWrapper": [],
+      "replacementChain": [],
+      "replacementResolution": "not-required",
+      "testEvidence": [
+        "feature-manifest:cleanup.genericArchivePlan"
+      ],
+      "classification": "direct-user-command",
+      "releaseDisposition": "evidence-blocker",
+      "exactReason": "A current frontend invoke exposes this command.",
+      "compatibilityConsumer": null,
+      "compatibilityTest": null,
+      "removalCondition": null,
+      "followUpIssue": "#125"
+    },
+    {
       "command": "create_java_stabilize_plan",
       "oldCommand": "create_java_stabilize_plan",
       "currentCommand": "create_java_stabilize_plan",
@@ -1080,6 +1106,28 @@
       "compatibilityTest": null,
       "removalCondition": null,
       "followUpIssue": null
+    },
+    {
+      "command": "execute_generic_archive_plan",
+      "oldCommand": null,
+      "currentCommand": "execute_generic_archive_plan",
+      "capabilityId": "cleanup.archive-plan",
+      "frontendLocation": [
+        "tauri/src/features/cleanup/api.ts:129"
+      ],
+      "dynamicWrapper": [],
+      "replacementChain": [],
+      "replacementResolution": "not-required",
+      "testEvidence": [
+        "feature-manifest:cleanup.genericArchivePlan"
+      ],
+      "classification": "direct-user-command",
+      "releaseDisposition": "evidence-blocker",
+      "exactReason": "A current frontend invoke exposes this command.",
+      "compatibilityConsumer": null,
+      "compatibilityTest": null,
+      "removalCondition": null,
+      "followUpIssue": "#125"
     },
     {
       "command": "execute_move_plan",
@@ -1478,14 +1526,18 @@
       "oldCommand": "inspect_app_usage",
       "currentCommand": "inspect_app_usage",
       "capabilityId": "cleanup.application-usage",
-      "frontendLocation": [],
+      "frontendLocation": [
+        "tauri/src/features/cleanup/api.ts:105"
+      ],
       "dynamicWrapper": [],
       "replacementChain": [],
       "replacementResolution": "not-required",
-      "testEvidence": [],
-      "classification": "diagnostic",
+      "testEvidence": [
+        "feature-manifest:cleanup.applicationUsage"
+      ],
+      "classification": "direct-user-command",
       "releaseDisposition": "ready",
-      "exactReason": "This read-only command supplies evidence to a broader user flow.",
+      "exactReason": "A current frontend invoke exposes this command.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
@@ -1654,14 +1706,18 @@
       "oldCommand": null,
       "currentCommand": "inspect_installed_software_usage",
       "capabilityId": "cleanup.application-usage",
-      "frontendLocation": [],
+      "frontendLocation": [
+        "tauri/src/features/cleanup/api.ts:109"
+      ],
       "dynamicWrapper": [],
       "replacementChain": [],
       "replacementResolution": "not-required",
-      "testEvidence": [],
-      "classification": "diagnostic",
+      "testEvidence": [
+        "feature-manifest:cleanup.applicationUsage"
+      ],
+      "classification": "direct-user-command",
       "releaseDisposition": "ready",
-      "exactReason": "This read-only command supplies evidence to a broader user flow.",
+      "exactReason": "A current frontend invoke exposes this command.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
@@ -2101,18 +2157,22 @@
       "oldCommand": "list_archive_plan_items",
       "currentCommand": "list_archive_plan_items",
       "capabilityId": "cleanup.archive-plan",
-      "frontendLocation": [],
+      "frontendLocation": [
+        "tauri/src/features/cleanup/api.ts:113"
+      ],
       "dynamicWrapper": [],
       "replacementChain": [],
       "replacementResolution": "not-required",
-      "testEvidence": [],
-      "classification": "diagnostic",
-      "releaseDisposition": "ready",
-      "exactReason": "This read-only command supplies evidence to a broader user flow.",
+      "testEvidence": [
+        "feature-manifest:cleanup.genericArchivePlan"
+      ],
+      "classification": "direct-user-command",
+      "releaseDisposition": "evidence-blocker",
+      "exactReason": "A current frontend invoke exposes this command.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": null
+      "followUpIssue": "#125"
     },
     {
       "command": "list_config_profiles",
@@ -2359,6 +2419,7 @@
       "testEvidence": [
         "feature-manifest:runtime.installed.actions",
         "feature-manifest:reports.exports",
+        "feature-manifest:cleanup.applicationUsage",
         "feature-manifest:cleanup.moveExpansionLargeFiles"
       ],
       "classification": "direct-user-command",
@@ -2717,17 +2778,21 @@
       "oldCommand": "remove_archive_plan_item",
       "currentCommand": "remove_archive_plan_item",
       "capabilityId": "cleanup.archive-plan",
-      "frontendLocation": [],
+      "frontendLocation": [
+        "tauri/src/features/cleanup/api.ts:121"
+      ],
       "dynamicWrapper": [],
       "replacementChain": [],
-      "replacementResolution": "no-replacement-code-blocker",
-      "testEvidence": [],
-      "classification": "compatibility-alias",
-      "releaseDisposition": "code-blocker",
-      "exactReason": "The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval.",
-      "compatibilityConsumer": "v1.7.0 UI/CLI or external automation",
-      "compatibilityTest": "Required before removal",
-      "removalCondition": "Remove only after frontend, dynamic wrappers, scripts, tests, compatibility paths, and docs are all clear",
+      "replacementResolution": "not-required",
+      "testEvidence": [
+        "feature-manifest:cleanup.genericArchivePlan"
+      ],
+      "classification": "direct-user-command",
+      "releaseDisposition": "evidence-blocker",
+      "exactReason": "A current frontend invoke exposes this command.",
+      "compatibilityConsumer": null,
+      "compatibilityTest": null,
+      "removalCondition": null,
       "followUpIssue": "#125"
     },
     {

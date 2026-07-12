@@ -538,6 +538,44 @@ struct ArchivePlanItem {
     suggestion: String,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct GenericArchivePlanEntry {
+    id: String,
+    source: String,
+    target: String,
+    size: u64,
+    sha256: String,
+    conflict: bool,
+    conflict_reason: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct GenericArchivePlan {
+    plan_id: String,
+    created_at: String,
+    target_root: String,
+    estimated_bytes: u64,
+    risk_level: String,
+    entries: Vec<GenericArchivePlanEntry>,
+    warnings: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct GenericArchiveResult {
+    plan_id: String,
+    success: bool,
+    moved_items: usize,
+    moved_bytes: u64,
+    skipped_items: usize,
+    failures: Vec<String>,
+    verified_targets: Vec<String>,
+    rollback_guidance: Vec<String>,
+    receipt_path: String,
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct CommandRunResult {
@@ -1144,6 +1182,8 @@ static PROFILE_APPLY_PLANS: OnceLock<Mutex<HashMap<String, PendingProfileApplyPl
     OnceLock::new();
 static DOCTOR_REPAIR_PLANS: OnceLock<Mutex<HashMap<String, PendingDoctorRepairPlan>>> =
     OnceLock::new();
+static GENERIC_ARCHIVE_PLANS: OnceLock<Mutex<HashMap<String, GenericArchivePlan>>> =
+    OnceLock::new();
 
 fn confirmation_tokens() -> &'static Mutex<HashMap<String, ConfirmationToken>> {
     CONFIRMATION_TOKENS.get_or_init(|| Mutex::new(HashMap::new()))
@@ -1369,6 +1409,14 @@ const RISK_OPERATION_REGISTRY: &[RiskOperationSpec] = &[
         requires_backup: true,
         requires_token: true,
         description: "执行空间搬家或归档计划",
+    },
+    RiskOperationSpec {
+        command: "execute_generic_archive_plan",
+        action_id: "execute_generic_archive_plan",
+        risk_level: "high",
+        requires_backup: false,
+        requires_token: true,
+        description: "Execute a selected-file archive plan without overwriting conflicts",
     },
     RiskOperationSpec {
         command: "execute_expansion_plan",
@@ -5508,6 +5556,253 @@ fn remove_archive_plan_item(id: String) -> Result<OperationResult, String> {
         }
         .to_string(),
     })
+}
+
+fn generic_archive_plan_store() -> &'static Mutex<HashMap<String, GenericArchivePlan>> {
+    GENERIC_ARCHIVE_PLANS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn validate_generic_archive_source(path: &str) -> Result<(PathBuf, u64), String> {
+    let candidate = PathBuf::from(path.trim())
+        .canonicalize()
+        .map_err(|error| format!("Archive source no longer resolves: {error}"))?;
+    let metadata = fs::symlink_metadata(&candidate)
+        .map_err(|error| format!("Cannot read archive source: {error}"))?;
+    if !metadata.is_file() || metadata.file_type().is_symlink() {
+        return Err("Only regular files can be executed by a generic archive plan".to_string());
+    }
+    if archive_path_is_sensitive(&candidate) {
+        return Err("Chat data, browser profiles, and credential-shaped files cannot be archived".to_string());
+    }
+    if cleanup::is_inside_managed_runtime(&candidate)
+        || env::current_dir()
+            .ok()
+            .is_some_and(|root| candidate.starts_with(root))
+        || (cleanup::should_skip_path(&candidate).is_some()
+            && !archive_user_root_allowed(&candidate))
+    {
+        return Err("System, current-project, and managed runtime paths cannot be archived".to_string());
+    }
+    Ok((candidate, metadata.len()))
+}
+
+fn generic_archive_target_root(target_drive: &str) -> Result<PathBuf, String> {
+    let drive = target_drive
+        .trim()
+        .trim_end_matches([':', '\\', '/']);
+    if drive.len() != 1 || !drive.as_bytes()[0].is_ascii_alphabetic() {
+        return Err("Archive target must be a drive letter such as D".to_string());
+    }
+    let drive = drive.to_ascii_uppercase();
+    if drive == "C" {
+        return Err("Generic archive target must not be the system C drive".to_string());
+    }
+    Ok(PathBuf::from(format!(
+        "{drive}:\\DevEnvArchive\\Selected-{}",
+        filename_timestamp()
+    )))
+}
+
+fn build_generic_archive_plan(
+    items: Vec<ArchivePlanItem>,
+    target_root: PathBuf,
+) -> Result<GenericArchivePlan, String> {
+    if items.is_empty() {
+        return Err("Add at least one file to the archive plan first".to_string());
+    }
+    let mut entries = Vec::new();
+    let mut targets = BTreeSet::new();
+    let mut estimated_bytes = 0_u64;
+    for item in items {
+        let (source, actual_size) = validate_generic_archive_source(&item.path)?;
+        let file_name = source
+            .file_name()
+            .ok_or_else(|| "Archive source has no file name".to_string())?;
+        let target = target_root.join(file_name);
+        let source_sha256 = file_sha256(&source)?;
+        let target_key = path_key(&display_path(&target));
+        let duplicate_target = !targets.insert(target_key);
+        let conflict = duplicate_target || target.exists();
+        entries.push(GenericArchivePlanEntry {
+            id: item.id,
+            source: display_path(&source),
+            target: display_path(&target),
+            size: actual_size,
+            sha256: source_sha256,
+            conflict,
+            conflict_reason: if duplicate_target {
+                "Another selected file has the same target name".to_string()
+            } else if target.exists() {
+                "Target already exists; execution will not overwrite it".to_string()
+            } else {
+                String::new()
+            },
+        });
+        estimated_bytes = estimated_bytes.saturating_add(actual_size);
+    }
+    let created_at = current_timestamp();
+    let mut hasher = Sha256::new();
+    hasher.update(display_path(&target_root).as_bytes());
+    hasher.update(created_at.as_bytes());
+    for entry in &entries {
+        hasher.update(entry.id.as_bytes());
+        hasher.update(entry.source.as_bytes());
+        hasher.update(entry.target.as_bytes());
+        hasher.update(entry.size.to_le_bytes());
+        hasher.update(entry.sha256.as_bytes());
+    }
+    Ok(GenericArchivePlan {
+        plan_id: format!("generic-archive-{:x}", hasher.finalize()),
+        created_at,
+        target_root: display_path(target_root),
+        estimated_bytes,
+        risk_level: "high".to_string(),
+        entries,
+        warnings: vec![
+            "Files are copied, verified, and then removed from their original locations".to_string(),
+            "Existing targets and duplicate target names are skipped without overwrite".to_string(),
+            "Use the execution receipt to copy archived files back when rollback is needed".to_string(),
+        ],
+    })
+}
+
+#[tauri::command]
+fn create_generic_archive_plan(target_drive: String) -> Result<GenericArchivePlan, String> {
+    let paths = load_paths()?;
+    let plan = build_generic_archive_plan(
+        load_archive_plan(&paths)?,
+        generic_archive_target_root(&target_drive)?,
+    )?;
+    let mut store = generic_archive_plan_store()
+        .lock()
+        .map_err(|_| "Generic archive plan storage is unavailable".to_string())?;
+    if store.len() >= 20 {
+        store.clear();
+    }
+    store.insert(plan.plan_id.clone(), plan.clone());
+    Ok(plan)
+}
+
+fn execute_generic_archive_files(plan: &GenericArchivePlan) -> GenericArchiveResult {
+    let target_root = PathBuf::from(&plan.target_root);
+    let mut moved_items = 0_usize;
+    let mut moved_bytes = 0_u64;
+    let mut skipped_items = 0_usize;
+    let mut failures = Vec::new();
+    let mut verified_targets = Vec::new();
+    let mut rollback_guidance = Vec::new();
+    if let Err(error) = fs::create_dir_all(&target_root) {
+        failures.push(format!("Cannot create archive target: {error}"));
+    } else {
+        for entry in &plan.entries {
+            if entry.conflict {
+                skipped_items += 1;
+                failures.push(format!("Skipped {}: {}", entry.source, entry.conflict_reason));
+                continue;
+            }
+            let Ok((source, actual_size)) = validate_generic_archive_source(&entry.source) else {
+                failures.push(format!("Source failed safety revalidation: {}", entry.source));
+                continue;
+            };
+            if actual_size != entry.size {
+                failures.push(format!("Source changed after preview: {}", entry.source));
+                continue;
+            }
+            if match file_sha256(&source) {
+                Ok(sha256) => !sha256.eq_ignore_ascii_case(&entry.sha256),
+                Err(_) => true,
+            } {
+                failures.push(format!("Source hash changed after preview: {}", entry.source));
+                continue;
+            }
+            let target = PathBuf::from(&entry.target);
+            if !target.starts_with(&target_root) || target.exists() {
+                skipped_items += 1;
+                failures.push(format!("Target conflict detected at execution: {}", entry.target));
+                continue;
+            }
+            match fs::copy(&source, &target) {
+                Ok(copied) if copied == actual_size => {
+                    let target_verified = target
+                        .metadata()
+                        .is_ok_and(|metadata| metadata.len() == actual_size)
+                        && file_sha256(&target)
+                            .is_ok_and(|sha256| sha256.eq_ignore_ascii_case(&entry.sha256));
+                    if !target_verified {
+                        let _ = fs::remove_file(&target);
+                        failures.push(format!("Copied target verification failed: {}", entry.target));
+                        continue;
+                    }
+                    if let Err(error) = fs::remove_file(&source) {
+                        let _ = fs::remove_file(&target);
+                        failures.push(format!("Could not remove source after verified copy: {error}"));
+                        continue;
+                    }
+                    let verified = !source.exists();
+                    if verified {
+                        moved_items += 1;
+                        moved_bytes = moved_bytes.saturating_add(actual_size);
+                        verified_targets.push(display_path(&target));
+                        rollback_guidance.push(format!(
+                            "Copy {} back to {} after confirming the original path is free",
+                            display_path(&target),
+                            entry.source
+                        ));
+                    } else {
+                        failures.push(format!("Post-move verification failed: {}", entry.source));
+                    }
+                }
+                Ok(copied) => {
+                    let _ = fs::remove_file(&target);
+                    failures.push(format!(
+                        "Copied byte count mismatch for {}: expected {}, copied {}",
+                        entry.source, actual_size, copied
+                    ));
+                }
+                Err(error) => failures.push(format!("Archive copy failed for {}: {error}", entry.source)),
+            }
+        }
+    }
+    let receipt_path = target_root.join(format!("archive-receipt-{}.json", plan.plan_id));
+    let mut result = GenericArchiveResult {
+        plan_id: plan.plan_id.clone(),
+        success: failures.is_empty() && moved_items > 0,
+        moved_items,
+        moved_bytes,
+        skipped_items,
+        failures,
+        verified_targets,
+        rollback_guidance,
+        receipt_path: display_path(&receipt_path),
+    };
+    if let Err(error) = save_json(&receipt_path, &result) {
+        result.success = false;
+        result.failures.push(format!("Failed to write archive receipt: {error}"));
+    }
+    result
+}
+
+#[tauri::command]
+fn execute_generic_archive_plan(
+    plan_id: String,
+    confirmation_token: Option<String>,
+) -> Result<GenericArchiveResult, String> {
+    require_risk_operation_token(
+        "execute_generic_archive_plan",
+        &plan_id,
+        confirmation_token,
+    )?;
+    let plan = generic_archive_plan_store()
+        .lock()
+        .map_err(|_| "Generic archive plan storage is unavailable".to_string())?
+        .remove(&plan_id)
+        .ok_or_else(|| "Generic archive plan is missing, expired, or already used".to_string())?;
+    let result = execute_generic_archive_files(&plan);
+    let paths = load_paths()?;
+    let mut items = load_archive_plan(&paths)?;
+    items.retain(|item| Path::new(&item.path).is_file());
+    save_json(&archive_plan_file(&paths), &items)?;
+    Ok(result)
 }
 
 #[tauri::command]
@@ -10502,6 +10797,8 @@ pub fn run() {
             add_archive_plan_item,
             list_archive_plan_items,
             remove_archive_plan_item,
+            create_generic_archive_plan,
+            execute_generic_archive_plan,
             clear_download_cache,
             inspect_command_safety,
             run_tool_command,
@@ -15357,6 +15654,7 @@ mod tests {
             "update_project_port",
             "rollback_move",
             "execute_move_plan",
+            "execute_generic_archive_plan",
             "execute_expansion_plan",
             "clear_download_cache",
             "clean_dev_cache",
@@ -15907,6 +16205,31 @@ mod tests {
         assert!(!archive_path_is_sensitive(Path::new(
             r"C:\Users\test\Downloads\archive.zip"
         )));
+    }
+
+    #[test]
+    fn generic_archive_moves_and_verifies_only_fixture_file() {
+        let root = tempfile::tempdir().unwrap();
+        let source_dir = root.path().join("source");
+        let target_dir = root.path().join("target");
+        fs::create_dir_all(&source_dir).unwrap();
+        let source = source_dir.join("notes.txt");
+        fs::write(&source, b"archive fixture").unwrap();
+        let item = ArchivePlanItem {
+            id: "fixture-item".to_string(),
+            path: display_path(&source),
+            size: 15,
+            source: "unit-test".to_string(),
+            added_at: "0".to_string(),
+            suggestion: String::new(),
+        };
+        let plan = build_generic_archive_plan(vec![item], target_dir.clone()).unwrap();
+        let result = execute_generic_archive_files(&plan);
+        assert!(result.success);
+        assert_eq!(result.moved_items, 1);
+        assert!(!source.exists());
+        assert!(target_dir.join("notes.txt").is_file());
+        assert!(Path::new(&result.receipt_path).is_file());
     }
 
     #[test]

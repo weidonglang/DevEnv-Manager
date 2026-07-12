@@ -1,5 +1,5 @@
 import { invoke } from "../../core/invoke";
-import type { CleanupArchitecture, CleanupPlan, CleanupResult, CleanupScanReport, DiskVolumeInfo, DuplicateGroup, ExpansionPlan, ExpansionResult, FolderUsageReport, LargeFileItem, MaintenanceOverview, MovePlan, MoveResult, OperationResult, PartitionLayoutReport, RollbackRecord } from "../../types";
+import type { AppUsageReport, ArchivePlanItem, CleanupArchitecture, CleanupPlan, CleanupResult, CleanupScanReport, DiskVolumeInfo, DuplicateGroup, ExpansionPlan, ExpansionResult, FolderUsageReport, GenericArchivePlan, GenericArchiveResult, InstalledSoftwareUsage, LargeFileItem, MaintenanceOverview, MovePlan, MoveResult, OperationResult, PartitionLayoutReport, RollbackRecord } from "../../types";
 
 export function fileDirectory(path: string, directory?: string) {
   return directory || path.replace(/[\\/][^\\/]*$/, "");
@@ -99,4 +99,32 @@ export function executeDownloadsArchivePlan(plan: MovePlan, confirmationToken: s
 
 export function openAnalysisPath(path: string): Promise<OperationResult> {
   return invoke<OperationResult>("open_analysis_path", { path });
+}
+
+export function inspectAppUsage(): Promise<AppUsageReport> {
+  return invoke<AppUsageReport>("inspect_app_usage");
+}
+
+export function inspectInstalledSoftwareUsage(): Promise<InstalledSoftwareUsage[]> {
+  return invoke<InstalledSoftwareUsage[]>("inspect_installed_software_usage");
+}
+
+export function listArchivePlanItems(): Promise<ArchivePlanItem[]> {
+  return invoke<ArchivePlanItem[]>("list_archive_plan_items");
+}
+
+export function addArchivePlanItem(path: string, source: string): Promise<OperationResult> {
+  return invoke<OperationResult>("add_archive_plan_item", { path, source });
+}
+
+export function removeArchivePlanItem(id: string): Promise<OperationResult> {
+  return invoke<OperationResult>("remove_archive_plan_item", { id });
+}
+
+export function createGenericArchivePlan(targetDrive: string): Promise<GenericArchivePlan> {
+  return invoke<GenericArchivePlan>("create_generic_archive_plan", { targetDrive });
+}
+
+export function executeGenericArchivePlan(planId: string, confirmationToken: string): Promise<GenericArchiveResult> {
+  return invoke<GenericArchiveResult>("execute_generic_archive_plan", { planId, confirmationToken });
 }

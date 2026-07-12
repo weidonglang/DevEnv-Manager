@@ -23,23 +23,23 @@
   "summary": {
     "total": 87,
     "byImplementationStatus": {
-      "degraded": 10,
+      "degraded": 8,
       "enhanced": 13,
-      "equivalent": 59,
+      "equivalent": 61,
       "missing": 5
     },
     "byEvidenceStatus": {
       "environment-blocked": 14,
-      "evidence-required": 21,
-      "verified-automated": 27,
+      "evidence-required": 20,
+      "verified-automated": 28,
       "verified-installed": 24,
       "verified-real-tauri": 1
     },
     "byReleaseDisposition": {
-      "code-blocker": 10,
-      "evidence-blocker": 20,
+      "code-blocker": 8,
+      "evidence-blocker": 21,
       "product-decision-required": 5,
-      "ready": 52
+      "ready": 53
     }
   },
   "capabilities": [
@@ -89,35 +89,30 @@
       "sourceRecordIds": [
         "v17.command.inspect_app_usage"
       ],
-      "v1.8.2Entry": [],
-      "v1.8.2Steps": [],
-      "v1.8.2Result": "No complete current user path evidenced",
+      "v1.8.2Entry": [
+        "tauri/src/features/cleanup/api.ts:105",
+        "tauri/src/features/cleanup/api.ts:109"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
       "replacementCommands": [
         "inspect_app_usage",
         "inspect_installed_software_usage"
       ],
-      "implementationStatus": "degraded",
-      "evidenceStatus": "evidence-required",
-      "releaseDisposition": "code-blocker",
-      "releaseReason": "The application-usage analyzers remain registered but have no Cleanup API call or rendered result section.",
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
       "followUpIssue": "#125",
       "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
-      "automatedEvidence": [],
-      "codeBlockerEvidence": {
-        "oldReproduction": [
-          "Use inspect_app_usage"
-        ],
-        "currentReproduction": [
-          "Open the mapped v1.8.2 domain and look for an equivalent result"
-        ],
-        "expected": "Cleanup Application Usage",
-        "actual": "The application-usage analyzers remain registered but have no Cleanup API call or rendered result section.",
-        "sourceLocations": [
-          "v1.7.0 frontend invoke"
-        ],
-        "userImpact": "The historical user goal may not be completable in v1.8.2.",
-        "minimalFix": "Expose the existing read-only reports in Cleanup."
-      },
+      "automatedEvidence": [
+        "frontend:tauri/src/features/cleanup/api.ts:105",
+        "frontend:tauri/src/features/cleanup/api.ts:109"
+      ],
+      "codeBlockerEvidence": null,
       "evidencePlan": null
     },
     {
@@ -144,42 +139,52 @@
         "v17.command.list_archive_plan_items",
         "v17.command.remove_archive_plan_item"
       ],
-      "v1.8.2Entry": [],
-      "v1.8.2Steps": [],
-      "v1.8.2Result": "No complete current user path evidenced",
+      "v1.8.2Entry": [
+        "tauri/src/features/cleanup/api.ts:113",
+        "tauri/src/features/cleanup/api.ts:117",
+        "tauri/src/features/cleanup/api.ts:121",
+        "tauri/src/features/cleanup/api.ts:125",
+        "tauri/src/features/cleanup/api.ts:129"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
       "replacementCommands": [
         "add_archive_plan_item",
+        "create_generic_archive_plan",
+        "execute_generic_archive_plan",
         "list_archive_plan_items",
         "remove_archive_plan_item"
       ],
-      "implementationStatus": "degraded",
+      "implementationStatus": "equivalent",
       "evidenceStatus": "evidence-required",
-      "releaseDisposition": "code-blocker",
-      "releaseReason": "The generic v1.7 add/remove/list archive-plan workflow is absent; v1.8.2 only exposes specialized Desktop and Downloads archive plans.",
+      "releaseDisposition": "evidence-blocker",
+      "releaseReason": "Implementation mapping exists, but the required installed or safely isolated execution evidence is incomplete.",
       "followUpIssue": "#125",
       "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
-      "automatedEvidence": [],
-      "codeBlockerEvidence": {
-        "oldReproduction": [
-          "Use add_archive_plan_item",
-          "Use archive-add",
-          "Use archive-remove",
-          "Use list_archive_plan_items",
-          "Use remove_archive_plan_item"
+      "automatedEvidence": [
+        "frontend:tauri/src/features/cleanup/api.ts:113",
+        "frontend:tauri/src/features/cleanup/api.ts:117",
+        "frontend:tauri/src/features/cleanup/api.ts:121",
+        "frontend:tauri/src/features/cleanup/api.ts:125",
+        "frontend:tauri/src/features/cleanup/api.ts:129"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": {
+        "fixture": "Dedicated temporary data or disposable VM snapshot",
+        "environment": "Windows real Tauri or installed application",
+        "steps": [
+          "Capture baseline",
+          "Run the mapped user path",
+          "Verify result against system state",
+          "Restore baseline"
         ],
-        "currentReproduction": [
-          "Open the mapped v1.8.2 domain and look for an equivalent result"
-        ],
-        "expected": "Cleanup Archive Plan",
-        "actual": "The generic v1.7 add/remove/list archive-plan workflow is absent; v1.8.2 only exposes specialized Desktop and Downloads archive plans.",
-        "sourceLocations": [
-          "v1.7.0 frontend action",
-          "v1.7.0 frontend invoke"
-        ],
-        "userImpact": "The historical user goal may not be completable in v1.8.2.",
-        "minimalFix": "Restore a generic archive selection UI or approve the narrower replacement."
-      },
-      "evidencePlan": null
+        "safetyBoundary": "Do not modify real services, associations, environment, or user files outside the fixture.",
+        "passCriteria": "UI result, receipt, and observed system state agree.",
+        "recovery": "Delete temporary data or revert the VM snapshot."
+      }
     },
     {
       "capabilityId": "cleanup.desktop-archive",

@@ -2,11 +2,11 @@
 
 Every registered command has a capability mapping and one final classification.
 
-- Registered: 168
+- Registered: 170
 - bootstrap: 3
-- compatibility-alias: 29
-- diagnostic: 9
-- direct-user-command: 108
+- compatibility-alias: 27
+- diagnostic: 6
+- direct-user-command: 115
 - dynamic-user-command: 7
 - internal-helper: 4
 - replacement-command: 8
@@ -14,7 +14,7 @@ Every registered command has a capability mapping and one final classification.
 | Command | Capability | Classification | Frontend/dynamic | Replacement chain | Disposition | Exact reason |
 |---|---|---|---|---|---|---|
 | `accept_safety_disclaimer` | `safety.disclaimer` | direct-user-command | tauri/src/app/bootstrap.ts:354 |  | ready | A current frontend invoke exposes this command. |
-| `add_archive_plan_item` | `cleanup.archive-plan` | compatibility-alias |  |  | code-blocker | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
+| `add_archive_plan_item` | `cleanup.archive-plan` | direct-user-command | tauri/src/features/cleanup/api.ts:117 |  | evidence-blocker | A current frontend invoke exposes this command. |
 | `analyze_project` | `projects.analysis` | direct-user-command | tauri/src/features/projects/api.ts:5 |  | ready | A current frontend invoke exposes this command. |
 | `analyze_python_environment` | `environment.python-health-repair` | direct-user-command | tauri/src/features/environment/api.ts:37 |  | evidence-blocker | A current frontend invoke exposes this command. |
 | `app_snapshot` | `dashboard.snapshot` | direct-user-command | tauri/src/features/dashboard/api.ts:5 |  | ready | A current frontend invoke exposes this command. |
@@ -45,6 +45,7 @@ Every registered command has a capability mapping and one final classification.
 | `create_downloads_archive_plan` | `cleanup.downloads-archive` | direct-user-command | tauri/src/features/cleanup/api.ts:93 |  | ready | A current frontend invoke exposes this command. |
 | `create_env_repair_plan` | `environment.java-stabilize` | compatibility-alias |  | apply_env_repair_plan, create_java_stabilize_plan | evidence-blocker | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
 | `create_file_association_plan` | `file-associations.apply` | direct-user-command | tauri/src/features/fileAssociations/api.ts:24 |  | ready | A current frontend invoke exposes this command. |
+| `create_generic_archive_plan` | `cleanup.archive-plan` | direct-user-command | tauri/src/features/cleanup/api.ts:125 |  | evidence-blocker | A current frontend invoke exposes this command. |
 | `create_java_stabilize_plan` | `environment.java-stabilize` | direct-user-command | tauri/src/features/environment/api.ts:53 |  | evidence-blocker | A current frontend invoke exposes this command. |
 | `create_junction_bridge_plan` | `cleanup.move-rollback` | compatibility-alias |  | create_move_plan, execute_move_plan, list_rollback_records, rollback_move | evidence-blocker | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
 | `create_managed_python_pip_repair_plan` | `environment.python-health-repair` | compatibility-alias |  | analyze_python_environment, apply_python_repair, preview_python_repair | evidence-blocker | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
@@ -62,6 +63,7 @@ Every registered command has a capability mapping and one final classification.
 | `execute_desktop_archive_plan` | `cleanup.desktop-archive` | direct-user-command | tauri/src/features/cleanup/api.ts:89 |  | ready | A current frontend invoke exposes this command. |
 | `execute_doctor_repair_plan` | `doctor.repair` | replacement-command | tauri/src/features/reports/api.ts:25 | repair_doctor_safe | ready | This command participates in an explicit old-to-new replacement chain. |
 | `execute_downloads_archive_plan` | `cleanup.downloads-archive` | direct-user-command | tauri/src/features/cleanup/api.ts:97 |  | ready | A current frontend invoke exposes this command. |
+| `execute_generic_archive_plan` | `cleanup.archive-plan` | direct-user-command | tauri/src/features/cleanup/api.ts:129 |  | evidence-blocker | A current frontend invoke exposes this command. |
 | `execute_move_plan` | `cleanup.move-rollback` | direct-user-command | tauri/src/features/cleanup/api.ts:45 |  | evidence-blocker | A current frontend invoke exposes this command. |
 | `execute_mysql_repair_plan` | `mysql.repair` | direct-user-command | tauri/src/features/toolchains/api.ts:29 |  | evidence-blocker | A current frontend invoke exposes this command. |
 | `execute_port_resolution_plan` | `ports.release` | direct-user-command | tauri/src/features/ports/api.ts:17 |  | ready | A current frontend invoke exposes this command. |
@@ -80,7 +82,7 @@ Every registered command has a capability mapping and one final classification.
 | `get_feature_risk` | `safety.risk-confirmation` | bootstrap |  |  | ready | This command belongs to application startup or global safety initialization. |
 | `import_config_profiles` | `profiles.import-export` | direct-user-command | tauri/src/features/profiles/api.ts:25 |  | ready | A current frontend invoke exposes this command. |
 | `inspect_agent_traces` | `debug.agent-traces` | direct-user-command | tauri/src/features/projects/api.ts:26 |  | ready | A current frontend invoke exposes this command. |
-| `inspect_app_usage` | `cleanup.application-usage` | diagnostic |  |  | ready | This read-only command supplies evidence to a broader user flow. |
+| `inspect_app_usage` | `cleanup.application-usage` | direct-user-command | tauri/src/features/cleanup/api.ts:105 |  | ready | A current frontend invoke exposes this command. |
 | `inspect_command_safety` | `toolchains.command-safety` | direct-user-command | tauri/src/features/toolchains/api.ts:41 |  | ready | A current frontend invoke exposes this command. |
 | `inspect_desktop` | `cleanup.folder-analysis` | direct-user-command | tauri/src/features/cleanup/api.ts:69 |  | ready | A current frontend invoke exposes this command. |
 | `inspect_disk_overview` | `legacy-cleanup.disk-overview` | direct-user-command | tauri/src/features/cleanup/api.ts:17 |  | product-decision-required | A current frontend invoke exposes this command. |
@@ -88,7 +90,7 @@ Every registered command has a capability mapping and one final classification.
 | `inspect_env_backup` | `environment.backups` | direct-user-command | tauri/src/features/environment/api.ts:25 |  | ready | A current frontend invoke exposes this command. |
 | `inspect_env_reliability` | `environment.snapshot` | direct-user-command | tauri/src/features/environment/api.ts:5 |  | ready | A current frontend invoke exposes this command. |
 | `inspect_idea_project` | `projects.idea-analysis` | direct-user-command | tauri/src/features/projects/api.ts:17 |  | ready | A current frontend invoke exposes this command. |
-| `inspect_installed_software_usage` | `cleanup.application-usage` | diagnostic |  |  | ready | This read-only command supplies evidence to a broader user flow. |
+| `inspect_installed_software_usage` | `cleanup.application-usage` | direct-user-command | tauri/src/features/cleanup/api.ts:109 |  | ready | A current frontend invoke exposes this command. |
 | `inspect_java_environment` | `environment.snapshot` | diagnostic |  |  | ready | This read-only command supplies evidence to a broader user flow. |
 | `inspect_local_services` | `services.inspect` | direct-user-command | tauri/src/features/ports/api.ts:21, tauri/src/features/toolchains/api.ts:17 |  | ready | A current frontend invoke exposes this command. |
 | `inspect_maintenance_overview` | `cleanup.overview` | direct-user-command | tauri/src/features/cleanup/api.ts:13 |  | ready | A current frontend invoke exposes this command. |
@@ -109,7 +111,7 @@ Every registered command has a capability mapping and one final classification.
 | `jdk_distributions` | `runtime.discover` | direct-user-command | tauri/src/features/runtimes/api.ts:9 |  | ready | A current frontend invoke exposes this command. |
 | `kill_process` | `ports.release` | compatibility-alias |  | create_port_resolution_plan, execute_port_resolution_plan | ready | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
 | `launch_update_installer` | `update.download-install` | direct-user-command | tauri/src/features/settings/api.ts:37 |  | evidence-blocker | A current frontend invoke exposes this command. |
-| `list_archive_plan_items` | `cleanup.archive-plan` | diagnostic |  |  | ready | This read-only command supplies evidence to a broader user flow. |
+| `list_archive_plan_items` | `cleanup.archive-plan` | direct-user-command | tauri/src/features/cleanup/api.ts:113 |  | evidence-blocker | A current frontend invoke exposes this command. |
 | `list_config_profiles` | `profiles.list` | direct-user-command | tauri/src/features/profiles/api.ts:5 |  | ready | A current frontend invoke exposes this command. |
 | `list_env_backups` | `environment.backups` | direct-user-command | tauri/src/features/environment/api.ts:17 |  | ready | A current frontend invoke exposes this command. |
 | `list_environment_backups` | `environment.backups` | direct-user-command | tauri/src/features/environment/api.ts:21 |  | ready | A current frontend invoke exposes this command. |
@@ -138,7 +140,7 @@ Every registered command has a capability mapping and one final classification.
 | `preview_python_repair` | `environment.python-health-repair` | direct-user-command | tauri/src/features/environment/api.ts:41 |  | evidence-blocker | A current frontend invoke exposes this command. |
 | `preview_user_environment_configuration` | `environment.configure` | replacement-command | tauri/src/features/environment/api.ts:13 | configure_user_environment | evidence-blocker | This command participates in an explicit old-to-new replacement chain. |
 | `project_health` | `projects.analysis` | compatibility-alias |  | analyze_project | ready | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
-| `remove_archive_plan_item` | `cleanup.archive-plan` | compatibility-alias |  |  | code-blocker | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
+| `remove_archive_plan_item` | `cleanup.archive-plan` | direct-user-command | tauri/src/features/cleanup/api.ts:121 |  | evidence-blocker | A current frontend invoke exposes this command. |
 | `rename_config_profile` | `legacy-profiles.rename-config-profile` | direct-user-command | tauri/src/features/profiles/api.ts:37 |  | product-decision-required | A current frontend invoke exposes this command. |
 | `repair_maven_gradle_registration` | `legacy-workbench.repair-maven-gradle-registration` | compatibility-alias |  |  | product-decision-required | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
 | `reset_ui_config` | `settings.reset-ui` | direct-user-command | tauri/src/features/settings/api.ts:21 |  | ready | A current frontend invoke exposes this command. |

@@ -904,6 +904,141 @@
       "priority": "P0",
       "features": [
         {
+          "featureId": "cleanup.applicationUsage",
+          "id": "cleanup.applicationUsage",
+          "domain": "Cleanup",
+          "userVisibleName": "Read-only application storage usage",
+          "name": "Read-only application storage usage",
+          "priority": "P1",
+          "targetVersion": "v1.8.2",
+          "status": "implemented",
+          "oldFeature": true,
+          "oldEntry": "Cleanup > Application usage",
+          "currentEntry": "Cleanup > Application storage usage",
+          "frontendComponent": "CleanupApplicationUsagePanel",
+          "frontendEntry": {
+            "route": "cleanup",
+            "testIds": [
+              "cleanup-application-usage-section",
+              "cleanup-application-usage-result",
+              "cleanup-application-usage-error"
+            ]
+          },
+          "selectors": {
+            "entry": "cleanup-application-usage-section",
+            "primaryAction": "inspect-application-usage",
+            "result": "cleanup-application-usage-result",
+            "error": "cleanup-application-usage-error"
+          },
+          "backendCommands": [
+            "inspect_app_usage",
+            "inspect_installed_software_usage",
+            "open_analysis_path"
+          ],
+          "backendExists": true,
+          "frontendWired": true,
+          "riskLevel": "readOnly",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "requiresLoading": true,
+          "requiresResultArea": true,
+          "requiresErrorArea": true,
+          "requiresDebug": true,
+          "requiresReport": false,
+          "requiresRiskPlan": false,
+          "requiresToken": false,
+          "requiresVerify": true,
+          "requiresRollback": false,
+          "requiresPagination": false,
+          "requiresI18n": true,
+          "requiresDarkReadable": true,
+          "safeSmokeMode": "readOnly",
+          "manualOnlyReason": null,
+          "deferredReason": null,
+          "testModes": [
+            "static",
+            "frontend",
+            "safe"
+          ],
+          "manualAllowed": false,
+          "acceptanceChecks": [
+            "selectorsPresent",
+            "resultPanelVisible",
+            "debugContract",
+            "noReportNeeded"
+          ]
+        },
+        {
+          "featureId": "cleanup.genericArchivePlan",
+          "id": "cleanup.genericArchivePlan",
+          "domain": "Cleanup",
+          "userVisibleName": "Generic selected-file archive plan",
+          "name": "Generic selected-file archive plan",
+          "priority": "P0",
+          "targetVersion": "v1.8.2",
+          "status": "implemented",
+          "oldFeature": true,
+          "oldEntry": "Cleanup > Archive list",
+          "currentEntry": "Cleanup > Selected-file archive plan",
+          "frontendComponent": "CleanupGenericArchivePanel",
+          "frontendEntry": {
+            "route": "cleanup",
+            "testIds": [
+              "cleanup-generic-archive-section",
+              "cleanup-generic-archive-items",
+              "cleanup-generic-archive-plan-preview",
+              "cleanup-generic-archive-result",
+              "cleanup-generic-archive-error"
+            ]
+          },
+          "selectors": {
+            "entry": "cleanup-generic-archive-section",
+            "primaryAction": "create-generic-archive-plan",
+            "result": "cleanup-generic-archive-result",
+            "error": "cleanup-generic-archive-error"
+          },
+          "backendCommands": [
+            "add_archive_plan_item",
+            "list_archive_plan_items",
+            "remove_archive_plan_item",
+            "create_generic_archive_plan",
+            "execute_generic_archive_plan"
+          ],
+          "backendExists": true,
+          "frontendWired": true,
+          "riskLevel": "high",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "requiresLoading": true,
+          "requiresResultArea": true,
+          "requiresErrorArea": true,
+          "requiresDebug": true,
+          "requiresReport": false,
+          "requiresRiskPlan": true,
+          "requiresToken": true,
+          "requiresVerify": true,
+          "requiresRollback": true,
+          "requiresPagination": false,
+          "requiresI18n": true,
+          "requiresDarkReadable": true,
+          "safeSmokeMode": "tempFile",
+          "manualOnlyReason": null,
+          "deferredReason": null,
+          "testModes": [
+            "static",
+            "frontend",
+            "safe"
+          ],
+          "manualAllowed": false,
+          "acceptanceChecks": [
+            "selectorsPresent",
+            "riskContract",
+            "resultPanelVisible",
+            "debugContract",
+            "noReportNeeded"
+          ]
+        },
+        {
           "featureId": "cleanup.cDriveRescue",
           "id": "cleanup.cDriveRescue",
           "domain": "Cleanup",
