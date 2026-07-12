@@ -735,7 +735,23 @@ export type UpdateCheckResult = {
     url: string;
   }>;
   fileName: string;
+  platform: string;
+  size: number;
   checkedAt: string;
+};
+
+export type UpdateDownloadResult = {
+  success: boolean;
+  version: string;
+  platform: string;
+  fileName: string;
+  filePath: string;
+  size: number;
+  sha256: string;
+  sourceName: string;
+  sourceUrl: string;
+  verified: boolean;
+  message: string;
 };
 
 export type FileAssociationSource = "userChoice" | "hkcu" | "hklm" | "unknown";

@@ -4,7 +4,7 @@ import { clearDebugEntries, debugEntriesAsMarkdown, getDebugEntries, isAdvancedM
 import { localeModeLabel, setLocale, t, type LocaleMode } from "../../core/i18n";
 import { applyTheme, readTheme, type ThemeMode } from "../../ui/theme/controller";
 import { bindAction } from "../sharedView";
-import { checkForUpdates, loadSettingsWorkbench, openAppConfigDir, powershellRunnerStatus, resetUiConfig, setAutoCheckUpdate, setRootDir } from "./api";
+import { checkForUpdates, downloadUpdate, launchUpdateInstaller, loadSettingsWorkbench, openAppConfigDir, powershellRunnerStatus, resetUiConfig, selfUninstall, setAutoCheckUpdate, setRootDir } from "./api";
 import { filterDebugEntries, renderDebugEntriesPreview, renderSettingsWorkbench, type DebugFilter } from "./render";
 import type { SettingsWorkbenchState } from "./state";
 
@@ -47,11 +47,100 @@ export function bindSettingsEvents(context: FeatureContext, state: SettingsWorkb
     context.root.innerHTML = renderSettingsWorkbench(state);
     bindSettingsEvents(context, state);
   });
-  bindAction(context.root, "check-update", async () => {
-    state.update = await checkForUpdates();
+  bindAction(context.root, "check-for-updates", async () => {
+    state.updateError = "";
+    state.updateDownload = null;
+    context.progress.start("Checking update metadata");
+    try {
+      state.update = await checkForUpdates();
+      context.progress.done("Update metadata loaded");
+    } catch (error) {
+      state.updateError = errorMessage(error);
+      context.progress.fail(state.updateError);
+    }
     if (!context.isCurrent()) return;
     context.root.innerHTML = renderSettingsWorkbench(state);
     bindSettingsEvents(context, state);
+  });
+  bindAction(context.root, "download-update", async () => {
+    state.updateError = "";
+    state.updateDownload = null;
+    if (!state.update?.updateAvailable) {
+      state.updateError = state.update ? "The current version is already up to date." : "Check for updates before downloading.";
+      context.root.innerHTML = renderSettingsWorkbench(state);
+      bindSettingsEvents(context, state);
+      return;
+    }
+    context.progress.start(`Downloading ${state.update.fileName}`);
+    try {
+      state.updateDownload = await downloadUpdate();
+      context.progress.done("Update downloaded and verified");
+    } catch (error) {
+      state.updateError = errorMessage(error);
+      context.progress.fail(state.updateError);
+    }
+    if (!context.isCurrent()) return;
+    context.root.innerHTML = renderSettingsWorkbench(state);
+    bindSettingsEvents(context, state);
+  });
+  bindAction(context.root, "launch-update-installer", async () => {
+    state.updateError = "";
+    const update = state.update;
+    const download = state.updateDownload;
+    if (!update || !download?.verified) {
+      state.updateError = "Download and verify the update before launching its installer.";
+      context.root.innerHTML = renderSettingsWorkbench(state);
+      bindSettingsEvents(context, state);
+      return;
+    }
+    try {
+      const result = await context.risk.run({
+        command: "launch_update_installer",
+        planId: `update:${update.latestVersion}:${update.sha256}`,
+        riskLevel: "high",
+        title: "Launch verified update installer",
+        summary: "Starts the downloaded installer after backend size and SHA-256 verification.",
+        before: [
+          { label: "Version", value: update.latestVersion },
+          { label: "Platform", value: update.platform },
+          { label: "File", value: update.fileName },
+          { label: "Source", value: download.sourceUrl },
+          { label: "Size", value: `${download.size.toLocaleString()} bytes` },
+          { label: "SHA-256", value: download.sha256 },
+        ],
+        warnings: ["DevEnv Manager closes after the installer starts.", "Review the verified asset identity before continuing."],
+        execute: launchUpdateInstaller,
+      });
+      state.operationResult = resultMessage(result, "Update installer started.");
+    } catch (error) {
+      state.updateError = errorMessage(error);
+      if (context.isCurrent()) {
+        context.root.innerHTML = renderSettingsWorkbench(state);
+        bindSettingsEvents(context, state);
+      }
+    }
+  });
+  bindAction(context.root, "self-uninstall", async () => {
+    state.uninstallResult = "";
+    state.uninstallError = "";
+    try {
+      const result = await context.risk.run({
+        command: "self_uninstall",
+        planId: "self-uninstall",
+        riskLevel: "high",
+        title: "Open DevEnv Manager uninstaller",
+        summary: "Starts the registered Windows uninstaller without silently deleting user configuration.",
+        warnings: ["The application closes after the uninstaller starts.", "Review any data-removal option shown by the official uninstaller."],
+        execute: selfUninstall,
+      });
+      state.uninstallResult = resultMessage(result, "Uninstaller started.");
+    } catch (error) {
+      state.uninstallError = errorMessage(error);
+      if (context.isCurrent()) {
+        context.root.innerHTML = renderSettingsWorkbench(state);
+        bindSettingsEvents(context, state);
+      }
+    }
   });
   bindAction(context.root, "open-config-dir", async () => {
     state.operationResult = "";

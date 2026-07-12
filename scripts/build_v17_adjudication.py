@@ -28,7 +28,7 @@ IMPLEMENTATION_STATUSES = {
 }
 EVIDENCE_STATUSES = {
     "verified-installed", "verified-real-tauri", "verified-automated",
-    "evidence-required", "not-safely-testable",
+    "evidence-required", "not-safely-testable", "environment-blocked",
 }
 RELEASE_DISPOSITIONS = {
     "ready", "code-blocker", "evidence-blocker", "product-decision-required",
@@ -234,6 +234,13 @@ UNSAFE_EVIDENCE_CAPABILITIES = {
     "mysql.repair", "update.download-install",
 }
 
+ENVIRONMENT_BLOCKED_CAPABILITIES = {
+    "environment.configure", "environment.java-stabilize", "environment.path-cleanup",
+    "file-associations.backup-rollback", "mysql.repair", "cleanup.partition-expansion",
+    "runtime.install", "runtime.lifecycle", "runtime.switch", "runtime.uninstall",
+    "system.self-uninstall", "update.download-install",
+}
+
 STATUS_OVERRIDES = {
     "navigation.workbench": "equivalent",
     "bootstrap.retry": "equivalent",
@@ -381,8 +388,10 @@ def build_capabilities(records: list[dict[str, Any]], current: dict[str, Any]) -
             evidence = "verified-installed"
         elif implementation in {"missing", "degraded"}:
             evidence = "evidence-required"
+        elif capability_id in ENVIRONMENT_BLOCKED_CAPABILITIES:
+            evidence = "environment-blocked"
         elif capability_id in UNSAFE_EVIDENCE_CAPABILITIES:
-            evidence = "not-safely-testable"
+            evidence = "evidence-required"
         elif frontend_commands:
             evidence = "verified-automated"
         else:
@@ -391,7 +400,7 @@ def build_capabilities(records: list[dict[str, Any]], current: dict[str, Any]) -
         docs_only = all(source["sourceType"] == "documentation-promise" for source in sources)
         if implementation in {"missing", "degraded"}:
             disposition = "product-decision-required" if docs_only else "code-blocker"
-        elif evidence in {"evidence-required", "not-safely-testable"}:
+        elif evidence in {"evidence-required", "not-safely-testable", "environment-blocked"}:
             disposition = "evidence-blocker"
         else:
             disposition = "ready"

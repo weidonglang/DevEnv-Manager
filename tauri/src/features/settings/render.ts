@@ -23,7 +23,6 @@ export function renderSettingsWorkbench(state: SettingsWorkbenchState): string {
         <div class="toolbar">
           ${renderActionButton("save-root-dir", t("settings.saveRoot"), "primary")}
           ${renderActionButton("toggle-auto-update", t("settings.toggleAutoUpdate"))}
-          ${renderActionButton("check-update", t("dashboard.checkUpdates"))}
           ${renderActionButton("open-config-dir", t("settings.openConfigDir"))}
           ${renderActionButton("show-safety-notice", t("settings.viewSafetyNotice"))}
           ${renderActionButton("toggle-advanced-mode", isAdvancedMode() ? t("settings.advancedOff") : t("settings.advancedOn"))}
@@ -31,12 +30,37 @@ export function renderSettingsWorkbench(state: SettingsWorkbenchState): string {
         </div>
       </section>
       ${renderRiskLevelGuide()}
+      ${renderUpdatePanel(state, vm.updateRows, vm.updateDownloadRows)}
+      <section class="panel" data-testid="settings-uninstall-section">
+        <div class="panel-head"><div><h2>Uninstall DevEnv Manager</h2><p>Starts the registered Windows uninstaller. User configuration is retained unless you explicitly remove it in the uninstaller.</p></div></div>
+        <div class="small-note">The application closes after the official uninstaller starts. This action does not silently delete user configuration or managed runtimes.</div>
+        <div class="toolbar">${renderActionButton("self-uninstall", "Open uninstaller", "danger")}</div>
+        <div data-testid="settings-uninstall-result">${state.uninstallError ? `<div class="error-state">${escapeHtml(state.uninstallError)}</div>` : state.uninstallResult ? `<div class="small-note">${escapeHtml(state.uninstallResult)}</div>` : `<div class="empty">${t("state.notChecked")}</div>`}</div>
+      </section>
       <section class="panel" data-testid="settings-operation-result"><h2>操作结果</h2>${state.operationError ? `<div class="error-state">${escapeHtml(state.operationError)}</div>` : ""}${state.operationResult ? `<div class="small-note">${escapeHtml(state.operationResult)}</div>` : `<div class="empty">${t("state.notChecked")}</div>`}</section>
-      <section class="panel"><h2>${t("settings.updateSource")}</h2>${renderRows(vm.updateRows)}</section>
       <section class="panel"><h2>${t("settings.powershellRunner")}</h2>${renderRows(vm.powershellRows)}</section>
       ${isAdvancedMode() ? renderDebugPanel(state.debugPage) : ""}
     </div>
   `;
+}
+
+function renderUpdatePanel(
+  state: SettingsWorkbenchState,
+  rows: Array<{ label: string; value: string }>,
+  downloadRows: Array<{ label: string; value: string }>,
+): string {
+  const download = state.updateDownload;
+  return `<section class="panel" data-testid="settings-update-section">
+    <div class="panel-head"><div><h2>${t("settings.updateSource")}</h2><p>Check metadata, download from the selected source, verify size and SHA-256, then confirm before launching the installer.</p></div></div>
+    <div class="toolbar">
+      ${renderActionButton("check-for-updates", t("dashboard.checkUpdates"), "primary")}
+      ${renderActionButton("download-update", "Download and verify")}
+      ${renderActionButton("launch-update-installer", "Launch verified installer", "danger")}
+    </div>
+    ${state.updateError ? `<div class="error-state" data-testid="settings-update-error">${escapeHtml(state.updateError)}</div>` : ""}
+    ${renderRows(rows)}
+    <div data-testid="settings-update-result">${download ? renderRows(downloadRows) : `<div class="empty">No downloaded update has been verified.</div>`}</div>
+  </section>`;
 }
 
 function renderRows(rows: Array<{ label: string; value: string }>): string {

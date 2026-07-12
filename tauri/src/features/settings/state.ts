@@ -1,10 +1,14 @@
-import type { ConfigView, PowerShellResult, UpdateCheckResult } from "../../types";
+import type { ConfigView, PowerShellResult, UpdateCheckResult, UpdateDownloadResult } from "../../types";
 import type { ThemeMode } from "../../ui/theme/controller";
 
 export type SettingsWorkbenchState = {
   config: ConfigView | null;
   powershell: PowerShellResult | null;
   update: UpdateCheckResult | null;
+  updateDownload: UpdateDownloadResult | null;
+  updateError: string;
+  uninstallResult: string;
+  uninstallError: string;
   theme: ThemeMode;
   operationResult: string;
   operationError: string;
@@ -16,6 +20,10 @@ export const settingsWorkbenchInitialState: SettingsWorkbenchState = {
   config: null,
   powershell: null,
   update: null,
+  updateDownload: null,
+  updateError: "",
+  uninstallResult: "",
+  uninstallError: "",
   theme: "system",
   operationResult: "",
   operationError: "",

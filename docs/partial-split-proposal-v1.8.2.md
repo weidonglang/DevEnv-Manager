@@ -116,5 +116,5 @@ This proposal does not modify the formal feature manifest.
 | `toolchains.mysqlRepair` | `toolchains.mysqlRepair.executeMysqlRepairPlan` | P1 | `execute_mysql_repair_plan` | equivalent | verified-automated | ready |
 | `toolchains.mysqlRepair` | `toolchains.mysqlRepair.mysqlPendingExecutionGuard` | P1 | `mysql_pending_execution_guard` | not-applicable | evidence-required | evidence-blocker |
 | `update.checkDownloadMetadata` | `update.checkDownloadMetadata.checkForUpdates` | P1 | `check_for_updates` | equivalent | verified-installed | ready |
-| `update.checkDownloadMetadata` | `update.checkDownloadMetadata.downloadUpdate` | P1 | `download_update` | degraded | evidence-required | code-blocker |
-| `update.checkDownloadMetadata` | `update.checkDownloadMetadata.launchUpdateInstaller` | P1 | `launch_update_installer` | degraded | evidence-required | code-blocker |
+| `update.checkDownloadMetadata` | `update.checkDownloadMetadata.downloadUpdate` | P1 | `download_update` | equivalent | verified-automated | ready |
+| `update.checkDownloadMetadata` | `update.checkDownloadMetadata.launchUpdateInstaller` | P1 | `launch_update_installer` | equivalent | verified-automated | ready |

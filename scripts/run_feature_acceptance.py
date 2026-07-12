@@ -89,6 +89,9 @@ def static_cases() -> list[Case]:
         script_case("static", "check_frontend_action_contracts.py"),
         script_case("static", "check_frontend_quality_regressions.py"),
         script_case("static", "check_tauri_command_contract.py"),
+        script_case("static", "check_update_lifecycle_contracts.py"),
+        script_case("static", "check_v17_migration_completeness.py"),
+        script_case("static", "check_release_dispositions.py"),
     ]
 
     for page, feature in iter_features():

@@ -5,16 +5,16 @@
     "registered": 168,
     "byClassification": {
       "bootstrap": 3,
-      "compatibility-alias": 37,
+      "compatibility-alias": 34,
       "diagnostic": 11,
-      "direct-user-command": 98,
+      "direct-user-command": 101,
       "dynamic-user-command": 7,
       "internal-helper": 4,
       "replacement-command": 8
     },
     "byReleaseDisposition": {
-      "code-blocker": 25,
-      "evidence-blocker": 41,
+      "code-blocker": 22,
+      "evidence-blocker": 44,
       "product-decision-required": 7,
       "ready": 95
     },
@@ -911,19 +911,21 @@
       "oldCommand": "download_update",
       "currentCommand": "download_update",
       "capabilityId": "update.download-install",
-      "frontendLocation": [],
+      "frontendLocation": [
+        "tauri/src/features/settings/api.ts:33"
+      ],
       "dynamicWrapper": [],
       "replacementChain": [],
-      "replacementResolution": "no-replacement-code-blocker",
+      "replacementResolution": "not-required",
       "testEvidence": [
         "feature-manifest:update.checkDownloadMetadata"
       ],
-      "classification": "compatibility-alias",
-      "releaseDisposition": "code-blocker",
-      "exactReason": "The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval.",
-      "compatibilityConsumer": "v1.7.0 UI/CLI or external automation",
-      "compatibilityTest": "Required before removal",
-      "removalCondition": "Remove only after frontend, dynamic wrappers, scripts, tests, compatibility paths, and docs are all clear",
+      "classification": "direct-user-command",
+      "releaseDisposition": "evidence-blocker",
+      "exactReason": "A current frontend invoke exposes this command.",
+      "compatibilityConsumer": null,
+      "compatibilityTest": null,
+      "removalCondition": null,
       "followUpIssue": "#125"
     },
     {
@@ -2055,19 +2057,21 @@
       "oldCommand": "launch_update_installer",
       "currentCommand": "launch_update_installer",
       "capabilityId": "update.download-install",
-      "frontendLocation": [],
+      "frontendLocation": [
+        "tauri/src/features/settings/api.ts:37"
+      ],
       "dynamicWrapper": [],
       "replacementChain": [],
-      "replacementResolution": "no-replacement-code-blocker",
+      "replacementResolution": "not-required",
       "testEvidence": [
         "feature-manifest:update.checkDownloadMetadata"
       ],
-      "classification": "compatibility-alias",
-      "releaseDisposition": "code-blocker",
-      "exactReason": "The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval.",
-      "compatibilityConsumer": "v1.7.0 UI/CLI or external automation",
-      "compatibilityTest": "Required before removal",
-      "removalCondition": "Remove only after frontend, dynamic wrappers, scripts, tests, compatibility paths, and docs are all clear",
+      "classification": "direct-user-command",
+      "releaseDisposition": "evidence-blocker",
+      "exactReason": "A current frontend invoke exposes this command.",
+      "compatibilityConsumer": null,
+      "compatibilityTest": null,
+      "removalCondition": null,
       "followUpIssue": "#125"
     },
     {
@@ -3220,17 +3224,21 @@
       "oldCommand": "self_uninstall",
       "currentCommand": "self_uninstall",
       "capabilityId": "system.self-uninstall",
-      "frontendLocation": [],
+      "frontendLocation": [
+        "tauri/src/features/settings/api.ts:41"
+      ],
       "dynamicWrapper": [],
       "replacementChain": [],
-      "replacementResolution": "no-replacement-code-blocker",
-      "testEvidence": [],
-      "classification": "compatibility-alias",
-      "releaseDisposition": "code-blocker",
-      "exactReason": "The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval.",
-      "compatibilityConsumer": "v1.7.0 UI/CLI or external automation",
-      "compatibilityTest": "Required before removal",
-      "removalCondition": "Remove only after frontend, dynamic wrappers, scripts, tests, compatibility paths, and docs are all clear",
+      "replacementResolution": "not-required",
+      "testEvidence": [
+        "feature-manifest:settings.selfUninstall"
+      ],
+      "classification": "direct-user-command",
+      "releaseDisposition": "evidence-blocker",
+      "exactReason": "A current frontend invoke exposes this command.",
+      "compatibilityConsumer": null,
+      "compatibilityTest": null,
+      "removalCondition": null,
       "followUpIssue": "#125"
     },
     {

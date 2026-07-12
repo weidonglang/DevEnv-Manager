@@ -1,5 +1,5 @@
 import { invoke } from "../../core/invoke";
-import type { ConfigView, OperationResult, PowerShellResult, UpdateCheckResult } from "../../types";
+import type { ConfigView, OperationResult, PowerShellResult, UpdateCheckResult, UpdateDownloadResult } from "../../types";
 
 export function loadSettingsWorkbench(): Promise<ConfigView> {
   return invoke<ConfigView>("load_config");
@@ -27,4 +27,16 @@ export function powershellRunnerStatus(): Promise<PowerShellResult> {
 
 export function checkForUpdates(): Promise<UpdateCheckResult> {
   return invoke<UpdateCheckResult>("check_for_updates");
+}
+
+export function downloadUpdate(): Promise<UpdateDownloadResult> {
+  return invoke<UpdateDownloadResult>("download_update");
+}
+
+export function launchUpdateInstaller(confirmationToken: string): Promise<OperationResult> {
+  return invoke<OperationResult>("launch_update_installer", { confirmationToken });
+}
+
+export function selfUninstall(confirmationToken: string): Promise<OperationResult> {
+  return invoke<OperationResult>("self_uninstall", { confirmationToken });
 }

@@ -8,7 +8,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 IMPLEMENTATION = {"equivalent", "enhanced", "degraded", "missing", "removed-approved", "not-applicable"}
-EVIDENCE = {"verified-installed", "verified-real-tauri", "verified-automated", "evidence-required", "not-safely-testable"}
+EVIDENCE = {"verified-installed", "verified-real-tauri", "verified-automated", "evidence-required", "not-safely-testable", "environment-blocked"}
 DISPOSITIONS = {"ready", "code-blocker", "evidence-blocker", "product-decision-required", "deferred-new-enhancement"}
 
 

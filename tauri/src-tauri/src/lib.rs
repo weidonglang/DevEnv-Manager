@@ -1091,7 +1091,25 @@ struct UpdateCheckResult {
     failed_sources: Vec<String>,
     mirrors: Vec<UpdateMirror>,
     file_name: String,
+    platform: String,
+    size: u64,
     checked_at: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct UpdateDownloadResult {
+    success: bool,
+    version: String,
+    platform: String,
+    file_name: String,
+    file_path: String,
+    size: u64,
+    sha256: String,
+    source_name: String,
+    source_url: String,
+    verified: bool,
+    message: String,
 }
 
 #[derive(Debug, Clone)]
@@ -1422,6 +1440,22 @@ const RISK_OPERATION_REGISTRY: &[RiskOperationSpec] = &[
         requires_backup: true,
         requires_token: true,
         description: "回滚文件默认打开方式备份",
+    },
+    RiskOperationSpec {
+        command: "launch_update_installer",
+        action_id: "launch_update_installer",
+        risk_level: "high",
+        requires_backup: false,
+        requires_token: true,
+        description: "Launch a verified DevEnv Manager update installer",
+    },
+    RiskOperationSpec {
+        command: "self_uninstall",
+        action_id: "self_uninstall",
+        risk_level: "high",
+        requires_backup: false,
+        requires_token: true,
+        description: "Launch the registered DevEnv Manager uninstaller",
     },
 ];
 
@@ -2570,6 +2604,8 @@ fn check_for_updates_blocking() -> Result<UpdateCheckResult, String> {
             failed_sources,
             mirrors: normalized_mirrors(&asset),
             file_name: asset.file_name,
+            platform: asset.platform,
+            size: asset.size,
             checked_at: current_timestamp(),
         });
     }
@@ -2674,11 +2710,11 @@ fn normalized_mirrors(asset: &UpdateAsset) -> Vec<UpdateMirror> {
 }
 
 #[tauri::command]
-async fn download_update(app: tauri::AppHandle) -> Result<OperationResult, String> {
+async fn download_update(app: tauri::AppHandle) -> Result<UpdateDownloadResult, String> {
     run_blocking(move || download_update_blocking(app)).await?
 }
 
-fn download_update_blocking(app: tauri::AppHandle) -> Result<OperationResult, String> {
+fn download_update_blocking(app: tauri::AppHandle) -> Result<UpdateDownloadResult, String> {
     let update = check_for_updates_blocking()?;
     if !update.update_available {
         return Err("当前已经是最新版本".to_string());
@@ -2707,9 +2743,27 @@ fn download_update_blocking(app: tauri::AppHandle) -> Result<OperationResult, St
             Some((&app, &task, 8, 95)),
         ) {
             Ok(()) => {
+                let (actual_size, actual_sha256) =
+                    match verify_update_installer_file(&target, update.size, &update.sha256) {
+                        Ok(verified) => verified,
+                        Err(error) => {
+                            let _ = fs::remove_file(&target);
+                            failures.push(format!("{}: {error}", mirror.name));
+                            continue;
+                        }
+                    };
                 emit_task_progress(&app, &task, 100, "更新安装包已通过 SHA256 校验");
-                return Ok(OperationResult {
+                return Ok(UpdateDownloadResult {
                     success: true,
+                    version: update.latest_version,
+                    platform: update.platform,
+                    file_name: update.file_name,
+                    file_path: display_path(&target),
+                    size: actual_size,
+                    sha256: actual_sha256,
+                    source_name: mirror.name,
+                    source_url: mirror.url,
+                    verified: true,
                     message: format!("更新安装包已就绪：{}", display_path(target)),
                 });
             }
@@ -2721,8 +2775,11 @@ fn download_update_blocking(app: tauri::AppHandle) -> Result<OperationResult, St
 }
 
 #[tauri::command]
-async fn launch_update_installer(app: tauri::AppHandle) -> Result<OperationResult, String> {
-    let result = run_blocking(|| {
+async fn launch_update_installer(
+    app: tauri::AppHandle,
+    confirmation_token: Option<String>,
+) -> Result<OperationResult, String> {
+    let result = run_blocking(move || {
         let update = check_for_updates_blocking()?;
         if !update.update_available {
             return Err("当前已经是最新版本".to_string());
@@ -2733,10 +2790,13 @@ async fn launch_update_installer(app: tauri::AppHandle) -> Result<OperationResul
         if !target.is_file() {
             return Err("更新安装包尚未下载，请先点击下载更新".to_string());
         }
-        let actual = file_sha256(&target)?;
-        if !actual.eq_ignore_ascii_case(&update.sha256) {
-            return Err("更新安装包 SHA256 校验失败，已拒绝启动".to_string());
-        }
+        verify_update_installer_file(&target, update.size, &update.sha256)?;
+        let plan_id = format!("update:{}:{}", update.latest_version, update.sha256);
+        require_risk_operation_token(
+            "launch_update_installer",
+            &plan_id,
+            confirmation_token,
+        )?;
         hidden_command(&target)
             .spawn()
             .map_err(|err| format!("启动更新安装器失败：{err}"))?;
@@ -2755,6 +2815,27 @@ fn validate_update_checksum(value: &str) -> Result<(), String> {
         return Err("更新清单缺少有效 SHA256，已拒绝下载".to_string());
     }
     Ok(())
+}
+
+fn verify_update_installer_file(
+    path: &Path,
+    expected_size: u64,
+    expected_sha256: &str,
+) -> Result<(u64, String), String> {
+    validate_update_checksum(expected_sha256)?;
+    let actual_size = fs::metadata(path)
+        .map_err(|error| format!("读取更新安装包信息失败：{error}"))?
+        .len();
+    if expected_size > 0 && actual_size != expected_size {
+        return Err(format!(
+            "更新安装包大小不匹配：预期 {expected_size}，实际 {actual_size}"
+        ));
+    }
+    let actual_sha256 = file_sha256(path)?;
+    if !actual_sha256.eq_ignore_ascii_case(expected_sha256) {
+        return Err("更新安装包 SHA256 校验失败，已拒绝启动".to_string());
+    }
+    Ok((actual_size, actual_sha256))
 }
 
 fn validate_update_manifest(manifest: &UpdateManifest) -> Result<(), String> {
@@ -9921,15 +10002,19 @@ fn portable_runtime_root(executable: &Path, kind: &str) -> Result<PathBuf, Strin
 }
 
 #[tauri::command]
-async fn self_uninstall(app: tauri::AppHandle) -> Result<OperationResult, String> {
-    let result = run_blocking(self_uninstall_blocking).await??;
+async fn self_uninstall(
+    app: tauri::AppHandle,
+    confirmation_token: Option<String>,
+) -> Result<OperationResult, String> {
+    let result = run_blocking(move || self_uninstall_blocking(confirmation_token)).await??;
     app.exit(0);
     Ok(result)
 }
 
-fn self_uninstall_blocking() -> Result<OperationResult, String> {
+fn self_uninstall_blocking(confirmation_token: Option<String>) -> Result<OperationResult, String> {
     let entry = find_self_uninstall_entry()
         .ok_or_else(|| "没有找到 DevEnv Manager 的卸载入口，请从 Windows 设置中卸载".to_string())?;
+    require_risk_operation_token("self_uninstall", "self-uninstall", confirmation_token)?;
     launch_uninstall_string(&entry.uninstall_string)?;
     Ok(OperationResult {
         success: true,
@@ -15277,6 +15362,8 @@ mod tests {
             "execute_mysql_repair_plan",
             "apply_file_association_plan",
             "rollback_file_association_backup",
+            "launch_update_installer",
+            "self_uninstall",
         ] {
             let spec = risk_operation_spec(command).unwrap_or_else(|| panic!("missing {command}"));
             assert!(spec.requires_token);
@@ -15742,6 +15829,17 @@ mod tests {
         assert!(validate_update_checksum(&"a".repeat(64)).is_ok());
         assert!(validate_update_checksum(&"g".repeat(64)).is_err());
         assert!(validate_update_checksum("abc").is_err());
+    }
+
+    #[test]
+    fn update_installer_verification_rejects_size_and_hash_mismatch() {
+        let root = tempfile::tempdir().unwrap();
+        let installer = root.path().join("update.exe");
+        fs::write(&installer, b"verified-update").unwrap();
+        let sha256 = file_sha256(&installer).unwrap();
+        assert!(verify_update_installer_file(&installer, 15, &sha256).is_ok());
+        assert!(verify_update_installer_file(&installer, 14, &sha256).is_err());
+        assert!(verify_update_installer_file(&installer, 15, &"a".repeat(64)).is_err());
     }
 
     #[test]

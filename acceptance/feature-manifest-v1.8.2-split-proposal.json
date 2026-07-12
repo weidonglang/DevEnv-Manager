@@ -1765,9 +1765,9 @@
       "commands": [
         "download_update"
       ],
-      "implementationStatus": "degraded",
-      "evidenceStatus": "evidence-required",
-      "releaseDisposition": "code-blocker",
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
       "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
     },
     {
@@ -1781,9 +1781,9 @@
       "commands": [
         "launch_update_installer"
       ],
-      "implementationStatus": "degraded",
-      "evidenceStatus": "evidence-required",
-      "releaseDisposition": "code-blocker",
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
       "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
     }
   ]

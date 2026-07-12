@@ -1946,6 +1946,68 @@
           ]
         },
         {
+          "featureId": "settings.selfUninstall",
+          "id": "settings.selfUninstall",
+          "domain": "Settings",
+          "userVisibleName": "Open the registered application uninstaller",
+          "name": "Open the registered application uninstaller",
+          "priority": "P1",
+          "targetVersion": "v1.8.2",
+          "status": "implemented",
+          "oldFeature": true,
+          "oldEntry": "Toolbox > Self uninstall",
+          "currentEntry": "Settings > Uninstall DevEnv Manager",
+          "frontendComponent": "SettingsUninstallPanel",
+          "frontendEntry": {
+            "route": "settings",
+            "testIds": [
+              "settings-uninstall-section",
+              "settings-uninstall-result"
+            ]
+          },
+          "selectors": {
+            "entry": "settings-uninstall-section",
+            "primaryAction": "self-uninstall",
+            "result": "settings-uninstall-result",
+            "error": "settings-uninstall-result"
+          },
+          "backendCommands": [
+            "self_uninstall"
+          ],
+          "backendExists": true,
+          "frontendWired": true,
+          "riskLevel": "high",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "requiresLoading": true,
+          "requiresResultArea": true,
+          "requiresErrorArea": true,
+          "requiresDebug": true,
+          "requiresReport": false,
+          "requiresRiskPlan": true,
+          "requiresToken": true,
+          "requiresVerify": true,
+          "requiresRollback": false,
+          "requiresPagination": false,
+          "requiresI18n": true,
+          "requiresDarkReadable": true,
+          "safeSmokeMode": "dryRun",
+          "manualOnlyReason": "Launching the real uninstaller remains an installed-app and VM gate.",
+          "deferredReason": null,
+          "testModes": [
+            "static",
+            "frontend",
+            "safe",
+            "manual"
+          ],
+          "manualAllowed": true,
+          "acceptanceChecks": [
+            "riskContract",
+            "resultPanelVisible",
+            "debugContract"
+          ]
+        },
+        {
           "featureId": "debug.panelAndExport",
           "id": "debug.panelAndExport",
           "domain": "Debug",
@@ -2029,7 +2091,8 @@
             "route": "settings",
             "testIds": [
               "settings-update-section",
-              "settings-update-result"
+              "settings-update-result",
+              "settings-update-error"
             ]
           },
           "selectors": {

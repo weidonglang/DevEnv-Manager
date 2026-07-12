@@ -10,6 +10,7 @@ export type SettingsViewModel = {
   powershell: string;
   powershellDetail: string;
   updateRows: Array<{ label: string; value: string }>;
+  updateDownloadRows: Array<{ label: string; value: string }>;
   powershellRows: Array<{ label: string; value: string }>;
 };
 
@@ -29,10 +30,24 @@ export function toSettingsViewModel(state: SettingsWorkbenchState): SettingsView
       { label: label("Source URL", "源地址"), value: present(state.update?.sourceUrl, notChecked()) },
       { label: label("Download URL", "下载地址"), value: present(state.update?.downloadUrl, notChecked()) },
       { label: label("File name", "文件名"), value: present(state.update?.fileName, notChecked()) },
+      { label: label("Platform", "平台"), value: present(state.update?.platform, notChecked()) },
+      { label: label("Expected size", "预期大小"), value: state.update?.size ? `${state.update.size.toLocaleString()} bytes` : notChecked() },
       { label: label("SHA-256", "SHA-256"), value: present(state.update?.sha256, notChecked()) },
       { label: label("Checked at", "检查时间"), value: formatTimestamp(state.update?.checkedAt) },
       { label: label("Mirrors", "镜像"), value: list(state.update?.mirrors?.map((mirror) => `${mirror.name}: ${mirror.url}`)) },
       { label: label("Failed sources", "失败源"), value: list(state.update?.failedSources) },
+    ],
+    updateDownloadRows: [
+      { label: label("Version", "版本"), value: present(state.updateDownload?.version, notChecked()) },
+      { label: label("Platform", "平台"), value: present(state.updateDownload?.platform, notChecked()) },
+      { label: label("File name", "文件名"), value: present(state.updateDownload?.fileName, notChecked()) },
+      { label: label("File path", "文件路径"), value: present(state.updateDownload?.filePath, notChecked()) },
+      { label: label("Size", "大小"), value: state.updateDownload ? `${state.updateDownload.size.toLocaleString()} bytes` : notChecked() },
+      { label: label("SHA-256", "SHA-256"), value: present(state.updateDownload?.sha256, notChecked()) },
+      { label: label("Update source", "更新源"), value: present(state.updateDownload?.sourceName, notChecked()) },
+      { label: label("Source URL", "源地址"), value: present(state.updateDownload?.sourceUrl, notChecked()) },
+      { label: label("Verified", "已验证"), value: state.updateDownload ? String(state.updateDownload.verified) : notChecked() },
+      { label: label("Message", "消息"), value: present(state.updateDownload?.message, notChecked()) },
     ],
     powershellRows: [
       { label: label("Status", "状态"), value: powershellStatus(state) },

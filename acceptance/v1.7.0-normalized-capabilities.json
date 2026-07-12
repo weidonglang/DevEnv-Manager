@@ -23,21 +23,21 @@
   "summary": {
     "total": 87,
     "byImplementationStatus": {
-      "degraded": 16,
+      "degraded": 14,
       "enhanced": 13,
-      "equivalent": 53,
+      "equivalent": 55,
       "missing": 5
     },
     "byEvidenceStatus": {
-      "evidence-required": 21,
-      "not-safely-testable": 16,
+      "environment-blocked": 12,
+      "evidence-required": 25,
       "verified-automated": 25,
       "verified-installed": 24,
       "verified-real-tauri": 1
     },
     "byReleaseDisposition": {
-      "code-blocker": 16,
-      "evidence-blocker": 16,
+      "code-blocker": 14,
+      "evidence-blocker": 18,
       "product-decision-required": 5,
       "ready": 50
     }
@@ -251,7 +251,7 @@
         "clean_dev_cache"
       ],
       "implementationStatus": "equivalent",
-      "evidenceStatus": "not-safely-testable",
+      "evidenceStatus": "evidence-required",
       "releaseDisposition": "evidence-blocker",
       "releaseReason": "Implementation mapping exists, but the required installed or safely isolated execution evidence is incomplete.",
       "followUpIssue": "#125",
@@ -303,7 +303,7 @@
         "clear_download_cache"
       ],
       "implementationStatus": "equivalent",
-      "evidenceStatus": "not-safely-testable",
+      "evidenceStatus": "evidence-required",
       "releaseDisposition": "evidence-blocker",
       "releaseReason": "Implementation mapping exists, but the required installed or safely isolated execution evidence is incomplete.",
       "followUpIssue": "#125",
@@ -469,7 +469,7 @@
         "rollback_move"
       ],
       "implementationStatus": "enhanced",
-      "evidenceStatus": "not-safely-testable",
+      "evidenceStatus": "evidence-required",
       "releaseDisposition": "evidence-blocker",
       "releaseReason": "Implementation mapping exists, but the required installed or safely isolated execution evidence is incomplete.",
       "followUpIssue": "#125",
@@ -575,7 +575,7 @@
         "inspect_partition_layout"
       ],
       "implementationStatus": "equivalent",
-      "evidenceStatus": "not-safely-testable",
+      "evidenceStatus": "environment-blocked",
       "releaseDisposition": "evidence-blocker",
       "releaseReason": "Implementation mapping exists, but the required installed or safely isolated execution evidence is incomplete.",
       "followUpIssue": "#125",
@@ -982,7 +982,7 @@
         "preview_user_environment_configuration"
       ],
       "implementationStatus": "enhanced",
-      "evidenceStatus": "not-safely-testable",
+      "evidenceStatus": "environment-blocked",
       "releaseDisposition": "evidence-blocker",
       "releaseReason": "Implementation mapping exists, but the required installed or safely isolated execution evidence is incomplete.",
       "followUpIssue": "#125",
@@ -1044,7 +1044,7 @@
         "verify_env_after_apply"
       ],
       "implementationStatus": "enhanced",
-      "evidenceStatus": "not-safely-testable",
+      "evidenceStatus": "environment-blocked",
       "releaseDisposition": "evidence-blocker",
       "releaseReason": "Implementation mapping exists, but the required installed or safely isolated execution evidence is incomplete.",
       "followUpIssue": "#125",
@@ -1096,7 +1096,7 @@
         "cleanup_path_entries"
       ],
       "implementationStatus": "equivalent",
-      "evidenceStatus": "not-safely-testable",
+      "evidenceStatus": "environment-blocked",
       "releaseDisposition": "evidence-blocker",
       "releaseReason": "Implementation mapping exists, but the required installed or safely isolated execution evidence is incomplete.",
       "followUpIssue": "#125",
@@ -1437,7 +1437,7 @@
         "rollback_file_association_backup"
       ],
       "implementationStatus": "equivalent",
-      "evidenceStatus": "not-safely-testable",
+      "evidenceStatus": "environment-blocked",
       "releaseDisposition": "evidence-blocker",
       "releaseReason": "Implementation mapping exists, but the required installed or safely isolated execution evidence is incomplete.",
       "followUpIssue": "#125",
@@ -1626,7 +1626,7 @@
         "mysql_pending_execution_guard"
       ],
       "implementationStatus": "enhanced",
-      "evidenceStatus": "not-safely-testable",
+      "evidenceStatus": "environment-blocked",
       "releaseDisposition": "evidence-blocker",
       "releaseReason": "Implementation mapping exists, but the required installed or safely isolated execution evidence is incomplete.",
       "followUpIssue": "#125",
@@ -2033,7 +2033,7 @@
         "execute_profile_apply_plan"
       ],
       "implementationStatus": "enhanced",
-      "evidenceStatus": "not-safely-testable",
+      "evidenceStatus": "evidence-required",
       "releaseDisposition": "evidence-blocker",
       "releaseReason": "Implementation mapping exists, but the required installed or safely isolated execution evidence is incomplete.",
       "followUpIssue": "#125",
@@ -2376,7 +2376,7 @@
         "preview_project_configuration"
       ],
       "implementationStatus": "equivalent",
-      "evidenceStatus": "not-safely-testable",
+      "evidenceStatus": "evidence-required",
       "releaseDisposition": "evidence-blocker",
       "releaseReason": "Implementation mapping exists, but the required installed or safely isolated execution evidence is incomplete.",
       "followUpIssue": "#125",
@@ -2520,7 +2520,7 @@
         "update_project_port"
       ],
       "implementationStatus": "equivalent",
-      "evidenceStatus": "not-safely-testable",
+      "evidenceStatus": "evidence-required",
       "releaseDisposition": "evidence-blocker",
       "releaseReason": "Implementation mapping exists, but the required installed or safely isolated execution evidence is incomplete.",
       "followUpIssue": "#125",
@@ -2781,7 +2781,7 @@
         "install_python"
       ],
       "implementationStatus": "equivalent",
-      "evidenceStatus": "not-safely-testable",
+      "evidenceStatus": "environment-blocked",
       "releaseDisposition": "evidence-blocker",
       "releaseReason": "Implementation mapping exists, but the required installed or safely isolated execution evidence is incomplete.",
       "followUpIssue": "#130",
@@ -2852,7 +2852,7 @@
         "verify_maven_gradle_with_current_jdk"
       ],
       "implementationStatus": "equivalent",
-      "evidenceStatus": "not-safely-testable",
+      "evidenceStatus": "environment-blocked",
       "releaseDisposition": "evidence-blocker",
       "releaseReason": "Implementation mapping exists, but the required installed or safely isolated execution evidence is incomplete.",
       "followUpIssue": "#130",
@@ -2919,7 +2919,7 @@
         "switch_runtime"
       ],
       "implementationStatus": "equivalent",
-      "evidenceStatus": "not-safely-testable",
+      "evidenceStatus": "environment-blocked",
       "releaseDisposition": "evidence-blocker",
       "releaseReason": "Implementation mapping exists, but the required installed or safely isolated execution evidence is incomplete.",
       "followUpIssue": "#130",
@@ -2981,7 +2981,7 @@
         "uninstall_runtime"
       ],
       "implementationStatus": "equivalent",
-      "evidenceStatus": "not-safely-testable",
+      "evidenceStatus": "environment-blocked",
       "releaseDisposition": "evidence-blocker",
       "releaseReason": "Implementation mapping exists, but the required installed or safely isolated execution evidence is incomplete.",
       "followUpIssue": "#130",
@@ -3677,35 +3677,40 @@
       "sourceRecordIds": [
         "v17.command.self_uninstall"
       ],
-      "v1.8.2Entry": [],
-      "v1.8.2Steps": [],
-      "v1.8.2Result": "No complete current user path evidenced",
+      "v1.8.2Entry": [
+        "tauri/src/features/settings/api.ts:41"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
       "replacementCommands": [
         "self_uninstall"
       ],
-      "implementationStatus": "degraded",
-      "evidenceStatus": "evidence-required",
-      "releaseDisposition": "code-blocker",
-      "releaseReason": "The v1.7 self-uninstall command remains registered but no current Settings entry invokes it.",
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "environment-blocked",
+      "releaseDisposition": "evidence-blocker",
+      "releaseReason": "Implementation mapping exists, but the required installed or safely isolated execution evidence is incomplete.",
       "followUpIssue": "#125",
       "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
-      "automatedEvidence": [],
-      "codeBlockerEvidence": {
-        "oldReproduction": [
-          "Use self_uninstall"
+      "automatedEvidence": [
+        "frontend:tauri/src/features/settings/api.ts:41"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": {
+        "fixture": "Dedicated temporary data or disposable VM snapshot",
+        "environment": "Windows real Tauri or installed application",
+        "steps": [
+          "Capture baseline",
+          "Run the mapped user path",
+          "Verify result against system state",
+          "Restore baseline"
         ],
-        "currentReproduction": [
-          "Open the mapped v1.8.2 domain and look for an equivalent result"
-        ],
-        "expected": "System Self Uninstall",
-        "actual": "The v1.7 self-uninstall command remains registered but no current Settings entry invokes it.",
-        "sourceLocations": [
-          "v1.7.0 frontend invoke"
-        ],
-        "userImpact": "The historical user goal may not be completable in v1.8.2.",
-        "minimalFix": "Restore the guarded uninstall entry or explicitly remove the promise."
-      },
-      "evidencePlan": null
+        "safetyBoundary": "Do not modify real services, associations, environment, or user files outside the fixture.",
+        "passCriteria": "UI result, receipt, and observed system state agree.",
+        "recovery": "Delete temporary data or revert the VM snapshot."
+      }
     },
     {
       "capabilityId": "toolchains.actions",
@@ -4157,42 +4162,43 @@
         "v17.command.launch_update_installer",
         "v17.promise.034"
       ],
-      "v1.8.2Entry": [],
-      "v1.8.2Steps": [],
-      "v1.8.2Result": "No complete current user path evidenced",
+      "v1.8.2Entry": [
+        "tauri/src/features/settings/api.ts:33",
+        "tauri/src/features/settings/api.ts:37"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
       "replacementCommands": [
         "download_update",
         "launch_update_installer"
       ],
-      "implementationStatus": "degraded",
-      "evidenceStatus": "evidence-required",
-      "releaseDisposition": "code-blocker",
-      "releaseReason": "Settings exposes update checking only; download_update and launch_update_installer have no current frontend invoke.",
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "environment-blocked",
+      "releaseDisposition": "evidence-blocker",
+      "releaseReason": "Implementation mapping exists, but the required installed or safely isolated execution evidence is incomplete.",
       "followUpIssue": "#125",
       "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
-      "automatedEvidence": [],
-      "codeBlockerEvidence": {
-        "oldReproduction": [
-          "Use README",
-          "Use download-update",
-          "Use download_update",
-          "Use install-update",
-          "Use launch_update_installer"
+      "automatedEvidence": [
+        "frontend:tauri/src/features/settings/api.ts:33",
+        "frontend:tauri/src/features/settings/api.ts:37"
+      ],
+      "codeBlockerEvidence": null,
+      "evidencePlan": {
+        "fixture": "Dedicated temporary data or disposable VM snapshot",
+        "environment": "Windows real Tauri or installed application",
+        "steps": [
+          "Capture baseline",
+          "Run the mapped user path",
+          "Verify result against system state",
+          "Restore baseline"
         ],
-        "currentReproduction": [
-          "Open the mapped v1.8.2 domain and look for an equivalent result"
-        ],
-        "expected": "程序内更新：每天最多自动检查一次，只读取固定更新清单，不上传遥测；下载包强制 SHA256 校验。",
-        "actual": "Settings exposes update checking only; download_update and launch_update_installer have no current frontend invoke.",
-        "sourceLocations": [
-          "README.md:程序内更新：每天最多自动检查一次，只读取固定更新清单，不上传遥测；下载包强制 SHA256 校验。",
-          "v1.7.0 frontend action",
-          "v1.7.0 frontend invoke"
-        ],
-        "userImpact": "The historical user goal may not be completable in v1.8.2.",
-        "minimalFix": "Restore download verification and installer-launch result flow."
-      },
-      "evidencePlan": null
+        "safetyBoundary": "Do not modify real services, associations, environment, or user files outside the fixture.",
+        "passCriteria": "UI result, receipt, and observed system state agree.",
+        "recovery": "Delete temporary data or revert the VM snapshot."
+      }
     }
   ]
 }
