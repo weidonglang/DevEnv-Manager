@@ -19,7 +19,7 @@
       ],
       "uncheckedItems": null,
       "currentEvidence": "All 237 raw sources are accounted for as 87 normalized capabilities; unreviewed and unaccounted counts are zero.",
-      "remainingProblem": "3 code blockers, 23 evidence blockers, and 5 product decisions remain.",
+      "remainingProblem": "0 code blockers, 23 evidence blockers, and 0 product decisions remain.",
       "blocksV182": true,
       "labelDisposition": "retain blocker pending product approval and approved blocker implementation batch",
       "followUpIssue": "#125"
@@ -85,23 +85,19 @@
   "adjudicationSummary": {
     "total": 87,
     "byImplementationStatus": {
-      "degraded": 3,
       "enhanced": 13,
-      "equivalent": 66,
-      "missing": 5
+      "equivalent": 74
     },
     "byEvidenceStatus": {
       "environment-blocked": 14,
-      "evidence-required": 17,
-      "verified-automated": 31,
+      "evidence-required": 9,
+      "verified-automated": 39,
       "verified-installed": 24,
       "verified-real-tauri": 1
     },
     "byReleaseDisposition": {
-      "code-blocker": 3,
       "evidence-blocker": 23,
-      "product-decision-required": 5,
-      "ready": 56
+      "ready": 64
     }
   }
 }

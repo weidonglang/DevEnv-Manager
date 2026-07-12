@@ -1,5 +1,5 @@
 import { invoke } from "../../core/invoke";
-import type { CommandRunResult, CommandSafetyAssessment, LocalServiceStatus, MySqlRepairPlan, MySqlRepairReport, OperationResult, PlatformReport, SystemPlatformReport, ToolchainReport } from "../../types";
+import type { CacheEntry, CommandRunResult, CommandSafetyAssessment, LocalServiceStatus, MySqlRepairPlan, MySqlRepairReport, NetworkDiagnostics, OperationResult, PlatformReport, SystemPlatformReport, ToolchainReport } from "../../types";
 
 export function inspectToolchains(): Promise<ToolchainReport> {
   return invoke<ToolchainReport>("inspect_toolchains");
@@ -51,6 +51,30 @@ export function openLocalServiceDirectory(serviceName: string): Promise<Operatio
 
 export function openServiceLogPath(path: string): Promise<OperationResult> {
   return invoke<OperationResult>("open_analysis_path", { path });
+}
+
+export function runToolchainAction(action: string, value: string | null, secondary: string | null, confirmationToken: string | null): Promise<OperationResult> {
+  return invoke<OperationResult>("run_toolchain_action", { action, value, secondary, confirmationToken });
+}
+
+export function runPlatformToolchainAction(action: string, value: string | null, confirmationToken: string): Promise<OperationResult> {
+  return invoke<OperationResult>("run_platform_action", { action, value, confirmationToken });
+}
+
+export function runChsrcAction(action: string, target: string, source: string | null, confirmationToken: string | null): Promise<OperationResult> {
+  return invoke<OperationResult>("run_chsrc_action", { action, target, source, confirmationToken });
+}
+
+export function inspectNetworkDiagnostics(): Promise<NetworkDiagnostics> {
+  return invoke<NetworkDiagnostics>("network_diagnostics");
+}
+
+export function inspectCacheEntries(calculateHash = true): Promise<CacheEntry[]> {
+  return invoke<CacheEntry[]>("cache_entries", { calculateHash });
+}
+
+export function clearToolchainDownloadCache(confirmationToken: string): Promise<OperationResult> {
+  return invoke<OperationResult>("clear_download_cache", { confirmationToken });
 }
 
 export function inspectCommandSafety(command: string): Promise<CommandSafetyAssessment> {

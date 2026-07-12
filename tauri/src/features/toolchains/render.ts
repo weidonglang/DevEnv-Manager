@@ -4,6 +4,7 @@ import { renderFeatureGuide } from "../../components/featureGuide";
 import type { LocalServiceStatus } from "../../types";
 import type { ToolchainWorkbenchState } from "./state";
 import { toToolchainViewModel } from "./viewModel";
+import { defaultActionValue, selectedToolchainAction, toolchainActionDefinitions } from "./toolchainActions";
 
 export function renderToolchainWorkbench(state: ToolchainWorkbenchState): string {
   const vm = toToolchainViewModel(state);
@@ -29,12 +30,173 @@ export function renderToolchainWorkbench(state: ToolchainWorkbenchState): string
         ${Object.keys(state.errors).length ? `<div class="error-state" data-testid="toolchains-error">${Object.values(state.errors).map((message) => `<p>${escapeHtml(message)}</p>`).join("")}</div>` : ""}
       </section>
       <section class="panel" data-testid="toolchains-result"><h2>${t("feature.toolchains.detail")}</h2>${renderRows(vm.detailRows)}</section>
+      ${renderEcosystemOverview(state)}
+      ${renderToolchainActions(state)}
+      ${renderMirrorCenter(state)}
+      ${renderNetworkCache(state)}
       ${renderPlatformManagement(state, vm.platformRows)}
       ${renderLocalServices(state)}
       <section class="panel" data-testid="toolchains-mysql-section"><h2>${t("feature.toolchains.mysqlRepair")}</h2>${state.operationError ? `<div class="error-state" data-testid="toolchains-mysql-error">${escapeHtml(state.operationError)}</div>` : ""}${renderRows(vm.mysqlRows)}<div data-testid="toolchains-mysql-result">${state.mysqlResult ? renderObjectTable(state.mysqlResult, ["success", "message"]) : `<div class="empty">${t("state.notChecked")}</div>`}</div></section>
       ${renderLearningCenter(state)}
     </div>
   `;
+}
+
+function renderEcosystemOverview(state: ToolchainWorkbenchState): string {
+  const git = state.report?.git;
+  const node = state.report?.node;
+  const python = state.report?.python;
+  const rust = state.platform?.rust;
+  const dotnet = state.platform?.dotnet;
+  return `<section class="panel" data-testid="toolchains-ecosystems-section">
+    <div class="panel-head"><div><h2>${label("Ecosystem diagnostics", "生态诊断")}</h2><p>${label("Versions, resolved executables, key configuration paths, and current source state from backend reports.", "展示后端报告中的版本、实际可执行文件、关键配置路径和当前源状态。")}</p></div></div>
+    <div class="operation-grid" data-testid="toolchains-ecosystems-result">
+      ${ecosystemCard("Git", [
+        [label("Git", "Git"), toolState(git?.git)],
+        [label("SSH", "SSH"), toolState(git?.ssh)],
+        [label("Git LFS", "Git LFS"), toolState(git?.gitLfs)],
+        [label("Global config", "全局配置"), git?.globalConfigPath || t("state.notChecked")],
+        [label("GitHub SSH", "GitHub SSH"), git?.githubSshStatus || t("state.notChecked")],
+        [label("GitHub HTTPS", "GitHub HTTPS"), git?.githubHttpsStatus || t("state.notChecked")],
+      ], "toolchains-git-ecosystem")}
+      ${ecosystemCard("Node", [
+        ...toolRows(node?.tools),
+        [label("npm registry", "npm 源"), node?.npmRegistry || t("state.notChecked")],
+        [label("npm config", "npm 配置"), node?.npmConfigPath || t("state.notChecked")],
+        [label("npm prefix", "npm 全局目录"), node?.npmPrefix || t("state.notChecked")],
+        [label("pnpm store", "pnpm 存储"), node?.pnpmStorePath || t("state.notChecked")],
+      ], "toolchains-node-ecosystem")}
+      ${ecosystemCard("Python", [
+        ...toolRows(python?.tools),
+        [label("pip index", "pip 源"), python?.pipIndexUrl || t("state.notChecked")],
+        [label("pip config path", "pip 配置路径"), python?.pipConfigPath || t("state.notChecked")],
+        [label("pip config", "pip 配置"), python?.pipConfig || t("state.notChecked")],
+      ], "toolchains-python-ecosystem")}
+      ${ecosystemCard("Rust", [
+        ...toolRows(rust?.tools),
+        [label("Default toolchain", "默认工具链"), rust?.defaultToolchain || t("state.notChecked")],
+        [label("Installed toolchains", "已安装工具链"), summarizeList(rust?.installedToolchains)],
+        [label("Cargo config", "Cargo 配置"), rust?.cargoConfigPath || t("state.notChecked")],
+        [label("Cargo source status", "Cargo 源状态"), state.platform?.mirrors.cargoConfigExists ? label("Cargo config exists; inspect the rust/cargo target below for the active source.", "Cargo 配置存在；请在下方检查 rust/cargo 目标的当前源。") : label("No Cargo config file detected", "未检测到 Cargo 配置文件")],
+        [label("MSVC Build Tools", "MSVC Build Tools"), rust?.msvcBuildTools || t("state.notChecked")],
+      ], "toolchains-rust-ecosystem")}
+      ${ecosystemCard(".NET", [
+        [label("SDK executable", "SDK 可执行文件"), toolState(dotnet?.dotnet)],
+        [label("SDKs", "SDK 列表"), summarizeList(dotnet?.sdks)],
+        [label("Runtimes", "运行时"), summarizeList(dotnet?.runtimes, 2)],
+        [label("NuGet config", "NuGet 配置"), dotnet?.nugetConfigPath || t("state.notChecked")],
+        [label("Current source", "当前源"), ["dotnet", "nuget"].includes(state.mirrorTarget) && state.mirrorCurrent ? state.mirrorCurrent : label("Inspect the allowlisted .NET/NuGet target below.", "请在下方检查受 allowlist 保护的 .NET/NuGet 目标。")],
+      ], "toolchains-dotnet-ecosystem")}
+    </div>
+  </section>`;
+}
+
+function ecosystemCard(title: string, rows: Array<[string, string]>, testId: string): string {
+  return `<article class="operation-card" data-testid="${escapeHtml(testId)}"><h3>${escapeHtml(title)}</h3>${renderRows(rows.map(([rowLabel, value]) => ({ label: rowLabel, value })))}</article>`;
+}
+
+function renderToolchainActions(state: ToolchainWorkbenchState): string {
+  const action = selectedToolchainAction(state.toolchainActionId);
+  const value = state.toolchainActionValue || defaultActionValue(action);
+  return `<section class="panel" data-testid="toolchains-action-section">
+    <div class="panel-head"><div><h2>${label("Allowlisted ecosystem actions", "受 allowlist 保护的生态操作")}</h2><p>${label("No arbitrary shell text is accepted. Every action maps to a fixed backend operation.", "不接受任意 Shell 文本；每个操作都映射到固定后端动作。")}</p></div></div>
+    <div class="form-grid">
+      <label>${label("Action", "操作")}<select id="toolchain-action" data-testid="toolchains-action-select">${toolchainActionDefinitions.map((item) => `<option value="${item.id}" ${item.id === action.id ? "selected" : ""}>${escapeHtml(`${item.ecosystem} - ${item.label}`)}</option>`).join("")}</select></label>
+      ${action.valueLabel ? `<label>${escapeHtml(action.valueLabel)}${action.valueOptions ? `<select id="toolchain-action-value" data-testid="toolchains-action-value">${action.valueOptions.map((option) => `<option value="${option.value}" ${option.value === value ? "selected" : ""}>${escapeHtml(option.label)}</option>`).join("")}</select>` : `<input id="toolchain-action-value" data-testid="toolchains-action-value" value="${escapeHtml(value)}" />`}</label>` : ""}
+      ${action.secondaryLabel ? `<label>${escapeHtml(action.secondaryLabel)}<input id="toolchain-action-secondary" data-testid="toolchains-action-secondary" value="${escapeHtml(state.toolchainActionSecondary)}" /></label>` : ""}
+    </div>
+    <div data-testid="toolchains-action-preview">${renderRows([
+      { label: label("Ecosystem", "生态"), value: action.ecosystem },
+      { label: label("Action", "操作"), value: action.id },
+      { label: label("Command preview", "命令预览"), value: action.commandPreview },
+      { label: label("Read only", "只读"), value: action.readOnly ? label("Yes", "是") : label("No", "否") },
+      { label: label("Risk", "风险"), value: action.riskLevel },
+      { label: label("Timeout", "超时"), value: `${action.timeoutSeconds}s` },
+    ])}</div>
+    <div class="toolbar">${renderActionButton("execute-toolchain-action", action.readOnly ? label("Run diagnostic", "运行诊断") : label("Confirm and execute", "确认并执行"), action.readOnly ? "primary" : "danger")}</div>
+    <div data-testid="toolchains-action-result">${state.toolchainOperationError ? `${renderRows([
+      { label: "stdout", value: "" },
+      { label: "stderr", value: state.toolchainOperationError },
+      { label: label("Exit code", "退出码"), value: label("Unavailable - backend rejected or command did not complete", "不可用 - 后端拒绝或命令未完成") },
+    ])}<div class="error-state" data-testid="toolchains-action-error">${escapeHtml(state.toolchainOperationError)}</div>` : state.toolchainOperationResult ? renderRows([
+      { label: "stdout", value: state.toolchainOperationResult.message },
+      { label: "stderr", value: "" },
+      { label: label("Exit code", "退出码"), value: state.toolchainOperationResult.success ? "0" : label("Non-zero", "非零") },
+      { label: label("Verification", "验证"), value: state.toolchainOperationVerification },
+    ]) : `<div class="empty">${label("No ecosystem action has run.", "尚未运行生态操作。")}</div>`}</div>
+  </section>`;
+}
+
+function renderMirrorCenter(state: ToolchainWorkbenchState): string {
+  const targets = ["node", "python", "go", "rust", "cargo", "maven", "gradle", "nuget", "dotnet"];
+  const sources = ["official", "npmmirror", "tuna", "aliyun", "ustc", "bfsu", "huawei", "tencent"];
+  return `<section class="panel" data-testid="toolchains-mirrors-section">
+    <div class="panel-head"><div><h2>${label("Mirror and registry center", "镜像与 Registry 中心")}</h2><p>${label("Inspect current and candidate sources before applying a backend-allowlisted change.", "应用后端 allowlist 变更前，先检查当前源和候选源。")}</p></div></div>
+    <div class="form-grid">
+      <label>${label("Target", "目标")}<select id="mirror-target" data-testid="toolchains-mirror-target">${targets.map((target) => `<option value="${target}" ${target === state.mirrorTarget ? "selected" : ""}>${target}</option>`).join("")}</select></label>
+      <label>${label("Change", "变更")}<select id="mirror-action" data-testid="toolchains-mirror-action">${["set", "auto", "reset"].map((action) => `<option value="${action}" ${action === state.mirrorAction ? "selected" : ""}>${action}</option>`).join("")}</select></label>
+      ${state.mirrorAction === "set" ? `<label>${label("Allowlisted source", "允许的源")}<select id="mirror-source" data-testid="toolchains-mirror-source">${sources.map((source) => `<option value="${source}" ${source === state.mirrorSource ? "selected" : ""}>${source}</option>`).join("")}</select></label>` : ""}
+    </div>
+    <div class="toolbar">${renderActionButton("inspect-mirror-current", label("Current source", "当前源"), "primary")}${renderActionButton("list-mirror-candidates", label("Candidate sources", "候选源"))}${renderActionButton("measure-mirror-candidates", label("Measure", "测速"))}</div>
+    <div data-testid="toolchains-mirror-preview">${renderRows([
+      { label: label("Target", "目标"), value: state.mirrorTarget },
+      { label: label("Original/current source", "原值 / 当前源"), value: state.mirrorCurrent || t("state.notChecked") },
+      { label: label("Planned action", "计划操作"), value: `${state.mirrorAction}${state.mirrorAction === "set" ? ` ${state.mirrorSource}` : ""}` },
+      { label: label("Risk", "风险"), value: label("High - confirmation token required", "高风险 - 需要确认令牌") },
+      { label: label("Rollback", "回滚"), value: label("Use reset or reapply an allowlisted original source after reviewing current-source output.", "查看当前源输出后，使用 reset 或重新应用允许的原始源。") },
+    ])}</div>
+    <div class="toolbar">${renderActionButton("execute-mirror-action", label("Confirm and apply", "确认并应用"), "danger")}</div>
+    <div data-testid="toolchains-mirror-result">
+      ${state.mirrorError ? `<div class="error-state" data-testid="toolchains-mirror-error">${escapeHtml(state.mirrorError)}</div>` : ""}
+      ${state.mirrorResult ? renderObjectTable(state.mirrorResult, ["success", "message"]) : ""}
+      ${state.mirrorVerification ? `<p class="small-note"><strong>${label("Verified current source", "验证后的当前源")}</strong><br>${escapeHtml(state.mirrorVerification)}</p>` : ""}
+      ${state.mirrorCandidates ? `<h3>${label("Candidates", "候选源")}</h3><pre>${escapeHtml(state.mirrorCandidates)}</pre>` : ""}
+      ${state.mirrorMeasure ? `<h3>${label("Measurement", "测速结果")}</h3><pre>${escapeHtml(state.mirrorMeasure)}</pre>` : ""}
+      ${!state.mirrorError && !state.mirrorResult && !state.mirrorCandidates && !state.mirrorMeasure ? `<div class="empty">${label("No mirror action has run.", "尚未运行镜像操作。")}</div>` : ""}
+    </div>
+  </section>`;
+}
+
+function renderNetworkCache(state: ToolchainWorkbenchState): string {
+  return `<section class="panel" data-testid="toolchains-network-cache-section">
+    <div class="panel-head"><div><h2>${label("Network and managed download cache", "网络与受管下载缓存")}</h2><p>${label("Diagnostics and cache listing are read only. Cache deletion uses a separate token-gated preview.", "网络诊断和缓存列表为只读；缓存删除使用独立的令牌预览流程。")}</p></div></div>
+    <div class="toolbar">${renderActionButton("inspect-network-diagnostics", label("Run network diagnostics", "运行网络诊断"), "primary")}${renderActionButton("inspect-download-cache", label("Inspect cache", "检查缓存"))}</div>
+    ${state.networkCacheError ? `<div class="error-state" data-testid="toolchains-network-cache-error">${escapeHtml(state.networkCacheError)}</div>` : ""}
+    <div data-testid="toolchains-network-result">${state.network?.checks.length ? `<div class="table-wrap"><table><thead><tr><th>${label("Target", "目标")}</th><th>${label("Status", "状态")}</th><th>${label("Latency", "耗时")}</th><th>${label("Source", "来源")}</th><th>${label("Risk", "风险")}</th></tr></thead><tbody>${state.network.checks.map((check) => `<tr><td>${escapeHtml(check.name)}<br><small>${escapeHtml(check.url)}</small></td><td>${check.success ? label("Reachable", "可访问") : escapeHtml(check.status)}</td><td>${check.elapsedMs}ms</td><td>network_diagnostics</td><td>readOnly</td></tr>`).join("")}</tbody></table></div>${renderRows(state.network.proxy.map(([name, value]) => ({ label: name, value })))}` : state.network ? `<div class="empty">${label("Diagnostics completed without endpoint results. Review proxy and backend logs.", "诊断已完成但没有端点结果，请检查代理和后端日志。")}</div>` : `<div class="empty">${label("Network diagnostics have not run.", "尚未运行网络诊断。")}</div>`}</div>
+    <div data-testid="toolchains-cache-result">${state.cacheEntries.length ? `<div class="table-wrap"><table><thead><tr><th>${label("File", "文件")}</th><th>${label("Size", "大小")}</th><th>SHA256</th><th>${label("Source", "来源")}</th><th>${label("Risk", "风险")}</th><th>${label("Actions", "操作")}</th></tr></thead><tbody>${state.cacheEntries.map((entry) => `<tr data-testid="toolchains-cache-row"><td>${escapeHtml(entry.name)}<br><small>${escapeHtml(entry.path)}</small></td><td>${formatBytes(entry.size)}</td><td>${escapeHtml(entry.sha256 || label("Not calculated", "未计算"))}</td><td>DevEnv Manager managed downloads</td><td>readOnly</td><td><button type="button" data-cache-open="${escapeHtml(entry.path)}" data-testid="toolchains-cache-open">${label("Open", "打开")}</button><button type="button" data-cache-copy="${escapeHtml(entry.path)}" data-testid="toolchains-cache-copy">${label("Copy", "复制")}</button></td></tr>`).join("")}</tbody></table></div>` : state.cacheInspected ? `<div class="empty">${label("The managed download cache is empty.", "受管下载缓存为空。")}</div>` : `<div class="empty">${label("No managed cache entries loaded. Run cache inspection.", "尚未加载受管缓存，请先检查缓存。")}</div>`}</div>
+    <div data-testid="toolchains-cache-clear-preview">${renderRows([
+      { label: label("Target", "目标"), value: label("DevEnv Manager managed download cache only", "仅 DevEnv Manager 受管下载缓存") },
+      { label: label("Entries currently listed", "当前条目数"), value: String(state.cacheEntries.length) },
+      { label: label("Risk", "风险"), value: label("High - files will be deleted after token confirmation", "高风险 - 令牌确认后删除文件") },
+      { label: label("Verification", "验证"), value: label("Re-list cache entries after execution", "执行后重新读取缓存列表") },
+    ])}</div>
+    <div class="toolbar">${renderActionButton("clear-toolchain-cache", label("Confirm and clear managed cache", "确认并清理受管缓存"), "danger")}</div>
+    <div data-testid="toolchains-cache-operation-result">${state.cacheOperationResult ? `<div class="small-note">${escapeHtml(state.cacheOperationResult)}</div>` : `<div class="empty">${label("No cache operation has run.", "尚未执行缓存操作。")}</div>`}</div>
+  </section>`;
+}
+
+function toolState(tool: { installed: boolean; version: string; path: string; detail: string } | undefined): string {
+  if (!tool) return t("state.notChecked");
+  if (!tool.installed) return label("Not installed", "未安装");
+  return [tool.version, tool.path, tool.detail].filter(Boolean).join(" - ");
+}
+
+function toolRows(tools: Array<{ name: string; installed: boolean; version: string; path: string; detail: string }> | undefined): Array<[string, string]> {
+  if (!tools?.length) return [[label("Tools", "工具"), t("state.notChecked")]];
+  return tools.map((tool) => [tool.name, tool.installed ? [tool.version, tool.path].filter(Boolean).join(" - ") : label("Not installed", "未安装")]);
+}
+
+function formatBytes(value: number): string {
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+  if (value < 1024 * 1024 * 1024) return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(value / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+}
+
+function summarizeList(values: string[] | undefined, limit = 4): string {
+  if (!values?.length) return t("state.notChecked");
+  const visible = values.slice(0, limit).join("; ");
+  return values.length > limit ? `${visible}; +${values.length - limit} more` : visible;
 }
 
 function renderPlatformManagement(state: ToolchainWorkbenchState, rows: Array<{ label: string; value: string }>): string {

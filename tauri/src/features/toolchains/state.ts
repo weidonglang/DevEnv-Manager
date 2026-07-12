@@ -1,4 +1,4 @@
-import type { CommandRunResult, CommandSafetyAssessment, LocalServiceStatus, MySqlRepairPlan, MySqlRepairReport, OperationResult, PlatformReport, SystemPlatformReport, ToolchainReport } from "../../types";
+import type { CacheEntry, CommandRunResult, CommandSafetyAssessment, LocalServiceStatus, MySqlRepairPlan, MySqlRepairReport, NetworkDiagnostics, OperationResult, PlatformReport, SystemPlatformReport, ToolchainReport } from "../../types";
 
 export type ToolchainWorkbenchState = {
   report: ToolchainReport | null;
@@ -21,6 +21,26 @@ export type ToolchainWorkbenchState = {
   platformVerification: string;
   dockerOpenResult: string;
   dockerOpenError: string;
+  toolchainActionId: string;
+  toolchainActionValue: string;
+  toolchainActionSecondary: string;
+  toolchainOperationResult: OperationResult | null;
+  toolchainOperationError: string;
+  toolchainOperationVerification: string;
+  mirrorTarget: string;
+  mirrorAction: "set" | "auto" | "reset";
+  mirrorSource: string;
+  mirrorCurrent: string;
+  mirrorCandidates: string;
+  mirrorMeasure: string;
+  mirrorResult: OperationResult | null;
+  mirrorError: string;
+  mirrorVerification: string;
+  network: NetworkDiagnostics | null;
+  cacheEntries: CacheEntry[];
+  cacheInspected: boolean;
+  networkCacheError: string;
+  cacheOperationResult: string;
   mysql: MySqlRepairReport | null;
   mysqlPlan: MySqlRepairPlan | null;
   mysqlResult: OperationResult | null;
@@ -53,6 +73,26 @@ export const toolchainWorkbenchInitialState: ToolchainWorkbenchState = {
   platformVerification: "",
   dockerOpenResult: "",
   dockerOpenError: "",
+  toolchainActionId: "git_test_ssh",
+  toolchainActionValue: "",
+  toolchainActionSecondary: "",
+  toolchainOperationResult: null,
+  toolchainOperationError: "",
+  toolchainOperationVerification: "",
+  mirrorTarget: "node",
+  mirrorAction: "set",
+  mirrorSource: "official",
+  mirrorCurrent: "",
+  mirrorCandidates: "",
+  mirrorMeasure: "",
+  mirrorResult: null,
+  mirrorError: "",
+  mirrorVerification: "",
+  network: null,
+  cacheEntries: [],
+  cacheInspected: false,
+  networkCacheError: "",
+  cacheOperationResult: "",
   mysql: null,
   mysqlPlan: null,
   mysqlResult: null,

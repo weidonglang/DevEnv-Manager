@@ -922,6 +922,7 @@ struct GitEnvironment {
     github_ssh_status: String,
     github_https_status: String,
     git_lfs: ToolState,
+    global_config_path: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -931,6 +932,7 @@ struct NodeEcosystem {
     npm_prefix: String,
     npm_registry: String,
     pnpm_store_path: String,
+    npm_config_path: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -939,6 +941,7 @@ struct PythonEcosystem {
     tools: Vec<ToolState>,
     pip_config: String,
     pip_index_url: String,
+    pip_config_path: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -977,6 +980,7 @@ struct DotnetEnvironment {
     dotnet: ToolState,
     sdks: Vec<String>,
     runtimes: Vec<String>,
+    nuget_config_path: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -1374,6 +1378,30 @@ const RISK_OPERATION_REGISTRY: &[RiskOperationSpec] = &[
         requires_backup: false,
         requires_token: true,
         description: "启动、停止或重启本地数据库 Windows 服务",
+    },
+    RiskOperationSpec {
+        command: "run_toolchain_action",
+        action_id: "run_toolchain_action",
+        risk_level: "high",
+        requires_backup: true,
+        requires_token: true,
+        description: "Run an allowlisted Git, Node, or Python ecosystem configuration action",
+    },
+    RiskOperationSpec {
+        command: "run_platform_action",
+        action_id: "run_platform_action",
+        risk_level: "high",
+        requires_backup: true,
+        requires_token: true,
+        description: "Run an allowlisted Go, Rust, Maven, or Gradle configuration action",
+    },
+    RiskOperationSpec {
+        command: "run_chsrc_action",
+        action_id: "run_chsrc_action",
+        risk_level: "high",
+        requires_backup: true,
+        requires_token: true,
+        description: "Change or reset an allowlisted chsrc ecosystem source",
     },
     RiskOperationSpec {
         command: "stop_local_service",
@@ -5392,14 +5420,21 @@ fn network_diagnostics_blocking() -> NetworkDiagnostics {
     ];
     let client = reqwest::blocking::Client::builder()
         .user_agent("DevEnvManager/2.0")
-        .timeout(std::time::Duration::from_secs(15))
+        .timeout(std::time::Duration::from_secs(10))
         .build();
-    let checks = endpoints
+    let Ok(client) = client else {
+        return NetworkDiagnostics {
+            checks: Vec::new(),
+            proxy: proxy_state(),
+        };
+    };
+    let workers = endpoints
         .into_iter()
         .map(|(name, url)| {
-            let started = Instant::now();
-            match &client {
-                Ok(client) => match client.get(url).send() {
+            let client = client.clone();
+            std::thread::spawn(move || {
+                let started = Instant::now();
+                match client.get(url).send() {
                     Ok(response) => NetworkCheck {
                         name: name.to_string(),
                         url: url.to_string(),
@@ -5414,16 +5449,13 @@ fn network_diagnostics_blocking() -> NetworkDiagnostics {
                         status: network_error(&err),
                         elapsed_ms: started.elapsed().as_millis(),
                     },
-                },
-                Err(err) => NetworkCheck {
-                    name: name.to_string(),
-                    url: url.to_string(),
-                    success: false,
-                    status: err.to_string(),
-                    elapsed_ms: started.elapsed().as_millis(),
-                },
-            }
+                }
+            })
         })
+        .collect::<Vec<_>>();
+    let checks = workers
+        .into_iter()
+        .filter_map(|worker| worker.join().ok())
         .collect();
     NetworkDiagnostics {
         checks,
@@ -7524,7 +7556,8 @@ fn inspect_toolchains_blocking() -> Result<ToolchainReport, String> {
         resolve_tool(&paths, "git"),
         &["config", "--global", "user.email"],
     );
-    let ssh_dir = dirs::home_dir().unwrap_or_default().join(".ssh");
+    let home = dirs::home_dir().unwrap_or_default();
+    let ssh_dir = home.join(".ssh");
     let public_key_path = ["id_ed25519.pub", "id_rsa.pub"]
         .iter()
         .map(|name| ssh_dir.join(name))
@@ -7580,17 +7613,24 @@ fn inspect_toolchains_blocking() -> Result<ToolchainReport, String> {
             github_ssh_status,
             github_https_status,
             git_lfs,
+            global_config_path: display_path(home.join(".gitconfig")),
         },
         node: NodeEcosystem {
             tools: node_tools,
             npm_prefix,
             npm_registry,
             pnpm_store_path,
+            npm_config_path: display_path(home.join(".npmrc")),
         },
         python: PythonEcosystem {
             tools: python_tools,
             pip_config,
             pip_index_url,
+            pip_config_path: display_path(
+                dirs::config_dir()
+                    .unwrap_or_else(|| home.join("AppData/Roaming"))
+                    .join("pip/pip.ini"),
+            ),
         },
         generated_at: current_timestamp(),
     })
@@ -7602,13 +7642,28 @@ async fn run_toolchain_action(
     action: String,
     value: Option<String>,
     secondary: Option<String>,
+    confirmation_token: Option<String>,
 ) -> Result<OperationResult, String> {
     let task = toolchain_action_title(&action).to_string();
     emit_task_progress(&app, &task, 5, "正在准备操作");
     let worker_action = action.clone();
-    let result =
-        run_blocking(move || run_toolchain_action_blocking(&worker_action, value, secondary))
-            .await?;
+    let plan_id = format!(
+        "{}:{}:{}",
+        action.trim(),
+        value.as_deref().unwrap_or("").trim(),
+        secondary.as_deref().unwrap_or("").trim()
+    );
+    let result = run_blocking(move || {
+        if worker_action != "git_test_ssh" {
+            require_risk_operation_token(
+                "run_toolchain_action",
+                &plan_id,
+                confirmation_token,
+            )?;
+        }
+        run_toolchain_action_blocking(&worker_action, value, secondary)
+    })
+    .await?;
     emit_task_progress(
         &app,
         &task,
@@ -7812,10 +7867,10 @@ fn inspect_platform_toolchains_blocking() -> Result<PlatformReport, String> {
         .map(str::to_string)
         .collect();
 
+    let home = dirs::home_dir().unwrap_or_default();
     let npm_registry = command_value(resolve_tool(&paths, "npm"), &["config", "get", "registry"]);
     let python = resolve_tool(&paths, "python");
     let pip_config = command_value(python, &["-m", "pip", "config", "list"]);
-    let home = dirs::home_dir().unwrap_or_default();
     let maven_settings_path = home.join(".m2/settings.xml");
     let gradle_init_path = home.join(".gradle/init.gradle");
     let chsrc = probe_tool("chsrc", resolve_tool(&paths, "chsrc"), &["--version"]);
@@ -7844,6 +7899,7 @@ fn inspect_platform_toolchains_blocking() -> Result<PlatformReport, String> {
             dotnet,
             sdks,
             runtimes,
+            nuget_config_path: display_path(home.join(".nuget/NuGet/NuGet.Config")),
         },
         mirrors: MirrorCenter {
             npm_registry,
@@ -7897,8 +7953,21 @@ async fn run_chsrc_action(
     action: String,
     target: String,
     source: Option<String>,
+    confirmation_token: Option<String>,
 ) -> Result<OperationResult, String> {
-    run_blocking(move || run_chsrc_action_blocking(&action, &target, source.as_deref())).await?
+    let plan_id = format!(
+        "{}:{}:{}",
+        action.trim(),
+        target.trim(),
+        source.as_deref().unwrap_or("").trim()
+    );
+    run_blocking(move || {
+        if !matches!(action.as_str(), "get" | "list" | "measure") {
+            require_risk_operation_token("run_chsrc_action", &plan_id, confirmation_token)?;
+        }
+        run_chsrc_action_blocking(&action, &target, source.as_deref())
+    })
+    .await?
 }
 
 fn run_chsrc_action_blocking(
@@ -7925,12 +7994,7 @@ fn run_chsrc_action_blocking(
         "reset" => run_action_command(&paths, executable, &["reset", &target])?,
         "set" => {
             let source = source.unwrap_or_default().trim().to_ascii_lowercase();
-            if source.is_empty()
-                || source.len() > 40
-                || !source
-                    .chars()
-                    .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | '.'))
-            {
+            if !chsrc_source_allowed(&source) {
                 return Err("镜像源只能填写 chsrc 列出的源 ID；不接受自定义 URL".to_string());
             }
             run_action_command(&paths, executable, &["set", &target, &source])?
@@ -7947,16 +8011,33 @@ fn run_chsrc_action_blocking(
     })
 }
 
+fn chsrc_source_allowed(source: &str) -> bool {
+    const SOURCES: [&str; 8] = [
+        "official", "npmmirror", "tuna", "aliyun", "ustc", "bfsu", "huawei", "tencent",
+    ];
+    SOURCES.contains(&source)
+}
+
 #[tauri::command]
 async fn run_platform_action(
     app: tauri::AppHandle,
     action: String,
     value: Option<String>,
+    confirmation_token: Option<String>,
 ) -> Result<OperationResult, String> {
     let task = platform_action_title(&action).to_string();
     emit_task_progress(&app, &task, 5, "正在准备操作");
     let worker_action = action.clone();
-    let result = run_blocking(move || run_platform_action_blocking(&worker_action, value)).await?;
+    let plan_id = format!(
+        "{}:{}",
+        action.trim(),
+        value.as_deref().unwrap_or("").trim()
+    );
+    let result = run_blocking(move || {
+        require_risk_operation_token("run_platform_action", &plan_id, confirmation_token)?;
+        run_platform_action_blocking(&worker_action, value)
+    })
+    .await?;
     emit_task_progress(
         &app,
         &task,
@@ -15400,6 +15481,31 @@ mod tests {
     fn chsrc_rejects_unknown_target_before_execution() {
         let error = run_chsrc_action_blocking("get", "unknown-target", None).unwrap_err();
         assert!(error.contains("白名单"));
+    }
+
+    #[test]
+    fn chsrc_source_allowlist_rejects_urls_and_unknown_ids() {
+        assert!(chsrc_source_allowed("official"));
+        assert!(chsrc_source_allowed("tuna"));
+        assert!(!chsrc_source_allowed("https://example.invalid/simple"));
+        assert!(!chsrc_source_allowed("custom-source"));
+    }
+
+    #[test]
+    fn ecosystem_write_commands_are_registered_as_token_gated() {
+        for command in [
+            "run_toolchain_action",
+            "run_platform_action",
+            "run_chsrc_action",
+        ] {
+            let spec = RISK_OPERATION_REGISTRY
+                .iter()
+                .find(|spec| spec.command == command)
+                .unwrap();
+            assert_eq!(spec.action_id, command);
+            assert_eq!(spec.risk_level, "high");
+            assert!(spec.requires_token);
+        }
     }
 
     #[test]

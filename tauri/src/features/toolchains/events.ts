@@ -1,11 +1,12 @@
 import type { FeatureContext } from "../../app/featureContext";
 import { t } from "../../core/i18n";
 import { bindAction } from "../sharedView";
-import { createMySqlRepairPlan, executeMySqlRepairPlan, inspectCommandSafety, inspectLocalServices, inspectMySqlRepair, inspectPlatformToolchains, inspectSystemPlatforms, inspectToolchains, localServiceLogs, manageLocalService, manageSystemPlatform, openDockerDesktop, openLocalServiceDirectory, openServiceLogPath, runLearningCheck } from "./api";
+import { clearToolchainDownloadCache, createMySqlRepairPlan, executeMySqlRepairPlan, inspectCacheEntries, inspectCommandSafety, inspectLocalServices, inspectMySqlRepair, inspectNetworkDiagnostics, inspectPlatformToolchains, inspectSystemPlatforms, inspectToolchains, localServiceLogs, manageLocalService, manageSystemPlatform, openDockerDesktop, openLocalServiceDirectory, openServiceLogPath, runChsrcAction, runLearningCheck, runPlatformToolchainAction, runToolchainAction } from "./api";
 import type { LocalServiceStatus, OperationResult } from "../../types";
 import { renderToolchainWorkbench } from "./render";
 import type { ToolchainWorkbenchState } from "./state";
 import { reconcileServiceSelection, serviceDirectoryError, serviceManagementError } from "./serviceSelection";
+import { defaultActionValue, selectedToolchainAction, toolchainActionPlanId } from "./toolchainActions";
 
 export function bindToolchainEvents(context: FeatureContext, state: ToolchainWorkbenchState): void {
   bindAction(context.root, "inspect-toolchains", () => refreshToolchains(context, state));
@@ -46,6 +47,9 @@ export function bindToolchainEvents(context: FeatureContext, state: ToolchainWor
   });
   bindServiceControls(context, state);
   bindPlatformControls(context, state);
+  bindEcosystemControls(context, state);
+  bindMirrorControls(context, state);
+  bindNetworkCacheControls(context, state);
   bindAction(context.root, "inspect-mysql", async () => {
     context.progress.start(t("feature.toolchains.checkingMysql"));
     try {
@@ -132,6 +136,202 @@ export function bindToolchainEvents(context: FeatureContext, state: ToolchainWor
       state.learningSafety = null;
       state.learningResult = null;
       state.learningError = "";
+      renderAndBind(context, state);
+    });
+  });
+}
+
+function bindEcosystemControls(context: FeatureContext, state: ToolchainWorkbenchState): void {
+  context.root.querySelector<HTMLSelectElement>("#toolchain-action")?.addEventListener("change", (event) => {
+    state.toolchainActionId = (event.currentTarget as HTMLSelectElement).value;
+    state.toolchainActionValue = defaultActionValue(selectedToolchainAction(state.toolchainActionId));
+    state.toolchainActionSecondary = "";
+    state.toolchainOperationResult = null;
+    state.toolchainOperationError = "";
+    state.toolchainOperationVerification = "";
+    renderAndBind(context, state);
+  });
+  context.root.querySelector<HTMLInputElement | HTMLSelectElement>("#toolchain-action-value")?.addEventListener("input", (event) => {
+    state.toolchainActionValue = (event.currentTarget as HTMLInputElement | HTMLSelectElement).value;
+  });
+  context.root.querySelector<HTMLInputElement>("#toolchain-action-secondary")?.addEventListener("input", (event) => {
+    state.toolchainActionSecondary = (event.currentTarget as HTMLInputElement).value;
+  });
+  bindAction(context.root, "execute-toolchain-action", async () => {
+    const definition = selectedToolchainAction(state.toolchainActionId);
+    const value = state.toolchainActionValue.trim();
+    const secondary = state.toolchainActionSecondary.trim();
+    if (definition.valueLabel && !value) {
+      state.toolchainOperationError = `${definition.valueLabel} is required for ${definition.label}.`;
+      renderAndBind(context, state);
+      return;
+    }
+    if (definition.secondaryLabel && !secondary) {
+      state.toolchainOperationError = `${definition.secondaryLabel} is required for ${definition.label}.`;
+      renderAndBind(context, state);
+      return;
+    }
+    state.toolchainOperationResult = null;
+    state.toolchainOperationError = "";
+    state.toolchainOperationVerification = "";
+    try {
+      let result: OperationResult;
+      if (definition.readOnly) {
+        result = await runToolchainAction(definition.id, value || null, secondary || null, null);
+      } else {
+        result = await context.risk.run({
+          command: definition.backend === "toolchain" ? "run_toolchain_action" : "run_platform_action",
+          planId: toolchainActionPlanId(definition, value, secondary),
+          riskLevel: "high",
+          title: definition.label,
+          summary: `${definition.ecosystem}: ${definition.commandPreview}`,
+          warnings: ["This action is selected from a backend allowlist. Review configuration backups and restart affected terminals when needed."],
+          execute: (confirmationToken) => definition.backend === "toolchain"
+            ? runToolchainAction(definition.id, value || null, secondary || null, confirmationToken)
+            : runPlatformToolchainAction(definition.id, value || null, confirmationToken),
+        }) as OperationResult;
+      }
+      state.toolchainOperationResult = result;
+      const [report, platform] = await Promise.allSettled([inspectToolchains(), inspectPlatformToolchains()]);
+      if (report.status === "fulfilled") state.report = report.value;
+      if (platform.status === "fulfilled") state.platform = platform.value;
+      state.toolchainOperationVerification = `Post-operation diagnostics refreshed for ${definition.ecosystem}.`;
+    } catch (error) {
+      state.toolchainOperationError = errorMessage(error);
+    }
+    renderAndBind(context, state);
+  });
+}
+
+function bindMirrorControls(context: FeatureContext, state: ToolchainWorkbenchState): void {
+  context.root.querySelector<HTMLSelectElement>("#mirror-target")?.addEventListener("change", (event) => {
+    state.mirrorTarget = (event.currentTarget as HTMLSelectElement).value;
+    state.mirrorCurrent = "";
+    state.mirrorCandidates = "";
+    state.mirrorMeasure = "";
+    state.mirrorResult = null;
+    state.mirrorError = "";
+    state.mirrorVerification = "";
+    renderAndBind(context, state);
+  });
+  context.root.querySelector<HTMLSelectElement>("#mirror-action")?.addEventListener("change", (event) => {
+    state.mirrorAction = (event.currentTarget as HTMLSelectElement).value as ToolchainWorkbenchState["mirrorAction"];
+    state.mirrorResult = null;
+    state.mirrorError = "";
+    state.mirrorVerification = "";
+    renderAndBind(context, state);
+  });
+  context.root.querySelector<HTMLSelectElement>("#mirror-source")?.addEventListener("change", (event) => {
+    state.mirrorSource = (event.currentTarget as HTMLSelectElement).value;
+    renderAndBind(context, state);
+  });
+  bindAction(context.root, "inspect-mirror-current", () => runReadOnlyMirror(context, state, "get"));
+  bindAction(context.root, "list-mirror-candidates", () => runReadOnlyMirror(context, state, "list"));
+  bindAction(context.root, "measure-mirror-candidates", () => runReadOnlyMirror(context, state, "measure"));
+  bindAction(context.root, "execute-mirror-action", async () => {
+    state.mirrorResult = null;
+    state.mirrorError = "";
+    state.mirrorVerification = "";
+    const source = state.mirrorAction === "set" ? state.mirrorSource : null;
+    try {
+      if (!state.mirrorCurrent) {
+        state.mirrorCurrent = (await runChsrcAction("get", state.mirrorTarget, null, null)).message;
+      }
+      const result = await context.risk.run({
+        command: "run_chsrc_action",
+        planId: `${state.mirrorAction}:${state.mirrorTarget}:${source ?? ""}`,
+        riskLevel: "high",
+        title: `Change ${state.mirrorTarget} source`,
+        summary: `chsrc ${state.mirrorAction} ${state.mirrorTarget}${source ? ` ${source}` : ""}`,
+        warnings: ["The original source is retained in this result panel. Use reset or an allowlisted source to recover."],
+        execute: (confirmationToken) => runChsrcAction(state.mirrorAction, state.mirrorTarget, source, confirmationToken),
+      });
+      state.mirrorResult = result as OperationResult;
+      state.mirrorVerification = (await runChsrcAction("get", state.mirrorTarget, null, null)).message;
+      state.platform = await inspectPlatformToolchains();
+    } catch (error) {
+      state.mirrorError = errorMessage(error);
+    }
+    renderAndBind(context, state);
+  });
+}
+
+async function runReadOnlyMirror(context: FeatureContext, state: ToolchainWorkbenchState, action: "get" | "list" | "measure"): Promise<void> {
+  state.mirrorError = "";
+  try {
+    const result = await runChsrcAction(action, state.mirrorTarget, null, null);
+    if (action === "get") state.mirrorCurrent = result.message;
+    if (action === "list") state.mirrorCandidates = result.message;
+    if (action === "measure") state.mirrorMeasure = result.message;
+  } catch (error) {
+    state.mirrorError = errorMessage(error);
+  }
+  renderAndBind(context, state);
+}
+
+function bindNetworkCacheControls(context: FeatureContext, state: ToolchainWorkbenchState): void {
+  bindAction(context.root, "inspect-network-diagnostics", async () => {
+    state.networkCacheError = "";
+    try {
+      state.network = await inspectNetworkDiagnostics();
+    } catch (error) {
+      state.networkCacheError = errorMessage(error);
+    }
+    renderAndBind(context, state);
+  });
+  bindAction(context.root, "inspect-download-cache", async () => {
+    state.networkCacheError = "";
+    try {
+      state.cacheEntries = await inspectCacheEntries(true);
+      state.cacheInspected = true;
+    } catch (error) {
+      state.networkCacheError = errorMessage(error);
+    }
+    renderAndBind(context, state);
+  });
+  bindAction(context.root, "clear-toolchain-cache", async () => {
+    state.networkCacheError = "";
+    state.cacheOperationResult = "";
+    try {
+      const result = await context.risk.run({
+        command: "clear_download_cache",
+        planId: "clear-download-cache",
+        riskLevel: "high",
+        title: "Clear managed download cache",
+        summary: "Delete files only from the DevEnv Manager managed download cache after reviewing the preview.",
+        warnings: ["Downloaded installers and archives in the managed cache will need to be downloaded again."],
+        execute: (confirmationToken) => clearToolchainDownloadCache(confirmationToken),
+      });
+      state.cacheEntries = await inspectCacheEntries(true);
+      state.cacheInspected = true;
+      state.cacheOperationResult = `${(result as OperationResult).message} Verification: ${state.cacheEntries.length} cache entries remain.`;
+    } catch (error) {
+      state.networkCacheError = errorMessage(error);
+    }
+    renderAndBind(context, state);
+  });
+  context.root.querySelectorAll<HTMLButtonElement>("[data-cache-open]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      state.networkCacheError = "";
+      try {
+        const result = await openServiceLogPath(button.dataset.cacheOpen || "");
+        state.cacheOperationResult = result.message;
+      } catch (error) {
+        state.networkCacheError = errorMessage(error);
+      }
+      renderAndBind(context, state);
+    });
+  });
+  context.root.querySelectorAll<HTMLButtonElement>("[data-cache-copy]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      state.networkCacheError = "";
+      try {
+        const path = button.dataset.cacheCopy || "";
+        await navigator.clipboard.writeText(path);
+        state.cacheOperationResult = `Copied cache path: ${path}`;
+      } catch (error) {
+        state.networkCacheError = errorMessage(error);
+      }
       renderAndBind(context, state);
     });
   });

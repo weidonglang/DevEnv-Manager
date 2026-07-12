@@ -267,6 +267,19 @@ CAPABILITY_COMMAND_OVERRIDES = {
         | COMMAND_GROUPS["runtime.uninstall"]
         | COMMAND_GROUPS["runtime.verify"]
     ),
+    "toolchains.git-ecosystem": ["inspect_toolchains", "run_toolchain_action"],
+    "toolchains.node-ecosystem": ["inspect_toolchains", "run_toolchain_action"],
+    "toolchains.python-ecosystem": ["inspect_toolchains", "run_toolchain_action"],
+    "toolchains.rust": ["inspect_platform_toolchains", "run_platform_action"],
+    "toolchains.dotnet": ["inspect_platform_toolchains", "run_chsrc_action"],
+}
+
+V182_PRODUCT_DECISIONS = {
+    "toolchains.git-ecosystem",
+    "toolchains.node-ecosystem",
+    "toolchains.python-ecosystem",
+    "toolchains.rust",
+    "toolchains.dotnet",
 }
 
 LOCAL_REPLACEMENTS = {
@@ -281,9 +294,6 @@ BLOCKER_DETAILS = {
     "environment.restore": ("The Environment page lists backup counts but does not expose a restore action for either backup model.", "Add a backup selector and token-gated restore result flow."),
     "runtime.external-jdk-verify": ("External JDK verification remains registered but is not exposed by the Runtime workbench.", "Add a read-only external JDK verification result flow."),
     "system.self-uninstall": ("The v1.7 self-uninstall command remains registered but no current Settings entry invokes it.", "Restore the guarded uninstall entry or explicitly remove the promise."),
-    "toolchains.actions": ("run_toolchain_action remains registered, but the current Toolchains API exposes inspection only for ecosystem actions.", "Expose supported actions with persistent results and risk handling."),
-    "toolchains.mirrors": ("run_chsrc_action remains registered, but the current Toolchains page has no chsrc source-management action.", "Restore fixed-target chsrc inspect/change/restore controls."),
-    "toolchains.network-cache": ("network_diagnostics and cache_entries remain registered without current Toolchains entries or result panels.", "Expose the read-only diagnostics and guarded cache workflow."),
     "update.download-install": ("Settings exposes update checking only; download_update and launch_update_installer have no current frontend invoke.", "Restore download verification and installer-launch result flow."),
 }
 
@@ -435,6 +445,11 @@ def build_capabilities(records: list[dict[str, Any]], current: dict[str, Any]) -
             "followUpIssue": "#130" if capability_id.startswith("runtime.") else "#125",
             "lastVerifiedCommit": EVIDENCE_COMMIT,
             "automatedEvidence": automated,
+            "productDecision": {
+                "decision": "included-in-v1.8.2-compatibility-scope",
+                "source": "#132 fourth-stage authoritative task",
+                "decidedAt": "2026-07-12",
+            } if capability_id in V182_PRODUCT_DECISIONS else None,
             "codeBlockerEvidence": {
                 "oldReproduction": [f"Use {entry}" for entry in sorted({source["oldAction"] or source["oldCommand"] or "README" for source in sources})],
                 "currentReproduction": ["Open the mapped v1.8.2 domain and look for an equivalent result"],

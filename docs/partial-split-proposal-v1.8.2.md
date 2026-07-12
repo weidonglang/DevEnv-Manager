@@ -2,8 +2,8 @@
 
 This proposal does not modify the formal feature manifest.
 
-- Partial parents: 27
-- Atomic child proposals: 111
+- Partial parents: 26
+- Atomic child proposals: 105
 
 | Parent | Proposed child | Priority | Command | Implementation | Evidence | Disposition |
 |---|---|---|---|---|---|---|
@@ -105,12 +105,6 @@ This proposal does not modify the formal feature manifest.
 | `settings.themeLanguageSafety` | `settings.themeLanguageSafety.setAutoCheckUpdate` | P1 | `set_auto_check_update` | equivalent | verified-automated | ready |
 | `settings.themeLanguageSafety` | `settings.themeLanguageSafety.resetUiConfig` | P1 | `reset_ui_config` | equivalent | verified-automated | ready |
 | `settings.themeLanguageSafety` | `settings.themeLanguageSafety.openAppConfigDir` | P1 | `open_app_config_dir` | equivalent | verified-automated | ready |
-| `toolchains.gitNodePythonMirrors` | `toolchains.gitNodePythonMirrors.inspectCommandSafety` | P1 | `inspect_command_safety` | equivalent | verified-automated | ready |
-| `toolchains.gitNodePythonMirrors` | `toolchains.gitNodePythonMirrors.runToolchainAction` | P1 | `run_toolchain_action` | degraded | evidence-required | code-blocker |
-| `toolchains.gitNodePythonMirrors` | `toolchains.gitNodePythonMirrors.runPlatformAction` | P1 | `run_platform_action` | degraded | evidence-required | code-blocker |
-| `toolchains.gitNodePythonMirrors` | `toolchains.gitNodePythonMirrors.runChsrcAction` | P1 | `run_chsrc_action` | degraded | evidence-required | code-blocker |
-| `toolchains.gitNodePythonMirrors` | `toolchains.gitNodePythonMirrors.networkDiagnostics` | P1 | `network_diagnostics` | degraded | evidence-required | code-blocker |
-| `toolchains.gitNodePythonMirrors` | `toolchains.gitNodePythonMirrors.cacheEntries` | P1 | `cache_entries` | degraded | evidence-required | code-blocker |
 | `toolchains.mysqlRepair` | `toolchains.mysqlRepair.inspectMysqlRepair` | P1 | `inspect_mysql_repair` | equivalent | verified-automated | ready |
 | `toolchains.mysqlRepair` | `toolchains.mysqlRepair.createMysqlRepairPlan` | P1 | `create_mysql_repair_plan` | equivalent | verified-automated | ready |
 | `toolchains.mysqlRepair` | `toolchains.mysqlRepair.executeMysqlRepairPlan` | P1 | `execute_mysql_repair_plan` | equivalent | verified-automated | ready |

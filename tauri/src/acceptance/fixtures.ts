@@ -6,6 +6,8 @@ import type { RuntimeWorkbenchState } from "../features/runtimes/state";
 import { toolchainWorkbenchInitialState, type ToolchainWorkbenchState } from "../features/toolchains/state";
 import type { PortRecord } from "../types";
 
+const acceptanceTool = (name: string, path: string) => ({ name, installed: true, version: "fixture-1.0", path, detail: "acceptance fixture" });
+
 const portsRecords = [
   {
     protocol: "TCP",
@@ -253,6 +255,45 @@ export const acceptanceFixtures = {
   fileAssociations: fileAssociationsAcceptanceFixture,
   toolchains: {
     ...toolchainWorkbenchInitialState,
+    report: {
+      git: {
+        git: acceptanceTool("Git", "C:\\Program Files\\Git\\cmd\\git.exe"),
+        gitBashPath: "C:\\Program Files\\Git\\bin\\bash.exe",
+        userName: "Acceptance User",
+        userEmail: "acceptance@example.invalid",
+        ssh: acceptanceTool("OpenSSH", "C:\\Windows\\System32\\OpenSSH\\ssh.exe"),
+        sshKeyExists: true,
+        publicKeyPath: "C:\\Users\\Acceptance\\.ssh\\id_ed25519.pub",
+        publicKey: "redacted fixture key",
+        githubSshStatus: "Authenticated fixture",
+        githubHttpsStatus: "Reachable fixture",
+        gitLfs: acceptanceTool("Git LFS", "C:\\Program Files\\Git LFS\\git-lfs.exe"),
+        globalConfigPath: "C:\\Users\\Acceptance\\.gitconfig",
+      },
+      node: {
+        tools: [acceptanceTool("Node.js", "C:\\Program Files\\nodejs\\node.exe"), acceptanceTool("npm", "C:\\Program Files\\nodejs\\npm.cmd")],
+        npmPrefix: "C:\\Users\\Acceptance\\AppData\\Roaming\\npm",
+        npmRegistry: "https://registry.npmjs.org/",
+        pnpmStorePath: "C:\\Users\\Acceptance\\AppData\\Local\\pnpm\\store",
+        npmConfigPath: "C:\\Users\\Acceptance\\.npmrc",
+      },
+      python: {
+        tools: [acceptanceTool("pip", "C:\\Python313\\python.exe"), acceptanceTool("uv", "C:\\Python313\\python.exe")],
+        pipConfig: "global.index-url=https://pypi.org/simple",
+        pipIndexUrl: "https://pypi.org/simple",
+        pipConfigPath: "C:\\Users\\Acceptance\\AppData\\Roaming\\pip\\pip.ini",
+      },
+      generatedAt: "2026-07-12T00:00:00Z",
+    },
+    platform: {
+      go: { go: acceptanceTool("Go", "C:\\Go\\bin\\go.exe"), goroot: "C:\\Go", gopath: "C:\\Users\\Acceptance\\go", goproxy: "https://proxy.golang.org,direct", gomodcache: "C:\\Users\\Acceptance\\go\\pkg\\mod" },
+      rust: { tools: [acceptanceTool("rustup", "C:\\Users\\Acceptance\\.cargo\\bin\\rustup.exe"), acceptanceTool("rustc", "C:\\Users\\Acceptance\\.cargo\\bin\\rustc.exe")], defaultToolchain: "stable-x86_64-pc-windows-msvc", installedToolchains: ["stable-x86_64-pc-windows-msvc"], msvcBuildTools: "Visual Studio Build Tools fixture", cargoConfigPath: "C:\\Users\\Acceptance\\.cargo\\config.toml" },
+      dotnet: { dotnet: acceptanceTool(".NET SDK", "C:\\Program Files\\dotnet\\dotnet.exe"), sdks: ["8.0.100"], runtimes: ["Microsoft.NETCore.App 8.0.0"], nugetConfigPath: "C:\\Users\\Acceptance\\.nuget\\NuGet\\NuGet.Config" },
+      mirrors: { npmRegistry: "https://registry.npmjs.org/", pipIndexUrl: "https://pypi.org/simple", goProxy: "https://proxy.golang.org,direct", mavenSettingsPath: "C:\\Users\\Acceptance\\.m2\\settings.xml", mavenSettingsExists: true, gradleInitPath: "C:\\Users\\Acceptance\\.gradle\\init.gradle", gradleInitExists: true, cargoConfigPath: "C:\\Users\\Acceptance\\.cargo\\config.toml", cargoConfigExists: true },
+      chsrc: acceptanceTool("chsrc", "C:\\Tools\\chsrc.exe"),
+      chsrcRecovery: { missing: false, explanation: ["fixture"], scoopCommand: "scoop install chsrc", wingetCommand: "winget install RubyMetric.chsrc", officialUrl: "https://github.com/RubyMetric/chsrc", fallbackFeatures: ["npm", "pip"] },
+      generatedAt: "2026-07-12T00:00:00Z",
+    },
     system: {
       docker: { name: "Docker", installed: true, version: "27.0.0", path: "C:\\Program Files\\Docker\\Docker\\resources\\bin\\docker.exe", detail: "fixture" },
       dockerInfo: "Docker Engine 27.0.0",
@@ -289,5 +330,11 @@ export const acceptanceFixtures = {
       },
     ],
     selectedServiceId: "mysql",
+    network: {
+      checks: [{ name: "GitHub", url: "https://github.com", success: true, status: "200", elapsedMs: 42 }],
+      proxy: [["HTTPS_PROXY", "not set"]],
+    },
+    cacheEntries: [{ name: "fixture.zip", path: "C:\\DevEnvManager\\downloads\\fixture.zip", size: 1024, sha256: "a".repeat(64) }],
+    cacheInspected: true,
   } satisfies ToolchainWorkbenchState,
 };

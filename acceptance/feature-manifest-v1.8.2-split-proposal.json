@@ -3,9 +3,9 @@
   "version": "1.8.2",
   "formalManifestChanged": false,
   "summary": {
-    "partialParents": 27,
-    "parentsWithProposal": 27,
-    "atomicChildren": 111,
+    "partialParents": 26,
+    "parentsWithProposal": 26,
+    "atomicChildren": 105,
     "unresolvedParents": 0
   },
   "children": [
@@ -1576,102 +1576,6 @@
       "implementationStatus": "equivalent",
       "evidenceStatus": "verified-automated",
       "releaseDisposition": "ready",
-      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
-    },
-    {
-      "newFeatureId": "toolchains.gitNodePythonMirrors.inspectCommandSafety",
-      "parentFeatureId": "toolchains.gitNodePythonMirrors",
-      "oldCapabilityIds": [
-        "toolchains.command-safety"
-      ],
-      "priority": "P1",
-      "userGoal": "Complete the Inspect Command Safety step within toolchains.gitNodePythonMirrors",
-      "commands": [
-        "inspect_command_safety"
-      ],
-      "implementationStatus": "equivalent",
-      "evidenceStatus": "verified-automated",
-      "releaseDisposition": "ready",
-      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
-    },
-    {
-      "newFeatureId": "toolchains.gitNodePythonMirrors.runToolchainAction",
-      "parentFeatureId": "toolchains.gitNodePythonMirrors",
-      "oldCapabilityIds": [
-        "toolchains.actions"
-      ],
-      "priority": "P1",
-      "userGoal": "Complete the Run Toolchain Action step within toolchains.gitNodePythonMirrors",
-      "commands": [
-        "run_toolchain_action"
-      ],
-      "implementationStatus": "degraded",
-      "evidenceStatus": "evidence-required",
-      "releaseDisposition": "code-blocker",
-      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
-    },
-    {
-      "newFeatureId": "toolchains.gitNodePythonMirrors.runPlatformAction",
-      "parentFeatureId": "toolchains.gitNodePythonMirrors",
-      "oldCapabilityIds": [
-        "platforms.manage"
-      ],
-      "priority": "P1",
-      "userGoal": "Complete the Run Platform Action step within toolchains.gitNodePythonMirrors",
-      "commands": [
-        "run_platform_action"
-      ],
-      "implementationStatus": "degraded",
-      "evidenceStatus": "evidence-required",
-      "releaseDisposition": "code-blocker",
-      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
-    },
-    {
-      "newFeatureId": "toolchains.gitNodePythonMirrors.runChsrcAction",
-      "parentFeatureId": "toolchains.gitNodePythonMirrors",
-      "oldCapabilityIds": [
-        "toolchains.mirrors"
-      ],
-      "priority": "P1",
-      "userGoal": "Complete the Run Chsrc Action step within toolchains.gitNodePythonMirrors",
-      "commands": [
-        "run_chsrc_action"
-      ],
-      "implementationStatus": "degraded",
-      "evidenceStatus": "evidence-required",
-      "releaseDisposition": "code-blocker",
-      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
-    },
-    {
-      "newFeatureId": "toolchains.gitNodePythonMirrors.networkDiagnostics",
-      "parentFeatureId": "toolchains.gitNodePythonMirrors",
-      "oldCapabilityIds": [
-        "toolchains.network-cache"
-      ],
-      "priority": "P1",
-      "userGoal": "Complete the Network Diagnostics step within toolchains.gitNodePythonMirrors",
-      "commands": [
-        "network_diagnostics"
-      ],
-      "implementationStatus": "degraded",
-      "evidenceStatus": "evidence-required",
-      "releaseDisposition": "code-blocker",
-      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
-    },
-    {
-      "newFeatureId": "toolchains.gitNodePythonMirrors.cacheEntries",
-      "parentFeatureId": "toolchains.gitNodePythonMirrors",
-      "oldCapabilityIds": [
-        "toolchains.network-cache"
-      ],
-      "priority": "P1",
-      "userGoal": "Complete the Cache Entries step within toolchains.gitNodePythonMirrors",
-      "commands": [
-        "cache_entries"
-      ],
-      "implementationStatus": "degraded",
-      "evidenceStatus": "evidence-required",
-      "releaseDisposition": "code-blocker",
       "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
     },
     {

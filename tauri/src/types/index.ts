@@ -543,17 +543,20 @@ export type ToolchainReport = {
     githubSshStatus: string;
     githubHttpsStatus: string;
     gitLfs: ToolState;
+    globalConfigPath: string;
   };
   node: {
     tools: ToolState[];
     npmPrefix: string;
     npmRegistry: string;
     pnpmStorePath: string;
+    npmConfigPath: string;
   };
   python: {
     tools: ToolState[];
     pipConfig: string;
     pipIndexUrl: string;
+    pipConfigPath: string;
   };
   generatedAt: string;
 };
@@ -577,6 +580,7 @@ export type PlatformReport = {
     dotnet: ToolState;
     sdks: string[];
     runtimes: string[];
+    nugetConfigPath: string;
   };
   mirrors: {
     npmRegistry: string;

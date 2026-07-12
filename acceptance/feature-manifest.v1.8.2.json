@@ -1800,11 +1800,11 @@
           "featureId": "toolchains.gitNodePythonMirrors",
           "id": "toolchains.gitNodePythonMirrors",
           "domain": "Toolchains",
-          "userVisibleName": "Git, Node, Python, mirrors and platform tools",
-          "name": "Git, Node, Python, mirrors and platform tools",
+          "userVisibleName": "Git, Node, Python, Rust, .NET, mirrors, network and managed cache",
+          "name": "Git, Node, Python, Rust, .NET, mirrors, network and managed cache",
           "priority": "P1",
           "targetVersion": "v1.8.2",
-          "status": "partial",
+          "status": "implemented",
           "oldFeature": true,
           "oldEntry": "Toolchains",
           "currentEntry": "Toolchains",
@@ -1813,22 +1813,35 @@
             "route": "toolchains",
             "testIds": [
               "toolchains-overview-section",
-              "toolchains-result"
+              "toolchains-result",
+              "toolchains-ecosystems-result",
+              "toolchains-action-preview",
+              "toolchains-action-result",
+              "toolchains-mirror-preview",
+              "toolchains-mirror-result",
+              "toolchains-network-result",
+              "toolchains-cache-result",
+              "toolchains-cache-operation-result"
             ]
           },
           "selectors": {
             "entry": "toolchains-overview-section",
             "primaryAction": "inspect-toolchains",
-            "result": "toolchains-result",
-            "error": "toolchains-error"
+            "result": "toolchains-action-result",
+            "error": "toolchains-action-error",
+            "plan": "toolchains-action-preview"
           },
           "backendCommands": [
+            "inspect_toolchains",
+            "inspect_platform_toolchains",
             "inspect_command_safety",
             "run_toolchain_action",
             "run_platform_action",
             "run_chsrc_action",
             "network_diagnostics",
-            "cache_entries"
+            "cache_entries",
+            "clear_download_cache",
+            "open_analysis_path"
           ],
           "backendExists": true,
           "frontendWired": true,
@@ -1844,7 +1857,7 @@
           "requiresToken": true,
           "requiresVerify": true,
           "requiresRollback": false,
-          "requiresPagination": true,
+          "requiresPagination": false,
           "requiresI18n": true,
           "requiresDarkReadable": true,
           "safeSmokeMode": "dryRun",
@@ -1860,7 +1873,11 @@
             "riskContract",
             "resultPanelVisible",
             "debugContract",
-            "reportContract"
+            "reportContract",
+            "ecosystemDiagnostics",
+            "allowlistedActions",
+            "mirrorPreviewVerifyRollback",
+            "networkCacheResult"
           ]
         },
         {
