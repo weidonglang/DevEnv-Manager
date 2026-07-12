@@ -631,6 +631,11 @@ export type LocalServiceStatus = {
   serviceName: string;
   serviceState: string;
   binaryPath: string;
+  executablePath: string;
+  installDirectory: string;
+  pathStatus: string;
+  logPath: string;
+  logPathReason: string;
 };
 
 export type MySqlCandidate = {

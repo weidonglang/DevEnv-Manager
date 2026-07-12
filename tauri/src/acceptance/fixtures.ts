@@ -3,6 +3,7 @@ import type { FileAssociationUiState } from "../features/fileAssociations/state"
 import type { PortsWorkbenchState } from "../features/ports/state";
 import { portRecordKey } from "../features/ports/portSafety";
 import type { RuntimeWorkbenchState } from "../features/runtimes/state";
+import { toolchainWorkbenchInitialState, type ToolchainWorkbenchState } from "../features/toolchains/state";
 import type { PortRecord } from "../types";
 
 const portsRecords = [
@@ -250,4 +251,43 @@ export const acceptanceFixtures = {
   cleanup: cleanupAcceptanceFixture,
   runtimes: runtimeAcceptanceFixture,
   fileAssociations: fileAssociationsAcceptanceFixture,
+  toolchains: {
+    ...toolchainWorkbenchInitialState,
+    system: {
+      docker: { name: "Docker", installed: true, version: "27.0.0", path: "C:\\Program Files\\Docker\\Docker\\resources\\bin\\docker.exe", detail: "fixture" },
+      dockerInfo: "Docker Engine 27.0.0",
+      dockerDesktopPath: "C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe",
+      wsl: { name: "WSL", installed: true, version: "2.3.0", path: "C:\\Windows\\System32\\wsl.exe", detail: "fixture" },
+      wslStatus: "Default Version: 2",
+      wslDistributions: ["Ubuntu Running 2", "Debian Stopped 2"],
+      wslItems: [
+        { name: "Ubuntu", state: "Running", version: "2", isDefault: true },
+        { name: "Debian", state: "Stopped", version: "2", isDefault: false },
+      ],
+    },
+    services: [
+      {
+        id: "mysql",
+        name: "MySQL",
+        port: 3306,
+        occupied: true,
+        pid: 4100,
+        processName: "mysqld.exe",
+        processPath: "C:\\Program Files\\MySQL\\MySQL Server 8.4\\bin\\mysqld.exe",
+        serviceNames: ["MySQL84"],
+        safeToStop: true,
+        connectionCommand: "mysql -h 127.0.0.1 -P 3306 -u root -p",
+        installed: true,
+        serviceName: "MySQL84",
+        serviceState: "Running",
+        binaryPath: "\"C:\\Program Files\\MySQL\\MySQL Server 8.4\\bin\\mysqld.exe\" --service",
+        executablePath: "C:\\Program Files\\MySQL\\MySQL Server 8.4\\bin\\mysqld.exe",
+        installDirectory: "C:\\Program Files\\MySQL\\MySQL Server 8.4\\bin",
+        pathStatus: "Executable and installation directory verified by the backend.",
+        logPath: "C:\\Windows\\System32\\winevt\\Logs\\Application.evtx",
+        logPathReason: "Windows Application event log queried by the backend.",
+      },
+    ],
+    selectedServiceId: "mysql",
+  } satisfies ToolchainWorkbenchState,
 };

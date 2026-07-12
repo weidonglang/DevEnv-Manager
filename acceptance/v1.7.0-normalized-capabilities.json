@@ -23,23 +23,23 @@
   "summary": {
     "total": 87,
     "byImplementationStatus": {
-      "degraded": 8,
+      "degraded": 3,
       "enhanced": 13,
-      "equivalent": 61,
+      "equivalent": 66,
       "missing": 5
     },
     "byEvidenceStatus": {
       "environment-blocked": 14,
-      "evidence-required": 20,
-      "verified-automated": 28,
+      "evidence-required": 17,
+      "verified-automated": 31,
       "verified-installed": 24,
       "verified-real-tauri": 1
     },
     "byReleaseDisposition": {
-      "code-blocker": 8,
-      "evidence-blocker": 21,
+      "code-blocker": 3,
+      "evidence-blocker": 23,
       "product-decision-required": 5,
-      "ready": 53
+      "ready": 56
     }
   },
   "capabilities": [
@@ -1564,7 +1564,7 @@
         "v17.promise.033"
       ],
       "v1.8.2Entry": [
-        "tauri/src/features/toolchains/api.ts:45"
+        "tauri/src/features/toolchains/api.ts:61"
       ],
       "v1.8.2Steps": [
         "Open the mapped Workbench domain",
@@ -1581,7 +1581,7 @@
       "followUpIssue": "#125",
       "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
       "automatedEvidence": [
-        "frontend:tauri/src/features/toolchains/api.ts:45"
+        "frontend:tauri/src/features/toolchains/api.ts:61"
       ],
       "codeBlockerEvidence": null,
       "evidencePlan": null
@@ -1716,34 +1716,27 @@
       "sourceRecordIds": [
         "v17.command.open_docker_desktop"
       ],
-      "v1.8.2Entry": [],
-      "v1.8.2Steps": [],
-      "v1.8.2Result": "No complete current user path evidenced",
+      "v1.8.2Entry": [
+        "tauri/src/features/toolchains/api.ts:41"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
       "replacementCommands": [
         "open_docker_desktop"
       ],
-      "implementationStatus": "degraded",
-      "evidenceStatus": "evidence-required",
-      "releaseDisposition": "code-blocker",
-      "releaseReason": "The dedicated Docker Desktop opener remains registered without a frontend entry.",
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
       "followUpIssue": "#125",
       "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
-      "automatedEvidence": [],
-      "codeBlockerEvidence": {
-        "oldReproduction": [
-          "Use open_docker_desktop"
-        ],
-        "currentReproduction": [
-          "Open the mapped v1.8.2 domain and look for an equivalent result"
-        ],
-        "expected": "Platforms Docker",
-        "actual": "The dedicated Docker Desktop opener remains registered without a frontend entry.",
-        "sourceLocations": [
-          "v1.7.0 frontend invoke"
-        ],
-        "userImpact": "The historical user goal may not be completable in v1.8.2.",
-        "minimalFix": "Expose the read-only/open action or approve its replacement."
-      },
+      "automatedEvidence": [
+        "frontend:tauri/src/features/toolchains/api.ts:41"
+      ],
+      "codeBlockerEvidence": null,
       "evidencePlan": null
     },
     {
@@ -1826,36 +1819,29 @@
         "manage_system_platform",
         "run_platform_action"
       ],
-      "implementationStatus": "degraded",
+      "implementationStatus": "equivalent",
       "evidenceStatus": "evidence-required",
-      "releaseDisposition": "code-blocker",
-      "releaseReason": "The visible platform-management button always sends action 'open', but manage_system_platform supports docker_install, docker_update, docker_shutdown, and WSL actions instead.",
+      "releaseDisposition": "evidence-blocker",
+      "releaseReason": "Implementation mapping exists, but the required installed or safely isolated execution evidence is incomplete.",
       "followUpIssue": "#125",
       "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
       "automatedEvidence": [
         "frontend:tauri/src/features/toolchains/api.ts:37"
       ],
-      "codeBlockerEvidence": {
-        "oldReproduction": [
-          "Use README",
-          "Use manage_system_platform",
-          "Use run_platform_action",
-          "Use system-platform"
+      "codeBlockerEvidence": null,
+      "evidencePlan": {
+        "fixture": "Dedicated temporary data or disposable VM snapshot",
+        "environment": "Windows real Tauri or installed application",
+        "steps": [
+          "Capture baseline",
+          "Run the mapped user path",
+          "Verify result against system state",
+          "Restore baseline"
         ],
-        "currentReproduction": [
-          "Open the mapped v1.8.2 domain and look for an equivalent result"
-        ],
-        "expected": "Docker Desktop 安装、更新、启动和关闭；WSL 更新、发行版安装、启动、停止和默认发行版管理。",
-        "actual": "The visible platform-management button always sends action 'open', but manage_system_platform supports docker_install, docker_update, docker_shutdown, and WSL actions instead.",
-        "sourceLocations": [
-          "README.md:Docker Desktop 安装、更新、启动和关闭；WSL 更新、发行版安装、启动、停止和默认发行版管理。",
-          "v1.7.0 frontend action",
-          "v1.7.0 frontend invoke"
-        ],
-        "userImpact": "The historical user goal may not be completable in v1.8.2.",
-        "minimalFix": "Render supported platform actions and pass the selected action/value."
-      },
-      "evidencePlan": null
+        "safetyBoundary": "Do not modify real services, associations, environment, or user files outside the fixture.",
+        "passCriteria": "UI result, receipt, and observed system state agree.",
+        "recovery": "Delete temporary data or revert the VM snapshot."
+      }
     },
     {
       "capabilityId": "ports.process-location",
@@ -3171,36 +3157,27 @@
         "v17.action.local-service-directory",
         "v17.command.open_local_service_directory"
       ],
-      "v1.8.2Entry": [],
-      "v1.8.2Steps": [],
-      "v1.8.2Result": "No complete current user path evidenced",
+      "v1.8.2Entry": [
+        "tauri/src/features/toolchains/api.ts:49"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
       "replacementCommands": [
         "open_local_service_directory"
       ],
-      "implementationStatus": "degraded",
-      "evidenceStatus": "evidence-required",
-      "releaseDisposition": "code-blocker",
-      "releaseReason": "Local-service installation-directory access remains registered without a row-level UI action.",
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
       "followUpIssue": "#125",
       "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
-      "automatedEvidence": [],
-      "codeBlockerEvidence": {
-        "oldReproduction": [
-          "Use local-service-directory",
-          "Use open_local_service_directory"
-        ],
-        "currentReproduction": [
-          "Open the mapped v1.8.2 domain and look for an equivalent result"
-        ],
-        "expected": "Services Directory",
-        "actual": "Local-service installation-directory access remains registered without a row-level UI action.",
-        "sourceLocations": [
-          "v1.7.0 frontend action",
-          "v1.7.0 frontend invoke"
-        ],
-        "userImpact": "The historical user goal may not be completable in v1.8.2.",
-        "minimalFix": "Add a selected-service open-directory action."
-      },
+      "automatedEvidence": [
+        "frontend:tauri/src/features/toolchains/api.ts:49"
+      ],
+      "codeBlockerEvidence": null,
       "evidencePlan": null
     },
     {
@@ -3262,36 +3239,27 @@
         "v17.action.local-service-logs",
         "v17.command.local_service_logs"
       ],
-      "v1.8.2Entry": [],
-      "v1.8.2Steps": [],
-      "v1.8.2Result": "No complete current user path evidenced",
+      "v1.8.2Entry": [
+        "tauri/src/features/toolchains/api.ts:45"
+      ],
+      "v1.8.2Steps": [
+        "Open the mapped Workbench domain",
+        "Run the mapped command flow"
+      ],
+      "v1.8.2Result": "Mapped result panel or operation receipt",
       "replacementCommands": [
         "local_service_logs"
       ],
-      "implementationStatus": "degraded",
-      "evidenceStatus": "evidence-required",
-      "releaseDisposition": "code-blocker",
-      "releaseReason": "Local-service log inspection remains registered without a rendered log action or result area.",
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
       "followUpIssue": "#125",
       "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
-      "automatedEvidence": [],
-      "codeBlockerEvidence": {
-        "oldReproduction": [
-          "Use local-service-logs",
-          "Use local_service_logs"
-        ],
-        "currentReproduction": [
-          "Open the mapped v1.8.2 domain and look for an equivalent result"
-        ],
-        "expected": "Services Logs",
-        "actual": "Local-service log inspection remains registered without a rendered log action or result area.",
-        "sourceLocations": [
-          "v1.7.0 frontend action",
-          "v1.7.0 frontend invoke"
-        ],
-        "userImpact": "The historical user goal may not be completable in v1.8.2.",
-        "minimalFix": "Add a selected-service logs action and persistent output."
-      },
+      "automatedEvidence": [
+        "frontend:tauri/src/features/toolchains/api.ts:45"
+      ],
+      "codeBlockerEvidence": null,
       "evidencePlan": null
     },
     {
@@ -3329,37 +3297,30 @@
         "manage_local_service",
         "stop_local_service"
       ],
-      "implementationStatus": "degraded",
+      "implementationStatus": "equivalent",
       "evidenceStatus": "evidence-required",
-      "releaseDisposition": "code-blocker",
-      "releaseReason": "The service-management button operates on state.services[0] rather than a user-selected service.",
+      "releaseDisposition": "evidence-blocker",
+      "releaseReason": "Implementation mapping exists, but the required installed or safely isolated execution evidence is incomplete.",
       "followUpIssue": "#125",
       "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
       "automatedEvidence": [
         "frontend:tauri/src/features/ports/api.ts:25",
         "frontend:tauri/src/features/toolchains/api.ts:33"
       ],
-      "codeBlockerEvidence": {
-        "oldReproduction": [
-          "Use README",
-          "Use local-service-manage",
-          "Use manage_local_service",
-          "Use stop_local_service"
+      "codeBlockerEvidence": null,
+      "evidencePlan": {
+        "fixture": "Dedicated temporary data or disposable VM snapshot",
+        "environment": "Windows real Tauri or installed application",
+        "steps": [
+          "Capture baseline",
+          "Run the mapped user path",
+          "Verify result against system state",
+          "Restore baseline"
         ],
-        "currentReproduction": [
-          "Open the mapped v1.8.2 domain and look for an equivalent result"
-        ],
-        "expected": "MySQL、PostgreSQL、Redis、MongoDB、Elasticsearch、SQL Server 服务检测、启动、停止、重启、日志和安装目录访问。",
-        "actual": "The service-management button operates on state.services[0] rather than a user-selected service.",
-        "sourceLocations": [
-          "README.md:MySQL、PostgreSQL、Redis、MongoDB、Elasticsearch、SQL Server 服务检测、启动、停止、重启、日志和安装目录访问。",
-          "v1.7.0 frontend action",
-          "v1.7.0 frontend invoke"
-        ],
-        "userImpact": "The historical user goal may not be completable in v1.8.2.",
-        "minimalFix": "Add explicit row selection and bind the selected service/action."
-      },
-      "evidencePlan": null
+        "safetyBoundary": "Do not modify real services, associations, environment, or user files outside the fixture.",
+        "passCriteria": "UI result, receipt, and observed system state agree.",
+        "recovery": "Delete temporary data or revert the VM snapshot."
+      }
     },
     {
       "capabilityId": "settings.auto-update",
@@ -3627,7 +3588,8 @@
       "v1.8.2Entry": [
         "tauri/src/features/cleanup/api.ts:101",
         "tauri/src/features/reports/api.ts:53",
-        "tauri/src/features/runtimes/api.ts:29"
+        "tauri/src/features/runtimes/api.ts:29",
+        "tauri/src/features/toolchains/api.ts:53"
       ],
       "v1.8.2Steps": [
         "Open the mapped Workbench domain",
@@ -3646,7 +3608,8 @@
       "automatedEvidence": [
         "frontend:tauri/src/features/cleanup/api.ts:101",
         "frontend:tauri/src/features/reports/api.ts:53",
-        "frontend:tauri/src/features/runtimes/api.ts:29"
+        "frontend:tauri/src/features/runtimes/api.ts:29",
+        "frontend:tauri/src/features/toolchains/api.ts:53"
       ],
       "codeBlockerEvidence": null,
       "evidencePlan": null
@@ -3769,7 +3732,7 @@
         "v17.promise.038"
       ],
       "v1.8.2Entry": [
-        "tauri/src/features/toolchains/api.ts:41"
+        "tauri/src/features/toolchains/api.ts:57"
       ],
       "v1.8.2Steps": [
         "Open the mapped Workbench domain",
@@ -3787,7 +3750,7 @@
       "followUpIssue": "#125",
       "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
       "automatedEvidence": [
-        "frontend:tauri/src/features/toolchains/api.ts:41"
+        "frontend:tauri/src/features/toolchains/api.ts:57"
       ],
       "codeBlockerEvidence": null,
       "evidencePlan": null

@@ -42,6 +42,16 @@ export const acceptanceSelectors = {
     planPreview: "file-associations-plan-preview",
     rollbackInfo: "file-associations-rollback-info",
   },
+  toolchains: {
+    platformDocker: "platform-docker-section",
+    platformPreview: "platform-operation-preview",
+    platformResult: "platform-operation-result",
+    serviceTable: "local-services-table",
+    serviceDirectoryResult: "local-service-directory-result",
+    serviceLogsResult: "local-service-logs-result",
+    servicePreview: "local-service-operation-preview",
+    serviceResult: "local-service-operation-result",
+  },
   quality: {
     persistentError: "global-persistent-error",
     persistentResult: "global-persistent-result",

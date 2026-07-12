@@ -249,8 +249,6 @@ STATUS_OVERRIDES = {
     "safety.guide": "enhanced",
     "cli.workflows": "equivalent",
     "runner.background-execution": "enhanced",
-    "platforms.manage": "degraded",
-    "services.manage": "degraded",
 }
 
 EVIDENCE_OVERRIDES = {
@@ -281,12 +279,7 @@ BLOCKER_DETAILS = {
     "environment.python-alias-settings": ("The Windows Python alias settings command remains registered but has no Environment action.", "Add the smallest explicit open-settings entry."),
     "environment.python-health-repair": ("Python analysis, preview, and repair commands remain registered but the Environment page exposes only Java stabilization and PATH cleanup.", "Restore Python diagnosis and guarded repair result panels."),
     "environment.restore": ("The Environment page lists backup counts but does not expose a restore action for either backup model.", "Add a backup selector and token-gated restore result flow."),
-    "platforms.docker": ("The dedicated Docker Desktop opener remains registered without a frontend entry.", "Expose the read-only/open action or approve its replacement."),
-    "platforms.manage": ("The visible platform-management button always sends action 'open', but manage_system_platform supports docker_install, docker_update, docker_shutdown, and WSL actions instead.", "Render supported platform actions and pass the selected action/value."),
     "runtime.external-jdk-verify": ("External JDK verification remains registered but is not exposed by the Runtime workbench.", "Add a read-only external JDK verification result flow."),
-    "services.directory": ("Local-service installation-directory access remains registered without a row-level UI action.", "Add a selected-service open-directory action."),
-    "services.logs": ("Local-service log inspection remains registered without a rendered log action or result area.", "Add a selected-service logs action and persistent output."),
-    "services.manage": ("The service-management button operates on state.services[0] rather than a user-selected service.", "Add explicit row selection and bind the selected service/action."),
     "system.self-uninstall": ("The v1.7 self-uninstall command remains registered but no current Settings entry invokes it.", "Restore the guarded uninstall entry or explicitly remove the promise."),
     "toolchains.actions": ("run_toolchain_action remains registered, but the current Toolchains API exposes inspection only for ecosystem actions.", "Expose supported actions with persistent results and risk handling."),
     "toolchains.mirrors": ("run_chsrc_action remains registered, but the current Toolchains page has no chsrc source-management action.", "Restore fixed-target chsrc inspect/change/restore controls."),

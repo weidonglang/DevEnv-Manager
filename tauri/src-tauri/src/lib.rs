@@ -1054,6 +1054,11 @@ struct LocalServiceStatus {
     service_name: String,
     service_state: String,
     binary_path: String,
+    executable_path: String,
+    install_directory: String,
+    path_status: String,
+    log_path: String,
+    log_path_reason: String,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -8325,6 +8330,38 @@ fn inspect_local_services_blocking() -> Result<Vec<LocalServiceStatus>, String> 
                 .filter(|items| !items.is_empty())
                 .or_else(|| service.map(|item| vec![item.name.clone()]))
                 .unwrap_or_default();
+            let executable = service.and_then(|item| service_executable_path(&item.path_name));
+            let install_directory = executable
+                .as_ref()
+                .and_then(|path| path.parent())
+                .filter(|path| path.is_dir())
+                .map(display_path)
+                .unwrap_or_default();
+            let executable_path = executable
+                .as_ref()
+                .map(display_path)
+                .unwrap_or_default();
+            let path_status = if service.is_none() {
+                "No installed Windows service was found for this database definition.".to_string()
+            } else if executable_path.is_empty() {
+                "The Windows service exists, but its configured executable could not be resolved to an existing file.".to_string()
+            } else if install_directory.is_empty() {
+                "The service executable was resolved, but its parent directory is not accessible.".to_string()
+            } else {
+                "Executable and installation directory verified by the backend.".to_string()
+            };
+            let application_log = service.and_then(|_| windows_application_event_log_path());
+            let log_path = application_log
+                .as_ref()
+                .map(display_path)
+                .unwrap_or_default();
+            let log_path_reason = if service.is_none() {
+                "No installed Windows service is available for event-log inspection.".to_string()
+            } else if log_path.is_empty() {
+                "The Windows Application event log file is not accessible; event entries can still be queried through the backend.".to_string()
+            } else {
+                "This is the Windows Application event log queried by the service log action, not a guessed database log directory.".to_string()
+            };
             LocalServiceStatus {
                 id: id.to_string(),
                 name: name.to_string(),
@@ -8355,9 +8392,20 @@ fn inspect_local_services_blocking() -> Result<Vec<LocalServiceStatus>, String> 
                 binary_path: service
                     .map(|item| item.path_name.clone())
                     .unwrap_or_default(),
+                executable_path,
+                install_directory,
+                path_status,
+                log_path,
+                log_path_reason,
             }
         })
         .collect())
+}
+
+fn windows_application_event_log_path() -> Option<PathBuf> {
+    let windows = std::env::var_os("WINDIR").map(PathBuf::from)?;
+    let path = windows.join("System32/winevt/Logs/Application.evtx");
+    path.is_file().then_some(path)
 }
 
 #[tauri::command]

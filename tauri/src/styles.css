@@ -1637,6 +1637,40 @@ input[type="checkbox"] {
   gap: 8px;
 }
 
+.operation-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  gap: 18px;
+  margin-top: 18px;
+}
+
+.operation-card {
+  min-width: 0;
+  padding: 16px 0;
+  border-top: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+}
+
+.operation-card h3 {
+  margin: 0 0 12px;
+  font-size: 1rem;
+}
+
+.operation-card label {
+  display: grid;
+  gap: 6px;
+  margin: 10px 0;
+}
+
+.operation-card select,
+.operation-card input {
+  width: 100%;
+  min-width: 0;
+}
+
+tr.is-selected td {
+  background: color-mix(in srgb, #2aa876 14%, transparent);
+}
+
 .icon-action {
   width: 34px;
   min-height: 30px;

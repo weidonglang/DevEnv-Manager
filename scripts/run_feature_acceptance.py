@@ -92,6 +92,7 @@ def static_cases() -> list[Case]:
         script_case("static", "check_update_lifecycle_contracts.py"),
         script_case("static", "check_environment_runtime_workflows.py"),
         script_case("static", "check_cleanup_recovery_workflows.py"),
+        script_case("static", "check_platform_service_workflows.py"),
         script_case("static", "check_v17_migration_completeness.py"),
         script_case("static", "check_release_dispositions.py"),
     ]

@@ -5,6 +5,22 @@ export type ToolchainWorkbenchState = {
   platform: PlatformReport | null;
   system: SystemPlatformReport | null;
   services: LocalServiceStatus[];
+  selectedServiceId: string;
+  serviceAction: "start" | "stop" | "restart";
+  serviceOperationResult: OperationResult | null;
+  serviceOperationError: string;
+  serviceVerification: string;
+  serviceLogText: string;
+  serviceLogError: string;
+  servicePathResult: string;
+  servicePathError: string;
+  platformAction: string;
+  platformValue: string;
+  platformOperationResult: OperationResult | null;
+  platformOperationError: string;
+  platformVerification: string;
+  dockerOpenResult: string;
+  dockerOpenError: string;
   mysql: MySqlRepairReport | null;
   mysqlPlan: MySqlRepairPlan | null;
   mysqlResult: OperationResult | null;
@@ -21,6 +37,22 @@ export const toolchainWorkbenchInitialState: ToolchainWorkbenchState = {
   platform: null,
   system: null,
   services: [],
+  selectedServiceId: "",
+  serviceAction: "restart",
+  serviceOperationResult: null,
+  serviceOperationError: "",
+  serviceVerification: "",
+  serviceLogText: "",
+  serviceLogError: "",
+  servicePathResult: "",
+  servicePathError: "",
+  platformAction: "docker_update",
+  platformValue: "",
+  platformOperationResult: null,
+  platformOperationError: "",
+  platformVerification: "",
+  dockerOpenResult: "",
+  dockerOpenError: "",
   mysql: null,
   mysqlPlan: null,
   mysqlResult: null,

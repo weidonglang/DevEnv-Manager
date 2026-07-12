@@ -2,6 +2,7 @@ import { renderCleanupWorkbench } from "../features/cleanup/render";
 import { renderFileAssociations } from "../features/fileAssociations/render";
 import { renderPortsWorkbench } from "../features/ports/render";
 import { renderRuntimeWorkbench } from "../features/runtimes/render";
+import { renderToolchainWorkbench } from "../features/toolchains/render";
 import { acceptanceFixtures } from "./fixtures";
 import { acceptanceSelectors } from "./selectors";
 
@@ -16,6 +17,7 @@ const pageHtml = {
   ports: () => renderPortsWorkbench(acceptanceFixtures.ports),
   runtimes: () => renderRuntimeWorkbench(acceptanceFixtures.runtimes),
   fileAssociations: () => renderFileAssociations(acceptanceFixtures.fileAssociations),
+  toolchains: () => renderToolchainWorkbench(acceptanceFixtures.toolchains),
 };
 
 export function renderAcceptancePage(pageId: keyof typeof pageHtml): string {
@@ -40,6 +42,11 @@ export function runFrontendAcceptanceSnapshot(): FrontendAcceptanceResult[] {
   const cleanupHtml = renderAcceptancePage("cleanup");
   checks.push(hasSelector("cleanup.diskOverview", cleanupHtml, acceptanceSelectors.cleanup.diskOverviewSection));
   checks.push(hasSelector("cleanup.operationResult", cleanupHtml, acceptanceSelectors.cleanup.operationResult));
+
+  const toolchainsHtml = renderAcceptancePage("toolchains");
+  for (const [name, selector] of Object.entries(acceptanceSelectors.toolchains)) {
+    checks.push(hasSelector(`toolchains.${name}`, toolchainsHtml, selector));
+  }
 
   return checks;
 }

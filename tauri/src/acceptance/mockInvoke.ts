@@ -13,6 +13,13 @@ export function createMockInvokeClient(overrides: MockInvokeMap = {}): InvokeCli
     scan_cleanup_targets: acceptanceFixtures.cleanup.scan,
     inspect_maintenance_overview: acceptanceFixtures.cleanup.overview,
     discover_runtimes: acceptanceFixtures.runtimes.runtimes,
+    inspect_system_platforms: acceptanceFixtures.toolchains.system,
+    inspect_local_services: acceptanceFixtures.toolchains.services,
+    open_docker_desktop: { success: true, message: "Docker Desktop fixture launched." },
+    manage_system_platform: { success: true, message: "Platform fixture action completed." },
+    open_local_service_directory: { success: true, message: "Service directory fixture opened." },
+    local_service_logs: "Fixture Windows Application event log entry.",
+    manage_local_service: { success: true, message: "Service fixture action completed." },
     ...overrides,
   };
 

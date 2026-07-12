@@ -37,6 +37,22 @@ export function manageSystemPlatform(action: string, value: string | null, confi
   return invoke<OperationResult>("manage_system_platform", { action, value, confirmationToken });
 }
 
+export function openDockerDesktop(): Promise<OperationResult> {
+  return invoke<OperationResult>("open_docker_desktop");
+}
+
+export function localServiceLogs(serviceName: string): Promise<string> {
+  return invoke<string>("local_service_logs", { serviceName });
+}
+
+export function openLocalServiceDirectory(serviceName: string): Promise<OperationResult> {
+  return invoke<OperationResult>("open_local_service_directory", { serviceName });
+}
+
+export function openServiceLogPath(path: string): Promise<OperationResult> {
+  return invoke<OperationResult>("open_analysis_path", { path });
+}
+
 export function inspectCommandSafety(command: string): Promise<CommandSafetyAssessment> {
   return invoke<CommandSafetyAssessment>("inspect_command_safety", { command });
 }

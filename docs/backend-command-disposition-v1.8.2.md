@@ -4,9 +4,9 @@ Every registered command has a capability mapping and one final classification.
 
 - Registered: 170
 - bootstrap: 3
-- compatibility-alias: 27
+- compatibility-alias: 24
 - diagnostic: 6
-- direct-user-command: 115
+- direct-user-command: 118
 - dynamic-user-command: 7
 - internal-helper: 4
 - replacement-command: 8
@@ -83,7 +83,7 @@ Every registered command has a capability mapping and one final classification.
 | `import_config_profiles` | `profiles.import-export` | direct-user-command | tauri/src/features/profiles/api.ts:25 |  | ready | A current frontend invoke exposes this command. |
 | `inspect_agent_traces` | `debug.agent-traces` | direct-user-command | tauri/src/features/projects/api.ts:26 |  | ready | A current frontend invoke exposes this command. |
 | `inspect_app_usage` | `cleanup.application-usage` | direct-user-command | tauri/src/features/cleanup/api.ts:105 |  | ready | A current frontend invoke exposes this command. |
-| `inspect_command_safety` | `toolchains.command-safety` | direct-user-command | tauri/src/features/toolchains/api.ts:41 |  | ready | A current frontend invoke exposes this command. |
+| `inspect_command_safety` | `toolchains.command-safety` | direct-user-command | tauri/src/features/toolchains/api.ts:57 |  | ready | A current frontend invoke exposes this command. |
 | `inspect_desktop` | `cleanup.folder-analysis` | direct-user-command | tauri/src/features/cleanup/api.ts:69 |  | ready | A current frontend invoke exposes this command. |
 | `inspect_disk_overview` | `legacy-cleanup.disk-overview` | direct-user-command | tauri/src/features/cleanup/api.ts:17 |  | product-decision-required | A current frontend invoke exposes this command. |
 | `inspect_downloads` | `cleanup.folder-analysis` | direct-user-command | tauri/src/features/cleanup/api.ts:73 |  | ready | A current frontend invoke exposes this command. |
@@ -118,19 +118,19 @@ Every registered command has a capability mapping and one final classification.
 | `list_file_association_backups` | `file-associations.backup-rollback` | direct-user-command | tauri/src/features/fileAssociations/api.ts:16 |  | evidence-blocker | A current frontend invoke exposes this command. |
 | `list_rollback_records` | `cleanup.move-rollback` | direct-user-command | tauri/src/features/cleanup/api.ts:65 |  | evidence-blocker | A current frontend invoke exposes this command. |
 | `load_config` | `settings.load` | direct-user-command | tauri/src/app/bootstrap.ts:334, tauri/src/features/settings/api.ts:5 |  | ready | A current frontend invoke exposes this command. |
-| `local_service_logs` | `services.logs` | compatibility-alias |  |  | code-blocker | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
-| `manage_local_service` | `services.manage` | direct-user-command | tauri/src/features/toolchains/api.ts:33 |  | code-blocker | A current frontend invoke exposes this command. |
-| `manage_system_platform` | `platforms.manage` | direct-user-command | tauri/src/features/toolchains/api.ts:37 |  | code-blocker | A current frontend invoke exposes this command. |
+| `local_service_logs` | `services.logs` | direct-user-command | tauri/src/features/toolchains/api.ts:45 |  | ready | A current frontend invoke exposes this command. |
+| `manage_local_service` | `services.manage` | direct-user-command | tauri/src/features/toolchains/api.ts:33 |  | evidence-blocker | A current frontend invoke exposes this command. |
+| `manage_system_platform` | `platforms.manage` | direct-user-command | tauri/src/features/toolchains/api.ts:37 |  | evidence-blocker | A current frontend invoke exposes this command. |
 | `mysql_pending_execution_guard` | `mysql.repair` | internal-helper |  |  | ready | This command supports validation or plan bookkeeping and is not a standalone user goal. |
 | `network_diagnostics` | `toolchains.network-cache` | compatibility-alias |  |  | code-blocker | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
-| `open_analysis_path` | `system.open-path` | direct-user-command | tauri/src/features/cleanup/api.ts:101, tauri/src/features/reports/api.ts:53, tauri/src/features/runtimes/api.ts:29 |  | ready | A current frontend invoke exposes this command. |
+| `open_analysis_path` | `system.open-path` | direct-user-command | tauri/src/features/cleanup/api.ts:101, tauri/src/features/reports/api.ts:53, tauri/src/features/runtimes/api.ts:29, tauri/src/features/toolchains/api.ts:53 |  | ready | A current frontend invoke exposes this command. |
 | `open_app_config_dir` | `settings.config-directory` | direct-user-command | tauri/src/features/settings/api.ts:17 |  | ready | A current frontend invoke exposes this command. |
 | `open_apps_features` | `system.apps-features` | direct-user-command | tauri/src/features/runtimes/api.ts:33 |  | ready | A current frontend invoke exposes this command. |
 | `open_default_apps_settings` | `file-associations.settings` | direct-user-command | tauri/src/features/fileAssociations/api.ts:36 |  | ready | A current frontend invoke exposes this command. |
-| `open_docker_desktop` | `platforms.docker` | compatibility-alias |  |  | code-blocker | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
+| `open_docker_desktop` | `platforms.docker` | direct-user-command | tauri/src/features/toolchains/api.ts:41 |  | ready | A current frontend invoke exposes this command. |
 | `open_file_association_backup_dir` | `file-associations.backup-rollback` | compatibility-alias |  | list_file_association_backups, rollback_file_association_backup | evidence-blocker | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
 | `open_file_type_settings` | `file-associations.settings` | direct-user-command | tauri/src/features/fileAssociations/api.ts:40 |  | ready | A current frontend invoke exposes this command. |
-| `open_local_service_directory` | `services.directory` | compatibility-alias |  |  | code-blocker | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
+| `open_local_service_directory` | `services.directory` | direct-user-command | tauri/src/features/toolchains/api.ts:49 |  | ready | A current frontend invoke exposes this command. |
 | `open_process_location` | `ports.process-location` | direct-user-command | tauri/src/features/ports/api.ts:29 |  | ready | A current frontend invoke exposes this command. |
 | `open_python_alias_settings` | `environment.python-alias-settings` | direct-user-command | tauri/src/features/environment/api.ts:49 |  | ready | A current frontend invoke exposes this command. |
 | `port_history` | `ports.scan-history` | direct-user-command | tauri/src/features/ports/api.ts:9 |  | ready | A current frontend invoke exposes this command. |
@@ -152,8 +152,8 @@ Every registered command has a capability mapping and one final classification.
 | `rollback_move` | `cleanup.move-rollback` | direct-user-command | tauri/src/features/cleanup/api.ts:49 |  | evidence-blocker | A current frontend invoke exposes this command. |
 | `run_chsrc_action` | `toolchains.mirrors` | compatibility-alias |  |  | code-blocker | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
 | `run_doctor` | `doctor.run` | direct-user-command | tauri/src/features/reports/api.ts:5 |  | ready | A current frontend invoke exposes this command. |
-| `run_learning_check` | `learning.center` | direct-user-command | tauri/src/features/toolchains/api.ts:45 |  | ready | A current frontend invoke exposes this command. |
-| `run_platform_action` | `platforms.manage` | compatibility-alias |  | manage_system_platform | code-blocker | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
+| `run_learning_check` | `learning.center` | direct-user-command | tauri/src/features/toolchains/api.ts:61 |  | ready | A current frontend invoke exposes this command. |
+| `run_platform_action` | `platforms.manage` | compatibility-alias |  | manage_system_platform | evidence-blocker | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
 | `run_project_action` | `projects.actions` | direct-user-command | tauri/src/features/projects/api.ts:30 |  | ready | A current frontend invoke exposes this command. |
 | `run_tool_command` | `toolchains.command-safety` | compatibility-alias |  | inspect_command_safety | ready | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
 | `run_toolchain_action` | `toolchains.actions` | compatibility-alias |  |  | code-blocker | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
@@ -169,7 +169,7 @@ Every registered command has a capability mapping and one final classification.
 | `self_uninstall` | `system.self-uninstall` | direct-user-command | tauri/src/features/settings/api.ts:41 |  | evidence-blocker | A current frontend invoke exposes this command. |
 | `set_auto_check_update` | `settings.auto-update` | direct-user-command | tauri/src/features/settings/api.ts:13 |  | ready | A current frontend invoke exposes this command. |
 | `set_root_dir` | `settings.root` | direct-user-command | tauri/src/features/settings/api.ts:9 |  | ready | A current frontend invoke exposes this command. |
-| `stop_local_service` | `services.manage` | direct-user-command | tauri/src/features/ports/api.ts:25 |  | code-blocker | A current frontend invoke exposes this command. |
+| `stop_local_service` | `services.manage` | direct-user-command | tauri/src/features/ports/api.ts:25 |  | evidence-blocker | A current frontend invoke exposes this command. |
 | `storage_cleanup_architecture` | `cleanup.overview` | direct-user-command | tauri/src/features/cleanup/api.ts:9 |  | ready | A current frontend invoke exposes this command. |
 | `switch_runtime` | `runtime.switch` | direct-user-command | tauri/src/features/runtimes/api.ts:21 |  | evidence-blocker | A current frontend invoke exposes this command. |
 | `uninstall_external_runtime` | `runtime.uninstall` | compatibility-alias |  | uninstall_runtime | evidence-blocker | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
