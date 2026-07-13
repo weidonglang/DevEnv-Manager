@@ -16,6 +16,50 @@ fn normalized(path: &Path) -> String {
         .to_ascii_lowercase()
 }
 
+fn path_is_reparse_point(path: &Path) -> bool {
+    let Ok(metadata) = fs::symlink_metadata(path) else {
+        return false;
+    };
+    if metadata.file_type().is_symlink() {
+        return true;
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x0400;
+        metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
+    }
+    #[cfg(not(windows))]
+    false
+}
+
+fn validate_new_move_target(target: &Path) -> Result<(), String> {
+    if target.exists() {
+        return Err("目标路径已经存在；空间搬家不会合并或覆盖现有目录".to_string());
+    }
+    let mut cursor = target.parent();
+    while let Some(path) = cursor {
+        if path.exists() && path_is_reparse_point(path) {
+            return Err(format!(
+                "目标路径包含符号链接、Junction 或 reparse point：{}",
+                path.display()
+            ));
+        }
+        cursor = path.parent();
+    }
+    let existing_parent = target
+        .ancestors()
+        .find(|path| path.exists())
+        .ok_or_else(|| "无法解析目标路径所在卷".to_string())?;
+    let resolved_parent = existing_parent
+        .canonicalize()
+        .map_err(|error| format!("解析目标路径失败：{error}"))?;
+    if normalized(&resolved_parent).starts_with("c:\\") {
+        return Err("目标位置解析后位于 C 盘".to_string());
+    }
+    Ok(())
+}
+
 pub(crate) fn target_root_for_drive(target_drive: &str, category: &str) -> Result<PathBuf, String> {
     let drive = target_drive
         .trim()
@@ -307,6 +351,12 @@ pub fn execute_move_plan(managed_root: &Path, plan: MovePlan) -> MoveResult {
         return result;
     }
 
+    if let Err(error) = validate_new_move_target(&target) {
+        result.failures.push(error);
+        result.report_markdown = move_report(&plan, &result);
+        return result;
+    }
+
     let backup = source.with_file_name(format!(
         "{}.devenv-backup-{}",
         source
@@ -405,5 +455,13 @@ mod tests {
             archive_category(Path::new("setup.exe"), None),
             Some("Installers")
         );
+    }
+
+    #[test]
+    fn move_target_must_not_merge_with_existing_directory() {
+        let root = tempfile::tempdir_in(std::env::current_dir().unwrap()).unwrap();
+        let target = root.path().join("existing");
+        fs::create_dir_all(&target).unwrap();
+        assert!(validate_new_move_target(&target).is_err());
     }
 }

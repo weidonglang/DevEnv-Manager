@@ -5640,6 +5640,45 @@ fn generic_archive_target_root(target_drive: &str) -> Result<PathBuf, String> {
     )))
 }
 
+fn path_is_reparse_point(path: &Path) -> bool {
+    let Ok(metadata) = fs::symlink_metadata(path) else {
+        return false;
+    };
+    if metadata.file_type().is_symlink() {
+        return true;
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x0400;
+        metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
+    }
+    #[cfg(not(windows))]
+    false
+}
+
+fn validate_archive_target_boundary(target_root: &Path) -> Result<PathBuf, String> {
+    let mut cursor = Some(target_root);
+    while let Some(path) = cursor {
+        if path.exists() && path_is_reparse_point(path) {
+            return Err(format!(
+                "Archive target contains a symbolic link, Junction, or reparse point: {}",
+                display_path(path)
+            ));
+        }
+        cursor = path.parent();
+    }
+    fs::create_dir_all(target_root)
+        .map_err(|error| format!("Cannot create archive target: {error}"))?;
+    let canonical = target_root
+        .canonicalize()
+        .map_err(|error| format!("Cannot resolve archive target: {error}"))?;
+    if path_key(&display_path(&canonical)).starts_with("c:\\") {
+        return Err("Archive target resolved onto the system C drive".to_string());
+    }
+    Ok(canonical)
+}
+
 fn build_generic_archive_plan(
     items: Vec<ArchivePlanItem>,
     target_root: PathBuf,
@@ -5728,9 +5767,12 @@ fn execute_generic_archive_files(plan: &GenericArchivePlan) -> GenericArchiveRes
     let mut failures = Vec::new();
     let mut verified_targets = Vec::new();
     let mut rollback_guidance = Vec::new();
-    if let Err(error) = fs::create_dir_all(&target_root) {
-        failures.push(format!("Cannot create archive target: {error}"));
+    if let Err(error) = validate_archive_target_boundary(&target_root) {
+        failures.push(error);
     } else {
+        let canonical_target_root = target_root
+            .canonicalize()
+            .unwrap_or_else(|_| target_root.clone());
         for entry in &plan.entries {
             if entry.conflict {
                 skipped_items += 1;
@@ -5756,6 +5798,17 @@ fn execute_generic_archive_files(plan: &GenericArchivePlan) -> GenericArchiveRes
             if !target.starts_with(&target_root) || target.exists() {
                 skipped_items += 1;
                 failures.push(format!("Target conflict detected at execution: {}", entry.target));
+                continue;
+            }
+            let target_parent_valid = target
+                .parent()
+                .and_then(|parent| parent.canonicalize().ok())
+                .is_some_and(|parent| parent == canonical_target_root);
+            if !target_parent_valid || target.parent().is_some_and(path_is_reparse_point) {
+                failures.push(format!(
+                    "Archive target parent failed canonical boundary validation: {}",
+                    entry.target
+                ));
                 continue;
             }
             match fs::copy(&source, &target) {
@@ -16363,9 +16416,10 @@ mod tests {
 
     #[test]
     fn generic_archive_moves_and_verifies_only_fixture_file() {
-        let root = tempfile::tempdir().unwrap();
-        let source_dir = root.path().join("source");
-        let target_dir = root.path().join("target");
+        let source_root = tempfile::tempdir().unwrap();
+        let target_root = tempfile::tempdir_in(env::current_dir().unwrap()).unwrap();
+        let source_dir = source_root.path().join("source");
+        let target_dir = target_root.path().join("target");
         fs::create_dir_all(&source_dir).unwrap();
         let source = source_dir.join("notes.txt");
         fs::write(&source, b"archive fixture").unwrap();
