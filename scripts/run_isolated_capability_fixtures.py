@@ -40,7 +40,7 @@ def main() -> int:
         "--quiet",
         "--features",
         "acceptance-fixtures",
-        "--bin",
+        "--example",
         "isolated-capability-fixtures",
         "--",
         str(output),

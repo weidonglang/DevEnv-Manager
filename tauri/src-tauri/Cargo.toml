@@ -14,9 +14,9 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 name = "devenv"
 path = "src/bin/devenv.rs"
 
-[[bin]]
+[[example]]
 name = "isolated-capability-fixtures"
-path = "src/bin/isolated_capability_fixtures.rs"
+path = "examples/isolated_capability_fixtures.rs"
 required-features = ["acceptance-fixtures"]
 
 [features]
