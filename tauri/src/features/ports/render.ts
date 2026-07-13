@@ -58,7 +58,6 @@ function renderPortsShell(state: PortsWorkbenchState): string {
       ${renderActionButton("create-port-plan", t("feature.ports.createPlanForSelected"))}
       ${renderActionButton("execute-port-plan", t("feature.ports.executePlan"), "danger")}
       ${renderActionButton("inspect-local-services", t("feature.ports.inspectServices"))}
-      ${renderActionButton("stop-local-service", t("feature.ports.stopService"), "danger")}
       ${state.retryPlanRequest ? renderActionButton("retry-port-plan-after-scan", t("feature.ports.rescanAndRetry")) : ""}
     </div>
   </section>`;

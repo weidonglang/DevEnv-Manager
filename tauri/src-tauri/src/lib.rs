@@ -13913,8 +13913,18 @@ fn apply_managed_environment(paths: &AppPaths, command: &mut Command) {
 }
 
 pub(crate) fn command_text(stdout: &[u8], stderr: &[u8]) -> String {
-    let stdout = decode_command_stream(stdout).trim().to_string();
-    let stderr = decode_command_stream(stderr).trim().to_string();
+    const MAX_COMMAND_OUTPUT_CHARS: usize = 32 * 1024;
+    let truncate = |value: String| {
+        let mut chars = value.trim().chars();
+        let text = chars.by_ref().take(MAX_COMMAND_OUTPUT_CHARS).collect::<String>();
+        if chars.next().is_some() {
+            format!("{text}\n[output truncated by DevEnv Manager]")
+        } else {
+            text
+        }
+    };
+    let stdout = truncate(decode_command_stream(stdout));
+    let stderr = truncate(decode_command_stream(stderr));
     [stdout, stderr]
         .into_iter()
         .filter(|item| !item.is_empty())
@@ -16283,6 +16293,14 @@ mod tests {
             b'A', b'c', b'c', 0xe8, b's', b' ', b'r', b'e', b'f', b'u', b's', 0xe9,
         ];
         assert_eq!(decode_command_stream(&bytes), "Accès refusé");
+    }
+
+    #[test]
+    fn command_text_caps_each_output_stream() {
+        let oversized = vec![b'x'; 40 * 1024];
+        let text = command_text(&oversized, &oversized);
+        assert!(text.contains("[output truncated by DevEnv Manager]"));
+        assert!(text.len() < 70 * 1024);
     }
 
     #[test]

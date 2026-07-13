@@ -1,7 +1,7 @@
 import type { FeatureContext } from "../../app/featureContext";
 import { t } from "../../core/i18n";
-import { bindAction, valueOf } from "../sharedView";
-import { createPortResolutionPlan, executePortResolutionPlan, inspectLocalServices, portHistory, scanPorts, stopLocalService } from "./api";
+import { bindAction } from "../sharedView";
+import { createPortResolutionPlan, executePortResolutionPlan, inspectLocalServices, portHistory, scanPorts } from "./api";
 import { assessPortTreatability, portRecordKey, selectedPortRecord } from "./portSafety";
 import { renderPortsTable, renderPortsWorkbench } from "./render";
 import type { PortsWorkbenchState } from "./state";
@@ -112,22 +112,6 @@ export function bindPortEvents(context: FeatureContext, state: PortsWorkbenchSta
     renderAndBind(context, state);
     context.toast(t("feature.ports.diagnosticsCopied"));
   });
-  bindAction(context.root, "stop-local-service", () =>
-    {
-      const serviceName = valueOf(state.services[0], "serviceName", "");
-      const selected = selectedPortRecord(state.records, state.selectedKey);
-      const port = selected?.localPort ?? state.selectedPort ?? 0;
-      return context.risk.run({
-      command: "stop_local_service",
-      planId: `${port}:${serviceName}`,
-      riskLevel: "high",
-      title: "Stop local service",
-      summary: "Stops a selected local development service through a backend token gate.",
-      warnings: ["Confirm the service name and owning process before stopping it."],
-      execute: (confirmationToken) => stopLocalService(port, serviceName, confirmationToken),
-      });
-    },
-  );
   bindAction(context.root, "retry-port-plan-after-scan", async () => {
     const retry = state.retryPlanRequest;
     if (!retry) return;
