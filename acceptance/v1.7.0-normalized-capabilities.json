@@ -28,14 +28,14 @@
     },
     "byEvidenceStatus": {
       "environment-blocked": 14,
-      "evidence-required": 9,
-      "verified-automated": 39,
+      "evidence-required": 2,
+      "verified-automated": 46,
       "verified-installed": 24,
       "verified-real-tauri": 1
     },
     "byReleaseDisposition": {
-      "evidence-blocker": 23,
-      "ready": 64
+      "evidence-blocker": 16,
+      "ready": 71
     }
   },
   "capabilities": [
@@ -157,9 +157,9 @@
         "remove_archive_plan_item"
       ],
       "implementationStatus": "equivalent",
-      "evidenceStatus": "evidence-required",
-      "releaseDisposition": "evidence-blocker",
-      "releaseReason": "Implementation mapping exists, but the required installed or safely isolated execution evidence is incomplete.",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
       "followUpIssue": "#125",
       "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
       "automatedEvidence": [
@@ -167,23 +167,12 @@
         "frontend:tauri/src/features/cleanup/api.ts:117",
         "frontend:tauri/src/features/cleanup/api.ts:121",
         "frontend:tauri/src/features/cleanup/api.ts:125",
-        "frontend:tauri/src/features/cleanup/api.ts:129"
+        "frontend:tauri/src/features/cleanup/api.ts:129",
+        "fixture:scripts/run_isolated_capability_fixtures.py"
       ],
       "productDecision": null,
       "codeBlockerEvidence": null,
-      "evidencePlan": {
-        "fixture": "Dedicated temporary data or disposable VM snapshot",
-        "environment": "Windows real Tauri or installed application",
-        "steps": [
-          "Capture baseline",
-          "Run the mapped user path",
-          "Verify result against system state",
-          "Restore baseline"
-        ],
-        "safetyBoundary": "Do not modify real services, associations, environment, or user files outside the fixture.",
-        "passCriteria": "UI result, receipt, and observed system state agree.",
-        "recovery": "Delete temporary data or revert the VM snapshot."
-      }
+      "evidencePlan": null
     },
     {
       "capabilityId": "cleanup.desktop-archive",
@@ -256,29 +245,18 @@
         "clean_dev_cache"
       ],
       "implementationStatus": "equivalent",
-      "evidenceStatus": "evidence-required",
-      "releaseDisposition": "evidence-blocker",
-      "releaseReason": "Implementation mapping exists, but the required installed or safely isolated execution evidence is incomplete.",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
       "followUpIssue": "#125",
       "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
       "automatedEvidence": [
-        "frontend:tauri/src/features/cleanup/api.ts:37"
+        "frontend:tauri/src/features/cleanup/api.ts:37",
+        "fixture:scripts/run_isolated_capability_fixtures.py"
       ],
       "productDecision": null,
       "codeBlockerEvidence": null,
-      "evidencePlan": {
-        "fixture": "Dedicated temporary data or disposable VM snapshot",
-        "environment": "Windows real Tauri or installed application",
-        "steps": [
-          "Capture baseline",
-          "Run the mapped user path",
-          "Verify result against system state",
-          "Restore baseline"
-        ],
-        "safetyBoundary": "Do not modify real services, associations, environment, or user files outside the fixture.",
-        "passCriteria": "UI result, receipt, and observed system state agree.",
-        "recovery": "Delete temporary data or revert the VM snapshot."
-      }
+      "evidencePlan": null
     },
     {
       "capabilityId": "cleanup.download-cache",
@@ -310,30 +288,19 @@
         "clear_download_cache"
       ],
       "implementationStatus": "equivalent",
-      "evidenceStatus": "evidence-required",
-      "releaseDisposition": "evidence-blocker",
-      "releaseReason": "Implementation mapping exists, but the required installed or safely isolated execution evidence is incomplete.",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
       "followUpIssue": "#125",
       "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
       "automatedEvidence": [
         "frontend:tauri/src/features/cleanup/api.ts:33",
-        "frontend:tauri/src/features/toolchains/api.ts:77"
+        "frontend:tauri/src/features/toolchains/api.ts:77",
+        "fixture:scripts/run_isolated_capability_fixtures.py"
       ],
       "productDecision": null,
       "codeBlockerEvidence": null,
-      "evidencePlan": {
-        "fixture": "Dedicated temporary data or disposable VM snapshot",
-        "environment": "Windows real Tauri or installed application",
-        "steps": [
-          "Capture baseline",
-          "Run the mapped user path",
-          "Verify result against system state",
-          "Restore baseline"
-        ],
-        "safetyBoundary": "Do not modify real services, associations, environment, or user files outside the fixture.",
-        "passCriteria": "UI result, receipt, and observed system state agree.",
-        "recovery": "Delete temporary data or revert the VM snapshot."
-      }
+      "evidencePlan": null
     },
     {
       "capabilityId": "cleanup.downloads-archive",
@@ -480,32 +447,21 @@
         "rollback_move"
       ],
       "implementationStatus": "enhanced",
-      "evidenceStatus": "evidence-required",
-      "releaseDisposition": "evidence-blocker",
-      "releaseReason": "Implementation mapping exists, but the required installed or safely isolated execution evidence is incomplete.",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
       "followUpIssue": "#125",
       "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
       "automatedEvidence": [
         "frontend:tauri/src/features/cleanup/api.ts:41",
         "frontend:tauri/src/features/cleanup/api.ts:45",
         "frontend:tauri/src/features/cleanup/api.ts:49",
-        "frontend:tauri/src/features/cleanup/api.ts:65"
+        "frontend:tauri/src/features/cleanup/api.ts:65",
+        "fixture:scripts/run_isolated_capability_fixtures.py"
       ],
       "productDecision": null,
       "codeBlockerEvidence": null,
-      "evidencePlan": {
-        "fixture": "Dedicated temporary data or disposable VM snapshot",
-        "environment": "Windows real Tauri or installed application",
-        "steps": [
-          "Capture baseline",
-          "Run the mapped user path",
-          "Verify result against system state",
-          "Restore baseline"
-        ],
-        "safetyBoundary": "Do not modify real services, associations, environment, or user files outside the fixture.",
-        "passCriteria": "UI result, receipt, and observed system state agree.",
-        "recovery": "Delete temporary data or revert the VM snapshot."
-      }
+      "evidencePlan": null
     },
     {
       "capabilityId": "cleanup.overview",
@@ -2057,30 +2013,19 @@
         "execute_profile_apply_plan"
       ],
       "implementationStatus": "enhanced",
-      "evidenceStatus": "evidence-required",
-      "releaseDisposition": "evidence-blocker",
-      "releaseReason": "Implementation mapping exists, but the required installed or safely isolated execution evidence is incomplete.",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
       "followUpIssue": "#125",
       "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
       "automatedEvidence": [
         "frontend:tauri/src/features/profiles/api.ts:13",
-        "frontend:tauri/src/features/profiles/api.ts:17"
+        "frontend:tauri/src/features/profiles/api.ts:17",
+        "fixture:scripts/run_isolated_capability_fixtures.py"
       ],
       "productDecision": null,
       "codeBlockerEvidence": null,
-      "evidencePlan": {
-        "fixture": "Dedicated temporary data or disposable VM snapshot",
-        "environment": "Windows real Tauri or installed application",
-        "steps": [
-          "Capture baseline",
-          "Run the mapped user path",
-          "Verify result against system state",
-          "Restore baseline"
-        ],
-        "safetyBoundary": "Do not modify real services, associations, environment, or user files outside the fixture.",
-        "passCriteria": "UI result, receipt, and observed system state agree.",
-        "recovery": "Delete temporary data or revert the VM snapshot."
-      }
+      "evidencePlan": null
     },
     {
       "capabilityId": "profiles.delete",
@@ -2408,30 +2353,19 @@
         "preview_project_configuration"
       ],
       "implementationStatus": "equivalent",
-      "evidenceStatus": "evidence-required",
-      "releaseDisposition": "evidence-blocker",
-      "releaseReason": "Implementation mapping exists, but the required installed or safely isolated execution evidence is incomplete.",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
       "followUpIssue": "#125",
       "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
       "automatedEvidence": [
         "frontend:tauri/src/features/projects/api.ts:34",
-        "frontend:tauri/src/features/projects/api.ts:9"
+        "frontend:tauri/src/features/projects/api.ts:9",
+        "fixture:scripts/run_isolated_capability_fixtures.py"
       ],
       "productDecision": null,
       "codeBlockerEvidence": null,
-      "evidencePlan": {
-        "fixture": "Dedicated temporary data or disposable VM snapshot",
-        "environment": "Windows real Tauri or installed application",
-        "steps": [
-          "Capture baseline",
-          "Run the mapped user path",
-          "Verify result against system state",
-          "Restore baseline"
-        ],
-        "safetyBoundary": "Do not modify real services, associations, environment, or user files outside the fixture.",
-        "passCriteria": "UI result, receipt, and observed system state agree.",
-        "recovery": "Delete temporary data or revert the VM snapshot."
-      }
+      "evidencePlan": null
     },
     {
       "capabilityId": "projects.idea-analysis",
@@ -2555,30 +2489,19 @@
         "update_project_port"
       ],
       "implementationStatus": "equivalent",
-      "evidenceStatus": "evidence-required",
-      "releaseDisposition": "evidence-blocker",
-      "releaseReason": "Implementation mapping exists, but the required installed or safely isolated execution evidence is incomplete.",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "releaseReason": "The current implementation and available evidence preserve the historical user goal.",
       "followUpIssue": "#125",
       "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
       "automatedEvidence": [
         "frontend:tauri/src/features/projects/api.ts:13",
-        "frontend:tauri/src/features/projects/api.ts:38"
+        "frontend:tauri/src/features/projects/api.ts:38",
+        "fixture:scripts/run_isolated_capability_fixtures.py"
       ],
       "productDecision": null,
       "codeBlockerEvidence": null,
-      "evidencePlan": {
-        "fixture": "Dedicated temporary data or disposable VM snapshot",
-        "environment": "Windows real Tauri or installed application",
-        "steps": [
-          "Capture baseline",
-          "Run the mapped user path",
-          "Verify result against system state",
-          "Restore baseline"
-        ],
-        "safetyBoundary": "Do not modify real services, associations, environment, or user files outside the fixture.",
-        "passCriteria": "UI result, receipt, and observed system state agree.",
-        "recovery": "Delete temporary data or revert the VM snapshot."
-      }
+      "evidencePlan": null
     },
     {
       "capabilityId": "reports.export",

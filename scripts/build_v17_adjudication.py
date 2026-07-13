@@ -257,6 +257,19 @@ EVIDENCE_OVERRIDES = {
     "safety.guide": "verified-installed",
     "cli.workflows": "verified-automated",
     "runner.background-execution": "verified-real-tauri",
+    "cleanup.archive-plan": "verified-automated",
+    "cleanup.dev-cache": "verified-automated",
+    "cleanup.download-cache": "verified-automated",
+    "cleanup.move-rollback": "verified-automated",
+    "profiles.apply": "verified-automated",
+    "projects.configuration": "verified-automated",
+    "projects.port-config": "verified-automated",
+}
+
+ISOLATED_FIXTURE_CAPABILITIES = {
+    "cleanup.archive-plan", "cleanup.dev-cache", "cleanup.download-cache",
+    "cleanup.move-rollback", "profiles.apply", "projects.configuration",
+    "projects.port-config",
 }
 
 CAPABILITY_COMMAND_OVERRIDES = {
@@ -425,6 +438,8 @@ def build_capabilities(records: list[dict[str, Any]], current: dict[str, Any]) -
             for command in frontend_commands
             for location in current["direct"].get(command, []) + current["dynamic"].get(command, [])
         })
+        if capability_id in ISOLATED_FIXTURE_CAPABILITIES:
+            automated.append("fixture:scripts/run_isolated_capability_fixtures.py")
         capabilities.append({
             "capabilityId": capability_id,
             "domain": capability_domain(capability_id),

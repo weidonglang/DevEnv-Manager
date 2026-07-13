@@ -5,6 +5,11 @@ mod file_assoc;
 mod mysql_repair;
 mod powershell_runner;
 mod safety;
+#[cfg(feature = "acceptance-fixtures")]
+mod isolated_acceptance;
+
+#[cfg(feature = "acceptance-fixtures")]
+pub use isolated_acceptance::run_isolated_capability_fixtures;
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -10143,11 +10148,9 @@ fn apply_config_profile_blocking(id: String) -> Result<OperationResult, String> 
             applied.push(format!("{kind} {version}"));
         }
     }
-    if let Err(error) = restore_environment_values(
-        profile.devenv_home.as_deref(),
-        profile.java_home.as_deref(),
-        &profile.path,
-    ) {
+    if let Err(error) = write_profile_environment(&profile, |devenv_home, java_home, path| {
+        restore_environment_values(devenv_home, java_home, path)
+    }) {
         restore_current_versions(&before_versions);
         let _ = restore_environment_values(
             before_environment.get("DEVENV_HOME").map(String::as_str),
@@ -10172,6 +10175,17 @@ fn apply_config_profile_blocking(id: String) -> Result<OperationResult, String> 
             format!("已应用模板 {}：{}", profile.name, applied.join("，"))
         },
     })
+}
+
+fn write_profile_environment<F>(profile: &ConfigProfile, writer: F) -> Result<(), String>
+where
+    F: FnOnce(Option<&str>, Option<&str>, &str) -> Result<(), String>,
+{
+    writer(
+        profile.devenv_home.as_deref(),
+        profile.java_home.as_deref(),
+        &profile.path,
+    )
 }
 
 #[tauri::command]
@@ -10628,6 +10642,12 @@ fn apply_project_configuration(
         &project_plan_id,
         confirmation_token,
     )?;
+    apply_project_configuration_blocking(request)
+}
+
+fn apply_project_configuration_blocking(
+    request: ProjectConfigApplyRequest,
+) -> Result<OperationResult, String> {
     let root = PathBuf::from(request.project_path.trim());
     analyze_project_blocking(&root)?;
     if request.files.len() > 4 {

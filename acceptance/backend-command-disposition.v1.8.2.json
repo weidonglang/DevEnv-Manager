@@ -13,9 +13,9 @@
       "replacement-command": 8
     },
     "byReleaseDisposition": {
-      "evidence-blocker": 61,
+      "evidence-blocker": 40,
       "product-decision-required": 7,
-      "ready": 102
+      "ready": 123
     },
     "unclassified": 0,
     "withoutCapabilityMapping": 0,
@@ -57,12 +57,12 @@
         "feature-manifest:cleanup.genericArchivePlan"
       ],
       "classification": "direct-user-command",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "A current frontend invoke exposes this command.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "analyze_project",
@@ -145,12 +145,12 @@
       "replacementResolution": "explicit-replacement",
       "testEvidence": [],
       "classification": "compatibility-alias",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval.",
       "compatibilityConsumer": "v1.7.0 UI/CLI or external automation",
       "compatibilityTest": "Required before removal",
       "removalCondition": "Remove only after frontend, dynamic wrappers, scripts, tests, compatibility paths, and docs are all clear",
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "apply_env_repair_plan",
@@ -251,12 +251,12 @@
         "feature-manifest:projects.configApply"
       ],
       "classification": "direct-user-command",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "A current frontend invoke exposes this command.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "apply_python_repair",
@@ -380,12 +380,12 @@
       "replacementResolution": "not-required",
       "testEvidence": [],
       "classification": "direct-user-command",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "A current frontend invoke exposes this command.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "clean_managed_download_cache",
@@ -400,12 +400,12 @@
       "replacementResolution": "explicit-replacement",
       "testEvidence": [],
       "classification": "compatibility-alias",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval.",
       "compatibilityConsumer": "v1.7.0 UI/CLI or external automation",
       "compatibilityTest": "Required before removal",
       "removalCondition": "Remove only after frontend, dynamic wrappers, scripts, tests, compatibility paths, and docs are all clear",
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "clean_selected_targets",
@@ -467,12 +467,12 @@
         "feature-manifest:toolchains.gitNodePythonMirrors"
       ],
       "classification": "direct-user-command",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "A current frontend invoke exposes this command.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "config_profile_plan_id",
@@ -722,12 +722,12 @@
         "feature-manifest:cleanup.genericArchivePlan"
       ],
       "classification": "direct-user-command",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "A current frontend invoke exposes this command.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "create_java_stabilize_plan",
@@ -767,12 +767,12 @@
       "replacementResolution": "explicit-replacement",
       "testEvidence": [],
       "classification": "compatibility-alias",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval.",
       "compatibilityConsumer": "v1.7.0 UI/CLI or external automation",
       "compatibilityTest": "Required before removal",
       "removalCondition": "Remove only after frontend, dynamic wrappers, scripts, tests, compatibility paths, and docs are all clear",
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "create_managed_python_pip_repair_plan",
@@ -811,12 +811,12 @@
         "feature-manifest:cleanup.moveExpansionLargeFiles"
       ],
       "classification": "direct-user-command",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "A current frontend invoke exposes this command.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "create_mysql_repair_plan",
@@ -880,12 +880,12 @@
         "feature-manifest:profiles.crudImportExportApply"
       ],
       "classification": "replacement-command",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "This command participates in an explicit old-to-new replacement chain.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "delete_config_profile",
@@ -1126,12 +1126,12 @@
         "feature-manifest:cleanup.genericArchivePlan"
       ],
       "classification": "direct-user-command",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "A current frontend invoke exposes this command.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "execute_move_plan",
@@ -1148,12 +1148,12 @@
         "feature-manifest:cleanup.moveExpansionLargeFiles"
       ],
       "classification": "direct-user-command",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "A current frontend invoke exposes this command.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "execute_mysql_repair_plan",
@@ -1217,12 +1217,12 @@
         "feature-manifest:profiles.crudImportExportApply"
       ],
       "classification": "replacement-command",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "This command participates in an explicit old-to-new replacement chain.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "export_cleanup_report",
@@ -1458,12 +1458,12 @@
         "feature-manifest:projects.configApply"
       ],
       "classification": "compatibility-alias",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval.",
       "compatibilityConsumer": "v1.7.0 UI/CLI or external automation",
       "compatibilityTest": "Required before removal",
       "removalCondition": "Remove only after frontend, dynamic wrappers, scripts, tests, compatibility paths, and docs are all clear",
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "get_feature_risk",
@@ -1874,12 +1874,12 @@
         "feature-manifest:projects.analysisAndVerify"
       ],
       "classification": "direct-user-command",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "A current frontend invoke exposes this command.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "inspect_python_integrity",
@@ -2181,12 +2181,12 @@
         "feature-manifest:cleanup.genericArchivePlan"
       ],
       "classification": "direct-user-command",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "A current frontend invoke exposes this command.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "list_config_profiles",
@@ -2289,12 +2289,12 @@
       "replacementResolution": "not-required",
       "testEvidence": [],
       "classification": "direct-user-command",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "A current frontend invoke exposes this command.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "load_config",
@@ -2735,12 +2735,12 @@
         "feature-manifest:projects.configApply"
       ],
       "classification": "direct-user-command",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "A current frontend invoke exposes this command.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "preview_python_repair",
@@ -2823,12 +2823,12 @@
         "feature-manifest:cleanup.genericArchivePlan"
       ],
       "classification": "direct-user-command",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "A current frontend invoke exposes this command.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "rename_config_profile",
@@ -3016,12 +3016,12 @@
         "feature-manifest:cleanup.moveExpansionLargeFiles"
       ],
       "classification": "direct-user-command",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "A current frontend invoke exposes this command.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "run_chsrc_action",
@@ -3552,12 +3552,12 @@
       "replacementResolution": "not-required",
       "testEvidence": [],
       "classification": "direct-user-command",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "A current frontend invoke exposes this command.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "validate_directory_path",

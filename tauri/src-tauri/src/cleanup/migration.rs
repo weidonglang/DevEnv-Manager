@@ -301,7 +301,10 @@ fn unique_destination(directory: &Path, file_name: &OsStr) -> PathBuf {
     ))
 }
 
-pub fn execute_move_plan(managed_root: &Path, plan: MovePlan) -> MoveResult {
+fn execute_move_plan_with<F>(managed_root: &Path, plan: MovePlan, validate_source: F) -> MoveResult
+where
+    F: Fn(&Path, &str) -> Result<Vec<String>, String>,
+{
     let source = PathBuf::from(&plan.source);
     let target = PathBuf::from(&plan.target);
     let mut result = MoveResult {
@@ -309,7 +312,7 @@ pub fn execute_move_plan(managed_root: &Path, plan: MovePlan) -> MoveResult {
         target_path: plan.target.clone(),
         ..MoveResult::default()
     };
-    if let Err(error) = ensure_movable_source(&source, &plan.mode) {
+    if let Err(error) = validate_source(&source, &plan.mode) {
         result.failures.push(error);
         result.report_markdown = move_report(&plan, &result);
         return result;
@@ -416,6 +419,20 @@ pub fn execute_move_plan(managed_root: &Path, plan: MovePlan) -> MoveResult {
     }
     result.report_markdown = move_report(&plan, &result);
     result
+}
+
+pub fn execute_move_plan(managed_root: &Path, plan: MovePlan) -> MoveResult {
+    execute_move_plan_with(managed_root, plan, ensure_movable_source)
+}
+
+#[cfg(feature = "acceptance-fixtures")]
+pub(crate) fn execute_isolated_move_plan(managed_root: &Path, plan: MovePlan) -> MoveResult {
+    execute_move_plan_with(managed_root, plan, |source, _| {
+        if !source.is_dir() || path_is_reparse_point(source) {
+            return Err("Fixture source is missing or redirected".to_string());
+        }
+        Ok(Vec::new())
+    })
 }
 
 pub(crate) fn move_report(plan: &MovePlan, result: &MoveResult) -> String {

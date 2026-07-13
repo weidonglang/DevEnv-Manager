@@ -65,8 +65,8 @@ def run_command(command: list[str], cwd: Path = ROOT, timeout: int = 120) -> tup
     return completed.returncode, completed.stdout.strip()
 
 
-def script_case(mode: str, script: str, priority: str = "P0") -> Case:
-    code, output = run_command([sys.executable, str(ROOT / "scripts" / script)])
+def script_case(mode: str, script: str, priority: str = "P0", timeout: int = 120) -> Case:
+    code, output = run_command([sys.executable, str(ROOT / "scripts" / script)], timeout=timeout)
     status = "passed" if code == 0 else "failed"
     reason = output.splitlines()[-1] if output else f"{script} exited {code}"
     if code != 0 and output:
@@ -94,6 +94,7 @@ def static_cases() -> list[Case]:
         script_case("static", "check_cleanup_recovery_workflows.py"),
         script_case("static", "check_platform_service_workflows.py"),
         script_case("static", "check_toolchain_ecosystem_workflows.py"),
+        script_case("static", "check_batch_c_e_security.py"),
         script_case("static", "check_v17_migration_completeness.py"),
         script_case("static", "check_release_dispositions.py"),
     ]
@@ -111,7 +112,9 @@ def static_cases() -> list[Case]:
 
 
 def safe_cases() -> list[Case]:
-    cases: list[Case] = []
+    cases: list[Case] = [
+        script_case("safe", "run_isolated_capability_fixtures.py", timeout=600),
+    ]
     commands = registered_commands()
     for page, feature in iter_features():
         priority = feature_priority(page, feature)

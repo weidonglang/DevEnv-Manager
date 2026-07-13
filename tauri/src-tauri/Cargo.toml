@@ -14,6 +14,14 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 name = "devenv"
 path = "src/bin/devenv.rs"
 
+[[bin]]
+name = "isolated-capability-fixtures"
+path = "src/bin/isolated_capability_fixtures.rs"
+required-features = ["acceptance-fixtures"]
+
+[features]
+acceptance-fixtures = []
+
 [build-dependencies]
 tauri-build = { version = "2.4.1", features = [] }
 
