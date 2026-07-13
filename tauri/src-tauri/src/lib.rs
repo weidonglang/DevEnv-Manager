@@ -11456,14 +11456,19 @@ fn writable_managed_root(base: &Path) -> Option<PathBuf> {
         return None;
     }
     let managed_root = base.join(APP_NAME);
-    let probe_parent = if managed_root.is_dir() {
-        managed_root.as_path()
-    } else if managed_root.exists() {
+    if !managed_root.exists() {
+        return match fs::create_dir(&managed_root) {
+            Ok(()) => {
+                let _ = fs::remove_dir(&managed_root);
+                Some(managed_root)
+            }
+            Err(_) => None,
+        };
+    }
+    if !managed_root.is_dir() {
         return None;
-    } else {
-        base
-    };
-    let probe = probe_parent.join(format!(
+    }
+    let probe = managed_root.join(format!(
         ".devenv-manager-root-probe-{}-{}",
         std::process::id(),
         SAVE_JSON_COUNTER.fetch_add(1, Ordering::Relaxed)
@@ -15448,12 +15453,26 @@ mod tests {
     fn writable_managed_root_accepts_writable_directory() {
         let base = tempfile::tempdir().unwrap();
         let expected = base.path().join(APP_NAME);
-        assert_eq!(writable_managed_root(base.path()), Some(expected));
+        assert_eq!(writable_managed_root(base.path()), Some(expected.clone()));
+        assert!(!expected.exists());
         assert!(fs::read_dir(base.path()).unwrap().all(|entry| !entry
             .unwrap()
             .file_name()
             .to_string_lossy()
             .starts_with(".devenv-manager-root-probe-")));
+    }
+
+    #[test]
+    fn writable_managed_root_accepts_existing_writable_managed_directory() {
+        let base = tempfile::tempdir().unwrap();
+        let managed_root = base.path().join(APP_NAME);
+        fs::create_dir(&managed_root).unwrap();
+        assert_eq!(
+            writable_managed_root(base.path()),
+            Some(managed_root.clone())
+        );
+        assert!(managed_root.is_dir());
+        assert!(fs::read_dir(&managed_root).unwrap().next().is_none());
     }
 
     #[test]
