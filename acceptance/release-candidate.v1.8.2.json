@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "version": "1.8.2",
+  "builtFrom": "c884495cc4f3ffa50c01df04d5b727bb815de8a2",
+  "gitStatusAtBuild": "clean",
+  "buildStartedAt": "2026-07-13T01:45:08.3156695Z",
+  "buildFinishedAt": "2026-07-13T01:47:23.4617962Z",
+  "target": "x86_64-pc-windows-msvc",
+  "buildCommand": "npx tauri build --bundles msi nsis --ci",
+  "assets": [
+    {
+      "bundle": "nsis",
+      "fileName": "DevEnv Manager_1.8.2_x64-setup.exe",
+      "size": 2700872,
+      "sha256": "959d9022df44ee58bfffbe5f6154904f52bab1706feac663820efed9fba01dec",
+      "architecture": "x64",
+      "signatureStatus": "NotSigned"
+    },
+    {
+      "bundle": "msi",
+      "fileName": "DevEnv Manager_1.8.2_x64_en-US.msi",
+      "size": 4546560,
+      "sha256": "4b9f54a9e4e681fb3b15ac9dd92c8b9acd20dbcdce01ab9933de2e3337b40a71",
+      "architecture": "x64",
+      "signatureStatus": "NotSigned"
+    }
+  ],
+  "hostHashVerified": true,
+  "guestHashVerified": false,
+  "guestValidationStatus": "pending",
+  "releaseStatus": "test-rc-only"
+}
