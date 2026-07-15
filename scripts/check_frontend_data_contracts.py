@@ -135,6 +135,12 @@ def main() -> int:
         return fail("File association apply token must use FileAssociationPlan.backupPath")
     if 'valueOf(state.plan, "backupName"' in file_association_events:
         return fail("File association apply must not read nonexistent FileAssociationPlan.backupName")
+    if file_association_events.count("await reloadAssociationBackups(context, state);") < 2:
+        return fail("File association apply and rollback must refresh the durable backup list")
+    if "item.backupId === appliedBackupId" not in file_association_events:
+        return fail("File association rollback must target the backup ID returned by the apply receipt")
+    if "state.operationError = t(\"toast.createAssociationPlanFirst\")" not in file_association_events:
+        return fail("File association apply-without-plan guidance must render a persistent inline error")
 
     feature_guide = read("tauri/src/components/featureGuide.ts")
     if "${item.risk}</span>" in feature_guide or "riskSummary(item)" not in feature_guide:

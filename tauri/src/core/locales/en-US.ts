@@ -266,6 +266,7 @@ export const enUS = {
   "feature.fileAssociations.manageable": "Manageable",
   "feature.fileAssociations.missingApps": "Missing apps",
   "feature.fileAssociations.backups": "Backups",
+  "feature.fileAssociations.backupRefreshFailed": "The operation completed, but the backup list could not be refreshed",
   "feature.fileAssociations.appName": "App name",
   "feature.fileAssociations.exePath": "Executable path",
   "feature.fileAssociations.filterExtension": "Filter extension or app",

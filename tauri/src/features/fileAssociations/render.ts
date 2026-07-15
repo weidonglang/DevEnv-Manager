@@ -5,6 +5,8 @@ import type { FileAssociationUiState } from "./state";
 
 export function renderFileAssociations(state: FileAssociationUiState): string {
   const records = filteredRecords(state);
+  const appliedBackupId = state.applyResult?.backupId;
+  const rollbackBackup = state.backups.find((item) => item.backupId === appliedBackupId) ?? state.backups[0];
   return `
     <div class="feature-layout">
       <section class="panel">
@@ -35,7 +37,7 @@ export function renderFileAssociations(state: FileAssociationUiState): string {
       </section>
       <section class="panel" data-testid="file-associations-app-search-result"><h2>${t("feature.fileAssociations.candidates")}</h2>${renderAppSearchState(state)}</section>
       <section class="panel"><h2>${t("feature.fileAssociations.records")}</h2><div class="data-table" data-testid="file-associations-records-table">${records.slice(0, 40).map((record) => `<div class="data-row"><span>${escapeHtml(valueOf(record, "extension"))}</span><span>${escapeHtml(valueOf(record, "currentAppName"))}</span><span>${escapeHtml(valueOf(record, "risk"))}</span><span>${escapeHtml(valueOf(record, "source"))}</span><span><button data-assoc-extension="${escapeHtml(valueOf(record, "extension"))}" data-assoc-app="${escapeHtml(valueOf(record, "currentAppName", ""))}" type="button">${t("feature.fileAssociations.changeOpenWith")}</button></span></div>`).join("") || `<div class="empty">${t("feature.fileAssociations.noResults")}</div>`}</div></section>
-      <section class="panel"><h2>${t("feature.fileAssociations.plan")}</h2>${state.selectionResult ? `<div class="small-note" data-testid="file-associations-selection-result">${escapeHtml(state.selectionResult)}</div>` : ""}<div data-testid="file-associations-plan-preview">${state.plan ? renderAssociationPlan(state.plan) : `<div class="empty">${t("feature.fileAssociations.noPlan")}</div>`}</div><div data-testid="file-associations-rollback-info">${state.backups.length ? renderObjectTable(state.backups[0], ["backupId", "createdAt", "backupPath", "extensions", "rollbackAvailable"]) : `<div class="empty">${t("toast.noBackupAvailable")}</div>`}</div>${renderAssociationResults(state)}</section>
+      <section class="panel"><h2>${t("feature.fileAssociations.plan")}</h2>${state.selectionResult ? `<div class="small-note" data-testid="file-associations-selection-result">${escapeHtml(state.selectionResult)}</div>` : ""}<div data-testid="file-associations-plan-preview">${state.plan ? renderAssociationPlan(state.plan) : `<div class="empty">${t("feature.fileAssociations.noPlan")}</div>`}</div><div data-testid="file-associations-rollback-info">${rollbackBackup ? renderObjectTable(rollbackBackup, ["backupId", "createdAt", "backupPath", "extensions", "rollbackAvailable"]) : `<div class="empty">${t("toast.noBackupAvailable")}</div>`}</div>${renderAssociationResults(state)}</section>
     </div>
   `;
 }

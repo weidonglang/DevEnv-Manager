@@ -168,6 +168,34 @@ pub struct FileAssociationBackup {
 pub struct FileAssociationBackupRecord {
     pub extension: String,
     pub before: FileAssociationRecord,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extension_key_before: Option<FileAssociationRegistryKeyBackup>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_prog_id_before: Option<FileAssociationProgIdBackup>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct FileAssociationRegistryValueBackup {
+    pub value_type: u32,
+    pub bytes: Vec<u8>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct FileAssociationRegistryKeyBackup {
+    pub existed: bool,
+    pub default_value: Option<FileAssociationRegistryValueBackup>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct FileAssociationProgIdBackup {
+    pub prog_id: String,
+    pub root: FileAssociationRegistryKeyBackup,
+    pub shell: FileAssociationRegistryKeyBackup,
+    pub open: FileAssociationRegistryKeyBackup,
+    pub command: FileAssociationRegistryKeyBackup,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -575,7 +603,11 @@ pub fn list_file_association_backups_blocking() -> Result<Vec<FileAssociationBac
             }
         }
     }
-    backups.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+    backups.sort_by(|a, b| {
+        b.created_at
+            .cmp(&a.created_at)
+            .then_with(|| b.backup_id.cmp(&a.backup_id))
+    });
     Ok(backups)
 }
 
@@ -765,6 +797,224 @@ fn apply_user_level_change(_change: &FileAssociationChange) -> Result<(), String
     Err("文件关联修改仅支持 Windows。".to_string())
 }
 
+fn capture_backup_record(
+    change: &FileAssociationChange,
+) -> Result<FileAssociationBackupRecord, String> {
+    let (extension_key_before, target_prog_id_before) = capture_registry_state(change)?;
+    Ok(FileAssociationBackupRecord {
+        extension: change.extension.clone(),
+        before: change.before.clone(),
+        extension_key_before,
+        target_prog_id_before,
+    })
+}
+
+#[cfg(windows)]
+fn capture_registry_state(
+    change: &FileAssociationChange,
+) -> Result<
+    (
+        Option<FileAssociationRegistryKeyBackup>,
+        Option<FileAssociationProgIdBackup>,
+    ),
+    String,
+> {
+    use winreg::{enums::*, RegKey};
+
+    if change.apply_mode != FileAssociationApplyMode::UserLevelRegistry {
+        return Ok((None, None));
+    }
+    validate_managed_prog_id(&change.after.prog_id)?;
+    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+    let extension_path = format!(r"Software\Classes\{}", change.extension);
+    let prog_id_path = format!(r"Software\Classes\{}", change.after.prog_id);
+    let shell_path = format!(r"{}\shell", prog_id_path);
+    let open_path = format!(r"{}\open", shell_path);
+    let command_path = format!(r"{}\command", open_path);
+    let extension_key_before = capture_registry_key(&hkcu, &extension_path)?;
+    let target_prog_id_before = FileAssociationProgIdBackup {
+        prog_id: change.after.prog_id.clone(),
+        root: capture_registry_key(&hkcu, &prog_id_path)?,
+        shell: capture_registry_key(&hkcu, &shell_path)?,
+        open: capture_registry_key(&hkcu, &open_path)?,
+        command: capture_registry_key(&hkcu, &command_path)?,
+    };
+    Ok((Some(extension_key_before), Some(target_prog_id_before)))
+}
+
+#[cfg(not(windows))]
+fn capture_registry_state(
+    _change: &FileAssociationChange,
+) -> Result<
+    (
+        Option<FileAssociationRegistryKeyBackup>,
+        Option<FileAssociationProgIdBackup>,
+    ),
+    String,
+> {
+    Ok((None, None))
+}
+
+#[cfg(windows)]
+fn capture_registry_key(
+    root: &winreg::RegKey,
+    path: &str,
+) -> Result<FileAssociationRegistryKeyBackup, String> {
+    use std::io::ErrorKind;
+    use winreg::enums::KEY_READ;
+
+    let key = match root.open_subkey_with_flags(path, KEY_READ) {
+        Ok(key) => key,
+        Err(error) if error.kind() == ErrorKind::NotFound => {
+            return Ok(FileAssociationRegistryKeyBackup {
+                existed: false,
+                default_value: None,
+            });
+        }
+        Err(error) => return Err(format!("Failed to inspect registry key {path}: {error}")),
+    };
+    let default_value = match key.get_raw_value("") {
+        Ok(value) => Some(backup_registry_value(value)),
+        Err(error) if error.kind() == ErrorKind::NotFound => None,
+        Err(error) => {
+            return Err(format!(
+                "Failed to inspect the default value for registry key {path}: {error}"
+            ));
+        }
+    };
+    Ok(FileAssociationRegistryKeyBackup {
+        existed: true,
+        default_value,
+    })
+}
+
+#[cfg(windows)]
+fn backup_registry_value(value: winreg::RegValue) -> FileAssociationRegistryValueBackup {
+    let winreg::RegValue { bytes, vtype } = value;
+    FileAssociationRegistryValueBackup {
+        value_type: vtype as u32,
+        bytes,
+    }
+}
+
+#[cfg(windows)]
+fn registry_value_from_backup(
+    value: &FileAssociationRegistryValueBackup,
+) -> Result<winreg::RegValue, String> {
+    use winreg::enums::*;
+
+    let vtype = match value.value_type {
+        0 => REG_NONE,
+        1 => REG_SZ,
+        2 => REG_EXPAND_SZ,
+        3 => REG_BINARY,
+        4 => REG_DWORD,
+        5 => REG_DWORD_BIG_ENDIAN,
+        6 => REG_LINK,
+        7 => REG_MULTI_SZ,
+        8 => REG_RESOURCE_LIST,
+        9 => REG_FULL_RESOURCE_DESCRIPTOR,
+        10 => REG_RESOURCE_REQUIREMENTS_LIST,
+        11 => REG_QWORD,
+        other => {
+            return Err(format!(
+                "Unsupported registry value type in backup: {other}"
+            ))
+        }
+    };
+    Ok(winreg::RegValue {
+        bytes: value.bytes.clone(),
+        vtype,
+    })
+}
+
+#[cfg(windows)]
+fn restore_registry_key(
+    root: &winreg::RegKey,
+    path: &str,
+    before: &FileAssociationRegistryKeyBackup,
+    label: &str,
+) -> Result<(), String> {
+    use std::io::ErrorKind;
+
+    if !before.existed {
+        return match root.delete_subkey_all(path) {
+            Ok(()) => Ok(()),
+            Err(error) if error.kind() == ErrorKind::NotFound => Ok(()),
+            Err(error) => Err(format!(
+                "Failed to remove restored {label} key {path}: {error}"
+            )),
+        };
+    }
+    let key = root
+        .create_subkey(path)
+        .map_err(|error| format!("Failed to open restored {label} key {path}: {error}"))?
+        .0;
+    match &before.default_value {
+        Some(value) => key
+            .set_raw_value("", &registry_value_from_backup(value)?)
+            .map_err(|error| {
+                format!("Failed to restore the default value for {label} key {path}: {error}")
+            }),
+        None => match key.delete_value("") {
+            Ok(()) => Ok(()),
+            Err(error) if error.kind() == ErrorKind::NotFound => Ok(()),
+            Err(error) => Err(format!(
+                "Failed to clear the default value for {label} key {path}: {error}"
+            )),
+        },
+    }
+}
+
+#[cfg(windows)]
+fn restore_target_prog_id(
+    classes: &winreg::RegKey,
+    before: &FileAssociationProgIdBackup,
+) -> Result<(), String> {
+    validate_managed_prog_id(&before.prog_id)?;
+    if !before.root.existed {
+        return restore_registry_key(classes, &before.prog_id, &before.root, "ProgID");
+    }
+
+    restore_registry_key(classes, &before.prog_id, &before.root, "ProgID")?;
+    let shell_path = format!(r"{}\shell", before.prog_id);
+    let open_path = format!(r"{}\open", shell_path);
+    let command_path = format!(r"{}\command", open_path);
+    restore_registry_key(classes, &command_path, &before.command, "ProgID command")?;
+    if !before.open.existed {
+        delete_empty_registry_key(classes, &open_path, "ProgID open")?;
+    }
+    if !before.shell.existed {
+        delete_empty_registry_key(classes, &shell_path, "ProgID shell")?;
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
+fn delete_empty_registry_key(root: &winreg::RegKey, path: &str, label: &str) -> Result<(), String> {
+    use std::io::ErrorKind;
+
+    match root.delete_subkey(path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(format!(
+            "Failed to remove the app-created {label} key {path}: {error}"
+        )),
+    }
+}
+
+fn validate_managed_prog_id(prog_id: &str) -> Result<(), String> {
+    if prog_id.starts_with("DevEnvManager.")
+        && prog_id
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '.' | '_' | '-'))
+    {
+        Ok(())
+    } else {
+        Err(format!("Unsafe managed ProgID in backup: {prog_id}"))
+    }
+}
+
 #[cfg(windows)]
 fn restore_record(record: &FileAssociationBackupRecord) -> Result<(), String> {
     use winreg::{enums::*, RegKey};
@@ -773,6 +1023,13 @@ fn restore_record(record: &FileAssociationBackupRecord) -> Result<(), String> {
         .create_subkey(r"Software\Classes")
         .map_err(|err| format!("打开当前用户 Classes 失败：{err}"))?
         .0;
+    if let Some(before) = &record.extension_key_before {
+        restore_registry_key(&classes, &record.extension, before, "extension")?;
+        if let Some(target_before) = &record.target_prog_id_before {
+            restore_target_prog_id(&classes, target_before)?;
+        }
+        return Ok(());
+    }
     let extension_key = classes
         .create_subkey(&record.extension)
         .map_err(|err| format!("打开扩展名键失败：{err}"))?
@@ -793,6 +1050,11 @@ fn restore_record(_record: &FileAssociationBackupRecord) -> Result<(), String> {
 }
 
 fn write_backup(plan: &FileAssociationPlan) -> Result<FileAssociationBackup, String> {
+    let records = plan
+        .changes
+        .iter()
+        .map(capture_backup_record)
+        .collect::<Result<Vec<_>, _>>()?;
     let backup = FileAssociationBackup {
         backup_id: plan.plan_id.clone(),
         created_at: current_timestamp(),
@@ -801,14 +1063,7 @@ fn write_backup(plan: &FileAssociationPlan) -> Result<FileAssociationBackup, Str
         plan_id: plan.plan_id.clone(),
         plan_fingerprint: plan.plan_fingerprint.clone(),
         target_app_name: plan.target_app_name.clone(),
-        records: plan
-            .changes
-            .iter()
-            .map(|change| FileAssociationBackupRecord {
-                extension: change.extension.clone(),
-                before: change.before.clone(),
-            })
-            .collect(),
+        records,
     };
     let path = PathBuf::from(&plan.backup_path);
     if let Some(parent) = path.parent() {
@@ -1528,6 +1783,50 @@ mod tests {
         assert_eq!(plan.risk_level, "high");
         assert!(plan.requires_confirmation_token);
         assert!(!plan.backup_path.trim().is_empty());
+    }
+
+    #[test]
+    fn legacy_backup_record_remains_readable_without_registry_snapshots() {
+        let before = unknown_record(
+            ".devenvtest182",
+            ExtensionDefinition {
+                extension: ".devenvtest182",
+                category: "fixture",
+                description: "fixture",
+            },
+        );
+        let value = serde_json::json!({
+            "extension": ".devenvtest182",
+            "before": before,
+        });
+
+        let record: FileAssociationBackupRecord = serde_json::from_value(value).unwrap();
+
+        assert!(record.extension_key_before.is_none());
+        assert!(record.target_prog_id_before.is_none());
+    }
+
+    #[test]
+    fn managed_prog_id_guard_rejects_registry_paths() {
+        assert!(validate_managed_prog_id("DevEnvManager.Fixture.devenvtest182").is_ok());
+        assert!(validate_managed_prog_id(r"DevEnvManager.Fixture\shell").is_err());
+        assert!(validate_managed_prog_id("OtherVendor.Fixture").is_err());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn registry_value_backup_preserves_raw_type_and_bytes() {
+        use winreg::enums::REG_EXPAND_SZ;
+
+        let original = winreg::RegValue {
+            bytes: vec![37, 0, 84, 0, 69, 0, 77, 0, 80, 0, 37, 0, 0, 0],
+            vtype: REG_EXPAND_SZ,
+        };
+        let backup = backup_registry_value(original);
+        let restored = registry_value_from_backup(&backup).unwrap();
+
+        assert_eq!(restored.vtype, REG_EXPAND_SZ);
+        assert_eq!(restored.bytes, backup.bytes);
     }
 
     #[test]

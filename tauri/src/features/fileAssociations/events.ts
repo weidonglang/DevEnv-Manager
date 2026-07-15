@@ -73,7 +73,13 @@ export function bindFileAssociationEvents(context: FeatureContext, state: FileAs
     }
   });
   bindAction(context.root, "apply-association-plan", async () => {
-    if (!state.plan) return context.toast(t("toast.createAssociationPlanFirst"), true);
+    if (!state.plan) {
+      state.operationError = t("toast.createAssociationPlanFirst");
+      context.toast(state.operationError, true);
+      context.root.innerHTML = renderFileAssociations(state);
+      bindFileAssociationEvents(context, state);
+      return;
+    }
     state.applyResult = null;
     state.rollbackResult = null;
     state.operationError = "";
@@ -91,15 +97,24 @@ export function bindFileAssociationEvents(context: FeatureContext, state: FileAs
       });
       state.applyResult = result as FileAssociationUiState["applyResult"];
       state.applyResultMessage = state.applyResult?.message ?? "";
+      await reloadAssociationBackups(context, state);
     } catch (error) {
       state.operationError = errorMessage(error);
     }
+    if (!context.isCurrent()) return;
     context.root.innerHTML = renderFileAssociations(state);
     bindFileAssociationEvents(context, state);
   });
   bindAction(context.root, "rollback-association-backup", async () => {
-    const backup = state.backups[0];
-    if (!backup) return context.toast(t("toast.noBackupAvailable"), true);
+    const appliedBackupId = state.applyResult?.backupId;
+    const backup = state.backups.find((item) => item.backupId === appliedBackupId) ?? state.backups[0];
+    if (!backup) {
+      state.operationError = t("toast.noBackupAvailable");
+      context.toast(state.operationError, true);
+      context.root.innerHTML = renderFileAssociations(state);
+      bindFileAssociationEvents(context, state);
+      return;
+    }
     state.rollbackResult = null;
     state.operationError = "";
     try {
@@ -115,9 +130,11 @@ export function bindFileAssociationEvents(context: FeatureContext, state: FileAs
       });
       state.rollbackResult = result as FileAssociationUiState["rollbackResult"];
       state.applyResultMessage = state.rollbackResult?.message ?? "";
+      await reloadAssociationBackups(context, state);
     } catch (error) {
       state.operationError = errorMessage(error);
     }
+    if (!context.isCurrent()) return;
     context.root.innerHTML = renderFileAssociations(state);
     bindFileAssociationEvents(context, state);
   });
@@ -152,6 +169,17 @@ export async function refreshFileAssociations(context: FeatureContext, state: Fi
   state.backups = backups;
   context.root.innerHTML = renderFileAssociations(state);
   bindFileAssociationEvents(context, state);
+}
+
+async function reloadAssociationBackups(context: FeatureContext, state: FileAssociationUiState): Promise<void> {
+  try {
+    const backups = await listAssociationBackups();
+    if (!context.isCurrent()) return;
+    state.backups = backups;
+  } catch (error) {
+    if (!context.isCurrent()) return;
+    state.operationError = `${t("feature.fileAssociations.backupRefreshFailed")}: ${errorMessage(error)}`;
+  }
 }
 
 function syncInputs(context: FeatureContext, state: FileAssociationUiState): void {

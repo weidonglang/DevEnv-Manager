@@ -266,6 +266,7 @@ export const zhCN = {
   "feature.fileAssociations.manageable": "可管理",
   "feature.fileAssociations.missingApps": "缺失应用",
   "feature.fileAssociations.backups": "备份",
+  "feature.fileAssociations.backupRefreshFailed": "操作已完成，但无法刷新备份列表",
   "feature.fileAssociations.appName": "应用名称",
   "feature.fileAssociations.exePath": "可执行文件路径",
   "feature.fileAssociations.filterExtension": "过滤扩展名或应用",
