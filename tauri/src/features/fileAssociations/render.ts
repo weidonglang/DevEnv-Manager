@@ -41,13 +41,10 @@ export function renderFileAssociations(state: FileAssociationUiState): string {
 }
 
 function renderAssociationPlan(plan: NonNullable<FileAssociationUiState["plan"]>): string {
-  const risk = plan.changes.some((change) => change.risk === "highRisk" || change.risk === "protected")
-    ? "high"
-    : plan.changes.some((change) => change.risk !== "normal") ? "medium" : "low";
   return `<div class="association-plan-detail">
     ${renderObjectTable({
       planId: plan.planId,
-      riskLevel: risk,
+      riskLevel: plan.riskLevel,
       targetAppName: plan.targetAppName,
       targetExecutable: plan.targetExecutable,
       backupPath: plan.backupPath,

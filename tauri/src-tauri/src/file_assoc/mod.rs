@@ -114,6 +114,7 @@ pub struct FileAssociationPlan {
     pub changes: Vec<FileAssociationChange>,
     pub backup_path: String,
     pub warnings: Vec<String>,
+    pub risk_level: String,
     pub requires_confirmation_token: bool,
     pub plan_fingerprint: String,
 }
@@ -348,10 +349,6 @@ pub fn create_file_association_plan_blocking(
     let created_at = current_timestamp();
     let plan_id = unique_file_assoc_id("file-assoc");
     let backup_path = backup_dir().join(format!("{plan_id}.json"));
-    let requires_confirmation_token = changes.iter().any(|item| {
-        item.risk == FileAssociationRisk::HighRisk
-            || item.apply_mode == FileAssociationApplyMode::Blocked
-    });
     let mut plan = FileAssociationPlan {
         plan_id,
         created_at,
@@ -360,7 +357,8 @@ pub fn create_file_association_plan_blocking(
         changes,
         backup_path: display_path(&backup_path),
         warnings,
-        requires_confirmation_token,
+        risk_level: "high".to_string(),
+        requires_confirmation_token: true,
         plan_fingerprint: String::new(),
     };
     plan.plan_fingerprint = plan_fingerprint(&plan);
@@ -1515,6 +1513,24 @@ mod tests {
     }
 
     #[test]
+    fn normal_plan_uses_registered_high_risk_token_contract() {
+        let request = FileAssociationPlanRequest {
+            target_app_name: "Fixture App".to_string(),
+            target_executable: std::env::current_exe()
+                .unwrap()
+                .to_string_lossy()
+                .to_string(),
+            extensions: vec![".devenvtest182".to_string()],
+            advanced_high_risk: false,
+        };
+        let plan = create_file_association_plan_blocking(request).unwrap();
+
+        assert_eq!(plan.risk_level, "high");
+        assert!(plan.requires_confirmation_token);
+        assert!(!plan.backup_path.trim().is_empty());
+    }
+
+    #[test]
     fn fingerprint_changes_when_plan_is_tampered() {
         let record = unknown_record(
             ".txt",
@@ -1544,7 +1560,8 @@ mod tests {
             }],
             backup_path: "backup.json".to_string(),
             warnings: Vec::new(),
-            requires_confirmation_token: false,
+            risk_level: "high".to_string(),
+            requires_confirmation_token: true,
             plan_fingerprint: String::new(),
         };
         plan.plan_fingerprint = plan_fingerprint(&plan);
@@ -1557,6 +1574,8 @@ mod tests {
         assert_eq!(change["after"]["executable"], "app.exe");
         assert_eq!(change["applyMode"], "openSystemSettings");
         assert!(serialized["backupPath"].as_str().is_some());
+        assert_eq!(serialized["riskLevel"], "high");
+        assert_eq!(serialized["requiresConfirmationToken"], true);
         plan.target_app_name = "Other".to_string();
         assert!(validate_plan_fingerprint(&plan).is_err());
     }

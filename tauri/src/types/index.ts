@@ -869,6 +869,7 @@ export type FileAssociationPlan = {
   changes: FileAssociationChange[];
   backupPath: string;
   warnings: string[];
+  riskLevel: "high";
   requiresConfirmationToken: boolean;
   planFingerprint: string;
 };

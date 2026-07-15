@@ -1,7 +1,7 @@
 import type { FeatureContext } from "../../app/featureContext";
 import { open } from "../../api/tauri";
 import { t } from "../../core/i18n";
-import { bindAction, valueOf } from "../sharedView";
+import { bindAction } from "../sharedView";
 import { applyAssociationPlan, createAssociationPlan, exportAssociationReport, listAssociationBackups, openDefaultAppsSettings, rollbackAssociationBackup, scanAssociations, searchAssociationApp } from "./api";
 import { renderFileAssociations } from "./render";
 import type { FileAssociationUiState } from "./state";
@@ -83,7 +83,7 @@ export function bindFileAssociationEvents(context: FeatureContext, state: FileAs
         command: "apply_file_association_plan",
         planId: state.plan.planId,
         riskLevel: "high",
-        backupReceipt: valueOf(state.plan, "backupName", null),
+        backupReceipt: state.plan.backupPath,
         title: "Apply file association plan",
         summary: "Applies ordinary and high-risk file association changes through a backend token gate.",
         warnings: ["UserChoice-protected associations may open Windows Settings instead of writing registry values."],

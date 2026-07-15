@@ -127,6 +127,15 @@ def main() -> int:
     if "state.page = 1" not in ports_events or "ports:next" not in ports_events:
         return fail("Ports pagination must reset on filter and bind next/previous controls")
 
+    file_association_render = read("tauri/src/features/fileAssociations/render.ts")
+    file_association_events = read("tauri/src/features/fileAssociations/events.ts")
+    if 'riskLevel: plan.riskLevel' not in file_association_render:
+        return fail("File association plan must render the backend operation risk level")
+    if 'backupReceipt: state.plan.backupPath' not in file_association_events:
+        return fail("File association apply token must use FileAssociationPlan.backupPath")
+    if 'valueOf(state.plan, "backupName"' in file_association_events:
+        return fail("File association apply must not read nonexistent FileAssociationPlan.backupName")
+
     feature_guide = read("tauri/src/components/featureGuide.ts")
     if "${item.risk}</span>" in feature_guide or "riskSummary(item)" not in feature_guide:
         return fail("Feature guide risk chip must show full risk context, not raw high/medium tokens")
