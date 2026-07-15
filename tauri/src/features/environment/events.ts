@@ -2,12 +2,50 @@ import type { FeatureContext } from "../../app/featureContext";
 import { open } from "../../api/tauri";
 import { t } from "../../core/i18n";
 import { bindAction, valueOf } from "../sharedView";
-import { analyzePythonEnvironment, applyEnvRepairPlan, applyPythonRepair, cleanupPathEntries, createJavaStabilizePlan, environmentHealth, inspectEnvBackup, inspectEnvironmentReliability, listEnvBackups, listEnvironmentBackups, openPythonAliasSettings, previewPythonRepair, previewUserEnvironmentConfiguration, restoreEnvBackup, restoreEnvironmentBackup } from "./api";
+import { analyzePythonEnvironment, applyEnvRepairPlan, applyPythonRepair, applyUserEnvironmentConfiguration, cleanupPathEntries, createJavaStabilizePlan, environmentHealth, inspectEnvBackup, inspectEnvironmentReliability, listEnvBackups, listEnvironmentBackups, openPythonAliasSettings, previewPythonRepair, previewUserEnvironmentConfiguration, restoreEnvBackup, restoreEnvironmentBackup } from "./api";
 import { renderEnvironmentWorkbench } from "./render";
 import type { EnvironmentWorkbenchState } from "./state";
 
 export function bindEnvironmentEvents(context: FeatureContext, state: EnvironmentWorkbenchState): void {
   bindAction(context.root, "inspect-environment", () => refreshEnvironment(context, state));
+  bindAction(context.root, "apply-user-environment-configuration", async () => {
+    state.configurationResult = "";
+    state.configurationError = "";
+    const preview = state.preview;
+    if (!preview) {
+      state.configurationError = "Refresh the environment preview before applying configuration.";
+      renderAndBind(context, state);
+      return;
+    }
+    try {
+      const result = await context.risk.run({
+        command: "apply_user_environment_configuration",
+        planId: preview.previewId,
+        riskLevel: "high",
+        backupReceipt: preview.backupName,
+        backupRequired: true,
+        title: "Apply user environment configuration",
+        summary: "Writes the previewed DEVENV_HOME, JAVA_HOME, and user PATH values after baseline verification.",
+        before: preview.changes.map((change) => ({ label: change.name, value: `${change.current || "not set"} -> ${change.proposed || "not set"}` })),
+        warnings: preview.warnings,
+        execute: (confirmationToken) => applyUserEnvironmentConfiguration(preview.previewId, confirmationToken),
+      });
+      const [reliability, envBackups, environmentBackups, nextPreview] = await Promise.all([
+        inspectEnvironmentReliability(),
+        listEnvBackups(),
+        listEnvironmentBackups(),
+        previewUserEnvironmentConfiguration(),
+      ]);
+      state.reliability = reliability;
+      state.envBackups = envBackups;
+      state.environmentBackups = environmentBackups;
+      state.preview = nextPreview;
+      state.configurationResult = `${resultMessage(result, "User environment configuration applied.")} Post-verification refreshed JAVA_HOME, PATH, and backup evidence.`;
+    } catch (error) {
+      state.configurationError = errorMessage(error);
+    }
+    renderAndBind(context, state);
+  });
   bindAction(context.root, "analyze-python-environment", async () => {
     state.pythonError = "";
     try {
@@ -161,17 +199,32 @@ export function bindEnvironmentEvents(context: FeatureContext, state: Environmen
     context.root.innerHTML = renderEnvironmentWorkbench(state);
     bindEnvironmentEvents(context, state);
   });
-  bindAction(context.root, "cleanup-path", () =>
-    context.risk.run({
-      command: "cleanup_path_entries",
-      planId: "cleanup-path-entries",
-      riskLevel: "high",
-      title: "Cleanup PATH entries",
-      summary: "Removes duplicate, invalid, and stale PATH entries through a token-gated backend command.",
-      warnings: ["Review PATH warnings and backups before running cleanup."],
-      execute: cleanupPathEntries,
-    }),
-  );
+  bindAction(context.root, "cleanup-path", async () => {
+    state.pathCleanupResult = "";
+    state.pathCleanupError = "";
+    try {
+      const result = await context.risk.run({
+        command: "cleanup_path_entries",
+        planId: "cleanup-path-entries",
+        riskLevel: "high",
+        backupRequired: true,
+        title: "Cleanup PATH entries",
+        summary: "Removes duplicate, invalid, and stale PATH entries through a token-gated backend command.",
+        warnings: ["Review PATH warnings and backups before running cleanup."],
+        execute: cleanupPathEntries,
+      });
+      const [reliability, environmentBackups] = await Promise.all([
+        inspectEnvironmentReliability(),
+        listEnvironmentBackups(),
+      ]);
+      state.reliability = reliability;
+      state.environmentBackups = environmentBackups;
+      state.pathCleanupResult = `${resultMessage(result, "PATH cleanup completed.")} Post-verification refreshed PATH evidence and backups.`;
+    } catch (error) {
+      state.pathCleanupError = errorMessage(error);
+    }
+    renderAndBind(context, state);
+  });
   bindAction(context.root, "export-environment-report", () => context.navigate("reports"));
 }
 

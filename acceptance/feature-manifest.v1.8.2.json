@@ -642,19 +642,24 @@
             "route": "environment",
             "testIds": [
               "environment-doctor-section",
-              "environment-operation-result"
+              "environment-operation-result",
+              "environment-configuration-section",
+              "environment-configuration-preview",
+              "environment-configuration-result",
+              "environment-path-cleanup-result"
             ]
           },
           "selectors": {
             "entry": "environment-doctor-section",
-            "primaryAction": "run-environment-check",
-            "result": "environment-operation-result",
-            "error": "environment-operation-error"
+            "primaryAction": "apply-user-environment-configuration",
+            "result": "environment-configuration-result",
+            "error": "environment-configuration-error"
           },
           "backendCommands": [
             "inspect_env_reliability",
             "environment_health",
             "preview_user_environment_configuration",
+            "apply_user_environment_configuration",
             "create_java_stabilize_plan",
             "apply_env_repair_plan",
             "cleanup_path_entries"

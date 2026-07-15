@@ -24,6 +24,10 @@ export type EnvironmentWorkbenchState = {
   reliability: EnvReliabilitySnapshot | null;
   health: EnvHealthCheck[];
   preview: EnvironmentConfigPreview | null;
+  configurationResult: string;
+  configurationError: string;
+  pathCleanupResult: string;
+  pathCleanupError: string;
   envBackups: EnvBackupRecord[];
   environmentBackups: EnvironmentBackupInfo[];
   plan: EnvRepairPlan | null;
@@ -50,6 +54,10 @@ export const environmentWorkbenchInitialState: EnvironmentWorkbenchState = {
   reliability: null,
   health: [],
   preview: null,
+  configurationResult: "",
+  configurationError: "",
+  pathCleanupResult: "",
+  pathCleanupError: "",
   envBackups: [],
   environmentBackups: [],
   plan: null,

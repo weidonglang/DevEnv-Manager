@@ -13,6 +13,10 @@ export function previewUserEnvironmentConfiguration(): Promise<EnvironmentConfig
   return invoke<EnvironmentConfigPreview>("preview_user_environment_configuration");
 }
 
+export function applyUserEnvironmentConfiguration(previewId: string, confirmationToken: string): Promise<OperationResult> {
+  return invoke<OperationResult>("apply_user_environment_configuration", { previewId, confirmationToken });
+}
+
 export function listEnvBackups(): Promise<EnvBackupRecord[]> {
   return invoke<EnvBackupRecord[]>("list_env_backups");
 }

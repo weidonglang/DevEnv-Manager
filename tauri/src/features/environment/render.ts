@@ -21,6 +21,7 @@ export function renderEnvironmentWorkbench(state: EnvironmentWorkbenchState): st
         </div>
         <div class="toolbar">
           ${renderActionButton("inspect-environment", t("feature.environment.inspect"), "primary")}
+          ${renderActionButton("apply-user-environment-configuration", "Apply environment configuration", "danger")}
           ${renderActionButton("create-java-plan", t("dashboard.createJavaStabilizePlan"))}
           ${renderActionButton("apply-java-plan", t("feature.environment.applyPlan"), "danger")}
           ${renderActionButton("cleanup-path", t("feature.environment.cleanupPath"), "danger")}
@@ -28,16 +29,34 @@ export function renderEnvironmentWorkbench(state: EnvironmentWorkbenchState): st
         </div>
         ${state.checking ? `<div class="loading-state inline-loading" role="status"><span class="loading-spinner" aria-hidden="true"></span><strong>${t("feature.environment.checking")}</strong></div>` : ""}
         ${Object.keys(state.errors).length ? `<div class="error-state" data-testid="environment-error-panel">${Object.values(state.errors).map((message) => `<p>${escapeHtml(message)}</p>`).join("")}</div>` : ""}
+        ${renderEnvironmentConfiguration(state)}
         ${renderJdkPlanSelector(state)}
       </section>
       <section class="panel" data-testid="environment-result-panel"><h2>${t("feature.environment.details")}</h2>${renderRows(vm.detailRows)}</section>
-      <section class="panel" data-testid="environment-path-section"><h2>${t("feature.environment.pathWarnings")}</h2>${renderRows(vm.pathRows)}</section>
+      <section class="panel" data-testid="environment-path-section"><h2>${t("feature.environment.pathWarnings")}</h2>${renderRows(vm.pathRows)}<div data-testid="environment-path-cleanup-result">${state.pathCleanupError ? `<div class="error-state" data-testid="environment-path-cleanup-error">${escapeHtml(state.pathCleanupError)}</div>` : state.pathCleanupResult ? `<div class="small-note">${escapeHtml(state.pathCleanupResult)}</div>` : `<div class="empty">PATH cleanup has not been executed.</div>`}</div></section>
       <section class="panel"><h2>${t("feature.environment.issues")}</h2>${renderRows(vm.issueRows, t("state.notChecked"))}</section>
       ${renderPythonPanel(state)}
       ${renderRestorePanel(state)}
       <section class="panel" data-testid="environment-operation-result"><h2>${t("feature.environment.repairPlan")}</h2>${state.plan ? renderObjectTable(state.plan, ["planId", "createdAt", "target", "riskLevel", "backupName", "requiresTerminalRestart", "warnings", "disclaimer"]) : state.errors.createPlan ? "" : `<div class="empty">${t("feature.environment.noPlan")}</div>`}${renderApplyResult(state)}</section>
     </div>
   `;
+}
+
+function renderEnvironmentConfiguration(state: EnvironmentWorkbenchState): string {
+  const preview = state.preview;
+  return `<section class="subpanel" data-testid="environment-configuration-section">
+    <h3>User environment configuration</h3>
+    <div data-testid="environment-configuration-preview">${preview ? `
+      ${renderObjectTable(preview, ["previewId", "createdAt", "backupName"])}
+      ${renderRows(preview.changes.map((change) => ({ label: change.name, value: `${change.current || "not set"} -> ${change.proposed || "not set"} (${change.impact})` })))}
+      ${renderRows([
+        { label: "PATH additions", value: preview.pathAdded.join("; ") || "none" },
+        { label: "PATH removals", value: preview.pathRemoved.join("; ") || "none" },
+        { label: "Warnings", value: preview.warnings.join("; ") || "none" },
+      ])}
+    ` : `<div class="empty">Refresh to create a configuration preview.</div>`}</div>
+    <div data-testid="environment-configuration-result">${state.configurationError ? `<div class="error-state" data-testid="environment-configuration-error">${escapeHtml(state.configurationError)}</div>` : state.configurationResult ? `<div class="small-note">${escapeHtml(state.configurationResult)}</div>` : `<div class="empty">Configuration has not been applied.</div>`}</div>
+  </section>`;
 }
 
 function renderPythonPanel(state: EnvironmentWorkbenchState): string {
