@@ -2,36 +2,32 @@
 
 ## Build Identity
 
-- Built from: `c884495cc4f3ffa50c01df04d5b727bb815de8a2`
-- Git status at build: clean
-- Build window: `2026-07-13T01:45:08.3156695Z` to `2026-07-13T01:47:23.4617962Z`
+- Built from: `71cdcd96139791c65308fb9a8a280f56806bf3a1`
+- Short commit: `71cdcd9`
 - Product version: `1.8.2`
 - Target: `x86_64-pc-windows-msvc`
-- Command: `npx tauri build --bundles msi nsis --ci`
-- Raw log: Git-ignored `artifacts/release-candidate/c884495/tauri-build.log`
+- Created: `2026-07-13T06:14:38Z`
+- Reason for rebuild: probe actual managed-directory creation permission so `C:\DevEnvManager` is selected when `D:` is read-only media.
+- Raw assets and logs: Git-ignored `artifacts/release-candidate/71cdcd9/`
 
 ## Assets
 
 | Bundle | File | Size | SHA256 | Signature |
 |---|---|---:|---|---|
-| NSIS | `DevEnv Manager_1.8.2_x64-setup.exe` | 2,700,872 | `959d9022df44ee58bfffbe5f6154904f52bab1706feac663820efed9fba01dec` | NotSigned |
-| MSI | `DevEnv Manager_1.8.2_x64_en-US.msi` | 4,546,560 | `4b9f54a9e4e681fb3b15ac9dd92c8b9acd20dbcdce01ab9933de2e3337b40a71` | NotSigned |
+| NSIS | `DevEnv Manager_1.8.2_x64-setup.exe` | 2,700,971 | `6d4d4edb59b115fd4be8b1fbff94c2f67ce7aeadf8dda91425167ba23fedb31a` | NotSigned |
+| MSI | `DevEnv Manager_1.8.2_x64_en-US.msi` | 4,550,656 | `d83d83c534566e8489d7c9745cb6809ec52fbca7dc97ea338d5d189c055d6644` | NotSigned |
 
-The binary files remain under the Git-ignored `artifacts/release-candidate/c884495/` directory and must not be committed or published before VM validation and independent release review.
+The earlier `c884495` and `d90f4b3` candidates are superseded. Historical v1.8.2 assets with hashes `858e128...` and `ca9f6f0...` remain RCA-only and must not be published.
 
-## Separation From Historical Assets
+## ReleaseLab Status
 
-These hashes differ from the historical v1.8.2 RCA assets:
+- Guest-side NSIS and MSI sizes and SHA256 values: matched.
+- Historical installer Cases A-E on independent clean restores: passed.
+- New RC Cases N1-N6: passed. N1 retains one nonblocking NSIS temporary self-delete observation; no installed product file or user setting was affected.
+- Interactive v1.7.0 rollback failure from the original host: not reproduced in clean ReleaseLab Cases D or E; installer blocker cleared.
+- `system.self-uninstall`: evidence complete.
+- `update.download-install`: evidence complete, including size and SHA256 rejection tests and token-gated installer launch.
+- Remaining VM evidence blockers: 14 capabilities across Partition, Environment, File Associations, MySQL, Platforms, Services, and Runtime.
+- PR #132 remains Draft. No merge, tag, or release is authorized by this document.
 
-- Historical NSIS: `858e128f42b774e41772da9c065596c116812355d90c7943636bfaedded321e7`
-- Historical MSI: `ca9f6f0346b68ec4901e18f2d2f499ba0aa053e2f23e6a4503d155d79ca95ac3`
-
-The historical files remain RCA-only and are not release candidates.
-
-## Pending ReleaseLab Gates
-
-- Guest-side SHA256 comparison: pending.
-- Historical installer Case A-E RCA: pending user-operated VMConnect evidence.
-- New RC install, upgrade, rollback, update and self-uninstall validation: pending.
-- Remaining 16 VM evidence blockers: pending.
-- Installer blocker: remains open until the ReleaseLab evidence is reviewed.
+The binary files must remain Git ignored until all remaining evidence blockers are resolved and an independent release review returns GO.

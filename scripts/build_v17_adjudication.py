@@ -11,6 +11,7 @@ import build_v17_release_matrices as baseline
 
 ROOT = Path(__file__).resolve().parents[1]
 EVIDENCE_COMMIT = "bfcc10fc907184e247aa139d69933b974a4351f9"
+RELEASELAB_PRODUCT_COMMIT = "71cdcd96139791c65308fb9a8a280f56806bf3a1"
 SOURCE_PATH = ROOT / "acceptance" / "v1.7.0-source-records.json"
 NORMALIZED_PATH = ROOT / "acceptance" / "v1.7.0-normalized-capabilities.json"
 NORMALIZED_MD = ROOT / "docs" / "v1.7.0-normalized-capabilities.md"
@@ -264,6 +265,20 @@ EVIDENCE_OVERRIDES = {
     "profiles.apply": "verified-automated",
     "projects.configuration": "verified-automated",
     "projects.port-config": "verified-automated",
+    "system.self-uninstall": "verified-installed",
+    "update.download-install": "verified-installed",
+}
+
+RELEASELAB_EVIDENCE = {
+    "system.self-uninstall": [
+        "release-lab:docs/release-lab-v1.8.2.md#current-rc-matrix",
+        "summary-sha256:ebf957ef4eb49499a648618dbbd65135b1c704caedfb7e2ad32338c06ab07dd7",
+    ],
+    "update.download-install": [
+        "release-lab:docs/release-lab-v1.8.2.md#current-rc-matrix",
+        "summary-sha256:d36a04aa53c0bcb78823f4bd313f7ae9ab609dfce735bf5fcd0e78a7bef11c0c",
+        "trace-sha256:1f6679438443d0bac17602b11ca2c83c4ceee5c068f20e2346532e28454ab485",
+    ],
 }
 
 ISOLATED_FIXTURE_CAPABILITIES = {
@@ -431,7 +446,11 @@ def build_capabilities(records: list[dict[str, Any]], current: dict[str, Any]) -
         elif disposition == "product-decision-required":
             reason = "The v1.7.0 documentation promise has no sufficiently precise current product mapping and needs owner adjudication."
         else:
-            reason = "The current implementation and available evidence preserve the historical user goal."
+            reason = (
+                "Installed ReleaseLab execution and retained evidence preserve the historical user goal."
+                if capability_id in RELEASELAB_EVIDENCE
+                else "The current implementation and available evidence preserve the historical user goal."
+            )
 
         automated = sorted({
             f"frontend:{location}"
@@ -440,6 +459,7 @@ def build_capabilities(records: list[dict[str, Any]], current: dict[str, Any]) -
         })
         if capability_id in ISOLATED_FIXTURE_CAPABILITIES:
             automated.append("fixture:scripts/run_isolated_capability_fixtures.py")
+        automated.extend(RELEASELAB_EVIDENCE.get(capability_id, []))
         capabilities.append({
             "capabilityId": capability_id,
             "domain": capability_domain(capability_id),
@@ -458,7 +478,7 @@ def build_capabilities(records: list[dict[str, Any]], current: dict[str, Any]) -
             "releaseDisposition": disposition,
             "releaseReason": reason,
             "followUpIssue": "#130" if capability_id.startswith("runtime.") else "#125",
-            "lastVerifiedCommit": EVIDENCE_COMMIT,
+            "lastVerifiedCommit": RELEASELAB_PRODUCT_COMMIT if capability_id in RELEASELAB_EVIDENCE else EVIDENCE_COMMIT,
             "automatedEvidence": automated,
             "productDecision": {
                 "decision": "included-in-v1.8.2-compatibility-scope",
@@ -688,9 +708,11 @@ def render_blockers(capabilities: list[dict[str, Any]]) -> str:
             lines.append(f"- `{item['capabilityId']}`: {item['releaseReason']}")
         lines.append("")
     lines.extend([
-        "## Installer blockers", "",
-        "- Interactive v1.8.2 uninstall followed by interactive v1.7.0 rollback did not persist the v1.7.0 install directory or uninstall registration.",
-        "- Silent v1.7.0 recovery succeeded. Root cause remains unresolved without a clean VM reproduction.",
+        "## Completed ReleaseLab evidence", "",
+        "- `system.self-uninstall`: N5 passed with a matching high-risk token contract, official uninstaller launch, application exit, cleanup, and retained settings/Profile evidence.",
+        "- `update.download-install`: N6 passed with controlled metadata, progress, size mismatch rejection, SHA256 mismatch rejection, verified download, a matching high-risk token contract, and installer launch evidence.",
+        "", "## Installer blockers", "", "Count: 0", "",
+        "Clean ReleaseLab historical Cases A-E and current RC Cases N1-N4 passed. The original host-only interactive rollback failure was not reproduced.",
     ])
     return "\n".join(lines) + "\n"
 

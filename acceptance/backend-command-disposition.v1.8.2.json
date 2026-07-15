@@ -13,9 +13,9 @@
       "replacement-command": 8
     },
     "byReleaseDisposition": {
-      "evidence-blocker": 40,
+      "evidence-blocker": 37,
       "product-decision-required": 7,
-      "ready": 123
+      "ready": 126
     },
     "unclassified": 0,
     "withoutCapabilityMapping": 0,
@@ -968,12 +968,12 @@
         "feature-manifest:update.checkDownloadMetadata"
       ],
       "classification": "direct-user-command",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "A current frontend invoke exposes this command.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "env_snapshot",
@@ -2159,12 +2159,12 @@
         "feature-manifest:update.checkDownloadMetadata"
       ],
       "classification": "direct-user-command",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "A current frontend invoke exposes this command.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "list_archive_plan_items",
@@ -3380,12 +3380,12 @@
         "feature-manifest:settings.selfUninstall"
       ],
       "classification": "direct-user-command",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "A current frontend invoke exposes this command.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "set_auto_check_update",

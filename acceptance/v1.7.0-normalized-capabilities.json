@@ -27,15 +27,15 @@
       "equivalent": 74
     },
     "byEvidenceStatus": {
-      "environment-blocked": 14,
+      "environment-blocked": 12,
       "evidence-required": 2,
       "verified-automated": 46,
-      "verified-installed": 24,
+      "verified-installed": 26,
       "verified-real-tauri": 1
     },
     "byReleaseDisposition": {
-      "evidence-blocker": 16,
-      "ready": 71
+      "evidence-blocker": 14,
+      "ready": 73
     }
   },
   "capabilities": [
@@ -3639,29 +3639,19 @@
         "self_uninstall"
       ],
       "implementationStatus": "equivalent",
-      "evidenceStatus": "environment-blocked",
-      "releaseDisposition": "evidence-blocker",
-      "releaseReason": "Implementation mapping exists, but the required installed or safely isolated execution evidence is incomplete.",
+      "evidenceStatus": "verified-installed",
+      "releaseDisposition": "ready",
+      "releaseReason": "Installed ReleaseLab execution and retained evidence preserve the historical user goal.",
       "followUpIssue": "#125",
-      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "lastVerifiedCommit": "71cdcd96139791c65308fb9a8a280f56806bf3a1",
       "automatedEvidence": [
-        "frontend:tauri/src/features/settings/api.ts:41"
+        "frontend:tauri/src/features/settings/api.ts:41",
+        "release-lab:docs/release-lab-v1.8.2.md#current-rc-matrix",
+        "summary-sha256:ebf957ef4eb49499a648618dbbd65135b1c704caedfb7e2ad32338c06ab07dd7"
       ],
       "productDecision": null,
       "codeBlockerEvidence": null,
-      "evidencePlan": {
-        "fixture": "Dedicated temporary data or disposable VM snapshot",
-        "environment": "Windows real Tauri or installed application",
-        "steps": [
-          "Capture baseline",
-          "Run the mapped user path",
-          "Verify result against system state",
-          "Restore baseline"
-        ],
-        "safetyBoundary": "Do not modify real services, associations, environment, or user files outside the fixture.",
-        "passCriteria": "UI result, receipt, and observed system state agree.",
-        "recovery": "Delete temporary data or revert the VM snapshot."
-      }
+      "evidencePlan": null
     },
     {
       "capabilityId": "toolchains.actions",
@@ -4194,30 +4184,21 @@
         "launch_update_installer"
       ],
       "implementationStatus": "equivalent",
-      "evidenceStatus": "environment-blocked",
-      "releaseDisposition": "evidence-blocker",
-      "releaseReason": "Implementation mapping exists, but the required installed or safely isolated execution evidence is incomplete.",
+      "evidenceStatus": "verified-installed",
+      "releaseDisposition": "ready",
+      "releaseReason": "Installed ReleaseLab execution and retained evidence preserve the historical user goal.",
       "followUpIssue": "#125",
-      "lastVerifiedCommit": "bfcc10fc907184e247aa139d69933b974a4351f9",
+      "lastVerifiedCommit": "71cdcd96139791c65308fb9a8a280f56806bf3a1",
       "automatedEvidence": [
         "frontend:tauri/src/features/settings/api.ts:33",
-        "frontend:tauri/src/features/settings/api.ts:37"
+        "frontend:tauri/src/features/settings/api.ts:37",
+        "release-lab:docs/release-lab-v1.8.2.md#current-rc-matrix",
+        "summary-sha256:d36a04aa53c0bcb78823f4bd313f7ae9ab609dfce735bf5fcd0e78a7bef11c0c",
+        "trace-sha256:1f6679438443d0bac17602b11ca2c83c4ceee5c068f20e2346532e28454ab485"
       ],
       "productDecision": null,
       "codeBlockerEvidence": null,
-      "evidencePlan": {
-        "fixture": "Dedicated temporary data or disposable VM snapshot",
-        "environment": "Windows real Tauri or installed application",
-        "steps": [
-          "Capture baseline",
-          "Run the mapped user path",
-          "Verify result against system state",
-          "Restore baseline"
-        ],
-        "safetyBoundary": "Do not modify real services, associations, environment, or user files outside the fixture.",
-        "passCriteria": "UI result, receipt, and observed system state agree.",
-        "recovery": "Delete temporary data or revert the VM snapshot."
-      }
+      "evidencePlan": null
     }
   ]
 }

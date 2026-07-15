@@ -56,7 +56,7 @@ Every registered command has a capability mapping and one final classification.
 | `delete_config_profile` | `profiles.delete` | direct-user-command | tauri/src/features/profiles/api.ts:33 |  | ready | A current frontend invoke exposes this command. |
 | `discover_runtimes` | `runtime.discover` | direct-user-command | tauri/src/features/runtimes/api.ts:5 |  | ready | A current frontend invoke exposes this command. |
 | `doctor_report_text` | `doctor.run` | direct-user-command | tauri/src/features/reports/api.ts:17 |  | ready | A current frontend invoke exposes this command. |
-| `download_update` | `update.download-install` | direct-user-command | tauri/src/features/settings/api.ts:33 |  | evidence-blocker | A current frontend invoke exposes this command. |
+| `download_update` | `update.download-install` | direct-user-command | tauri/src/features/settings/api.ts:33 |  | ready | A current frontend invoke exposes this command. |
 | `env_snapshot` | `environment.snapshot` | compatibility-alias |  | environment_health, inspect_env_reliability | ready | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
 | `environment_health` | `environment.snapshot` | direct-user-command | tauri/src/features/dashboard/api.ts:9, tauri/src/features/environment/api.ts:9 |  | ready | A current frontend invoke exposes this command. |
 | `execute_c_drive_expansion` | `cleanup.partition-expansion` | direct-user-command | tauri/src/features/cleanup/api.ts:61 |  | evidence-blocker | A current frontend invoke exposes this command. |
@@ -110,7 +110,7 @@ Every registered command has a capability mapping and one final classification.
 | `install_python` | `runtime.install` | dynamic-user-command | tauri/src/features/runtimes/events.ts |  | evidence-blocker | A recognized dynamic invoke wrapper exposes this command. |
 | `jdk_distributions` | `runtime.discover` | direct-user-command | tauri/src/features/runtimes/api.ts:9 |  | ready | A current frontend invoke exposes this command. |
 | `kill_process` | `ports.release` | compatibility-alias |  | create_port_resolution_plan, execute_port_resolution_plan | ready | The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval. |
-| `launch_update_installer` | `update.download-install` | direct-user-command | tauri/src/features/settings/api.ts:37 |  | evidence-blocker | A current frontend invoke exposes this command. |
+| `launch_update_installer` | `update.download-install` | direct-user-command | tauri/src/features/settings/api.ts:37 |  | ready | A current frontend invoke exposes this command. |
 | `list_archive_plan_items` | `cleanup.archive-plan` | direct-user-command | tauri/src/features/cleanup/api.ts:113 |  | ready | A current frontend invoke exposes this command. |
 | `list_config_profiles` | `profiles.list` | direct-user-command | tauri/src/features/profiles/api.ts:5 |  | ready | A current frontend invoke exposes this command. |
 | `list_env_backups` | `environment.backups` | direct-user-command | tauri/src/features/environment/api.ts:17 |  | ready | A current frontend invoke exposes this command. |
@@ -166,7 +166,7 @@ Every registered command has a capability mapping and one final classification.
 | `scan_ports` | `ports.scan-history` | direct-user-command | tauri/src/features/dashboard/api.ts:26, tauri/src/features/ports/api.ts:5 |  | ready | A current frontend invoke exposes this command. |
 | `scan_storage_cleanup` | `cleanup.scan-plan-execute` | diagnostic |  |  | ready | This read-only command supplies evidence to a broader user flow. |
 | `search_file_association_app` | `legacy-file-associations.search-file-association-app` | direct-user-command | tauri/src/features/fileAssociations/api.ts:20 |  | product-decision-required | A current frontend invoke exposes this command. |
-| `self_uninstall` | `system.self-uninstall` | direct-user-command | tauri/src/features/settings/api.ts:41 |  | evidence-blocker | A current frontend invoke exposes this command. |
+| `self_uninstall` | `system.self-uninstall` | direct-user-command | tauri/src/features/settings/api.ts:41 |  | ready | A current frontend invoke exposes this command. |
 | `set_auto_check_update` | `settings.auto-update` | direct-user-command | tauri/src/features/settings/api.ts:13 |  | ready | A current frontend invoke exposes this command. |
 | `set_root_dir` | `settings.root` | direct-user-command | tauri/src/features/settings/api.ts:9 |  | ready | A current frontend invoke exposes this command. |
 | `stop_local_service` | `services.manage` | direct-user-command | tauri/src/features/ports/api.ts:25 |  | evidence-blocker | A current frontend invoke exposes this command. |

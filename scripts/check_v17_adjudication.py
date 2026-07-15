@@ -45,8 +45,13 @@ def main() -> None:
     assert all(capability["evidencePlan"] for capability in capabilities if capability["releaseDisposition"] == "evidence-blocker")
     assert sum(len(capability["sourceRecordIds"]) for capability in capabilities) == sources["summary"]["mapped"]
 
-    assert split["summary"]["partialParents"] == 27
-    assert split["summary"]["parentsWithProposal"] == 27
+    current = baseline.current_inventory()
+    expected_partial_parents = sum(
+        feature.get("status") == "partial"
+        for feature in current["featureRecords"].values()
+    )
+    assert split["summary"]["partialParents"] == expected_partial_parents
+    assert split["summary"]["parentsWithProposal"] == expected_partial_parents
     assert split["summary"]["unresolvedParents"] == 0
     assert len({child["newFeatureId"] for child in children}) == len(children)
     partial_commands = {command for child in children for command in child["commands"]}
@@ -58,7 +63,7 @@ def main() -> None:
     proposed_old_capabilities = {capability_id for child in children for capability_id in child["oldCapabilityIds"]}
     assert expected_old_capabilities <= proposed_old_capabilities
 
-    registered_commands = baseline.current_inventory()["registered"]
+    registered_commands = current["registered"]
     assert backend["summary"]["registered"] == len(registered_commands)
     assert {command["command"] for command in commands} == set(registered_commands)
     assert backend["summary"]["unclassified"] == 0
