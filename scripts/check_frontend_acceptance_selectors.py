@@ -32,7 +32,8 @@ def main() -> int:
     for page in manifest().get("pages", []):
         for feature in page.get("features", []):
             priority = feature.get("priority") or page.get("priority")
-            if priority != "P0":
+            status = feature.get("status", "")
+            if priority not in {"P0", "P1"} or status in {"deferred", "manualOnly"}:
                 continue
             for test_id in feature.get("frontendEntry", {}).get("testIds", []):
                 required.append((feature.get("featureId", "<unknown>"), page.get("pageId", "<unknown>"), test_id))
@@ -44,7 +45,7 @@ def main() -> int:
             print(f"- {feature_id} ({page_id}) missing data-testid={test_id}")
         return 1
 
-    print(f"Frontend acceptance selector check passed ({len(required)} P0 selectors).")
+    print(f"Frontend acceptance selector check passed ({len(required)} P0/P1 selectors).")
     return 0
 
 

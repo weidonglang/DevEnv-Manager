@@ -30,7 +30,11 @@ export function bindPortEvents(context: FeatureContext, state: PortsWorkbenchSta
   bindPortsTableEvents(context, state);
   bindAction(context.root, "create-port-plan", async () => {
     const selected = selectedPortRecord(state.records, state.selectedKey);
-    if (!selected) return context.toast(state.records.length ? t("feature.ports.selectPortFirst") : t("toast.portScanFirst"), true);
+    if (!selected) {
+      state.planError = state.records.length ? t("feature.ports.selectPortFirst") : t("toast.portScanFirst");
+      renderAndBind(context, state);
+      return;
+    }
     state.plan = null;
     state.executionResult = null;
     state.planError = "";
@@ -86,9 +90,13 @@ export function bindPortEvents(context: FeatureContext, state: PortsWorkbenchSta
     });
   });
   bindAction(context.root, "inspect-local-services", async () => {
-    state.services = await inspectLocalServices();
-    context.root.innerHTML = renderPortsWorkbench(state);
-    bindPortEvents(context, state);
+    state.servicesError = "";
+    try {
+      state.services = await inspectLocalServices();
+    } catch (error) {
+      state.servicesError = errorMessage(error);
+    }
+    renderAndBind(context, state);
   });
   bindAction(context.root, "copy-selected-port-diagnostics", async () => {
     const selected = selectedPortRecord(state.records, state.selectedKey);

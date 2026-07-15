@@ -62,7 +62,7 @@ function renderShell() {
           ${workbenchRoutes
             .map(
               (route) => `
-                <button class="nav-item" data-view="${route.id}">
+                <button class="nav-item" data-view="${route.id}" data-testid="${route.id === "dashboard" ? "nav-dashboard" : `nav-${route.id}`}">
                   <span class="nav-icon" aria-hidden="true">${route.icon}</span>
                   <span>${routeLabel(route)}</span>
                 </button>
@@ -79,7 +79,7 @@ function renderShell() {
             <p id="view-description">${t("route.dashboard.description")}</p>
           </div>
           <div class="toolbar compact">
-            <button id="open-command-palette" class="button button--primary primary" type="button">${t("app.commandPalette")}</button>
+            <button id="open-command-palette" data-testid="command-palette-open" class="button button--primary primary" type="button">${t("app.commandPalette")}</button>
             <button id="refresh-active-view" class="button button--secondary" type="button">${t("app.refresh")}</button>
             <div class="theme-switcher" aria-label="${t("app.theme")}">
               ${(["light", "dark", "system", "high-contrast"] as const)

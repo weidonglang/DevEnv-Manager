@@ -10,6 +10,7 @@ SCOPED_FILES = [
     ROOT / "tauri" / "src" / "features" / "ports" / "events.ts",
     ROOT / "tauri" / "src" / "features" / "cleanup" / "render.ts",
     ROOT / "tauri" / "src" / "features" / "cleanup" / "events.ts",
+    ROOT / "tauri" / "src" / "features" / "environment" / "events.ts",
     ROOT / "tauri" / "src" / "ui" / "components" / "riskUx.ts",
 ]
 
@@ -20,6 +21,12 @@ FORBIDDEN = [
     "taskkill failed",
     "PID 4 is protected",
 ]
+
+REQUIRED_SNIPPETS = {
+    ROOT / "tauri" / "src" / "features" / "environment" / "events.ts": [
+        'state.errors.applyResult = t("toast.createRepairPlanFirst");',
+    ],
+}
 
 
 def fail(message: str) -> int:
@@ -34,6 +41,13 @@ def main() -> int:
         for needle in FORBIDDEN:
             if needle in text:
                 failures.append(f"{path.relative_to(ROOT).as_posix()} contains forbidden UI copy: {needle}")
+    for path, snippets in REQUIRED_SNIPPETS.items():
+        text = path.read_text(encoding="utf-8")
+        for snippet in snippets:
+            if snippet not in text:
+                failures.append(
+                    f"{path.relative_to(ROOT).as_posix()} is missing durable operation feedback: {snippet}"
+                )
     if failures:
         return fail("\n- " + "\n- ".join(failures))
     print("Frontend quality regression check passed.")

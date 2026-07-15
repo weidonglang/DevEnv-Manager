@@ -66,9 +66,11 @@ export function bindToolchainEvents(context: FeatureContext, state: ToolchainWor
   bindAction(context.root, "create-mysql-plan", async () => {
     const candidate = state.mysql?.candidates[0];
     if (!candidate) {
-      context.toast(t("toast.runMysqlDiagnosisFirst"), true);
+      state.operationError = t("toast.runMysqlDiagnosisFirst");
+      renderAndBind(context, state);
       return;
     }
+    state.operationError = "";
     context.progress.start(t("feature.toolchains.creatingMysqlPlan"));
     try {
       state.mysqlPlan = await createMySqlRepairPlan(candidate.id, "repair");
@@ -76,11 +78,17 @@ export function bindToolchainEvents(context: FeatureContext, state: ToolchainWor
       context.progress.done(t("toast.planReady"));
       renderAndBind(context, state);
     } catch (error) {
-      context.progress.fail(errorMessage(error));
+      state.operationError = errorMessage(error);
+      context.progress.fail(state.operationError);
+      renderAndBind(context, state);
     }
   });
   bindAction(context.root, "execute-mysql-plan", async () => {
-    if (!state.mysqlPlan) return context.toast(t("toast.createMysqlPlanFirst"), true);
+    if (!state.mysqlPlan) {
+      state.operationError = t("toast.createMysqlPlanFirst");
+      renderAndBind(context, state);
+      return;
+    }
     state.mysqlResult = null;
     state.operationError = "";
     try {

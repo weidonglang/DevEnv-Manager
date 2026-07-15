@@ -31,7 +31,8 @@ export function bindProjectEvents(context: FeatureContext, state: ProjectWorkben
     } catch (error) {
       const message = errorMessage(error);
       finishDebug(pickerLog, "failed", message);
-      context.toast(message, true);
+      state.errors.analysis = message;
+      renderAndBind(context, state);
     }
   });
   bindAction(context.root, "analyze-project", () => refreshProject(context, state));
@@ -47,7 +48,9 @@ export function bindProjectEvents(context: FeatureContext, state: ProjectWorkben
   });
   bindAction(context.root, "apply-project-config", async () => {
     if (!state.preview) {
-      context.toast(t("toast.createProjectPreviewFirst"), true);
+      state.applyResult = null;
+      state.errors.applyResult = t("toast.createProjectPreviewFirst");
+      renderAndBind(context, state);
       return;
     }
     const preview = state.preview;
@@ -82,22 +85,35 @@ export function bindProjectEvents(context: FeatureContext, state: ProjectWorkben
     }
     renderAndBind(context, state);
   });
-  bindAction(context.root, "update-project-port", () => {
+  bindAction(context.root, "update-project-port", async () => {
     const port = state.ports[0];
     if (!port) {
-      context.toast(t("toast.inspectProjectPortsFirst"), true);
+      state.applyResult = null;
+      state.errors.applyResult = t("toast.inspectProjectPortsFirst");
+      renderAndBind(context, state);
       return;
     }
-    return context.risk.run({
-      command: "update_project_port",
-      planId: `${projectPath(context, state)}:${port.id}:${port.currentPort}`,
-      riskLevel: "medium",
-      backupReceipt: port.backupPath || `${port.file}.devenv-backup-<execution-time>`,
-      title: "Update project port",
-      summary: "Updates a selected project port file through a token-gated backend command.",
-      warnings: ["Confirm the target file and new port before execution."],
-      execute: (confirmationToken) => updateProjectPort(projectPath(context, state), port.id, port.currentPort, confirmationToken),
-    });
+    state.applyResult = null;
+    state.errors.applyResult = "";
+    try {
+      const result = await context.risk.run({
+        command: "update_project_port",
+        planId: `${projectPath(context, state)}:${port.id}:${port.currentPort}`,
+        riskLevel: "medium",
+        backupReceipt: port.backupPath || `${port.file}.devenv-backup-<execution-time>`,
+        title: "Update project port",
+        summary: "Updates a selected project port file through a token-gated backend command.",
+        warnings: ["Confirm the target file and new port before execution."],
+        execute: (confirmationToken) => updateProjectPort(projectPath(context, state), port.id, port.currentPort, confirmationToken),
+      });
+      state.applyResult = result as ProjectWorkbenchState["applyResult"];
+      state.ports = await inspectProjectPortConfigs(projectPath(context, state));
+      delete state.errors.applyResult;
+      delete state.errors.ports;
+    } catch (error) {
+      state.errors.applyResult = errorMessage(error);
+    }
+    renderAndBind(context, state);
   });
   bindAction(context.root, "inspect-idea-project", async () => {
     state.selectedPath = projectPath(context, state);

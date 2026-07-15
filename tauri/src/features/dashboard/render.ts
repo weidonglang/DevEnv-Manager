@@ -8,7 +8,7 @@ export function renderDashboard(state: DashboardState): string {
   const vm = toDashboardViewModel(state);
   return `
     <div class="feature-layout dashboard-view">
-      <section class="panel">
+      <section class="panel" data-testid="dashboard-summary-section">
         <div class="panel-head"><div><h2>${t("dashboard.title")}</h2><p>${t("dashboard.description")}</p></div></div>
         ${renderFeatureGuide("dashboard")}
         ${renderHealthCards(state)}

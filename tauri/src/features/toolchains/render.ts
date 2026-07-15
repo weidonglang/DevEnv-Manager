@@ -320,7 +320,7 @@ function platformTarget(action: string): string {
 
 function renderLearningCenter(state: ToolchainWorkbenchState): string {
   const commands = ["java -version", "javac -version", "python --version", "python -m pip --version", "node --version", "npm --version", "mvn -version", "gradle -version", "go version", "rustc --version", "cargo --version", "dotnet --info", "where java"];
-  return `<section class="panel">
+  return `<section class="panel" data-testid="learning-center-section">
     <div class="panel-head"><div><h2>${t("feature.toolchains.learningCenter")}</h2><p>${t("feature.toolchains.learningCenterDetail")}</p></div></div>
     <div class="form-row command-row">
       <input id="learning-command" value="${escapeHtml(state.learningCommand)}" placeholder="${t("feature.toolchains.learningCommand")}" />
@@ -329,9 +329,11 @@ function renderLearningCenter(state: ToolchainWorkbenchState): string {
     </div>
     <div class="toolbar compact">${commands.map((command) => `<button type="button" data-learning-command="${escapeHtml(command)}">${escapeHtml(command)}</button>`).join("")}</div>
     <p class="small-note">${t("feature.toolchains.learningBoundary")}</p>
-    ${state.learningError ? `<p class="error-text">${escapeHtml(state.learningError)}</p>` : ""}
-    ${state.learningSafety ? `<h3>${t("feature.toolchains.learningSafety")}</h3>${renderObjectTable(state.learningSafety, ["allowed", "risk", "reason", "requiresConfirmation", "elevated", "executable"])}` : ""}
-    ${state.learningResult ? `<h3>${t("feature.toolchains.learningResult")}</h3>${renderObjectTable(state.learningResult, ["success", "returnCode", "elapsedMs"])}<pre>${escapeHtml(state.learningResult.output)}</pre>` : ""}
+    <div data-testid="learning-command-result">
+      ${state.learningError ? `<p class="error-text">${escapeHtml(state.learningError)}</p>` : ""}
+      ${state.learningSafety ? `<h3>${t("feature.toolchains.learningSafety")}</h3>${renderObjectTable(state.learningSafety, ["allowed", "risk", "reason", "requiresConfirmation", "elevated", "executable"])}` : ""}
+      ${state.learningResult ? `<h3>${t("feature.toolchains.learningResult")}</h3>${renderObjectTable(state.learningResult, ["success", "returnCode", "elapsedMs"])}<pre>${escapeHtml(state.learningResult.output)}</pre>` : `<div class="empty">${t("state.notChecked")}</div>`}
+    </div>
   </section>`;
 }
 

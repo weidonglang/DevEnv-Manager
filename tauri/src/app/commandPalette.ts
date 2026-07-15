@@ -80,7 +80,7 @@ export function registerCommandPalette(): void {
     palette = document.createElement("div");
     palette.className = "command-palette";
     palette.innerHTML = `
-      <div class="command-palette__panel" role="dialog" aria-modal="true" aria-label="${t("app.commandPalette")}">
+      <div class="command-palette__panel" data-testid="command-palette-panel" role="dialog" aria-modal="true" aria-label="${t("app.commandPalette")}">
         <input class="command-palette__search" type="search" placeholder="${t("palette.search")}" aria-label="${t("palette.search")}" autofocus />
         <div class="command-palette__list" role="listbox"></div>
       </div>

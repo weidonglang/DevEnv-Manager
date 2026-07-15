@@ -175,7 +175,9 @@ export function bindEnvironmentEvents(context: FeatureContext, state: Environmen
   });
   bindAction(context.root, "apply-java-plan", async () => {
     if (!state.plan) {
-      context.toast(t("toast.createRepairPlanFirst"), true);
+      state.applyResult = "";
+      state.errors.applyResult = t("toast.createRepairPlanFirst");
+      renderAndBind(context, state);
       return;
     }
     state.applyResult = "";

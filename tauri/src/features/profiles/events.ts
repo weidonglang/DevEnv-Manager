@@ -1,6 +1,7 @@
 import type { FeatureContext } from "../../app/featureContext";
 import { open } from "../../api/tauri";
 import { getActiveLocale, t } from "../../core/i18n";
+import type { OperationResult } from "../../types";
 import { bindAction } from "../sharedView";
 import { copyConfigProfile, createProfileApplyPlan, deleteConfigProfile, executeProfileApplyPlan, exportConfigProfiles, importConfigProfiles, listProfiles, previewConfigProfiles, renameConfigProfile, saveCurrentProfile } from "./api";
 import { renderProfilesWorkbench } from "./render";
@@ -88,7 +89,13 @@ export function bindProfileEvents(context: FeatureContext, state: ProfilesState)
   });
   bindAction(context.root, "create-profile-plan", async () => {
     const id = state.selectedProfileId || state.profiles[0]?.id;
-    if (!id) return context.toast(t("toast.selectProfileFirst"), true);
+    if (!id) {
+      state.operationResult = "";
+      state.operationError = t("toast.selectProfileFirst");
+      renderAndBind(context, state);
+      return;
+    }
+    state.operationError = "";
     context.progress.start(t("feature.profiles.creatingPlan"));
     try {
       state.plan = await createProfileApplyPlan(id);
@@ -97,31 +104,48 @@ export function bindProfileEvents(context: FeatureContext, state: ProfilesState)
       context.root.innerHTML = renderProfilesWorkbench(state);
       bindProfileEvents(context, state);
     } catch (error) {
-      context.progress.fail(errorMessage(error));
+      state.operationError = errorMessage(error);
+      context.progress.fail(state.operationError);
+      renderAndBind(context, state);
     }
   });
-  bindAction(context.root, "execute-profile-plan", () => {
-    if (!state.plan) return context.toast(t("toast.createProfilePlanFirst"), true);
-    return context.risk.run({
-      command: "execute_profile_apply_plan",
-      planId: state.plan.planId,
-      riskLevel: "high",
-      backupReceipt: state.plan.backupName,
-      title: t("feature.profiles.executePlan"),
-      summary: label("Apply the selected configuration profile after reviewing runtime and environment changes.", "应用已审阅的配置模板计划，包含运行时切换和用户环境写入。"),
-      before: [
-        { label: label("Profile", "配置模板"), value: state.plan.profileName },
-        { label: label("Current backup", "执行前备份"), value: state.plan.backupName },
-      ],
-      after: [
-        { label: label("Runtime switches", "运行时切换"), value: state.plan.runtimeSwitches.join(", ") || label("None", "无") },
-        { label: label("Missing runtimes", "缺失运行时"), value: String(state.plan.missingRequirements.length) },
-        { label: label("Install missing runtimes", "补齐缺失运行时"), value: state.plan.willInstall ? label("Yes", "是") : label("No", "否") },
-        { label: label("Write user environment", "写入用户环境"), value: state.plan.willWriteEnvironment ? label("Yes", "是") : label("No", "否") },
-      ],
-      warnings: [label("Use the backup shown here to restore if the applied profile is not correct.", "如果应用后环境不正确，请使用这里显示的备份恢复。"), ...state.plan.warnings.map(localizeProfileWarning)],
-      execute: (confirmationToken) => executeProfileApplyPlan(state.plan!.planId, confirmationToken),
-    });
+  bindAction(context.root, "execute-profile-plan", async () => {
+    if (!state.plan) {
+      state.operationResult = "";
+      state.operationError = t("toast.createProfilePlanFirst");
+      renderAndBind(context, state);
+      return;
+    }
+    const plan = state.plan;
+    state.operationResult = "";
+    state.operationError = "";
+    try {
+      const result = await context.risk.run({
+        command: "execute_profile_apply_plan",
+        planId: plan.planId,
+        riskLevel: "high",
+        backupReceipt: plan.backupName,
+        title: t("feature.profiles.executePlan"),
+        summary: label("Apply the selected configuration profile after reviewing runtime and environment changes.", "应用已审阅的配置模板计划，包含运行时切换和用户环境写入。"),
+        before: [
+          { label: label("Profile", "配置模板"), value: plan.profileName },
+          { label: label("Current backup", "执行前备份"), value: plan.backupName },
+        ],
+        after: [
+          { label: label("Runtime switches", "运行时切换"), value: plan.runtimeSwitches.join(", ") || label("None", "无") },
+          { label: label("Missing runtimes", "缺失运行时"), value: String(plan.missingRequirements.length) },
+          { label: label("Install missing runtimes", "补齐缺失运行时"), value: plan.willInstall ? label("Yes", "是") : label("No", "否") },
+          { label: label("Write user environment", "写入用户环境"), value: plan.willWriteEnvironment ? label("Yes", "是") : label("No", "否") },
+        ],
+        warnings: [label("Use the backup shown here to restore if the applied profile is not correct.", "如果应用后环境不正确，请使用这里显示的备份恢复。"), ...plan.warnings.map(localizeProfileWarning)],
+        execute: (confirmationToken) => executeProfileApplyPlan(plan.planId, confirmationToken),
+      }) as OperationResult;
+      state.operationResult = result.message;
+      state.plan = null;
+    } catch (error) {
+      state.operationError = errorMessage(error);
+    }
+    renderAndBind(context, state);
   });
   bindAction(context.root, "choose-profile-import", async () => {
     const selected = await open({ directory: false, multiple: false, filters: [{ name: "JSON", extensions: ["json"] }] });
@@ -136,7 +160,12 @@ export function bindProfileEvents(context: FeatureContext, state: ProfilesState)
   });
   bindAction(context.root, "preview-profile-import", async () => {
     state.importPath = profileImportPath(context, state);
-    if (!state.importPath) return context.toast(t("feature.profiles.importPathRequired"), true);
+    if (!state.importPath) {
+      state.operationError = t("feature.profiles.importPathRequired");
+      renderAndBind(context, state);
+      return;
+    }
+    state.operationError = "";
     try {
       state.importPreview = await previewConfigProfiles(state.importPath);
       state.importResult = "";
@@ -144,12 +173,18 @@ export function bindProfileEvents(context: FeatureContext, state: ProfilesState)
       context.toast(t("toast.profileImportPreviewReady"));
       renderAndBind(context, state);
     } catch (error) {
-      context.toast(errorMessage(error), true);
+      state.operationError = errorMessage(error);
+      renderAndBind(context, state);
     }
   });
   bindAction(context.root, "import-profiles", async () => {
     state.importPath = profileImportPath(context, state);
-    if (!state.importPath) return context.toast(t("feature.profiles.importPathRequired"), true);
+    if (!state.importPath) {
+      state.operationError = t("feature.profiles.importPathRequired");
+      renderAndBind(context, state);
+      return;
+    }
+    state.operationError = "";
     context.progress.start(t("feature.profiles.importing"));
     try {
       const result = await importConfigProfiles(state.importPath);
@@ -157,7 +192,9 @@ export function bindProfileEvents(context: FeatureContext, state: ProfilesState)
       context.progress.done(result.message);
       await refreshProfiles(context, state);
     } catch (error) {
-      context.progress.fail(errorMessage(error));
+      state.operationError = errorMessage(error);
+      context.progress.fail(state.operationError);
+      renderAndBind(context, state);
     }
   });
   bindAction(context.root, "export-profiles", async () => {
@@ -176,17 +213,25 @@ export function bindProfileEvents(context: FeatureContext, state: ProfilesState)
   });
   bindAction(context.root, "delete-profile", async () => {
     const id = state.selectedProfileId || state.profiles[0]?.id;
-    if (!id) return context.toast(t("toast.selectProfileFirst"), true);
+    if (!id) {
+      state.operationError = t("toast.selectProfileFirst");
+      renderAndBind(context, state);
+      return;
+    }
     if (!window.confirm(t("feature.profiles.deleteConfirm"))) return;
+    state.operationResult = "";
+    state.operationError = "";
     context.progress.start(t("feature.profiles.deleting"));
     try {
       const result = await deleteConfigProfile(id);
-      context.toast(result.message);
+      state.operationResult = result.message;
       state.selectedProfileId = null;
       if (!context.isCurrent()) return;
       await refreshProfiles(context, state);
     } catch (error) {
-      context.progress.fail(errorMessage(error));
+      state.operationError = errorMessage(error);
+      context.progress.fail(state.operationError);
+      renderAndBind(context, state);
     }
   });
 }
@@ -231,6 +276,8 @@ export async function refreshProfiles(context: FeatureContext, state: ProfilesSt
     context.root.innerHTML = renderProfilesWorkbench(state);
     bindProfileEvents(context, state);
   } catch (error) {
-    context.progress.fail(errorMessage(error));
+    state.operationError = errorMessage(error);
+    context.progress.fail(state.operationError);
+    renderAndBind(context, state);
   }
 }

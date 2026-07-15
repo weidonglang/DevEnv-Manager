@@ -2,7 +2,7 @@ import type { FeatureContext } from "../../app/featureContext";
 import { open } from "../../api/tauri";
 import { bindAction, valueOf } from "../sharedView";
 import { t } from "../../core/i18n";
-import type { ArchivePlanItem, CleanupArchitecture, CleanupScanReport, DiskVolumeInfo, DuplicateGroup, ExpansionResult, FolderUsageReport, LargeFileItem, MaintenanceOverview, MoveResult, PartitionLayoutReport, RollbackRecord } from "../../types";
+import type { ArchivePlanItem, CleanupArchitecture, CleanupResult, CleanupScanReport, DiskVolumeInfo, DuplicateGroup, ExpansionResult, FolderUsageReport, GenericArchiveResult, LargeFileItem, MaintenanceOverview, MoveResult, OperationResult, PartitionLayoutReport, RollbackRecord } from "../../types";
 import { addArchivePlanItem, cleanDevCache, cleanSelectedTargets, clearDownloadCache, createCDriveExpansionPlan, createCleanupPlan, createDesktopArchivePlan, createDownloadsArchivePlan, createGenericArchivePlan, createMovePlan, executeCDriveExpansion, executeDesktopArchivePlan, executeDownloadsArchivePlan, executeGenericArchivePlan, executeMovePlan, inspectAppUsage, inspectDesktop, inspectDiskOverview, inspectDownloads, inspectInstalledSoftwareUsage, inspectMaintenanceOverview, inspectPartitionLayout, listArchivePlanItems, listRollbackRecords, openAnalysisPath, removeArchivePlanItem, rollbackMove, scanCleanupTargets, scanDuplicateLargeFiles, scanLargeFiles, storageCleanupArchitecture } from "./api";
 import { renderCleanupWorkbench } from "./render";
 import type { CleanupWorkbenchState } from "./state";
@@ -92,8 +92,8 @@ export function bindCleanupEvents(context: FeatureContext, state: CleanupWorkben
         ],
         warnings: plan.warnings,
         execute: (confirmationToken) => executeGenericArchivePlan(plan.planId, confirmationToken),
-      });
-      state.archiveResult = result as CleanupWorkbenchState["archiveResult"];
+      }) as GenericArchiveResult;
+      state.archiveResult = result;
       state.archivePlan = null;
       state.archiveItems = await listArchivePlanItems();
       delete state.errors.archive;
@@ -106,7 +106,8 @@ export function bindCleanupEvents(context: FeatureContext, state: CleanupWorkben
   bindAction(context.root, "create-cleanup-plan", async () => {
     const selectedIds = selectedCleanableIds(state);
     if (!selectedIds.length) {
-      context.toast(t("toast.selectCleanupCandidateFirst"), true);
+      state.errors.createPlan = t("toast.selectCleanupCandidateFirst");
+      renderAndBind(context, state);
       return;
     }
     state.selectedIds = selectedIds;
@@ -115,64 +116,91 @@ export function bindCleanupEvents(context: FeatureContext, state: CleanupWorkben
     context.progress.start(t("feature.cleanup.createPlan"));
     try {
       state.plan = await createCleanupPlan(selectedIds);
+      delete state.errors.createPlan;
       if (!context.isCurrent()) return;
       context.progress.done(t("toast.planReady"));
       context.root.innerHTML = renderCleanupWorkbench(state);
       bindCleanupEvents(context, state);
     } catch (error) {
-      context.progress.fail(errorMessage(error));
+      state.errors.createPlan = errorMessage(error);
+      context.progress.fail(state.errors.createPlan);
+      renderAndBind(context, state);
     }
   });
   bindAction(context.root, "execute-cleanup-plan", async () => {
-    if (!state.plan) return context.toast(t("toast.createCleanupPlanFirst"), true);
+    if (!state.plan) {
+      state.errors.executeCleanupResult = t("toast.createCleanupPlanFirst");
+      renderAndBind(context, state);
+      return;
+    }
     state.cleanupResult = null;
     state.errors.executeCleanupResult = "";
-    const result = await context.risk.run({
-      command: "execute_cleanup_plan",
-      planId: state.plan.planId,
-      riskLevel: "medium",
-      title: t("feature.cleanup.executePlanTitle"),
-      summary: t("feature.cleanup.executePlanSummary"),
-      before: [
-        { label: t("feature.cleanup.selected"), value: String(state.plan.selectedItems.length) },
-        { label: t("feature.cleanup.bytes"), value: String(state.plan.estimatedBytes) },
-        { label: t("feature.cleanup.planExecutable"), value: String(state.plan.selectedItems.length) },
-      ],
-      after: [
-        { label: t("feature.cleanup.resultCleaned"), value: t("feature.cleanup.resultAvailableAfterExecute") },
-        { label: t("feature.cleanup.resultRecovery"), value: t("feature.cleanup.resultRecoveryDetail") },
-      ],
-      warnings: [t("feature.cleanup.executePlanWarning"), t("feature.cleanup.executePlanRecoveryWarning"), ...state.plan.warnings],
-      execute: (confirmationToken) => cleanSelectedTargets(state.plan!, confirmationToken),
-    });
-    state.cleanupResult = result as CleanupWorkbenchState["cleanupResult"];
-    delete state.errors.executeCleanupResult;
+    try {
+      const result = await context.risk.run({
+        command: "execute_cleanup_plan",
+        planId: state.plan.planId,
+        riskLevel: "medium",
+        title: t("feature.cleanup.executePlanTitle"),
+        summary: t("feature.cleanup.executePlanSummary"),
+        before: [
+          { label: t("feature.cleanup.selected"), value: String(state.plan.selectedItems.length) },
+          { label: t("feature.cleanup.bytes"), value: String(state.plan.estimatedBytes) },
+          { label: t("feature.cleanup.planExecutable"), value: String(state.plan.selectedItems.length) },
+        ],
+        after: [
+          { label: t("feature.cleanup.resultCleaned"), value: t("feature.cleanup.resultAvailableAfterExecute") },
+          { label: t("feature.cleanup.resultRecovery"), value: t("feature.cleanup.resultRecoveryDetail") },
+        ],
+        warnings: [t("feature.cleanup.executePlanWarning"), t("feature.cleanup.executePlanRecoveryWarning"), ...state.plan.warnings],
+        execute: (confirmationToken) => cleanSelectedTargets(state.plan!, confirmationToken),
+      }) as CleanupResult;
+      state.cleanupResult = result;
+      delete state.errors.executeCleanupResult;
+    } catch (error) {
+      state.errors.executeCleanupResult = errorMessage(error);
+    }
     if (!context.isCurrent()) return;
     context.root.innerHTML = renderCleanupWorkbench(state);
     bindCleanupEvents(context, state);
   });
-  bindAction(context.root, "clear-download-cache", () =>
-    context.risk.run({
-      command: "clear_download_cache",
-      planId: "clear-download-cache",
-      riskLevel: "medium",
-      title: "Clear download cache",
-      summary: "Clears managed download cache through a token-gated backend command.",
-      warnings: ["Only managed cache entries should be removed."],
-      execute: clearDownloadCache,
-    }),
-  );
-  bindAction(context.root, "clean-dev-cache", () =>
-    context.risk.run({
-      command: "clean_dev_cache",
-      planId: "tool-npm",
-      riskLevel: "medium",
-      title: "Clean dev cache",
-      summary: "Cleans selected development cache through a token-gated backend command.",
-      warnings: ["Review tool-specific cache scope before executing."],
-      execute: (confirmationToken) => cleanDevCache("npm", confirmationToken),
-    }),
-  );
+  bindAction(context.root, "clear-download-cache", async () => {
+    state.moveOperationResult = "";
+    delete state.errors.utilityOperation;
+    try {
+      const result = await context.risk.run({
+        command: "clear_download_cache",
+        planId: "clear-download-cache",
+        riskLevel: "medium",
+        title: "Clear download cache",
+        summary: "Clears managed download cache through a token-gated backend command.",
+        warnings: ["Only managed cache entries should be removed."],
+        execute: clearDownloadCache,
+      }) as OperationResult;
+      state.moveOperationResult = result.message;
+    } catch (error) {
+      state.errors.utilityOperation = errorMessage(error);
+    }
+    renderAndBind(context, state);
+  });
+  bindAction(context.root, "clean-dev-cache", async () => {
+    state.moveOperationResult = "";
+    delete state.errors.utilityOperation;
+    try {
+      const result = await context.risk.run({
+        command: "clean_dev_cache",
+        planId: "tool-npm",
+        riskLevel: "medium",
+        title: "Clean dev cache",
+        summary: "Cleans selected development cache through a token-gated backend command.",
+        warnings: ["Review tool-specific cache scope before executing."],
+        execute: (confirmationToken) => cleanDevCache("npm", confirmationToken),
+      }) as OperationResult;
+      state.moveOperationResult = result.message;
+    } catch (error) {
+      state.errors.utilityOperation = errorMessage(error);
+    }
+    renderAndBind(context, state);
+  });
   bindAction(context.root, "choose-cleanup-move-source", async () => {
     const selected = await open({ directory: true, multiple: false });
     if (!selected || Array.isArray(selected)) {
@@ -190,9 +218,11 @@ export function bindCleanupEvents(context: FeatureContext, state: CleanupWorkben
   bindAction(context.root, "create-move-plan", async () => {
     syncMoveInputs(context, state);
     if (!state.moveSource) {
-      context.toast(t("feature.cleanup.moveSourceRequired"), true);
+      state.errors.moveOperation = t("feature.cleanup.moveSourceRequired");
+      renderAndBind(context, state);
       return;
     }
+    delete state.errors.moveOperation;
     context.progress.start(t("feature.cleanup.createMove"));
     try {
       state.movePlan = await createMovePlan(state.moveSource, state.moveTargetDrive, state.moveMode);
@@ -201,33 +231,64 @@ export function bindCleanupEvents(context: FeatureContext, state: CleanupWorkben
       context.root.innerHTML = renderCleanupWorkbench(state);
       bindCleanupEvents(context, state);
     } catch (error) {
-      context.progress.fail(errorMessage(error));
+      state.errors.moveOperation = errorMessage(error);
+      context.progress.fail(state.errors.moveOperation);
+      renderAndBind(context, state);
     }
   });
-  bindAction(context.root, "execute-move-plan", () => {
-    if (!state.movePlan) return context.toast(t("toast.createMovePlanFirst"), true);
-    return context.risk.run({
-      command: "execute_move_plan",
-      planId: state.movePlan.planId,
-      riskLevel: "high",
-      backupReceipt: state.movePlan.target,
-      title: "Execute move plan",
-      summary: "Moves or archives selected files using a backend plan and token gate.",
-      warnings: ["Review source, target drive, and rollback options."],
-      execute: (confirmationToken) => executeMovePlan(state.movePlan!, confirmationToken),
-    });
+  bindAction(context.root, "execute-move-plan", async () => {
+    if (!state.movePlan) {
+      state.errors.moveOperation = t("toast.createMovePlanFirst");
+      renderAndBind(context, state);
+      return;
+    }
+    state.moveOperationResult = "";
+    delete state.errors.moveOperation;
+    try {
+      const result = await context.risk.run({
+        command: "execute_move_plan",
+        planId: state.movePlan.planId,
+        riskLevel: "high",
+        backupReceipt: state.movePlan.target,
+        title: "Execute move plan",
+        summary: "Moves or archives selected files using a backend plan and token gate.",
+        warnings: ["Review source, target drive, and rollback options."],
+        execute: (confirmationToken) => executeMovePlan(state.movePlan!, confirmationToken),
+      }) as MoveResult;
+      state.moveOperationResult = `${result.success ? "Move completed" : "Move completed with failures"}: ${result.movedItems} item(s), rollback ${result.rollbackId || "not available"}.`;
+      state.movePlan = null;
+      state.rollbackRecords = await listRollbackRecords();
+    } catch (error) {
+      state.errors.moveOperation = errorMessage(error);
+    }
+    renderAndBind(context, state);
   });
-  bindAction(context.root, "rollback-move", () =>
-    context.risk.run({
-      command: "rollback_move",
-      planId: valueOf(state.rollbackRecords[0], "rollbackId", "rollback_move"),
-      riskLevel: "high",
-      title: "Rollback move",
-      summary: "Rolls back a previous move operation with a backend token.",
-      warnings: ["Review rollback record before execution."],
-      execute: (confirmationToken) => rollbackMove(valueOf(state.rollbackRecords[0], "rollbackId", ""), confirmationToken),
-    }),
-  );
+  bindAction(context.root, "rollback-move", async () => {
+    const rollbackId = valueOf(state.rollbackRecords[0], "rollbackId", "");
+    if (!rollbackId) {
+      state.errors.moveOperation = "No rollback record is available.";
+      renderAndBind(context, state);
+      return;
+    }
+    state.moveOperationResult = "";
+    delete state.errors.moveOperation;
+    try {
+      const result = await context.risk.run({
+        command: "rollback_move",
+        planId: rollbackId,
+        riskLevel: "high",
+        title: "Rollback move",
+        summary: "Rolls back a previous move operation with a backend token.",
+        warnings: ["Review rollback record before execution."],
+        execute: (confirmationToken) => rollbackMove(rollbackId, confirmationToken),
+      }) as OperationResult;
+      state.moveOperationResult = result.message;
+      state.rollbackRecords = await listRollbackRecords();
+    } catch (error) {
+      state.errors.moveOperation = errorMessage(error);
+    }
+    renderAndBind(context, state);
+  });
   bindAction(context.root, "inspect-c-drive-rescue", () => refreshCDriveRescue(context, state));
   bindAction(context.root, "inspect-disk-overview", () => refreshDiskOverview(context, state));
   bindAction(context.root, "scan-large-files-c", () => scanCLargeFiles(context, state));
@@ -246,11 +307,17 @@ export function bindCleanupEvents(context: FeatureContext, state: CleanupWorkben
       context.root.innerHTML = renderCleanupWorkbench(state);
       bindCleanupEvents(context, state);
     } catch (error) {
-      context.progress.fail(errorMessage(error));
+      state.errors.expansionResult = errorMessage(error);
+      context.progress.fail(state.errors.expansionResult);
+      renderAndBind(context, state);
     }
   });
   bindAction(context.root, "execute-expansion-plan", async () => {
-    if (!state.expansionPlan) return context.toast(t("feature.cleanup.createExpansionFirst"), true);
+    if (!state.expansionPlan) {
+      state.errors.expansionResult = t("feature.cleanup.createExpansionFirst");
+      renderAndBind(context, state);
+      return;
+    }
     state.expansionResult = null;
     state.errors.expansionResult = "";
     state.expansionBackupReceipt = context.root.querySelector<HTMLInputElement>("#cleanup-expansion-backup-receipt")?.value.trim() || "";

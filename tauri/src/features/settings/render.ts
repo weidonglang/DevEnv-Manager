@@ -9,7 +9,7 @@ export function renderSettingsWorkbench(state: SettingsWorkbenchState): string {
   const vm = toSettingsViewModel(state);
   return `
     <div class="feature-layout">
-      <section class="panel">
+      <section class="panel" data-testid="settings-theme-section">
         <div class="panel-head"><div><h2>${t("settings.title")}</h2><p>${t("settings.description")}</p></div></div>
         ${renderFeatureGuide("settings")}
         <div class="metrics">${renderMetric(t("settings.root"), vm.rootDir, state.errors.config ?? "")}${renderMetric(t("settings.autoUpdates"), vm.autoUpdate)}${renderMetric(t("settings.theme"), vm.theme)}${renderMetric(t("settings.language"), vm.language)}${renderMetric(t("settings.powershell"), vm.powershell, vm.powershellDetail)}</div>
@@ -70,8 +70,8 @@ function renderRows(rows: Array<{ label: string; value: string }>): string {
 function renderDebugPanel(page: number): string {
   const entries = filterDebugEntries(getDebugEntries(), {});
   const paged = pageItems(entries, page, 40);
-  return `<section class="panel" id="debug-panel">
-    <div class="panel-head"><div><h2>${t("settings.debugPanel")}</h2><p>${t("settings.debugPanelDetail")}</p></div></div>
+  return `<section class="panel" id="debug-panel" data-testid="settings-debug-section">
+    <div class="panel-head" data-testid="settings-advanced-section"><div><h2>${t("settings.debugPanel")}</h2><p>${t("settings.debugPanelDetail")}</p></div></div>
     <div class="debug-filter-grid">
       <label>${t("settings.debugFilterType")}<select id="debug-filter-type">${renderDebugTypeOptions()}</select></label>
       <label>${t("settings.debugFilterStatus")}<select id="debug-filter-status">${renderDebugStatusOptions()}</select></label>

@@ -17,8 +17,9 @@ const warnings = [];
 for (const page of manifest.pages ?? []) {
   for (const feature of page.features ?? []) {
     const priority = feature.priority ?? page.priority ?? "P2";
+    const status = feature.status ?? "";
     for (const testId of feature.frontendEntry?.testIds ?? []) {
-      if (priority === "P0" && !presentSelectors.has(testId) && !source.includes(testId)) {
+      if (["P0", "P1"].includes(priority) && !["deferred", "manualOnly"].includes(status) && !presentSelectors.has(testId) && !source.includes(testId)) {
         failures.push(`${feature.featureId}: missing data-testid=${testId}`);
       }
     }
@@ -37,8 +38,9 @@ for (const requiredFile of [
 }
 
 for (const bad of ["undefined", "null", "[object Object]"]) {
-  const userVisiblePattern = new RegExp(`>[^<]*${escapeRegExp(bad)}[^<]*<`);
-  if (userVisiblePattern.test(source)) {
+  const userVisiblePattern = new RegExp(`>[^<>{}$?]*${escapeRegExp(bad)}[^<>{}$?]*<`);
+  const visibleLiteral = templateLiterals(source).some((literal) => userVisiblePattern.test(literal));
+  if (visibleLiteral) {
     warnings.push(`possible user-visible ${bad} literal in source`);
   }
 }
@@ -75,4 +77,8 @@ function readAllTs(root, options = { includeAcceptance: true }) {
 
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function templateLiterals(value) {
+  return [...value.matchAll(/`(?:\\.|[^`])*`/gs)].map((match) => match[0]);
 }

@@ -71,6 +71,7 @@ function actionTestId(id: string): string {
     "copy-report-summary": "reports-copy-summary-action",
     "create-doctor-repair-plan": "reports-repair-plan",
     "execute-doctor-repair-plan": "reports-repair-result",
+    "export-debug-markdown": "settings-debug-export",
   };
   return aliases[id] ?? id;
 }
