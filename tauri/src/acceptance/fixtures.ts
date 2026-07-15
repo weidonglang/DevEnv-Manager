@@ -159,6 +159,7 @@ export const cleanupAcceptanceFixture: CleanupWorkbenchState = {
   moveMode: "archive",
   expansionPlan: null,
   expansionResult: null,
+  expansionBackupReceipt: "",
   desktop: null,
   downloads: null,
   largeFiles: [],

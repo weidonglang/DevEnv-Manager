@@ -256,6 +256,7 @@ async function runRuntimeRowAction(context: FeatureContext, state: RuntimeWorkbe
         command: "switch_runtime",
         planId: `${kind}:${version}:${path}`,
         riskLevel: "medium",
+        backupReceipt: `managed-runtime-current-pointer:${kind}:<pre-switch>`,
         title: t("feature.runtimes.switchTitle", { name: label, version }),
         summary: t("feature.runtimes.switchSummary"),
         warnings: [t("feature.runtimes.switchWarning")],

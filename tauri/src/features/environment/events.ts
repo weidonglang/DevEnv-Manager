@@ -206,7 +206,8 @@ export function bindEnvironmentEvents(context: FeatureContext, state: Environmen
       const result = await context.risk.run({
         command: "cleanup_path_entries",
         planId: "cleanup-path-entries",
-        riskLevel: "high",
+        riskLevel: "medium",
+        backupReceipt: "env-backup-<PATH-cleanup-time>.json",
         backupRequired: true,
         title: "Cleanup PATH entries",
         summary: "Removes duplicate, invalid, and stale PATH entries through a token-gated backend command.",

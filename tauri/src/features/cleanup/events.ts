@@ -210,6 +210,7 @@ export function bindCleanupEvents(context: FeatureContext, state: CleanupWorkben
       command: "execute_move_plan",
       planId: state.movePlan.planId,
       riskLevel: "high",
+      backupReceipt: state.movePlan.target,
       title: "Execute move plan",
       summary: "Moves or archives selected files using a backend plan and token gate.",
       warnings: ["Review source, target drive, and rollback options."],
@@ -252,11 +253,21 @@ export function bindCleanupEvents(context: FeatureContext, state: CleanupWorkben
     if (!state.expansionPlan) return context.toast(t("feature.cleanup.createExpansionFirst"), true);
     state.expansionResult = null;
     state.errors.expansionResult = "";
+    state.expansionBackupReceipt = context.root.querySelector<HTMLInputElement>("#cleanup-expansion-backup-receipt")?.value.trim() || "";
+    if (state.expansionPlan.backupRequired && !state.expansionBackupReceipt) {
+      state.errors.expansionResult = "Enter the external system backup receipt before executing a partition expansion plan.";
+      if (!context.isCurrent()) return;
+      context.root.innerHTML = renderCleanupWorkbench(state);
+      bindCleanupEvents(context, state);
+      return;
+    }
     try {
       const result = await context.risk.run({
         command: "execute_expansion_plan",
         planId: state.expansionPlan.planId,
         riskLevel: "critical",
+        backupReceipt: state.expansionBackupReceipt,
+        backupRequired: state.expansionPlan.backupRequired,
         title: t("feature.cleanup.executeExpansionTitle"),
         summary: t("feature.cleanup.executeExpansionSummary"),
         before: [

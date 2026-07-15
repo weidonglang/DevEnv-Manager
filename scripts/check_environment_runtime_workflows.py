@@ -69,6 +69,17 @@ def main() -> None:
     require(env_events, "state.configurationError =", "Environment configuration durable error")
     require(env_events, "state.pathCleanupResult =", "PATH cleanup durable result")
     require(env_events, "state.pathCleanupError =", "PATH cleanup durable error")
+    cleanup_start = env_events.index('bindAction(context.root, "cleanup-path"')
+    cleanup_end = env_events.index('bindAction(context.root, "export-environment-report"', cleanup_start)
+    cleanup_flow = env_events[cleanup_start:cleanup_end]
+    require(cleanup_flow, 'command: "cleanup_path_entries"', "PATH cleanup command contract")
+    require(cleanup_flow, 'planId: "cleanup-path-entries"', "PATH cleanup plan contract")
+    require(cleanup_flow, 'riskLevel: "medium"', "PATH cleanup risk contract")
+    require(cleanup_flow, 'backupReceipt: "env-backup-<PATH-cleanup-time>.json"', "PATH cleanup backup contract")
+    cleanup_spec_start = rust.index('command: "cleanup_path_entries"')
+    cleanup_spec = rust[cleanup_spec_start:rust.index("},", cleanup_spec_start)]
+    require(cleanup_spec, 'risk_level: "medium"', "Rust PATH cleanup risk contract")
+    require(cleanup_spec, "requires_backup: true", "Rust PATH cleanup backup contract")
     require(env_render, "analysis.firstPython3OnPath", "python3 execution alias status")
     require(env_render, "Rollback guidance", "Python rollback guidance")
 

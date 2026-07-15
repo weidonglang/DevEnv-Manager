@@ -241,6 +241,7 @@ function bindMirrorControls(context: FeatureContext, state: ToolchainWorkbenchSt
         command: "run_chsrc_action",
         planId: `${state.mirrorAction}:${state.mirrorTarget}:${source ?? ""}`,
         riskLevel: "high",
+        backupReceipt: state.mirrorCurrent || `chsrc-current-source:${state.mirrorTarget}:captured`,
         title: `Change ${state.mirrorTarget} source`,
         summary: `chsrc ${state.mirrorAction} ${state.mirrorTarget}${source ? ` ${source}` : ""}`,
         warnings: ["The original source is retained in this result panel. Use reset or an allowlisted source to recover."],
@@ -296,7 +297,7 @@ function bindNetworkCacheControls(context: FeatureContext, state: ToolchainWorkb
       const result = await context.risk.run({
         command: "clear_download_cache",
         planId: "clear-download-cache",
-        riskLevel: "high",
+        riskLevel: "medium",
         title: "Clear managed download cache",
         summary: "Delete files only from the DevEnv Manager managed download cache after reviewing the preview.",
         warnings: ["Downloaded installers and archives in the managed cache will need to be downloaded again."],

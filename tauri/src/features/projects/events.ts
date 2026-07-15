@@ -59,6 +59,7 @@ export function bindProjectEvents(context: FeatureContext, state: ProjectWorkben
         command: "apply_project_configuration",
         planId: projectConfigurationPlanId(request),
         riskLevel: "high",
+        backupReceipt: `${preview.projectPath}\\.devenv-manager\\backups\\<execution-time>`,
         title: "Apply project configuration",
         summary: "Writes project configuration files after previewing append/create/replace semantics.",
         warnings: ["Review target files and backup metadata before applying."],
@@ -90,7 +91,8 @@ export function bindProjectEvents(context: FeatureContext, state: ProjectWorkben
     return context.risk.run({
       command: "update_project_port",
       planId: `${projectPath(context, state)}:${port.id}:${port.currentPort}`,
-      riskLevel: "high",
+      riskLevel: "medium",
+      backupReceipt: port.backupPath || `${port.file}.devenv-backup-<execution-time>`,
       title: "Update project port",
       summary: "Updates a selected project port file through a token-gated backend command.",
       warnings: ["Confirm the target file and new port before execution."],

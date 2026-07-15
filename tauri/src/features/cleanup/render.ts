@@ -42,6 +42,7 @@ export function renderCleanupWorkbench(state: CleanupWorkbenchState): string {
             <option value="junction" ${state.moveMode === "junction" ? "selected" : ""}>${t("feature.cleanup.moveModeJunction")}</option>
           </select>
           ${renderActionButton("choose-cleanup-move-source", t("feature.cleanup.chooseMoveSource"))}
+          <label>Partition expansion backup receipt<input id="cleanup-expansion-backup-receipt" data-testid="cleanup-expansion-backup-receipt" value="${escapeHtml(state.expansionBackupReceipt)}" placeholder="External system backup receipt required" /></label>
         </div>
       </section>
       ${renderCDriveRescue(state)}

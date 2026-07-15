@@ -17,6 +17,7 @@ export type CleanupWorkbenchState = {
   moveMode: string;
   expansionPlan: ExpansionPlan | null;
   expansionResult: ExpansionResult | null;
+  expansionBackupReceipt: string;
   desktop: FolderUsageReport | null;
   downloads: FolderUsageReport | null;
   largeFiles: LargeFileItem[];
@@ -59,6 +60,7 @@ export const cleanupWorkbenchInitialState: CleanupWorkbenchState = {
   moveMode: "archive",
   expansionPlan: null,
   expansionResult: null,
+  expansionBackupReceipt: "",
   desktop: null,
   downloads: null,
   largeFiles: [],
