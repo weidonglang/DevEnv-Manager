@@ -3275,6 +3275,39 @@ fn cleanup_path_entries_blocking() -> Result<OperationResult, String> {
         .or_else(|| environment.get("PATH"))
         .cloned()
         .unwrap_or_default();
+    let (new_path, removed) = cleaned_path_value(&paths, &old_path);
+
+    if new_path == old_path {
+        return Ok(OperationResult {
+            success: true,
+            message: "PATH 没有需要清理的真实失效或重复项".to_string(),
+        });
+    }
+
+    let backup_name = create_environment_backup(&paths, &environment)?;
+    restore_environment_values(
+        environment.get("DEVENV_HOME").map(String::as_str),
+        environment.get("JAVA_HOME").map(String::as_str),
+        &new_path,
+    )?;
+    broadcast_environment_change();
+    Ok(OperationResult {
+        success: true,
+        message: if removed == 0 {
+            format!("PATH 已规范化；备份：{backup_name}")
+        } else {
+            format!(
+                "已清理 {removed} 个真实失效、重复或空 PATH 项，托管待安装路径已保留；备份：{backup_name}"
+            )
+        },
+    })
+}
+
+fn cleaned_path_value(paths: &AppPaths, old_path: &str) -> (String, usize) {
+    if old_path.is_empty() {
+        return (String::new(), 0);
+    }
+
     let mut seen = BTreeSet::new();
     let mut retained = Vec::new();
     let mut removed = 0_usize;
@@ -3282,6 +3315,7 @@ fn cleanup_path_entries_blocking() -> Result<OperationResult, String> {
     for entry in old_path.split(';') {
         let entry = entry.trim();
         if entry.is_empty() {
+            removed += 1;
             continue;
         }
         let key = path_key(entry);
@@ -3289,34 +3323,15 @@ fn cleanup_path_entries_blocking() -> Result<OperationResult, String> {
             removed += 1;
             continue;
         }
-        let expanded = expand_environment_path(entry, &paths);
-        if !Path::new(&expanded).exists() && !is_managed_pending_path(&expanded, &paths) {
+        let expanded = expand_environment_path(entry, paths);
+        if !Path::new(&expanded).exists() && !is_managed_pending_path(&expanded, paths) {
             removed += 1;
             continue;
         }
         retained.push(entry.to_string());
     }
 
-    let new_path = retained.join(";");
-    let backup_name = if removed > 0 {
-        Some(create_environment_backup(&paths, &environment)?)
-    } else {
-        None
-    };
-    let java_home = environment.get("JAVA_HOME").map(String::as_str);
-    set_user_environment_values(&paths, java_home, &new_path)?;
-    broadcast_environment_change();
-    Ok(OperationResult {
-        success: true,
-        message: if removed == 0 {
-            "PATH 没有需要清理的真实失效或重复项".to_string()
-        } else {
-            format!(
-                "已清理 {removed} 个真实失效或重复 PATH，托管待安装路径已保留；备份：{}",
-                backup_name.unwrap_or_default()
-            )
-        },
-    })
+    (retained.join(";"), removed)
 }
 
 #[tauri::command]
@@ -15514,6 +15529,26 @@ mod tests {
             1
         );
         assert_eq!(parts.iter().filter(|item| **item == r"C:\Tools").count(), 1);
+    }
+
+    #[test]
+    fn path_cleanup_does_not_change_an_empty_or_clean_path() {
+        let root = tempfile::tempdir().unwrap();
+        let paths = AppPaths::new(root.path().join("DevEnvManager"));
+        let existing = display_path(root.path());
+
+        assert_eq!(cleaned_path_value(&paths, ""), (String::new(), 0));
+        assert_eq!(cleaned_path_value(&paths, &existing), (existing.clone(), 0));
+    }
+
+    #[test]
+    fn path_cleanup_counts_empty_and_duplicate_entries_as_changes() {
+        let root = tempfile::tempdir().unwrap();
+        let paths = AppPaths::new(root.path().join("DevEnvManager"));
+        let existing = display_path(root.path());
+        let input = format!("{existing};{existing};");
+
+        assert_eq!(cleaned_path_value(&paths, &input), (existing, 2));
     }
 
     #[test]
