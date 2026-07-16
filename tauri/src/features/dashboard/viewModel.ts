@@ -1,4 +1,5 @@
 import { localize, t } from "../../core/i18n";
+import { localizeBackendText } from "../../core/backendText";
 import type { EnvHealthCheck } from "../../types";
 import type { DashboardState } from "./state";
 
@@ -25,12 +26,12 @@ export function toDashboardViewModel(state: DashboardState): DashboardViewModel 
   return {
     rootDirectory: state.snapshot?.defaultRoot || t("state.notAvailable"),
     discoveredTools: state.errors.health ? t("state.notAvailable") : String(state.health.length),
-    pathWarnings: state.errors.health ? t("state.notAvailable") : path?.status || t("state.notChecked"),
-    pathWarningsDetail: state.errors.health || path?.detail || "",
-    jdkStatus: state.errors.health ? t("state.notAvailable") : jdk?.status || t("state.notChecked"),
-    jdkDetail: state.errors.health || jdk?.detail || "",
-    pythonStatus: state.errors.health ? t("state.notAvailable") : python?.status || t("state.notChecked"),
-    pythonDetail: state.errors.health || python?.detail || "",
+    pathWarnings: state.errors.health ? t("state.notAvailable") : localizeBackendText(path?.status || t("state.notChecked")),
+    pathWarningsDetail: localizeBackendText(state.errors.health || path?.detail || ""),
+    jdkStatus: state.errors.health ? t("state.notAvailable") : localizeBackendText(jdk?.status || t("state.notChecked")),
+    jdkDetail: localizeBackendText(state.errors.health || jdk?.detail || ""),
+    pythonStatus: state.errors.health ? t("state.notAvailable") : localizeBackendText(python?.status || t("state.notChecked")),
+    pythonDetail: localizeBackendText(state.errors.health || python?.detail || ""),
     powershellRunner: powershellStatus(state),
     powershellDetail: powershellDetail(state),
     updateStatus: state.errors.update ? t("state.notAvailable") : state.update?.latestVersion || t("state.notChecked"),

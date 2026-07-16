@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 EN_LOCALE = ROOT / "tauri/src/core/locales/en-US.ts"
 ZH_LOCALE = ROOT / "tauri/src/core/locales/zh-CN.ts"
 FRONTEND = ROOT / "tauri/src"
+BACKEND_TEXT_ADAPTER = FRONTEND / "core/backendText.ts"
 
 KEY_RE = re.compile(r'^\s*"([^"]+)"\s*:', re.MULTILINE)
 T_REF_RE = re.compile(r'\bt\(\s*["\']([^"\']+)["\']')
@@ -145,8 +146,37 @@ def check_visible_literals() -> list[str]:
     return failures
 
 
+def check_backend_text_adapter() -> list[str]:
+    failures: list[str] = []
+    adapter = read(BACKEND_TEXT_ADAPTER)
+    required_phrases = (
+        "Windows 系统目录仅统计，不允许清理",
+        "Java 生效链不一致",
+        "命中 WindowsApps Store Alias 时",
+        "目录存在只代表文件夹存在",
+        "受管路径置前并去重",
+        "重复 PATH:",
+    )
+    for phrase in required_phrases:
+        if phrase not in adapter:
+            failures.append(f"backend text adapter is missing a release-critical phrase: {phrase}")
+
+    required_boundaries = {
+        FRONTEND / "features/sharedView.ts": "localizeBackendText(value)",
+        FRONTEND / "features/dashboard/viewModel.ts": "localizeBackendText",
+        FRONTEND / "features/environment/viewModel.ts": "localizeBackendText",
+        FRONTEND / "features/runtimes/viewModel.ts": "localizeBackendText",
+    }
+    for path, marker in required_boundaries.items():
+        if marker not in read(path):
+            failures.append(
+                f"{path.relative_to(ROOT)} does not route backend-visible text through the locale adapter"
+            )
+    return failures
+
+
 def main() -> int:
-    failures = check_locales() + check_visible_literals()
+    failures = check_locales() + check_visible_literals() + check_backend_text_adapter()
     if failures:
         print("Frontend i18n contract check failed:")
         for failure in failures:

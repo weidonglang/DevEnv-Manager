@@ -26,6 +26,13 @@ REQUIRED_SNIPPETS = {
     ROOT / "tauri" / "src" / "features" / "environment" / "events.ts": [
         'state.errors.applyResult = t("toast.createRepairPlanFirst");',
     ],
+    ROOT / "tauri" / "src" / "styles.css": [
+        ".cleanup-summary {",
+        "border: 1px solid var(--color-border);",
+        "background: var(--color-surface-raised);",
+        "color: var(--color-text);",
+        ".cleanup-summary strong {",
+    ],
 }
 
 

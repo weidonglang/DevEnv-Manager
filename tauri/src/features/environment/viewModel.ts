@@ -1,4 +1,5 @@
 import { getActiveLocale, t } from "../../core/i18n";
+import { localizeBackendText } from "../../core/backendText";
 import type { EnvReliabilitySnapshot } from "../../types";
 import type { EnvironmentWorkbenchState } from "./state";
 
@@ -48,7 +49,7 @@ export function toEnvironmentViewModel(state: EnvironmentWorkbenchState): Enviro
       { label: label("PATH too long", "PATH 是否过长"), value: booleanLabel(Boolean(reliability?.pathAnalysis.pathTooLong)) },
       { label: label("Total entries", "条目总数"), value: String(reliability?.pathAnalysis.totalEntries ?? 0) },
     ],
-    issueRows: (reliability?.issues ?? []).map((issue) => ({ label: `${issue.severity}: ${issue.title}`, value: issue.detail })),
+    issueRows: (reliability?.issues ?? []).map((issue) => ({ label: `${issue.severity}: ${localizeBackendText(issue.title)}`, value: localizeBackendText(issue.detail) })),
   };
 }
 

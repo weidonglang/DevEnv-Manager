@@ -1,6 +1,7 @@
 import type { FeatureContext } from "../app/featureContext";
 import { finishDebug, logDebug } from "../core/debugLog";
 import { localize, t } from "../core/i18n";
+import { localizeBackendText } from "../core/backendText";
 
 export type SafeResult<T> = { ok: true; value: T } | { ok: false; error: string };
 
@@ -88,7 +89,7 @@ const objectFieldLabels: Record<string, readonly [string, string]> = {
 };
 
 export function escapeHtml(value: unknown): string {
-  return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char] || char);
+  return localizeBackendText(value).replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char] || char);
 }
 
 export function valueOf(source: unknown, path: string, fallback: unknown = t("state.notAvailable")): string {

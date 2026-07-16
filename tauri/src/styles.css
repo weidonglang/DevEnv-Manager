@@ -904,8 +904,10 @@ svg {
 .table-wrap {
   max-height: calc(100vh - 190px);
   overflow: auto;
-  border: 1px solid #e3e9ed;
+  border: 1px solid var(--color-border);
   border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-text);
 }
 
 #view-toolbox > .grid + .grid {
@@ -1034,7 +1036,7 @@ table {
 th,
 td {
   padding: 10px 12px;
-  border-bottom: 1px solid #e8eef2;
+  border-bottom: 1px solid var(--color-border);
   text-align: left;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1044,8 +1046,8 @@ td {
 th {
   position: sticky;
   top: 0;
-  background: #f7f9fb;
-  color: #52616b;
+  background: var(--color-surface-raised);
+  color: var(--color-text);
 }
 
 .sort-head {
@@ -1355,7 +1357,7 @@ input[type="checkbox"] {
 
 .small-note {
   margin-top: 10px;
-  color: #62717c;
+  color: var(--color-text-muted);
   font-size: 13px;
   overflow-wrap: anywhere;
 }
@@ -1851,9 +1853,10 @@ tr.is-selected td {
   gap: 12px;
   margin: 16px 0 12px;
   padding: 12px;
-  border: 1px solid #dbe4e8;
+  border: 1px solid var(--color-border);
   border-radius: 8px;
-  background: #f7faf9;
+  background: var(--color-surface-raised);
+  color: var(--color-text);
 }
 
 .cleanup-summary > div:not(.toolbar) {
@@ -1863,7 +1866,11 @@ tr.is-selected td {
 
 .cleanup-summary span,
 .cleanup-candidate small {
-  color: #62717c;
+  color: var(--color-text-muted);
+}
+
+.cleanup-summary strong {
+  color: var(--color-text);
 }
 
 .cleanup-volume-grid {

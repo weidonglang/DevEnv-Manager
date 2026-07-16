@@ -1,4 +1,5 @@
 import { localize, t } from "../../core/i18n";
+import { localizeBackendText } from "../../core/backendText";
 import type { RuntimeInfo, RuntimeStrongVerificationReport } from "../../types";
 import type { RuntimeWorkbenchState } from "./state";
 
@@ -27,7 +28,7 @@ export function toRuntimeViewModel(state: RuntimeWorkbenchState): RuntimeViewMod
   return {
     rows,
     verification: verificationSummary(state.strongVerification),
-    verificationDetail: state.strongVerification?.summary.join(" - ") || "",
+    verificationDetail: localizeBackendText(state.strongVerification?.summary.join(" - ") || ""),
   };
 }
 
@@ -45,7 +46,7 @@ function toRuntimeRow(runtime: RuntimeInfo, report: RuntimeStrongVerificationRep
     managed,
     readonlyLabel: managed ? t("state.available") : localize("External install / read-only", "外部安装 / 只读"),
     current: item?.current ? localize("Current", "当前") : managed ? localize("Managed", "受管") : localize("External", "外部"),
-    status: item?.status || (managed ? t("state.notChecked") : localize("Read-only", "只读")),
+    status: localizeBackendText(item?.status || (managed ? t("state.notChecked") : localize("Read-only", "只读"))),
   };
 }
 
