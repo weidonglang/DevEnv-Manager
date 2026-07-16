@@ -30,14 +30,6 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Rust tests
-        working-directory: tauri/src-tauri
-        run: cargo test --all-targets
-
-      - name: Rust clippy
-        working-directory: tauri/src-tauri
-        run: cargo clippy --all-targets -- -D warnings
-
       - name: Frontend dependencies
         working-directory: tauri
         run: npm ci
@@ -45,6 +37,14 @@ jobs:
       - name: Frontend build
         working-directory: tauri
         run: npm run build
+
+      - name: Rust tests
+        working-directory: tauri/src-tauri
+        run: cargo test --all-targets
+
+      - name: Rust clippy
+        working-directory: tauri/src-tauri
+        run: cargo clippy --all-targets -- -D warnings
 
       - name: Safety wording
         run: python scripts/check_safety_wording.py
