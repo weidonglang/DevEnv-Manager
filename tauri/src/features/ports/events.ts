@@ -1,5 +1,5 @@
 import type { FeatureContext } from "../../app/featureContext";
-import { t } from "../../core/i18n";
+import { localize, t } from "../../core/i18n";
 import { bindAction } from "../sharedView";
 import { createPortResolutionPlan, executePortResolutionPlan, inspectLocalServices, portHistory, scanPorts } from "./api";
 import { assessPortTreatability, portRecordKey, selectedPortRecord } from "./portSafety";
@@ -79,7 +79,7 @@ export function bindPortEvents(context: FeatureContext, state: PortsWorkbenchSta
         }
         state.scanError = "";
       } catch (error) {
-        state.scanError = `Port verification refresh unavailable: ${errorMessage(error)}`;
+        state.scanError = `${localize("Port verification refresh unavailable", "端口验证刷新不可用")}：${errorMessage(error)}`;
       }
     } catch (error) {
       state.planError = errorMessage(error);
@@ -151,19 +151,19 @@ export async function refreshPorts(context: FeatureContext, state: PortsWorkbenc
     }
   } else {
     state.records = [];
-    state.scanError = `Port scan unavailable: ${errorMessage(records.reason)}`;
+    state.scanError = `${localize("Port scan unavailable", "端口扫描不可用")}：${errorMessage(records.reason)}`;
   }
   if (history.status === "fulfilled") {
     state.history = history.value;
     state.historyError = "";
   } else {
-    state.historyError = `Port history unavailable: ${errorMessage(history.reason)}`;
+    state.historyError = `${localize("Port history unavailable", "端口历史不可用")}：${errorMessage(history.reason)}`;
   }
   if (services.status === "fulfilled") {
     state.services = services.value;
     state.servicesError = "";
   } else {
-    state.servicesError = `Local services unavailable: ${errorMessage(services.reason)}`;
+    state.servicesError = `${localize("Local services unavailable", "本地服务信息不可用")}：${errorMessage(services.reason)}`;
   }
   context.root.innerHTML = renderPortsWorkbench(state);
   bindPortEvents(context, state);

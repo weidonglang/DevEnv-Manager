@@ -1,6 +1,6 @@
 import type { FeatureContext } from "../../app/featureContext";
 import { open } from "../../api/tauri";
-import { t } from "../../core/i18n";
+import { localize, t } from "../../core/i18n";
 import { bindAction } from "../sharedView";
 import { discoverRuntimes, getJdkDistributions, inspectRuntimeStrongVerification, installRuntime, openAppsFeatures, openRuntimeDirectory, switchRuntime, uninstallRuntime, verifyExternalJdk } from "./api";
 import { renderRuntimeWorkbench } from "./render";
@@ -29,7 +29,7 @@ export function bindRuntimeEvents(context: FeatureContext, state: RuntimeWorkben
     state.externalJdkResult = "";
     state.externalJdkError = "";
     if (!state.externalJdkPath) {
-      state.externalJdkError = "Select or choose an external JDK root first.";
+      state.externalJdkError = localize("Select or choose an external JDK root first.", "请先选择或浏览外部 JDK 根目录。");
       renderAndBind(context, state);
       return;
     }
@@ -38,8 +38,8 @@ export function bindRuntimeEvents(context: FeatureContext, state: RuntimeWorkben
       state.externalJdkChecks = await verifyExternalJdk(state.externalJdkPath);
       const requiredPassed = state.externalJdkChecks.filter((check) => check.required).every((check) => check.success);
       state.externalJdkResult = requiredPassed
-        ? `External JDK verified. JAVA_HOME can point to ${state.externalJdkPath}.`
-        : "External Java verification completed with missing or failed required tools.";
+        ? localize(`External JDK verified. JAVA_HOME can point to ${state.externalJdkPath}.`, `外部 JDK 验证通过，JAVA_HOME 可以指向 ${state.externalJdkPath}。`)
+        : localize("External Java verification completed with missing or failed required tools.", "外部 Java 验证已完成，但必需工具缺失或验证失败。");
       context.progress.done(t("feature.runtimes.externalJdkVerificationDone"));
     } catch (error) {
       state.externalJdkError = errorMessage(error);

@@ -1,4 +1,4 @@
-import { t } from "../../core/i18n";
+import { localize, t } from "../../core/i18n";
 import type { RuntimeInfo, RuntimeStrongVerificationReport } from "../../types";
 import type { RuntimeWorkbenchState } from "./state";
 
@@ -43,9 +43,9 @@ function toRuntimeRow(runtime: RuntimeInfo, report: RuntimeStrongVerificationRep
     runtimeRoot: runtimeRoot(runtime.executable),
     source: runtime.source,
     managed,
-    readonlyLabel: managed ? t("state.available") : "External install / read-only",
-    current: item?.current ? "Current" : managed ? "Managed" : "External",
-    status: item?.status || (managed ? t("state.notChecked") : "Read-only"),
+    readonlyLabel: managed ? t("state.available") : localize("External install / read-only", "外部安装 / 只读"),
+    current: item?.current ? localize("Current", "当前") : managed ? localize("Managed", "受管") : localize("External", "外部"),
+    status: item?.status || (managed ? t("state.notChecked") : localize("Read-only", "只读")),
   };
 }
 
@@ -53,7 +53,7 @@ function verificationSummary(report: RuntimeStrongVerificationReport | null): st
   if (!report) return t("state.notChecked");
   const failed = report.items.filter((item) => item.status.toLowerCase().includes("fail") || item.checks.some((check) => !check.success && check.required)).length;
   const usable = report.items.length - failed;
-  return `${usable}/${report.items.length} usable`;
+  return localize(`${usable}/${report.items.length} usable`, `${usable}/${report.items.length} 可用`);
 }
 
 function runtimeRoot(executable: string): string {

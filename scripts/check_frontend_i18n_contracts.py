@@ -24,7 +24,18 @@ UI_LITERAL_RES = (
     re.compile(r'renderMetric\(\s*"([^"]*[A-Za-z][^"]*)"'),
 )
 VISIBLE_MESSAGE_RE = re.compile(
-    r'\b(?:showToast|progress\.(?:start|done|fail))\(\s*["`]([^"`]*[A-Za-z\u3400-\u9fff][^"`]*)["`]'
+    r'\b(?:showToast|context\.toast|progress\.(?:start|done|fail))\(\s*["`]([^"`]*[A-Za-z\u3400-\u9fff][^"`]*)["`]'
+)
+STATE_LITERAL_RE = re.compile(
+    r'\bstate(?:\.\w+|\[[^\]]+\])*(?:Error|Result|Message|Detail|Verification|Warning|Text)\s*=\s*["`]([^"`]*[A-Za-z\u3400-\u9fff][^"`]*)["`]'
+)
+RETURN_LITERAL_RE = re.compile(
+    r'\breturn\s+["`]([^"`]*[A-Za-z\u3400-\u9fff][^"`]*)["`]'
+)
+OBJECT_UI_LITERAL_RES = (
+    re.compile(r'\b(?:title|summary)\s*:\s*["`]([^"`]*[A-Za-z\u3400-\u9fff][^"`]*)["`]'),
+    re.compile(r'\bwarnings\s*:\s*\[\s*["`]([^"`]*[A-Za-z\u3400-\u9fff][^"`]*)["`]'),
+    re.compile(r'\{\s*label\s*:\s*["`]([^"`]*[A-Za-z\u3400-\u9fff][^"`]*)["`]'),
 )
 
 # These are identifiers, brands, protocols, or units rather than translatable prose.
@@ -34,7 +45,11 @@ TECHNICAL_LITERAL_RE = re.compile(
     r"WSL|UAC|URL|JSON|HTTP|HTTPS|TCP|UDP|IPv4|IPv6|"
     r"Node(?:\.js)?|Python|Go|Rust|Maven|Gradle|Docker(?: Desktop)?|"
     r"PowerShell|Windows|GitHub|Gitee|MSI|NSIS|MB|GB|TB|ms|Info|Ubuntu|Temurin|"
-    r"Temurin / Microsoft / Zulu|network_diagnostics|readOnly"
+    r"Temurin / Microsoft / Zulu|network_diagnostics|readOnly|"
+    r"idle|loading|running|ready|success|failed|complete|completed|skipped|manual|"
+    r"install|uninstall|start|stop|restart|open|copy|inspect|refresh|none|"
+    r"defaultRoot|configDir|os|arch|username|stdout|stderr|java\.exe|javac\.exe|"
+    r"JAVA_HOME raw|JAVA_HOME expanded|docker_install"
     r")$",
     re.IGNORECASE,
 )
@@ -52,6 +67,7 @@ def locale_keys(path: Path) -> tuple[list[str], set[str]]:
 def frontend_files() -> list[Path]:
     files = list((FRONTEND / "features").glob("**/render.ts"))
     files.extend((FRONTEND / "features").glob("**/events.ts"))
+    files.extend((FRONTEND / "features").glob("**/viewModel.ts"))
     files.extend((FRONTEND / "components").glob("*.ts"))
     files.extend([
         FRONTEND / "app/shell.ts",
@@ -71,7 +87,10 @@ def is_code_fragment(value: str) -> bool:
         "`", "state.", "querySelector", ".join(", "Parameters", "Promise", "Record",
         "unknown |", "| undefined", "renderPortRow", "renderServiceRow",
     )
-    return any(marker in value for marker in markers)
+    if any(marker in value for marker in markers):
+        return True
+    without_interpolation = re.sub(r"\$\{[^}]+\}", "", value)
+    return not re.search(r"[A-Za-z\u3400-\u9fff]", without_interpolation)
 
 
 def check_locales() -> list[str]:
@@ -100,6 +119,8 @@ def check_visible_literals() -> list[str]:
         if "\ufffd" in text:
             failures.append(f"{path.relative_to(ROOT)} contains Unicode replacement characters")
         for line_number, line in enumerate(text.splitlines(), start=1):
+            if "localize(" in line or "label(" in line or "t(" in line:
+                continue
             candidates: list[str] = []
             candidates.extend(match.group(1) for match in TEXT_NODE_RE.finditer(line))
             candidates.extend(match.group(1) for match in CJK_TEXT_NODE_RE.finditer(line))
@@ -107,6 +128,13 @@ def check_visible_literals() -> list[str]:
             for pattern in UI_LITERAL_RES:
                 candidates.extend(match.group(1) for match in pattern.finditer(line))
             candidates.extend(match.group(1) for match in VISIBLE_MESSAGE_RE.finditer(line))
+            candidates.extend(match.group(1) for match in STATE_LITERAL_RE.finditer(line))
+            if path.name == "viewModel.ts":
+                candidates.extend(match.group(1) for match in RETURN_LITERAL_RE.finditer(line))
+            for pattern in OBJECT_UI_LITERAL_RES:
+                if path.name == "sharedView.ts":
+                    continue
+                candidates.extend(match.group(1) for match in pattern.finditer(line))
             for candidate in candidates:
                 value = " ".join(candidate.split())
                 if not value or is_technical_literal(value) or is_code_fragment(value):

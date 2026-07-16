@@ -1,7 +1,7 @@
 import type { FeatureContext } from "../../app/featureContext";
 import { open } from "../../api/tauri";
 import { finishDebug, logDebug } from "../../core/debugLog";
-import { t } from "../../core/i18n";
+import { localize, t } from "../../core/i18n";
 import { bindAction } from "../sharedView";
 import { analyzeProject, applyProjectConfiguration, inspectAgentTraces, inspectIdeaProject, inspectProjectPortConfigs, previewProjectConfiguration, updateProjectPort, verifyJavaConsumerEnvironment } from "./api";
 import { renderProjectWorkbench } from "./render";
@@ -63,9 +63,9 @@ export function bindProjectEvents(context: FeatureContext, state: ProjectWorkben
         planId: projectConfigurationPlanId(request),
         riskLevel: "high",
         backupReceipt: `${preview.projectPath}\\.devenv-manager\\backups\\<execution-time>`,
-        title: "Apply project configuration",
-        summary: "Writes project configuration files after previewing append/create/replace semantics.",
-        warnings: ["Review target files and backup metadata before applying."],
+        title: localize("Apply project configuration", "应用项目配置"),
+        summary: localize("Writes project configuration files after previewing append/create/replace semantics.", "预览追加、创建或替换语义后写入项目配置文件。"),
+        warnings: [localize("Review target files and backup metadata before applying.", "应用前请检查目标文件和备份元数据。")],
         execute: (confirmationToken) => applyProjectConfiguration(request, confirmationToken),
       });
       state.applyResult = result as ProjectWorkbenchState["applyResult"];
@@ -101,9 +101,9 @@ export function bindProjectEvents(context: FeatureContext, state: ProjectWorkben
         planId: `${projectPath(context, state)}:${port.id}:${port.currentPort}`,
         riskLevel: "medium",
         backupReceipt: port.backupPath || `${port.file}.devenv-backup-<execution-time>`,
-        title: "Update project port",
-        summary: "Updates a selected project port file through a token-gated backend command.",
-        warnings: ["Confirm the target file and new port before execution."],
+        title: localize("Update project port", "更新项目端口"),
+        summary: localize("Updates a selected project port file through a token-gated backend command.", "通过确认令牌保护的后端命令更新所选项目端口文件。"),
+        warnings: [localize("Confirm the target file and new port before execution.", "执行前请确认目标文件和新端口。")],
         execute: (confirmationToken) => updateProjectPort(projectPath(context, state), port.id, port.currentPort, confirmationToken),
       });
       state.applyResult = result as ProjectWorkbenchState["applyResult"];

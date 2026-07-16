@@ -1,4 +1,4 @@
-import { t } from "../../core/i18n";
+import { localize, t } from "../../core/i18n";
 import type { ProjectWorkbenchState } from "./state";
 
 export type ProjectViewModel = {
@@ -25,11 +25,11 @@ export function toProjectViewModel(state: ProjectWorkbenchState): ProjectViewMod
     ports: state.errors.ports ? t("state.notAvailable") : String(state.ports.length),
     traces: state.errors.traces ? t("state.notAvailable") : String(state.traces?.items.length ?? 0),
     analysisRows: [
-      { label: "Root", value: present(analysis?.root || state.selectedPath) },
-      { label: "Project types", value: list(analysis?.projectTypes) },
-      { label: "Detected files", value: list(analysis?.detectedFiles) },
-      { label: "Package manager", value: present(analysis?.packageManager) },
-      { label: "Warnings", value: list(analysis?.warnings) },
+      { label: localize("Root", "根目录"), value: present(analysis?.root || state.selectedPath) },
+      { label: localize("Project types", "项目类型"), value: list(analysis?.projectTypes) },
+      { label: localize("Detected files", "检测文件"), value: list(analysis?.detectedFiles) },
+      { label: localize("Package manager", "包管理器"), value: present(analysis?.packageManager) },
+      { label: localize("Warnings", "警告"), value: list(analysis?.warnings) },
     ],
     recommendedRuntimeRows: (analysis?.recommendedRuntime ?? []).map((runtime) => ({
       label: runtime.name,
@@ -37,21 +37,21 @@ export function toProjectViewModel(state: ProjectWorkbenchState): ProjectViewMod
     })),
     actionRows: (analysis?.actions ?? []).map((action) => ({
       label: action.title,
-      value: `${action.safeToRun ? "safe" : "review"} - ${action.command || action.description}`,
+      value: `${action.safeToRun ? localize("safe", "安全") : localize("review", "需检查")} - ${action.command || action.description}`,
     })),
     previewRows: state.preview
       ? [
-          { label: "Project path", value: state.preview.projectPath },
-          { label: "Detected types", value: list(state.preview.detectedTypes) },
-          { label: "Files", value: String(state.preview.files.length) },
-          { label: "Current JDK", value: present(state.preview.current.jdk) },
-          { label: "Current Python", value: present(state.preview.current.python) },
-          { label: "Warnings", value: list(state.preview.warnings) },
+          { label: localize("Project path", "项目路径"), value: state.preview.projectPath },
+          { label: localize("Detected types", "检测类型"), value: list(state.preview.detectedTypes) },
+          { label: localize("Files", "文件"), value: String(state.preview.files.length) },
+          { label: localize("Current JDK", "当前 JDK"), value: present(state.preview.current.jdk) },
+          { label: localize("Current Python", "当前 Python"), value: present(state.preview.current.python) },
+          { label: localize("Warnings", "警告"), value: list(state.preview.warnings) },
         ]
       : [],
     previewFileRows: (state.preview?.files ?? []).map((file) => ({
       label: file.relativePath,
-      value: `${file.existed ? "update" : "create"} - ${file.enabled ? "enabled" : "disabled"}`,
+      value: `${file.existed ? localize("update", "更新") : localize("create", "创建")} - ${file.enabled ? localize("enabled", "启用") : localize("disabled", "禁用")}`,
     })),
     portRows: state.ports.map((port) => ({
       label: `${port.kind} ${port.currentPort}`,
@@ -59,26 +59,26 @@ export function toProjectViewModel(state: ProjectWorkbenchState): ProjectViewMod
     })),
     ideaRows: state.idea
       ? [
-          { label: "Root", value: state.idea.root },
-          { label: "Detected", value: booleanLabel(state.idea.detected) },
-          { label: "Project SDK", value: present(state.idea.projectSdk) },
-          { label: "Language level", value: present(state.idea.languageLevel) },
-          { label: "Modules", value: String(state.idea.moduleCount) },
-          { label: "JDK match", value: present(state.idea.jdkMatch) },
-          { label: "Warnings", value: list(state.idea.warnings) },
+          { label: localize("Root", "根目录"), value: state.idea.root },
+          { label: localize("Detected", "已检测"), value: booleanLabel(state.idea.detected) },
+          { label: localize("Project SDK", "项目 SDK"), value: present(state.idea.projectSdk) },
+          { label: localize("Language level", "语言级别"), value: present(state.idea.languageLevel) },
+          { label: localize("Modules", "模块"), value: String(state.idea.moduleCount) },
+          { label: localize("JDK match", "JDK 匹配"), value: present(state.idea.jdkMatch) },
+          { label: localize("Warnings", "警告"), value: list(state.idea.warnings) },
         ]
       : [],
     javaConsumerRows: state.javaConsumer
       ? [
-          { label: "Consumer", value: state.javaConsumer.consumer },
-          { label: "Root", value: state.javaConsumer.root },
-          { label: "Usable", value: booleanLabel(state.javaConsumer.usable) },
+          { label: localize("Consumer", "使用方"), value: state.javaConsumer.consumer },
+          { label: localize("Root", "根目录"), value: state.javaConsumer.root },
+          { label: localize("Usable", "可用"), value: booleanLabel(state.javaConsumer.usable) },
           { label: "JAVA_HOME raw", value: present(state.javaConsumer.javaHomeRaw) },
           { label: "JAVA_HOME expanded", value: present(state.javaConsumer.javaHomeExpanded) },
           { label: "java.exe", value: booleanLabel(state.javaConsumer.javaExists) },
           { label: "javac.exe", value: booleanLabel(state.javaConsumer.javacExists) },
-          { label: "PATH java", value: present(state.javaConsumer.pathJava) },
-          { label: "Explanation", value: list(state.javaConsumer.explanation) },
+          { label: localize("PATH java", "PATH 中的 java"), value: present(state.javaConsumer.pathJava) },
+          { label: localize("Explanation", "说明"), value: list(state.javaConsumer.explanation) },
         ]
       : [],
     traceRows: (state.traces?.items ?? []).map((trace) => ({
@@ -91,7 +91,7 @@ export function toProjectViewModel(state: ProjectWorkbenchState): ProjectViewMod
 function healthLabel(state: ProjectWorkbenchState): string {
   if (state.errors.analysis) return t("state.notAvailable");
   if (!state.analysis) return t("state.notChecked");
-  return state.analysis.warnings.length ? "Needs review" : t("state.available");
+  return state.analysis.warnings.length ? localize("Needs review", "需要检查") : t("state.available");
 }
 
 function present(value: unknown): string {
@@ -104,5 +104,5 @@ function list(values: unknown[] | undefined): string {
 }
 
 function booleanLabel(value: boolean): string {
-  return value ? "yes" : "no";
+  return value ? localize("yes", "是") : localize("no", "否");
 }

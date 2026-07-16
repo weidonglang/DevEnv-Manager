@@ -1,6 +1,6 @@
 import type { FeatureContext } from "../../app/featureContext";
 import { open } from "../../api/tauri";
-import { t } from "../../core/i18n";
+import { localize, t } from "../../core/i18n";
 import { bindAction } from "../sharedView";
 import { applyAssociationPlan, createAssociationPlan, exportAssociationReport, listAssociationBackups, openDefaultAppsSettings, rollbackAssociationBackup, scanAssociations, searchAssociationApp } from "./api";
 import { renderFileAssociations } from "./render";
@@ -90,9 +90,9 @@ export function bindFileAssociationEvents(context: FeatureContext, state: FileAs
         planId: state.plan.planId,
         riskLevel: "high",
         backupReceipt: state.plan.backupPath,
-        title: "Apply file association plan",
-        summary: "Applies ordinary and high-risk file association changes through a backend token gate.",
-        warnings: ["UserChoice-protected associations may open Windows Settings instead of writing registry values."],
+        title: localize("Apply file association plan", "应用文件关联计划"),
+        summary: localize("Applies ordinary and high-risk file association changes through a backend token gate.", "通过后端确认令牌应用普通或高风险文件关联变更。"),
+        warnings: [localize("UserChoice-protected associations may open Windows Settings instead of writing registry values.", "受 UserChoice 保护的关联可能会打开 Windows 设置，而不是直接写入注册表。")],
         execute: (confirmationToken) => applyAssociationPlan(state.plan!, confirmationToken),
       });
       state.applyResult = result as FileAssociationUiState["applyResult"];
@@ -123,9 +123,9 @@ export function bindFileAssociationEvents(context: FeatureContext, state: FileAs
         planId: backup.backupId,
         riskLevel: "high",
         backupReceipt: backup.backupPath,
-        title: "Rollback file association backup",
-        summary: "Restores a previous file association backup through a token-gated backend command.",
-        warnings: ["Review the backup timestamp before rollback."],
+        title: localize("Rollback file association backup", "回滚文件关联备份"),
+        summary: localize("Restores a previous file association backup through a token-gated backend command.", "通过确认令牌保护的后端命令恢复之前的文件关联备份。"),
+        warnings: [localize("Review the backup timestamp before rollback.", "回滚前请检查备份时间。")],
         execute: (confirmationToken) => rollbackAssociationBackup(backup.backupId, confirmationToken),
       });
       state.rollbackResult = result as FileAssociationUiState["rollbackResult"];

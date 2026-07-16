@@ -2,7 +2,7 @@ import type { FeatureContext } from "../../app/featureContext";
 import { open } from "../../api/tauri";
 import { showSafetyNoticeDialog } from "../../components/disclaimerPanel";
 import { clearDebugEntries, debugEntriesAsMarkdown, getDebugEntries, isAdvancedMode, logDebug, setAdvancedMode } from "../../core/debugLog";
-import { localeModeLabel, setLocale, t, type LocaleMode } from "../../core/i18n";
+import { localeModeLabel, localize, setLocale, t, type LocaleMode } from "../../core/i18n";
 import { applyTheme, readTheme, type ThemeMode } from "../../ui/theme/controller";
 import { bindAction } from "../sharedView";
 import { checkForUpdates, downloadUpdate, launchUpdateInstaller, loadSettingsWorkbench, openAppConfigDir, powershellRunnerStatus, resetUiConfig, selfUninstall, setAutoCheckUpdate, setRootDir } from "./api";
@@ -49,7 +49,7 @@ export function bindSettingsEvents(context: FeatureContext, state: SettingsWorkb
       if (!selected || Array.isArray(selected)) return;
       const input = context.root.querySelector<HTMLInputElement>("#settings-root");
       if (input) input.value = selected;
-      state.operationResult = `Selected root directory: ${selected}`;
+      state.operationResult = `${localize("Selected root directory", "已选择根目录")}：${selected}`;
     } catch (error) {
       state.operationError = errorMessage(error);
       context.root.innerHTML = renderSettingsWorkbench(state);
@@ -81,7 +81,7 @@ export function bindSettingsEvents(context: FeatureContext, state: SettingsWorkb
     state.updateError = "";
     state.updateDownload = null;
     if (!state.update?.updateAvailable) {
-      state.updateError = state.update ? "The current version is already up to date." : "Check for updates before downloading.";
+      state.updateError = state.update ? localize("The current version is already up to date.", "当前版本已是最新版本。") : localize("Check for updates before downloading.", "下载前请先检查更新。");
       context.root.innerHTML = renderSettingsWorkbench(state);
       bindSettingsEvents(context, state);
       return;
@@ -103,7 +103,7 @@ export function bindSettingsEvents(context: FeatureContext, state: SettingsWorkb
     const update = state.update;
     const download = state.updateDownload;
     if (!update || !download?.verified) {
-      state.updateError = "Download and verify the update before launching its installer.";
+      state.updateError = localize("Download and verify the update before launching its installer.", "启动安装器前请先下载并验证更新。");
       context.root.innerHTML = renderSettingsWorkbench(state);
       bindSettingsEvents(context, state);
       return;
@@ -113,20 +113,20 @@ export function bindSettingsEvents(context: FeatureContext, state: SettingsWorkb
         command: "launch_update_installer",
         planId: `update:${update.latestVersion}:${update.sha256}`,
         riskLevel: "high",
-        title: "Launch verified update installer",
-        summary: "Starts the downloaded installer after backend size and SHA-256 verification.",
+        title: localize("Launch verified update installer", "启动已验证的更新安装器"),
+        summary: localize("Starts the downloaded installer after backend size and SHA-256 verification.", "后端验证文件大小和 SHA-256 后启动已下载的安装器。"),
         before: [
-          { label: "Version", value: update.latestVersion },
-          { label: "Platform", value: update.platform },
-          { label: "File", value: update.fileName },
-          { label: "Source", value: download.sourceUrl },
-          { label: "Size", value: `${download.size.toLocaleString()} bytes` },
+          { label: localize("Version", "版本"), value: update.latestVersion },
+          { label: localize("Platform", "平台"), value: update.platform },
+          { label: localize("File", "文件"), value: update.fileName },
+          { label: localize("Source", "来源"), value: download.sourceUrl },
+          { label: localize("Size", "大小"), value: `${download.size.toLocaleString()} bytes` },
           { label: "SHA-256", value: download.sha256 },
         ],
-        warnings: ["DevEnv Manager closes after the installer starts.", "Review the verified asset identity before continuing."],
+        warnings: [localize("DevEnv Manager closes after the installer starts.", "安装器启动后 DevEnv Manager 将关闭。"), localize("Review the verified asset identity before continuing.", "继续前请检查已验证的资产身份。")],
         execute: launchUpdateInstaller,
       });
-      state.operationResult = resultMessage(result, "Update installer started.");
+      state.operationResult = resultMessage(result, localize("Update installer started.", "更新安装器已启动。"));
     } catch (error) {
       state.updateError = errorMessage(error);
       if (context.isCurrent()) {
@@ -143,12 +143,12 @@ export function bindSettingsEvents(context: FeatureContext, state: SettingsWorkb
         command: "self_uninstall",
         planId: "self-uninstall",
         riskLevel: "high",
-        title: "Open DevEnv Manager uninstaller",
-        summary: "Starts the registered Windows uninstaller without silently deleting user configuration.",
-        warnings: ["The application closes after the uninstaller starts.", "Review any data-removal option shown by the official uninstaller."],
+        title: localize("Open DevEnv Manager uninstaller", "打开 DevEnv Manager 卸载程序"),
+        summary: localize("Starts the registered Windows uninstaller without silently deleting user configuration.", "启动 Windows 中已注册的卸载程序，不会静默删除用户配置。"),
+        warnings: [localize("The application closes after the uninstaller starts.", "卸载程序启动后应用将关闭。"), localize("Review any data-removal option shown by the official uninstaller.", "请检查官方卸载程序显示的所有数据移除选项。")],
         execute: selfUninstall,
       });
-      state.uninstallResult = resultMessage(result, "Uninstaller started.");
+      state.uninstallResult = resultMessage(result, localize("Uninstaller started.", "卸载程序已启动。"));
     } catch (error) {
       state.uninstallError = errorMessage(error);
       if (context.isCurrent()) {

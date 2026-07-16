@@ -10968,6 +10968,7 @@ async fn powershell_runner_status() -> Result<powershell_runner::PowerShellResul
 }
 
 pub fn run() {
+    suppress_system_error_dialogs();
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
@@ -11145,6 +11146,26 @@ pub fn run() {
         .run(tauri::generate_context!())
         .expect("error while running DevEnv Manager");
 }
+
+#[cfg(windows)]
+fn suppress_system_error_dialogs() {
+    const SEM_FAILCRITICALERRORS: u32 = 0x0001;
+    const SEM_NOGPFAULTERRORBOX: u32 = 0x0002;
+
+    #[link(name = "kernel32")]
+    unsafe extern "system" {
+        fn SetErrorMode(mode: u32) -> u32;
+    }
+
+    // Probe targets are untrusted external executables. Loader failures must be
+    // returned to the workbench instead of blocking it with a system dialog.
+    unsafe {
+        SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
+    }
+}
+
+#[cfg(not(windows))]
+fn suppress_system_error_dialogs() {}
 
 pub fn cli_main() -> i32 {
     match run_cli(std::env::args().skip(1).collect()) {

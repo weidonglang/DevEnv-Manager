@@ -1,4 +1,4 @@
-import { t } from "../../core/i18n";
+import { localize, t } from "../../core/i18n";
 import type { EnvHealthCheck } from "../../types";
 import type { DashboardState } from "./state";
 
@@ -36,11 +36,11 @@ export function toDashboardViewModel(state: DashboardState): DashboardViewModel 
     updateStatus: state.errors.update ? t("state.notAvailable") : state.update?.latestVersion || t("state.notChecked"),
     updateDetail: state.errors.update || state.update?.sourceName || "",
     environmentRows: [
-      { label: "defaultRoot", value: state.snapshot?.defaultRoot || t("state.notAvailable") },
-      { label: "configDir", value: state.snapshot?.configDir || t("state.notAvailable") },
-      { label: "os", value: state.snapshot?.os || t("state.notAvailable") },
-      { label: "arch", value: state.snapshot?.arch || t("state.notAvailable") },
-      { label: "username", value: state.snapshot?.username || t("state.notAvailable") },
+      { label: localize("Default root", "默认根目录"), value: state.snapshot?.defaultRoot || t("state.notAvailable") },
+      { label: localize("Configuration directory", "配置目录"), value: state.snapshot?.configDir || t("state.notAvailable") },
+      { label: localize("Operating system", "操作系统"), value: state.snapshot?.os || t("state.notAvailable") },
+      { label: localize("Architecture", "架构"), value: state.snapshot?.arch || t("state.notAvailable") },
+      { label: localize("User name", "用户名"), value: state.snapshot?.username || t("state.notAvailable") },
     ],
   };
 }
@@ -53,8 +53,8 @@ function findHealth(items: EnvHealthCheck[], name: string): EnvHealthCheck | und
 function powershellStatus(state: DashboardState): string {
   if (state.errors.powershell) return t("state.notAvailable");
   if (!state.powershell) return t("state.notChecked");
-  if (state.powershell.timedOut) return "Timed out";
-  return state.powershell.success ? t("state.available") : "Failed";
+  if (state.powershell.timedOut) return localize("Timed out", "已超时");
+  return state.powershell.success ? t("state.available") : localize("Failed", "失败");
 }
 
 function powershellDetail(state: DashboardState): string {

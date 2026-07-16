@@ -1,6 +1,6 @@
 import type { FeatureContext } from "../../app/featureContext";
 import { open } from "../../api/tauri";
-import { t } from "../../core/i18n";
+import { localize, t } from "../../core/i18n";
 import { bindAction, valueOf } from "../sharedView";
 import { analyzePythonEnvironment, applyEnvRepairPlan, applyPythonRepair, applyUserEnvironmentConfiguration, cleanupPathEntries, createJavaStabilizePlan, environmentHealth, inspectEnvBackup, inspectEnvironmentReliability, listEnvBackups, listEnvironmentBackups, openPythonAliasSettings, previewPythonRepair, previewUserEnvironmentConfiguration, restoreEnvBackup, restoreEnvironmentBackup } from "./api";
 import { renderEnvironmentWorkbench } from "./render";
@@ -13,7 +13,7 @@ export function bindEnvironmentEvents(context: FeatureContext, state: Environmen
     state.configurationError = "";
     const preview = state.preview;
     if (!preview) {
-      state.configurationError = "Refresh the environment preview before applying configuration.";
+      state.configurationError = localize("Refresh the environment preview before applying configuration.", "应用配置前请先刷新环境预览。");
       renderAndBind(context, state);
       return;
     }
@@ -24,9 +24,9 @@ export function bindEnvironmentEvents(context: FeatureContext, state: Environmen
         riskLevel: "high",
         backupReceipt: preview.backupName,
         backupRequired: true,
-        title: "Apply user environment configuration",
-        summary: "Writes the previewed DEVENV_HOME, JAVA_HOME, and user PATH values after baseline verification.",
-        before: preview.changes.map((change) => ({ label: change.name, value: `${change.current || "not set"} -> ${change.proposed || "not set"}` })),
+        title: localize("Apply user environment configuration", "应用用户环境配置"),
+        summary: localize("Writes the previewed DEVENV_HOME, JAVA_HOME, and user PATH values after baseline verification.", "验证基线后写入预览中的 DEVENV_HOME、JAVA_HOME 和用户 PATH。"),
+        before: preview.changes.map((change) => ({ label: change.name, value: `${change.current || localize("not set", "未设置")} -> ${change.proposed || localize("not set", "未设置")}` })),
         warnings: preview.warnings,
         execute: (confirmationToken) => applyUserEnvironmentConfiguration(preview.previewId, confirmationToken),
       });
@@ -40,7 +40,7 @@ export function bindEnvironmentEvents(context: FeatureContext, state: Environmen
       state.envBackups = envBackups;
       state.environmentBackups = environmentBackups;
       state.preview = nextPreview;
-      state.configurationResult = `${resultMessage(result, "User environment configuration applied.")} Post-verification refreshed JAVA_HOME, PATH, and backup evidence.`;
+      state.configurationResult = `${resultMessage(result, localize("User environment configuration applied.", "用户环境配置已应用。"))} ${localize("Post-verification refreshed JAVA_HOME, PATH, and backup evidence.", "执行后验证已刷新 JAVA_HOME、PATH 和备份证据。")}`;
     } catch (error) {
       state.configurationError = errorMessage(error);
     }
@@ -60,7 +60,7 @@ export function bindEnvironmentEvents(context: FeatureContext, state: Environmen
     state.aliasError = "";
     try {
       const result = await openPythonAliasSettings();
-      state.aliasResult = result.message || "Windows execution alias settings opened.";
+      state.aliasResult = result.message || localize("Windows execution alias settings opened.", "已打开 Windows 应用执行别名设置。");
     } catch (error) {
       state.aliasError = errorMessage(error);
     }
@@ -83,7 +83,7 @@ export function bindEnvironmentEvents(context: FeatureContext, state: Environmen
     state.pythonResult = "";
     state.pythonError = "";
     if (!state.pythonPlan) {
-      state.pythonError = "Create and review a Python repair preview first.";
+      state.pythonError = localize("Create and review a Python repair preview first.", "请先创建并检查 Python 修复预览。");
       renderAndBind(context, state);
       return;
     }
@@ -94,12 +94,12 @@ export function bindEnvironmentEvents(context: FeatureContext, state: Environmen
         planId: plan.planId,
         riskLevel: "high",
         backupReceipt: plan.backupName,
-        title: "Apply Python health repair",
-        summary: "Runs the previewed pip repair and/or prepends Python paths after verifying the environment baseline.",
+        title: localize("Apply Python health repair", "应用 Python 健康修复"),
+        summary: localize("Runs the previewed pip repair and/or prepends Python paths after verifying the environment baseline.", "验证环境基线后执行预览中的 pip 修复和/或调整 Python PATH 顺序。"),
         before: [
           { label: "Python", value: plan.pythonPath },
-          { label: "Actions", value: plan.actions.join("; ") },
-          { label: "PATH additions", value: plan.pathAdded.join("; ") || "none" },
+          { label: localize("Actions", "操作"), value: plan.actions.join("; ") },
+          { label: localize("PATH additions", "PATH 新增项"), value: plan.pathAdded.join("; ") || localize("none", "无") },
         ],
         warnings: plan.warnings,
         execute: (confirmationToken) => applyPythonRepair(plan.planId, confirmationToken),
@@ -107,7 +107,7 @@ export function bindEnvironmentEvents(context: FeatureContext, state: Environmen
       const [analysis, reliability] = await Promise.all([analyzePythonEnvironment(), inspectEnvironmentReliability()]);
       state.pythonAnalysis = analysis;
       state.reliability = reliability;
-      state.pythonResult = `${resultMessage(result, "Python repair completed.")} Post-verification refreshed Python ownership, aliases, and PATH evidence.`;
+      state.pythonResult = `${resultMessage(result, localize("Python repair completed.", "Python 修复完成。"))} ${localize("Post-verification refreshed Python ownership, aliases, and PATH evidence.", "执行后验证已刷新 Python 归属、别名和 PATH 证据。")}`;
       state.pythonPlan = null;
     } catch (error) {
       state.pythonError = errorMessage(error);
@@ -188,9 +188,9 @@ export function bindEnvironmentEvents(context: FeatureContext, state: Environmen
         planId: state.plan.planId,
         riskLevel: "high",
         backupReceipt: valueOf(state.plan, "backupName", null),
-        title: "Apply environment repair plan",
-        summary: "Writes user-level environment variables after showing before/after and backup metadata.",
-        warnings: [valueOf(state.plan, "warnings", "Review plan warnings before execution.")],
+        title: localize("Apply environment repair plan", "应用环境修复计划"),
+        summary: localize("Writes user-level environment variables after showing before/after and backup metadata.", "显示变更前后内容和备份元数据后写入用户级环境变量。"),
+        warnings: [valueOf(state.plan, "warnings", localize("Review plan warnings before execution.", "执行前请检查计划警告。"))],
         execute: (confirmationToken) => applyEnvRepairPlan(state.plan!, confirmationToken),
       });
       state.applyResult = resultMessage(result, t("feature.environment.applyPlan"));
@@ -211,9 +211,9 @@ export function bindEnvironmentEvents(context: FeatureContext, state: Environmen
         riskLevel: "medium",
         backupReceipt: "env-backup-<PATH-cleanup-time>.json",
         backupRequired: true,
-        title: "Cleanup PATH entries",
-        summary: "Removes duplicate, invalid, and stale PATH entries through a token-gated backend command.",
-        warnings: ["Review PATH warnings and backups before running cleanup."],
+        title: localize("Cleanup PATH entries", "清理 PATH 条目"),
+        summary: localize("Removes duplicate, invalid, and stale PATH entries through a token-gated backend command.", "通过确认令牌保护的后端命令移除重复、无效和陈旧的 PATH 条目。"),
+        warnings: [localize("Review PATH warnings and backups before running cleanup.", "运行清理前请检查 PATH 警告和备份。")],
         execute: cleanupPathEntries,
       });
       const [reliability, environmentBackups] = await Promise.all([
@@ -222,7 +222,7 @@ export function bindEnvironmentEvents(context: FeatureContext, state: Environmen
       ]);
       state.reliability = reliability;
       state.environmentBackups = environmentBackups;
-      state.pathCleanupResult = `${resultMessage(result, "PATH cleanup completed.")} Post-verification refreshed PATH evidence and backups.`;
+      state.pathCleanupResult = `${resultMessage(result, localize("PATH cleanup completed.", "PATH 清理完成。"))} ${localize("Post-verification refreshed PATH evidence and backups.", "执行后验证已刷新 PATH 证据和备份。")}`;
     } catch (error) {
       state.pathCleanupError = errorMessage(error);
     }
@@ -271,7 +271,7 @@ async function createRestorePlan(context: FeatureContext, state: EnvironmentWork
   state.restoreError = "";
   const [kind, backupName] = state.selectedBackupId.split(":", 2);
   if (!backupName || (kind !== "envCore" && kind !== "legacy")) {
-    state.restoreError = "Select an environment backup before creating a restore preview.";
+    state.restoreError = localize("Select an environment backup before creating a restore preview.", "创建恢复预览前请选择环境备份。");
     renderAndBind(context, state);
     return;
   }
@@ -293,12 +293,12 @@ async function createRestorePlan(context: FeatureContext, state: EnvironmentWork
       };
     } else {
       const record = state.environmentBackups.find((item) => item.fileName === backupName);
-      if (!record) throw new Error("The selected legacy environment backup is no longer available.");
+      if (!record) throw new Error(localize("The selected legacy environment backup is no longer available.", "所选旧版环境备份已不可用。"));
       state.restorePlan = {
         kind,
         backupName,
         createdAt: record.createdAt,
-        reason: "legacy environment backup",
+        reason: localize("legacy environment backup", "旧版环境备份"),
         changedVariables: ["DEVENV_HOME", "JAVA_HOME", "Path"],
         currentJavaHome: state.reliability?.userEnv.javaHomeRaw || "",
         backupJavaHome: record.javaHome,
@@ -318,7 +318,7 @@ async function executeRestore(context: FeatureContext, state: EnvironmentWorkben
   state.restoreVerification = "";
   const plan = state.restorePlan;
   if (!plan) {
-    state.restoreError = "Create and review a restore preview first.";
+    state.restoreError = localize("Create and review a restore preview first.", "请先创建并检查恢复预览。");
     renderAndBind(context, state);
     return;
   }
@@ -329,23 +329,26 @@ async function executeRestore(context: FeatureContext, state: EnvironmentWorkben
       planId: plan.backupName,
       riskLevel: "high",
       backupRequired: true,
-      title: "Restore user environment backup",
-      summary: "Restores DEVENV_HOME, JAVA_HOME, and user PATH from the selected backup after creating a new safety backup.",
+      title: localize("Restore user environment backup", "恢复用户环境备份"),
+      summary: localize("Restores DEVENV_HOME, JAVA_HOME, and user PATH from the selected backup after creating a new safety backup.", "先创建新的安全备份，再从所选备份恢复 DEVENV_HOME、JAVA_HOME 和用户 PATH。"),
       before: [
-        { label: "Backup", value: plan.backupName },
-        { label: "Changed variables", value: plan.changedVariables.join(", ") },
-        { label: "JAVA_HOME", value: `${plan.currentJavaHome || "not set"} -> ${plan.backupJavaHome || "not set"}` },
-        { label: "PATH entries", value: `${plan.currentPathEntries} -> ${plan.backupPathEntries}` },
+        { label: localize("Backup", "备份"), value: plan.backupName },
+        { label: localize("Changed variables", "变更变量"), value: plan.changedVariables.join(", ") },
+        { label: "JAVA_HOME", value: `${plan.currentJavaHome || localize("not set", "未设置")} -> ${plan.backupJavaHome || localize("not set", "未设置")}` },
+        { label: localize("PATH entries", "PATH 条目"), value: `${plan.currentPathEntries} -> ${plan.backupPathEntries}` },
       ],
-      warnings: ["Open terminals, IDEs, and services may need to restart.", "A pre-restore safety backup is created by the backend."],
+      warnings: [localize("Open terminals, IDEs, and services may need to restart.", "已打开的终端、IDE 和服务可能需要重启。"), localize("A pre-restore safety backup is created by the backend.", "后端会在恢复前创建安全备份。")],
       execute: (confirmationToken) => plan.kind === "envCore"
         ? restoreEnvBackup(plan.backupName, confirmationToken)
         : restoreEnvironmentBackup(plan.backupName, confirmationToken),
     });
     const reliability = await inspectEnvironmentReliability();
     state.reliability = reliability;
-    state.restoreResult = resultMessage(result, "Environment backup restored.");
-    state.restoreVerification = `Post-verification: JAVA_HOME ${reliability.java.javaHomeValid ? "valid" : "needs attention"}; Java consistency ${reliability.java.consistency}; PATH entries ${reliability.pathAnalysis.totalEntries}.`;
+    state.restoreResult = resultMessage(result, localize("Environment backup restored.", "环境备份已恢复。"));
+    state.restoreVerification = localize(
+      `Post-verification: JAVA_HOME ${reliability.java.javaHomeValid ? "valid" : "needs attention"}; Java consistency ${reliability.java.consistency}; PATH entries ${reliability.pathAnalysis.totalEntries}.`,
+      `执行后验证：JAVA_HOME ${reliability.java.javaHomeValid ? "有效" : "需要处理"}；Java 一致性 ${reliability.java.consistency}；PATH 条目 ${reliability.pathAnalysis.totalEntries}。`,
+    );
     state.restorePlan = null;
     const [envBackups, environmentBackups] = await Promise.all([listEnvBackups(), listEnvironmentBackups()]);
     state.envBackups = envBackups;
@@ -380,11 +383,11 @@ function environmentPlanFailure(message: string, jdkPath: string): EnvironmentWo
   const exitCode = message.match(/exit(?: code)?\s*(?:Some\()?(-?\d+)/i)?.[1] ?? t("state.notAvailable");
   const args = tool.toLowerCase() === "jar.exe" ? "" : " -version";
   return {
-    step: "JDK compatibility probe",
-    command: tool === "JDK toolchain" ? `Validate ${jdkPath}` : `${jdkPath}\\bin\\${tool}${args}`,
+    step: localize("JDK compatibility probe", "JDK 兼容性探测"),
+    command: tool === "JDK toolchain" ? localize(`Validate ${jdkPath}`, `验证 ${jdkPath}`) : `${jdkPath}\\bin\\${tool}${args}`,
     exitCode,
     readableError: message,
-    nextStep: "Confirm this is a JDK root containing runnable java.exe, javac.exe, and jar.exe. JDK 8 jar usage output is accepted without --help.",
+    nextStep: localize("Confirm this is a JDK root containing runnable java.exe, javac.exe, and jar.exe. JDK 8 jar usage output is accepted without --help.", "请确认这是包含可运行 java.exe、javac.exe 和 jar.exe 的 JDK 根目录。JDK 8 的 jar 用法输出无需 --help 也会被接受。"),
   };
 }
 

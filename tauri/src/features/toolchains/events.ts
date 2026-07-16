@@ -1,6 +1,6 @@
 import type { FeatureContext } from "../../app/featureContext";
 import { open } from "../../api/tauri";
-import { t } from "../../core/i18n";
+import { localize, t } from "../../core/i18n";
 import { bindAction } from "../sharedView";
 import { clearToolchainDownloadCache, createMySqlRepairPlan, executeMySqlRepairPlan, inspectCacheEntries, inspectCommandSafety, inspectLocalServices, inspectMySqlRepair, inspectNetworkDiagnostics, inspectPlatformToolchains, inspectSystemPlatforms, inspectToolchains, localServiceLogs, manageLocalService, manageSystemPlatform, mysqlPendingExecutionGuard, openDockerDesktop, openLocalServiceDirectory, openServiceLogPath, runChsrcAction, runLearningCheck, runPlatformToolchainAction, runToolchainAction } from "./api";
 import type { LocalServiceStatus, OperationResult } from "../../types";
@@ -104,8 +104,8 @@ export function bindToolchainEvents(context: FeatureContext, state: ToolchainWor
         planFingerprint: guard.planFingerprint,
         backupRequired: guard.backupRequired,
         backupReceipt: guard.backupReceipt,
-        title: "Execute MySQL repair plan",
-        summary: "Runs the guarded MySQL repair plan. Critical flow keeps explicit confirmation.",
+        title: localize("Execute MySQL repair plan", "执行 MySQL 修复计划"),
+        summary: localize("Runs the guarded MySQL repair plan. Critical flow keeps explicit confirmation.", "执行受保护的 MySQL 修复计划；关键流程仍需要明确确认。"),
         warnings: mysqlExecutionWarnings(state.mysqlPlan.action),
         execute: (confirmationToken) => executeMySqlRepairPlan(
           state.mysqlPlan!.planId,
@@ -182,12 +182,12 @@ function bindEcosystemControls(context: FeatureContext, state: ToolchainWorkbenc
     const value = state.toolchainActionValue.trim();
     const secondary = state.toolchainActionSecondary.trim();
     if (definition.valueLabel && !value) {
-      state.toolchainOperationError = `${definition.valueLabel} is required for ${definition.label}.`;
+      state.toolchainOperationError = localize(`${definition.valueLabel} is required for ${definition.label}.`, `${definition.label} 需要填写${definition.valueLabel}。`);
       renderAndBind(context, state);
       return;
     }
     if (definition.secondaryLabel && !secondary) {
-      state.toolchainOperationError = `${definition.secondaryLabel} is required for ${definition.label}.`;
+      state.toolchainOperationError = localize(`${definition.secondaryLabel} is required for ${definition.label}.`, `${definition.label} 需要填写${definition.secondaryLabel}。`);
       renderAndBind(context, state);
       return;
     }
@@ -205,7 +205,7 @@ function bindEcosystemControls(context: FeatureContext, state: ToolchainWorkbenc
           riskLevel: "high",
           title: definition.label,
           summary: `${definition.ecosystem}: ${definition.commandPreview}`,
-          warnings: ["This action is selected from a backend allowlist. Review configuration backups and restart affected terminals when needed."],
+          warnings: [localize("This action is selected from a backend allowlist. Review configuration backups and restart affected terminals when needed.", "此操作来自后端允许列表。请检查配置备份，并在需要时重启受影响的终端。")],
           execute: (confirmationToken) => definition.backend === "toolchain"
             ? runToolchainAction(definition.id, value || null, secondary || null, confirmationToken)
             : runPlatformToolchainAction(definition.id, value || null, confirmationToken),
@@ -215,7 +215,7 @@ function bindEcosystemControls(context: FeatureContext, state: ToolchainWorkbenc
       const [report, platform] = await Promise.allSettled([inspectToolchains(), inspectPlatformToolchains()]);
       if (report.status === "fulfilled") state.report = report.value;
       if (platform.status === "fulfilled") state.platform = platform.value;
-      state.toolchainOperationVerification = `Post-operation diagnostics refreshed for ${definition.ecosystem}.`;
+      state.toolchainOperationVerification = localize(`Post-operation diagnostics refreshed for ${definition.ecosystem}.`, `${definition.ecosystem} 的操作后诊断已刷新。`);
     } catch (error) {
       state.toolchainOperationError = errorMessage(error);
     }
@@ -262,9 +262,9 @@ function bindMirrorControls(context: FeatureContext, state: ToolchainWorkbenchSt
         planId: `${state.mirrorAction}:${state.mirrorTarget}:${source ?? ""}`,
         riskLevel: "high",
         backupReceipt: state.mirrorCurrent || `chsrc-current-source:${state.mirrorTarget}:captured`,
-        title: `Change ${state.mirrorTarget} source`,
+        title: localize(`Change ${state.mirrorTarget} source`, `更改 ${state.mirrorTarget} 镜像源`),
         summary: `chsrc ${state.mirrorAction} ${state.mirrorTarget}${source ? ` ${source}` : ""}`,
-        warnings: ["The original source is retained in this result panel. Use reset or an allowlisted source to recover."],
+        warnings: [localize("The original source is retained in this result panel. Use reset or an allowlisted source to recover.", "结果区会保留原镜像源；可使用重置或允许列表中的镜像源恢复。")],
         execute: (confirmationToken) => runChsrcAction(state.mirrorAction, state.mirrorTarget, source, confirmationToken),
       });
       state.mirrorResult = result as OperationResult;
@@ -318,14 +318,14 @@ function bindNetworkCacheControls(context: FeatureContext, state: ToolchainWorkb
         command: "clear_download_cache",
         planId: "clear-download-cache",
         riskLevel: "medium",
-        title: "Clear managed download cache",
-        summary: "Delete files only from the DevEnv Manager managed download cache after reviewing the preview.",
-        warnings: ["Downloaded installers and archives in the managed cache will need to be downloaded again."],
+        title: localize("Clear managed download cache", "清理受管下载缓存"),
+        summary: localize("Delete files only from the DevEnv Manager managed download cache after reviewing the preview.", "检查预览后，仅删除 DevEnv Manager 受管下载缓存中的文件。"),
+        warnings: [localize("Downloaded installers and archives in the managed cache will need to be downloaded again.", "受管缓存中的安装器和压缩包删除后需要重新下载。")],
         execute: (confirmationToken) => clearToolchainDownloadCache(confirmationToken),
       });
       state.cacheEntries = await inspectCacheEntries(true);
       state.cacheInspected = true;
-      state.cacheOperationResult = `${(result as OperationResult).message} Verification: ${state.cacheEntries.length} cache entries remain.`;
+      state.cacheOperationResult = `${(result as OperationResult).message} ${localize(`Verification: ${state.cacheEntries.length} cache entries remain.`, `验证：剩余 ${state.cacheEntries.length} 个缓存条目。`)}`;
     } catch (error) {
       state.networkCacheError = errorMessage(error);
     }
@@ -349,7 +349,7 @@ function bindNetworkCacheControls(context: FeatureContext, state: ToolchainWorkb
       try {
         const path = button.dataset.cacheCopy || "";
         await navigator.clipboard.writeText(path);
-        state.cacheOperationResult = `Copied cache path: ${path}`;
+        state.cacheOperationResult = `${localize("Copied cache path", "已复制缓存路径")}：${path}`;
       } catch (error) {
         state.networkCacheError = errorMessage(error);
       }
@@ -426,10 +426,10 @@ function normalizeMysqlCandidate(state: ToolchainWorkbenchState): void {
 }
 
 function mysqlExecutionWarnings(action: string): string[] {
-  if (action === "backup") return ["The destination must be outside the MySQL Data directory.", "Existing non-empty destinations are rejected."];
-  if (action === "repair_system_schema") return ["A recent verified full Data backup is mandatory.", "This may affect database service startup."];
-  if (action === "register_service" || action === "start_service") return ["This changes Windows service state and requires administrator rights."];
-  return ["Review the generated guide before using any command outside DevEnv Manager."];
+  if (action === "backup") return [localize("The destination must be outside the MySQL Data directory.", "目标目录必须位于 MySQL Data 目录之外。"), localize("Existing non-empty destinations are rejected.", "已有内容的非空目标目录将被拒绝。")];
+  if (action === "repair_system_schema") return [localize("A recent verified full Data backup is mandatory.", "必须提供近期验证过的完整 Data 备份。"), localize("This may affect database service startup.", "此操作可能影响数据库服务启动。")];
+  if (action === "register_service" || action === "start_service") return [localize("This changes Windows service state and requires administrator rights.", "此操作会更改 Windows 服务状态并需要管理员权限。")];
+  return [localize("Review the generated guide before using any command outside DevEnv Manager.", "在 DevEnv Manager 之外使用任何命令前，请检查生成的指南。")];
 }
 
 function bindPlatformControls(context: FeatureContext, state: ToolchainWorkbenchState): void {
@@ -462,7 +462,7 @@ function bindPlatformControls(context: FeatureContext, state: ToolchainWorkbench
     const action = state.platformAction;
     const value = platformActionValue(state);
     if (platformActionNeedsValue(action) && !value) {
-      state.platformOperationError = "Select or enter a WSL distribution before creating this operation.";
+      state.platformOperationError = localize("Select or enter a WSL distribution before creating this operation.", "创建此操作前请选择或输入 WSL 发行版。");
       renderAndBind(context, state);
       return;
     }
@@ -474,9 +474,9 @@ function bindPlatformControls(context: FeatureContext, state: ToolchainWorkbench
         command: "manage_system_platform",
         planId: `${action}:${value ?? ""}`,
         riskLevel: "high",
-        title: "Manage system platform",
-        summary: `Execute ${action} for ${value || platformActionTarget(action)} after reviewing the persistent preview.`,
-        warnings: ["Installation, update, shutdown, and WSL state changes can affect active development workloads."],
+        title: localize("Manage system platform", "管理系统平台"),
+        summary: localize(`Execute ${action} for ${value || platformActionTarget(action)} after reviewing the persistent preview.`, `检查持续显示的预览后，为 ${value || platformActionTarget(action)} 执行 ${action}。`),
+        warnings: [localize("Installation, update, shutdown, and WSL state changes can affect active development workloads.", "安装、更新、关机和 WSL 状态变更可能影响正在运行的开发任务。")],
         execute: (confirmationToken) => manageSystemPlatform(action, value, confirmationToken),
       });
       state.platformOperationResult = result as OperationResult;
@@ -507,7 +507,7 @@ function bindServiceControls(context: FeatureContext, state: ToolchainWorkbenchS
   bindAction(context.root, "manage-local-service", async () => {
     const selectedId = state.selectedServiceId;
     if (!selectedId) {
-      state.serviceOperationError = "Select a service row before creating a management operation.";
+      state.serviceOperationError = localize("Select a service row before creating a management operation.", "创建管理操作前请选择一行服务。");
       renderAndBind(context, state);
       return;
     }
@@ -518,7 +518,7 @@ function bindServiceControls(context: FeatureContext, state: ToolchainWorkbenchS
       const refreshed = await inspectLocalServices();
       updateServicesAfterRefresh(state, refreshed);
       const service = selectedService(state);
-      if (!service) throw new Error("The selected service disappeared during the pre-execution refresh. Select another row.");
+      if (!service) throw new Error(localize("The selected service disappeared during the pre-execution refresh. Select another row.", "执行前刷新时所选服务已消失，请选择其他服务。"));
       const validationError = serviceManagementError(service);
       if (validationError) throw new Error(validationError);
       const action = state.serviceAction;
@@ -526,9 +526,9 @@ function bindServiceControls(context: FeatureContext, state: ToolchainWorkbenchS
         command: "manage_local_service",
         planId: `${service.serviceName}:${action}`,
         riskLevel: "high",
-        title: `Manage ${service.name}`,
-        summary: `${action} Windows service ${service.serviceName}; current state ${service.serviceState}; PID ${service.pid || "none"}.`,
-        warnings: ["Existing database connections may be interrupted. The backend revalidates the service allowlist before execution."],
+        title: localize(`Manage ${service.name}`, `管理 ${service.name}`),
+        summary: localize(`${action} Windows service ${service.serviceName}; current state ${service.serviceState}; PID ${service.pid || "none"}.`, `对 Windows 服务 ${service.serviceName} 执行 ${action}；当前状态 ${service.serviceState}；PID ${service.pid || "无"}。`),
+        warnings: [localize("Existing database connections may be interrupted. The backend revalidates the service allowlist before execution.", "现有数据库连接可能中断；后端会在执行前重新验证服务允许列表。")],
         execute: (confirmationToken) => manageLocalService(service.serviceName, action, confirmationToken),
       });
       state.serviceOperationResult = result as OperationResult;
@@ -536,8 +536,8 @@ function bindServiceControls(context: FeatureContext, state: ToolchainWorkbenchS
       updateServicesAfterRefresh(state, verified);
       const after = selectedService(state);
       state.serviceVerification = after
-        ? `Post-execution verification: ${after.serviceName} is ${after.serviceState}; PID ${after.pid || "none"}.`
-        : "Post-execution verification: the selected service is no longer present in the inspected list.";
+        ? localize(`Post-execution verification: ${after.serviceName} is ${after.serviceState}; PID ${after.pid || "none"}.`, `执行后验证：${after.serviceName} 状态为 ${after.serviceState}；PID ${after.pid || "无"}。`)
+        : localize("Post-execution verification: the selected service is no longer present in the inspected list.", "执行后验证：检查列表中已不存在所选服务。");
     } catch (error) {
       state.serviceOperationError = errorMessage(error);
     }
@@ -564,7 +564,7 @@ async function runServiceDirectoryAction(context: FeatureContext, state: Toolcha
         state.servicePathResult = result.message;
       } else {
         await navigator.clipboard.writeText(service.installDirectory);
-        state.servicePathResult = `Copied installation directory: ${service.installDirectory}`;
+        state.servicePathResult = `${localize("Copied installation directory", "已复制安装目录")}：${service.installDirectory}`;
       }
     } catch (error) {
       state.servicePathError = errorMessage(error);
@@ -577,19 +577,19 @@ async function runServiceLogAction(context: FeatureContext, state: ToolchainWork
   state.serviceLogError = "";
   const service = selectedService(state);
   if (!service) {
-    state.serviceLogError = "Select a service row before inspecting its logs.";
+    state.serviceLogError = localize("Select a service row before inspecting its logs.", "查看日志前请选择一行服务。");
   } else {
     try {
       if (action === "inspect") {
         state.serviceLogText = await localServiceLogs(service.serviceName);
       } else if (!service.logPath) {
-        state.serviceLogError = service.logPathReason || "The backend did not return a verified log path.";
+        state.serviceLogError = service.logPathReason || localize("The backend did not return a verified log path.", "后端未返回经过验证的日志路径。");
       } else if (action === "open") {
         const result = await openServiceLogPath(service.logPath);
         state.serviceLogText = result.message;
       } else {
         await navigator.clipboard.writeText(service.logPath);
-        state.serviceLogText = `Copied log path: ${service.logPath}`;
+        state.serviceLogText = `${localize("Copied log path", "已复制日志路径")}：${service.logPath}`;
       }
     } catch (error) {
       state.serviceLogError = errorMessage(error);
@@ -608,7 +608,7 @@ function updateServicesAfterRefresh(state: ToolchainWorkbenchState, services: Lo
   const selection = reconcileServiceSelection(services, selectedId);
   state.selectedServiceId = selection.selectedId;
   if (selection.selectionLost) {
-    state.serviceOperationError = "The previously selected service disappeared after refresh. Select a current row before continuing.";
+    state.serviceOperationError = localize("The previously selected service disappeared after refresh. Select a current row before continuing.", "刷新后之前选择的服务已不存在，请选择当前服务后继续。");
   }
 }
 
@@ -637,10 +637,16 @@ function platformActionTarget(action: string): string {
 
 function platformVerification(state: ToolchainWorkbenchState, action: string, value: string | null): string {
   if (action.startsWith("docker_")) {
-    return `Post-execution inspection: Docker Desktop path ${state.system?.dockerDesktopPath || "not detected"}; ${state.system?.dockerInfo || "no engine status"}.`;
+    return localize(
+      `Post-execution inspection: Docker Desktop path ${state.system?.dockerDesktopPath || "not detected"}; ${state.system?.dockerInfo || "no engine status"}.`,
+      `执行后检查：Docker Desktop 路径 ${state.system?.dockerDesktopPath || "未检测到"}；${state.system?.dockerInfo || "无引擎状态"}。`,
+    );
   }
   const distro = value ? state.system?.wslItems.find((item) => item.name.toLowerCase() === value.toLowerCase()) : undefined;
-  return `Post-execution inspection: WSL ${state.system?.wsl.installed ? "detected" : "not detected"}; ${distro ? `${distro.name} is ${distro.state}` : state.system?.wslStatus || "no distribution state detected"}.`;
+  return localize(
+    `Post-execution inspection: WSL ${state.system?.wsl.installed ? "detected" : "not detected"}; ${distro ? `${distro.name} is ${distro.state}` : state.system?.wslStatus || "no distribution state detected"}.`,
+    `执行后检查：WSL ${state.system?.wsl.installed ? "已检测" : "未检测"}；${distro ? `${distro.name} 状态为 ${distro.state}` : state.system?.wslStatus || "未检测到发行版状态"}。`,
+  );
 }
 
 function normalizePlatformAction(state: ToolchainWorkbenchState): void {

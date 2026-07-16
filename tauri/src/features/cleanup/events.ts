@@ -1,7 +1,7 @@
 import type { FeatureContext } from "../../app/featureContext";
 import { open } from "../../api/tauri";
 import { bindAction, valueOf } from "../sharedView";
-import { t } from "../../core/i18n";
+import { localize, t } from "../../core/i18n";
 import type { ArchivePlanItem, CleanupArchitecture, CleanupResult, CleanupScanReport, DiskVolumeInfo, DuplicateGroup, ExpansionResult, FolderUsageReport, GenericArchiveResult, LargeFileItem, MaintenanceOverview, MoveResult, OperationResult, PartitionLayoutReport, RollbackRecord } from "../../types";
 import { addArchivePlanItem, cleanDevCache, cleanSelectedTargets, clearDownloadCache, createCDriveExpansionPlan, createCleanupPlan, createDesktopArchivePlan, createDownloadsArchivePlan, createGenericArchivePlan, createMovePlan, executeCDriveExpansion, executeDesktopArchivePlan, executeDownloadsArchivePlan, executeGenericArchivePlan, executeMovePlan, inspectAppUsage, inspectDesktop, inspectDiskOverview, inspectDownloads, inspectInstalledSoftwareUsage, inspectMaintenanceOverview, inspectPartitionLayout, listArchivePlanItems, listRollbackRecords, openAnalysisPath, removeArchivePlanItem, rollbackMove, scanCleanupTargets, scanDuplicateLargeFiles, scanLargeFiles, storageCleanupArchitecture } from "./api";
 import { renderCleanupWorkbench } from "./render";
@@ -32,7 +32,7 @@ export function bindCleanupEvents(context: FeatureContext, state: CleanupWorkben
   bindAction(context.root, "add-archive-plan-item", async () => {
     syncArchiveInputs(context, state);
     if (!state.archiveSource) {
-      state.errors.archive = "Choose a regular file before adding an archive item.";
+      state.errors.archive = localize("Choose a regular file before adding an archive item.", "添加归档项前请选择普通文件。");
       renderAndBind(context, state);
       return;
     }
@@ -73,7 +73,7 @@ export function bindCleanupEvents(context: FeatureContext, state: CleanupWorkben
     state.archiveResult = null;
     const plan = state.archivePlan;
     if (!plan) {
-      state.errors.archive = "Create and review a selected-file archive preview first.";
+      state.errors.archive = localize("Create and review a selected-file archive preview first.", "请先创建并检查所选文件的归档预览。");
       renderAndBind(context, state);
       return;
     }
@@ -82,13 +82,13 @@ export function bindCleanupEvents(context: FeatureContext, state: CleanupWorkben
         command: "execute_generic_archive_plan",
         planId: plan.planId,
         riskLevel: "high",
-        title: "Execute selected-file archive plan",
-        summary: "Copies each previewed file to the non-system target, verifies it, then removes the source without overwriting conflicts.",
+        title: localize("Execute selected-file archive plan", "执行所选文件归档计划"),
+        summary: localize("Copies each previewed file to the non-system target, verifies it, then removes the source without overwriting conflicts.", "将预览中的文件复制到非系统盘目标位置，验证后再移除源文件，且不会覆盖冲突文件。"),
         before: [
-          { label: "Target root", value: plan.targetRoot },
-          { label: "Files", value: String(plan.entries.length) },
-          { label: "Estimated bytes", value: String(plan.estimatedBytes) },
-          { label: "Conflicts", value: String(plan.entries.filter((entry) => entry.conflict).length) },
+          { label: localize("Target root", "目标根目录"), value: plan.targetRoot },
+          { label: localize("Files", "文件数"), value: String(plan.entries.length) },
+          { label: localize("Estimated bytes", "预计字节数"), value: String(plan.estimatedBytes) },
+          { label: localize("Conflicts", "冲突数"), value: String(plan.entries.filter((entry) => entry.conflict).length) },
         ],
         warnings: plan.warnings,
         execute: (confirmationToken) => executeGenericArchivePlan(plan.planId, confirmationToken),
@@ -171,9 +171,9 @@ export function bindCleanupEvents(context: FeatureContext, state: CleanupWorkben
         command: "clear_download_cache",
         planId: "clear-download-cache",
         riskLevel: "medium",
-        title: "Clear download cache",
-        summary: "Clears managed download cache through a token-gated backend command.",
-        warnings: ["Only managed cache entries should be removed."],
+        title: localize("Clear download cache", "清理下载缓存"),
+        summary: localize("Clears managed download cache through a token-gated backend command.", "通过确认令牌保护的后端命令清理受管下载缓存。"),
+        warnings: [localize("Only managed cache entries should be removed.", "只应移除 DevEnv Manager 受管的缓存条目。")],
         execute: clearDownloadCache,
       }) as OperationResult;
       state.moveOperationResult = result.message;
@@ -190,9 +190,9 @@ export function bindCleanupEvents(context: FeatureContext, state: CleanupWorkben
         command: "clean_dev_cache",
         planId: "tool-npm",
         riskLevel: "medium",
-        title: "Clean dev cache",
-        summary: "Cleans selected development cache through a token-gated backend command.",
-        warnings: ["Review tool-specific cache scope before executing."],
+        title: localize("Clean dev cache", "清理开发工具缓存"),
+        summary: localize("Cleans selected development cache through a token-gated backend command.", "通过确认令牌保护的后端命令清理所选开发工具缓存。"),
+        warnings: [localize("Review tool-specific cache scope before executing.", "执行前请检查对应工具的缓存范围。")],
         execute: (confirmationToken) => cleanDevCache("npm", confirmationToken),
       }) as OperationResult;
       state.moveOperationResult = result.message;
@@ -266,12 +266,15 @@ export function bindCleanupEvents(context: FeatureContext, state: CleanupWorkben
         planId: state.movePlan.planId,
         riskLevel: "high",
         backupReceipt: state.movePlan.target,
-        title: "Execute move plan",
-        summary: "Moves or archives selected files using a backend plan and token gate.",
-        warnings: ["Review source, target drive, and rollback options."],
+        title: localize("Execute move plan", "执行搬家计划"),
+        summary: localize("Moves or archives selected files using a backend plan and token gate.", "使用后端计划和确认令牌搬移或归档所选文件。"),
+        warnings: [localize("Review source, target drive, and rollback options.", "请检查源目录、目标盘和回滚选项。")],
         execute: (confirmationToken) => executeMovePlan(state.movePlan!, confirmationToken),
       }) as MoveResult;
-      state.moveOperationResult = `${result.success ? "Move completed" : "Move completed with failures"}: ${result.movedItems} item(s), rollback ${result.rollbackId || "not available"}.`;
+      state.moveOperationResult = localize(
+        `${result.success ? "Move completed" : "Move completed with failures"}: ${result.movedItems} item(s), rollback ${result.rollbackId || "not available"}.`,
+        `${result.success ? "搬家完成" : "搬家完成但存在失败项"}：已处理 ${result.movedItems} 项，回滚标识 ${result.rollbackId || "不可用"}。`,
+      );
       state.movePlan = null;
       state.rollbackRecords = await listRollbackRecords();
     } catch (error) {
@@ -282,7 +285,7 @@ export function bindCleanupEvents(context: FeatureContext, state: CleanupWorkben
   bindAction(context.root, "rollback-move", async () => {
     const rollbackId = valueOf(state.rollbackRecords[0], "rollbackId", "");
     if (!rollbackId) {
-      state.errors.moveOperation = "No rollback record is available.";
+      state.errors.moveOperation = localize("No rollback record is available.", "当前没有可用的回滚记录。");
       renderAndBind(context, state);
       return;
     }
@@ -293,9 +296,9 @@ export function bindCleanupEvents(context: FeatureContext, state: CleanupWorkben
         command: "rollback_move",
         planId: rollbackId,
         riskLevel: "high",
-        title: "Rollback move",
-        summary: "Rolls back a previous move operation with a backend token.",
-        warnings: ["Review rollback record before execution."],
+        title: localize("Rollback move", "回滚搬家操作"),
+        summary: localize("Rolls back a previous move operation with a backend token.", "使用后端确认令牌回滚之前的搬家操作。"),
+        warnings: [localize("Review rollback record before execution.", "执行前请检查回滚记录。")],
         execute: (confirmationToken) => rollbackMove(rollbackId, confirmationToken),
       }) as OperationResult;
       state.moveOperationResult = result.message;
@@ -405,7 +408,7 @@ export async function refreshCleanup(context: FeatureContext, state: CleanupWork
 
 function syncArchiveInputs(context: FeatureContext, state: CleanupWorkbenchState): void {
   state.archiveSource = context.root.querySelector<HTMLInputElement>("#cleanup-archive-source")?.value.trim() || state.archiveSource;
-  state.archiveSourceLabel = context.root.querySelector<HTMLInputElement>("#cleanup-archive-source-label")?.value.trim() || "manual selection";
+  state.archiveSourceLabel = context.root.querySelector<HTMLInputElement>("#cleanup-archive-source-label")?.value.trim() || localize("manual selection", "手动选择");
   state.archiveTargetDrive = context.root.querySelector<HTMLInputElement>("#cleanup-archive-target-drive")?.value.trim() || state.archiveTargetDrive;
 }
 
@@ -550,16 +553,16 @@ async function executeArchivePlan(context: FeatureContext, state: CleanupWorkben
       planId: plan.planId,
       riskLevel: "high",
       backupReceipt: plan.reversible ? plan.target : null,
-      title: kind === "desktop" ? "Execute desktop archive plan" : "Execute downloads archive plan",
-      summary: kind === "desktop" ? "Archives selected desktop files after preview and token confirmation." : "Archives selected Downloads files after preview and token confirmation.",
+      title: kind === "desktop" ? localize("Execute desktop archive plan", "执行桌面归档计划") : localize("Execute downloads archive plan", "执行下载目录归档计划"),
+      summary: kind === "desktop" ? localize("Archives selected desktop files after preview and token confirmation.", "预览并确认令牌后归档所选桌面文件。") : localize("Archives selected Downloads files after preview and token confirmation.", "预览并确认令牌后归档所选下载目录文件。"),
       before: [
-        { label: "Source", value: plan.source },
-        { label: "Target", value: plan.target },
+        { label: localize("Source", "源目录"), value: plan.source },
+        { label: localize("Target", "目标目录"), value: plan.target },
         { label: t("feature.cleanup.bytes"), value: String(plan.estimatedBytes) },
       ],
       after: [
-        { label: t("feature.cleanup.resultCleaned"), value: "Moved items and failures are rendered in the Cleanup page result panel." },
-        { label: t("feature.cleanup.resultRecovery"), value: "Use target folder, rollback record, or report summary to restore files." },
+        { label: t("feature.cleanup.resultCleaned"), value: localize("Moved items and failures are rendered in the Cleanup page result panel.", "已搬移项和失败项会显示在清理页结果区。") },
+        { label: t("feature.cleanup.resultRecovery"), value: localize("Use target folder, rollback record, or report summary to restore files.", "可通过目标目录、回滚记录或报告摘要恢复文件。") },
       ],
       warnings: plan.warnings,
       execute: (confirmationToken) => kind === "desktop" ? executeDesktopArchivePlan(plan, confirmationToken) : executeDownloadsArchivePlan(plan, confirmationToken),
