@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 
@@ -213,8 +214,38 @@ def main() -> int:
     if 'planId: "clear-download-cache"' not in cleanup_events or 'planId: "tool-npm"' not in cleanup_events:
         return fail("Cleanup cache actions must use backend-matching plan IDs")
     toolchain_events = read("tauri/src/features/toolchains/events.ts")
-    if "planFingerprint: state.mysqlPlan.planFingerprint" not in toolchain_events or "actionId: `mysql_${state.mysqlPlan.action}`" not in toolchain_events:
-        return fail("MySQL repair must use backend plan actionId/riskLevel/fingerprint")
+    mysql_guard_fields = [
+        "mysqlPendingExecutionGuard(state.mysqlPlan.planId)",
+        "planId: guard.planId",
+        "actionId: guard.actionId",
+        "riskLevel: guard.riskLevel",
+        "planFingerprint: guard.planFingerprint",
+        "backupRequired: guard.backupRequired",
+        "backupReceipt: guard.backupReceipt",
+    ]
+    if any(field not in toolchain_events for field in mysql_guard_fields):
+        return fail("MySQL repair must pass every backend execution-guard field into token creation")
+    if 'createMySqlRepairPlan(candidate.id, "repair")' in toolchain_events:
+        return fail("MySQL repair must not use the unsupported hard-coded repair action")
+    if "createMySqlRepairPlan(candidate.id, state.mysqlAction)" not in toolchain_events or "state.mysqlBackupDestination.trim()" not in toolchain_events:
+        return fail("MySQL repair must bind the selected action and backup destination to plan execution")
+    toolchain_render = read("tauri/src/features/toolchains/render.ts")
+    for selector in ["toolchains-mysql-candidate-select", "toolchains-mysql-action-select", "toolchains-mysql-backup-destination", "toolchains-mysql-plan-preview", "toolchains-mysql-result"]:
+        if selector not in toolchain_render:
+            return fail(f"MySQL repair is missing durable UI selector {selector}")
+    if 'id="mysql-backup-destination"' not in toolchain_render or 'id="mysql-backup-destination" data-testid="toolchains-mysql-backup-destination" value="${escapeHtml(state.mysqlBackupDestination)}" readonly' not in toolchain_render:
+        return fail("MySQL backup destination must be selected through a read-only directory field")
+    directory_inputs = {
+        "tauri/src/features/cleanup/render.ts": ["cleanup-move-source", "cleanup-duplicate-scan-root"],
+        "tauri/src/features/settings/render.ts": ["settings-root"],
+        "tauri/src/features/projects/render.ts": ["project-path"],
+    }
+    for path, element_ids in directory_inputs.items():
+        text = read(path)
+        for element_id in element_ids:
+            match = re.search(rf'<input[^>]*id="{re.escape(element_id)}"[^>]*>', text)
+            if not match or "readonly" not in match.group(0):
+                return fail(f"Directory input {element_id} must be picker-backed and read-only")
 
     print("Frontend data contract check passed.")
     return 0

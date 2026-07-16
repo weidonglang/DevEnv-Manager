@@ -1,7 +1,8 @@
 import type { FeatureContext } from "../../app/featureContext";
+import { open } from "../../api/tauri";
 import { t } from "../../core/i18n";
 import { bindAction } from "../sharedView";
-import { clearToolchainDownloadCache, createMySqlRepairPlan, executeMySqlRepairPlan, inspectCacheEntries, inspectCommandSafety, inspectLocalServices, inspectMySqlRepair, inspectNetworkDiagnostics, inspectPlatformToolchains, inspectSystemPlatforms, inspectToolchains, localServiceLogs, manageLocalService, manageSystemPlatform, openDockerDesktop, openLocalServiceDirectory, openServiceLogPath, runChsrcAction, runLearningCheck, runPlatformToolchainAction, runToolchainAction } from "./api";
+import { clearToolchainDownloadCache, createMySqlRepairPlan, executeMySqlRepairPlan, inspectCacheEntries, inspectCommandSafety, inspectLocalServices, inspectMySqlRepair, inspectNetworkDiagnostics, inspectPlatformToolchains, inspectSystemPlatforms, inspectToolchains, localServiceLogs, manageLocalService, manageSystemPlatform, mysqlPendingExecutionGuard, openDockerDesktop, openLocalServiceDirectory, openServiceLogPath, runChsrcAction, runLearningCheck, runPlatformToolchainAction, runToolchainAction } from "./api";
 import type { LocalServiceStatus, OperationResult } from "../../types";
 import { renderToolchainWorkbench } from "./render";
 import type { ToolchainWorkbenchState } from "./state";
@@ -47,6 +48,7 @@ export function bindToolchainEvents(context: FeatureContext, state: ToolchainWor
   });
   bindServiceControls(context, state);
   bindPlatformControls(context, state);
+  bindMysqlControls(context, state);
   bindEcosystemControls(context, state);
   bindMirrorControls(context, state);
   bindNetworkCacheControls(context, state);
@@ -55,6 +57,7 @@ export function bindToolchainEvents(context: FeatureContext, state: ToolchainWor
     try {
       state.mysql = await inspectMySqlRepair();
       if (!context.isCurrent()) return;
+      normalizeMysqlCandidate(state);
       delete state.errors.mysql;
       context.progress.done(t("feature.toolchains.checkDone"));
     } catch (error) {
@@ -64,7 +67,7 @@ export function bindToolchainEvents(context: FeatureContext, state: ToolchainWor
     renderAndBind(context, state);
   });
   bindAction(context.root, "create-mysql-plan", async () => {
-    const candidate = state.mysql?.candidates[0];
+    const candidate = state.mysql?.candidates.find((item) => item.id === state.mysqlCandidateId);
     if (!candidate) {
       state.operationError = t("toast.runMysqlDiagnosisFirst");
       renderAndBind(context, state);
@@ -73,7 +76,7 @@ export function bindToolchainEvents(context: FeatureContext, state: ToolchainWor
     state.operationError = "";
     context.progress.start(t("feature.toolchains.creatingMysqlPlan"));
     try {
-      state.mysqlPlan = await createMySqlRepairPlan(candidate.id, "repair");
+      state.mysqlPlan = await createMySqlRepairPlan(candidate.id, state.mysqlAction);
       state.mysqlResult = null;
       context.progress.done(t("toast.planReady"));
       renderAndBind(context, state);
@@ -92,18 +95,27 @@ export function bindToolchainEvents(context: FeatureContext, state: ToolchainWor
     state.mysqlResult = null;
     state.operationError = "";
     try {
+      const guard = await mysqlPendingExecutionGuard(state.mysqlPlan.planId);
       const result = await context.risk.run({
         command: "execute_mysql_repair_plan",
-        planId: state.mysqlPlan.planId,
-        actionId: `mysql_${state.mysqlPlan.action}`,
-        riskLevel: state.mysqlPlan.riskLevel,
-        planFingerprint: state.mysqlPlan.planFingerprint,
+        planId: guard.planId,
+        actionId: guard.actionId,
+        riskLevel: guard.riskLevel,
+        planFingerprint: guard.planFingerprint,
+        backupRequired: guard.backupRequired,
+        backupReceipt: guard.backupReceipt,
         title: "Execute MySQL repair plan",
         summary: "Runs the guarded MySQL repair plan. Critical flow keeps explicit confirmation.",
-        warnings: ["Complete a full Data backup before execution.", "This may affect database service startup."],
-        execute: (confirmationToken) => executeMySqlRepairPlan(state.mysqlPlan!.planId, "", confirmationToken),
+        warnings: mysqlExecutionWarnings(state.mysqlPlan.action),
+        execute: (confirmationToken) => executeMySqlRepairPlan(
+          state.mysqlPlan!.planId,
+          state.mysqlPlan!.action === "backup" ? state.mysqlBackupDestination.trim() : "",
+          confirmationToken,
+        ),
       });
       state.mysqlResult = result as ToolchainWorkbenchState["mysqlResult"];
+      state.mysql = await inspectMySqlRepair();
+      normalizeMysqlCandidate(state);
     } catch (error) {
       state.operationError = errorMessage(error);
     }
@@ -372,7 +384,52 @@ export async function refreshToolchains(context: FeatureContext, state: Toolchai
   else state.errors.mysql = errorMessage(mysql.reason);
   if (Object.keys(state.errors).length) context.progress.fail(t("feature.toolchains.checkPartialFailed"));
   else context.progress.done(t("feature.toolchains.checkDone"));
+  normalizeMysqlCandidate(state);
   renderAndBind(context, state);
+}
+
+function bindMysqlControls(context: FeatureContext, state: ToolchainWorkbenchState): void {
+  context.root.querySelector<HTMLSelectElement>("#mysql-candidate")?.addEventListener("change", (event) => {
+    state.mysqlCandidateId = (event.currentTarget as HTMLSelectElement).value;
+    clearMysqlPlan(state);
+    renderAndBind(context, state);
+  });
+  context.root.querySelector<HTMLSelectElement>("#mysql-action")?.addEventListener("change", (event) => {
+    state.mysqlAction = (event.currentTarget as HTMLSelectElement).value as ToolchainWorkbenchState["mysqlAction"];
+    clearMysqlPlan(state);
+    renderAndBind(context, state);
+  });
+  bindAction(context.root, "choose-mysql-backup-destination", async () => {
+    try {
+      const selected = await open({ directory: true, multiple: false });
+      if (!selected || Array.isArray(selected)) return;
+      state.mysqlBackupDestination = selected;
+      state.operationError = "";
+    } catch (error) {
+      state.operationError = errorMessage(error);
+    }
+    renderAndBind(context, state);
+  });
+}
+
+function clearMysqlPlan(state: ToolchainWorkbenchState): void {
+  state.mysqlPlan = null;
+  state.mysqlResult = null;
+  state.operationError = "";
+}
+
+function normalizeMysqlCandidate(state: ToolchainWorkbenchState): void {
+  if (!state.mysql?.candidates.some((candidate) => candidate.id === state.mysqlCandidateId)) {
+    state.mysqlCandidateId = state.mysql?.candidates[0]?.id || "";
+    state.mysqlPlan = null;
+  }
+}
+
+function mysqlExecutionWarnings(action: string): string[] {
+  if (action === "backup") return ["The destination must be outside the MySQL Data directory.", "Existing non-empty destinations are rejected."];
+  if (action === "repair_system_schema") return ["A recent verified full Data backup is mandatory.", "This may affect database service startup."];
+  if (action === "register_service" || action === "start_service") return ["This changes Windows service state and requires administrator rights."];
+  return ["Review the generated guide before using any command outside DevEnv Manager."];
 }
 
 function bindPlatformControls(context: FeatureContext, state: ToolchainWorkbenchState): void {

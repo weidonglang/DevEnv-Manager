@@ -49,5 +49,8 @@ jobs:
       - name: Safety wording
         run: python scripts/check_safety_wording.py
 
+      - name: Frontend i18n contracts
+        run: python scripts/check_frontend_i18n_contracts.py
+
       - name: Repository hygiene
         run: python scripts/check_repo_hygiene.py

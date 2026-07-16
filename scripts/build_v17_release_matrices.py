@@ -72,7 +72,9 @@ COMMAND_ALIASES = {
     "configure_user_environment": ["preview_user_environment_configuration", "apply_user_environment_configuration"],
     "repair_doctor_safe": ["create_doctor_repair_plan", "execute_doctor_repair_plan"],
     "apply_config_profile": ["create_profile_apply_plan", "execute_profile_apply_plan"],
+    "apply_java_stabilize_plan": ["create_java_stabilize_plan", "apply_env_repair_plan"],
     "install_profile_missing": ["create_profile_apply_plan", "execute_profile_apply_plan"],
+    "run_tool_command": ["inspect_command_safety", "run_learning_check"],
     "restore_user_environment": ["restore_environment_backup"],
 }
 
@@ -114,6 +116,7 @@ INTERNAL_HELPERS = {
     "config_profile_plan_id",
     "config_profile_requirements",
     "mysql_pending_execution_guard",
+    "repair_maven_gradle_registration",
     "validate_directory_path",
 }
 

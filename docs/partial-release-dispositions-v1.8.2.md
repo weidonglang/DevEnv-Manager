@@ -3,8 +3,8 @@
 No manifest status is changed by this document. Broad features are marked `split-required` until their sub-capabilities are adjudicated.
 
 - P0 partial: 15
-- P1 partial: 12
-- Total: 27
+- P1 partial: 11
+- Total: 26
 
 | Feature | Priority | Old feature | Commands | Evidence | Disposition | Reason | Follow-up |
 |---|---|---:|---|---|---|---|---|
@@ -17,7 +17,7 @@ No manifest status is changed by this document. Broad features are marked `split
 | `cleanup.planExecuteAndVerify` | P0 | True | scan_cleanup_targets, create_cleanup_plan, clean_selected_targets, export_cleanup_report | feature-manifest:cleanup.planExecuteAndVerify, installed-app-targeted-smoke | split-required | Feature aggregates multiple historical capabilities; split before ready/blocker adjudication. | #125 |
 | `debug.panelAndExport` | P1 | False | powershell_runner_status | feature-manifest:debug.panelAndExport, installed-app-targeted-smoke | deferred-nonblocking | No v1.7.0 command overlap was found; product owner must confirm this is a new enhancement. | #125 |
 | `doctor.runAndRepair` | P0 | True | run_doctor, doctor_report_text, create_doctor_repair_plan, execute_doctor_repair_plan | feature-manifest:doctor.runAndRepair, installed-app-targeted-smoke | split-required | Feature aggregates multiple historical capabilities; split before ready/blocker adjudication. | #125 |
-| `environment.doctorAndJava` | P0 | True | inspect_env_reliability, environment_health, preview_user_environment_configuration, create_java_stabilize_plan, apply_env_repair_plan, cleanup_path_entries | feature-manifest:environment.doctorAndJava, installed-app-targeted-smoke | split-required | Feature aggregates multiple historical capabilities; split before ready/blocker adjudication. | #125 |
+| `environment.doctorAndJava` | P0 | True | inspect_env_reliability, environment_health, preview_user_environment_configuration, apply_user_environment_configuration, create_java_stabilize_plan, apply_env_repair_plan, cleanup_path_entries | feature-manifest:environment.doctorAndJava, installed-app-targeted-smoke | split-required | Feature aggregates multiple historical capabilities; split before ready/blocker adjudication. | #125 |
 | `environment.pathEvidence` | P0 | True | inspect_env_reliability, environment_health | feature-manifest:environment.pathEvidence, installed-app-targeted-smoke | split-required | Feature aggregates multiple historical capabilities; split before ready/blocker adjudication. | #125 |
 | `fileAssociations.planApplyRollback` | P0 | True | create_file_association_plan, apply_file_association_plan, list_file_association_backups, rollback_file_association_backup | feature-manifest:fileAssociations.planApplyRollback, installed-app-targeted-smoke | split-required | Feature aggregates multiple historical capabilities; split before ready/blocker adjudication. | #125 |
 | `learning.readOnlyCommandSandbox` | P1 | True | run_tool_command, inspect_command_safety | feature-manifest:learning.readOnlyCommandSandbox | split-required | Feature aggregates multiple historical capabilities; split before ready/blocker adjudication. | #125 |
@@ -32,6 +32,5 @@ No manifest status is changed by this document. Broad features are marked `split
 | `runtime.install.groups` | P0 | True | jdk_distributions, install_jdk, install_node, install_python, install_go, install_maven_latest, install_gradle_latest | feature-manifest:runtime.install.groups | split-required | Feature aggregates multiple historical capabilities; split before ready/blocker adjudication. | #130 |
 | `runtime.installed.actions` | P0 | True | discover_runtimes, inspect_runtime_strong_verification, switch_runtime, uninstall_runtime, open_analysis_path, open_apps_features | feature-manifest:runtime.installed.actions | split-required | Feature aggregates multiple historical capabilities; split before ready/blocker adjudication. | #130 |
 | `settings.themeLanguageSafety` | P1 | True | load_config, set_root_dir, set_auto_check_update, reset_ui_config, open_app_config_dir | feature-manifest:settings.themeLanguageSafety, installed-app-targeted-smoke | split-required | Feature aggregates multiple historical capabilities; split before ready/blocker adjudication. | #125 |
-| `toolchains.gitNodePythonMirrors` | P1 | True | inspect_command_safety, run_toolchain_action, run_platform_action, run_chsrc_action, network_diagnostics, cache_entries | feature-manifest:toolchains.gitNodePythonMirrors | split-required | Feature aggregates multiple historical capabilities; split before ready/blocker adjudication. | #125 |
 | `toolchains.mysqlRepair` | P1 | True | inspect_mysql_repair, create_mysql_repair_plan, execute_mysql_repair_plan, mysql_pending_execution_guard | feature-manifest:toolchains.mysqlRepair | split-required | Feature aggregates multiple historical capabilities; split before ready/blocker adjudication. | #125 |
 | `update.checkDownloadMetadata` | P1 | True | check_for_updates, download_update, launch_update_installer | feature-manifest:update.checkDownloadMetadata, installed-app-targeted-smoke | split-required | Feature aggregates multiple historical capabilities; split before ready/blocker adjudication. | #125 |

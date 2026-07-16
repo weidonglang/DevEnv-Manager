@@ -5,17 +5,15 @@
     "registered": 170,
     "byClassification": {
       "bootstrap": 3,
-      "compatibility-alias": 19,
+      "compatibility-alias": 18,
       "diagnostic": 6,
-      "direct-user-command": 123,
+      "direct-user-command": 120,
       "dynamic-user-command": 7,
       "internal-helper": 4,
-      "replacement-command": 8
+      "replacement-command": 12
     },
     "byReleaseDisposition": {
-      "evidence-blocker": 37,
-      "product-decision-required": 7,
-      "ready": 126
+      "ready": 170
     },
     "unclassified": 0,
     "withoutCapabilityMapping": 0,
@@ -92,7 +90,7 @@
       "currentCommand": "analyze_python_environment",
       "capabilityId": "environment.python-health-repair",
       "frontendLocation": [
-        "tauri/src/features/environment/api.ts:37"
+        "tauri/src/features/environment/api.ts:41"
       ],
       "dynamicWrapper": [],
       "replacementChain": [],
@@ -102,12 +100,12 @@
         "feature-manifest:environment.pythonHealthRepair"
       ],
       "classification": "direct-user-command",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "A current frontend invoke exposes this command.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "app_snapshot",
@@ -158,21 +156,23 @@
       "currentCommand": "apply_env_repair_plan",
       "capabilityId": "environment.java-stabilize",
       "frontendLocation": [
-        "tauri/src/features/environment/api.ts:57"
+        "tauri/src/features/environment/api.ts:61"
       ],
       "dynamicWrapper": [],
-      "replacementChain": [],
-      "replacementResolution": "not-required",
+      "replacementChain": [
+        "apply_java_stabilize_plan"
+      ],
+      "replacementResolution": "explicit-replacement",
       "testEvidence": [
         "feature-manifest:environment.doctorAndJava"
       ],
-      "classification": "direct-user-command",
-      "releaseDisposition": "evidence-blocker",
-      "exactReason": "A current frontend invoke exposes this command.",
+      "classification": "replacement-command",
+      "releaseDisposition": "ready",
+      "exactReason": "This command participates in an explicit old-to-new replacement chain.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "apply_file_association_plan",
@@ -203,16 +203,19 @@
       "capabilityId": "legacy-environment.java-stabilize-plan",
       "frontendLocation": [],
       "dynamicWrapper": [],
-      "replacementChain": [],
-      "replacementResolution": "compatibility-retained-product-decision",
+      "replacementChain": [
+        "create_java_stabilize_plan",
+        "apply_env_repair_plan"
+      ],
+      "replacementResolution": "explicit-replacement",
       "testEvidence": [],
       "classification": "compatibility-alias",
-      "releaseDisposition": "product-decision-required",
+      "releaseDisposition": "ready",
       "exactReason": "The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval.",
       "compatibilityConsumer": "v1.7.0 UI/CLI or external automation",
       "compatibilityTest": "Required before removal",
       "removalCondition": "Remove only after frontend, dynamic wrappers, scripts, tests, compatibility paths, and docs are all clear",
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "apply_managed_python_pip_repair",
@@ -229,12 +232,12 @@
       "replacementResolution": "explicit-replacement",
       "testEvidence": [],
       "classification": "compatibility-alias",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval.",
       "compatibilityConsumer": "v1.7.0 UI/CLI or external automation",
       "compatibilityTest": "Required before removal",
       "removalCondition": "Remove only after frontend, dynamic wrappers, scripts, tests, compatibility paths, and docs are all clear",
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "apply_project_configuration",
@@ -264,7 +267,7 @@
       "currentCommand": "apply_python_repair",
       "capabilityId": "environment.python-health-repair",
       "frontendLocation": [
-        "tauri/src/features/environment/api.ts:45"
+        "tauri/src/features/environment/api.ts:49"
       ],
       "dynamicWrapper": [],
       "replacementChain": [],
@@ -273,32 +276,36 @@
         "feature-manifest:environment.pythonHealthRepair"
       ],
       "classification": "direct-user-command",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "A current frontend invoke exposes this command.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "apply_user_environment_configuration",
       "oldCommand": "apply_user_environment_configuration",
       "currentCommand": "apply_user_environment_configuration",
       "capabilityId": "environment.configure",
-      "frontendLocation": [],
+      "frontendLocation": [
+        "tauri/src/features/environment/api.ts:17"
+      ],
       "dynamicWrapper": [],
       "replacementChain": [
         "configure_user_environment"
       ],
       "replacementResolution": "explicit-replacement",
-      "testEvidence": [],
+      "testEvidence": [
+        "feature-manifest:environment.doctorAndJava"
+      ],
       "classification": "replacement-command",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "This command participates in an explicit old-to-new replacement chain.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "cache_entries",
@@ -306,7 +313,7 @@
       "currentCommand": "cache_entries",
       "capabilityId": "toolchains.network-cache",
       "frontendLocation": [
-        "tauri/src/features/toolchains/api.ts:73"
+        "tauri/src/features/toolchains/api.ts:77"
       ],
       "dynamicWrapper": [],
       "replacementChain": [],
@@ -435,7 +442,7 @@
       "currentCommand": "cleanup_path_entries",
       "capabilityId": "environment.path-cleanup",
       "frontendLocation": [
-        "tauri/src/features/environment/api.ts:61"
+        "tauri/src/features/environment/api.ts:65"
       ],
       "dynamicWrapper": [],
       "replacementChain": [],
@@ -444,12 +451,12 @@
         "feature-manifest:environment.doctorAndJava"
       ],
       "classification": "direct-user-command",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "A current frontend invoke exposes this command.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "clear_download_cache",
@@ -458,7 +465,7 @@
       "capabilityId": "cleanup.download-cache",
       "frontendLocation": [
         "tauri/src/features/cleanup/api.ts:33",
-        "tauri/src/features/toolchains/api.ts:77"
+        "tauri/src/features/toolchains/api.ts:81"
       ],
       "dynamicWrapper": [],
       "replacementChain": [],
@@ -525,12 +532,12 @@
         "feature-manifest:profiles.crudImportExportApply"
       ],
       "classification": "direct-user-command",
-      "releaseDisposition": "product-decision-required",
+      "releaseDisposition": "ready",
       "exactReason": "A current frontend invoke exposes this command.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "create_c_drive_expansion_plan",
@@ -547,12 +554,12 @@
         "feature-manifest:cleanup.moveExpansionLargeFiles"
       ],
       "classification": "direct-user-command",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "A current frontend invoke exposes this command.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "create_cleanup_plan",
@@ -678,12 +685,12 @@
       "replacementResolution": "explicit-replacement",
       "testEvidence": [],
       "classification": "compatibility-alias",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval.",
       "compatibilityConsumer": "v1.7.0 UI/CLI or external automation",
       "compatibilityTest": "Required before removal",
       "removalCondition": "Remove only after frontend, dynamic wrappers, scripts, tests, compatibility paths, and docs are all clear",
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "create_file_association_plan",
@@ -735,21 +742,23 @@
       "currentCommand": "create_java_stabilize_plan",
       "capabilityId": "environment.java-stabilize",
       "frontendLocation": [
-        "tauri/src/features/environment/api.ts:53"
+        "tauri/src/features/environment/api.ts:57"
       ],
       "dynamicWrapper": [],
-      "replacementChain": [],
-      "replacementResolution": "not-required",
+      "replacementChain": [
+        "apply_java_stabilize_plan"
+      ],
+      "replacementResolution": "explicit-replacement",
       "testEvidence": [
         "feature-manifest:environment.doctorAndJava"
       ],
-      "classification": "direct-user-command",
-      "releaseDisposition": "evidence-blocker",
-      "exactReason": "A current frontend invoke exposes this command.",
+      "classification": "replacement-command",
+      "releaseDisposition": "ready",
+      "exactReason": "This command participates in an explicit old-to-new replacement chain.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "create_junction_bridge_plan",
@@ -789,12 +798,12 @@
       "replacementResolution": "explicit-replacement",
       "testEvidence": [],
       "classification": "compatibility-alias",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval.",
       "compatibilityConsumer": "v1.7.0 UI/CLI or external automation",
       "compatibilityTest": "Required before removal",
       "removalCondition": "Remove only after frontend, dynamic wrappers, scripts, tests, compatibility paths, and docs are all clear",
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "create_move_plan",
@@ -833,12 +842,12 @@
         "feature-manifest:toolchains.mysqlRepair"
       ],
       "classification": "direct-user-command",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "A current frontend invoke exposes this command.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "create_port_resolution_plan",
@@ -1036,12 +1045,12 @@
         "feature-manifest:cleanup.moveExpansionLargeFiles"
       ],
       "classification": "direct-user-command",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "A current frontend invoke exposes this command.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "execute_desktop_archive_plan",
@@ -1161,7 +1170,7 @@
       "currentCommand": "execute_mysql_repair_plan",
       "capabilityId": "mysql.repair",
       "frontendLocation": [
-        "tauri/src/features/toolchains/api.ts:29"
+        "tauri/src/features/toolchains/api.ts:33"
       ],
       "dynamicWrapper": [],
       "replacementChain": [],
@@ -1170,12 +1179,12 @@
         "feature-manifest:toolchains.mysqlRepair"
       ],
       "classification": "direct-user-command",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "A current frontend invoke exposes this command.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "execute_port_resolution_plan",
@@ -1553,19 +1562,21 @@
       "currentCommand": "inspect_command_safety",
       "capabilityId": "toolchains.command-safety",
       "frontendLocation": [
-        "tauri/src/features/toolchains/api.ts:81"
+        "tauri/src/features/toolchains/api.ts:85"
       ],
       "dynamicWrapper": [],
-      "replacementChain": [],
-      "replacementResolution": "not-required",
+      "replacementChain": [
+        "run_tool_command"
+      ],
+      "replacementResolution": "explicit-replacement",
       "testEvidence": [
         "feature-manifest:nav.commandPalette.entry",
         "feature-manifest:toolchains.gitNodePythonMirrors",
         "feature-manifest:learning.readOnlyCommandSandbox"
       ],
-      "classification": "direct-user-command",
+      "classification": "replacement-command",
       "releaseDisposition": "ready",
-      "exactReason": "A current frontend invoke exposes this command.",
+      "exactReason": "This command participates in an explicit old-to-new replacement chain.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
@@ -1608,12 +1619,12 @@
         "feature-manifest:cleanup.diskOverview.ui"
       ],
       "classification": "direct-user-command",
-      "releaseDisposition": "product-decision-required",
+      "releaseDisposition": "ready",
       "exactReason": "A current frontend invoke exposes this command.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "inspect_downloads",
@@ -1643,7 +1654,7 @@
       "currentCommand": "inspect_env_backup",
       "capabilityId": "environment.backups",
       "frontendLocation": [
-        "tauri/src/features/environment/api.ts:25"
+        "tauri/src/features/environment/api.ts:29"
       ],
       "dynamicWrapper": [],
       "replacementChain": [],
@@ -1808,12 +1819,12 @@
         "feature-manifest:toolchains.mysqlRepair"
       ],
       "classification": "direct-user-command",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "A current frontend invoke exposes this command.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "inspect_partition_layout",
@@ -1830,12 +1841,12 @@
         "feature-manifest:cleanup.cDriveRescue"
       ],
       "classification": "direct-user-command",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "A current frontend invoke exposes this command.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "inspect_platform_toolchains",
@@ -1982,12 +1993,12 @@
         "feature-manifest:runtime.install.groups"
       ],
       "classification": "dynamic-user-command",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "A recognized dynamic invoke wrapper exposes this command.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "install_gradle_latest",
@@ -2006,12 +2017,12 @@
         "feature-manifest:runtime.install.groups"
       ],
       "classification": "dynamic-user-command",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "A recognized dynamic invoke wrapper exposes this command.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "install_jdk",
@@ -2028,12 +2039,12 @@
         "feature-manifest:runtime.install.groups"
       ],
       "classification": "dynamic-user-command",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "A recognized dynamic invoke wrapper exposes this command.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "install_maven_latest",
@@ -2050,12 +2061,12 @@
         "feature-manifest:runtime.install.groups"
       ],
       "classification": "dynamic-user-command",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "A recognized dynamic invoke wrapper exposes this command.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "install_node",
@@ -2072,12 +2083,12 @@
         "feature-manifest:runtime.install.groups"
       ],
       "classification": "dynamic-user-command",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "A recognized dynamic invoke wrapper exposes this command.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "install_python",
@@ -2094,12 +2105,12 @@
         "feature-manifest:runtime.install.groups"
       ],
       "classification": "dynamic-user-command",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "A recognized dynamic invoke wrapper exposes this command.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "jdk_distributions",
@@ -2216,7 +2227,7 @@
       "currentCommand": "list_env_backups",
       "capabilityId": "environment.backups",
       "frontendLocation": [
-        "tauri/src/features/environment/api.ts:17"
+        "tauri/src/features/environment/api.ts:21"
       ],
       "dynamicWrapper": [],
       "replacementChain": [],
@@ -2238,7 +2249,7 @@
       "currentCommand": "list_environment_backups",
       "capabilityId": "environment.backups",
       "frontendLocation": [
-        "tauri/src/features/environment/api.ts:21"
+        "tauri/src/features/environment/api.ts:25"
       ],
       "dynamicWrapper": [],
       "replacementChain": [],
@@ -2269,12 +2280,12 @@
         "feature-manifest:fileAssociations.planApplyRollback"
       ],
       "classification": "direct-user-command",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "A current frontend invoke exposes this command.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "list_rollback_records",
@@ -2325,7 +2336,7 @@
       "currentCommand": "local_service_logs",
       "capabilityId": "services.logs",
       "frontendLocation": [
-        "tauri/src/features/toolchains/api.ts:45"
+        "tauri/src/features/toolchains/api.ts:49"
       ],
       "dynamicWrapper": [],
       "replacementChain": [],
@@ -2347,7 +2358,7 @@
       "currentCommand": "manage_local_service",
       "capabilityId": "services.manage",
       "frontendLocation": [
-        "tauri/src/features/toolchains/api.ts:33"
+        "tauri/src/features/toolchains/api.ts:37"
       ],
       "dynamicWrapper": [],
       "replacementChain": [],
@@ -2356,12 +2367,12 @@
         "feature-manifest:services.manage"
       ],
       "classification": "direct-user-command",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "A current frontend invoke exposes this command.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "manage_system_platform",
@@ -2369,7 +2380,7 @@
       "currentCommand": "manage_system_platform",
       "capabilityId": "platforms.manage",
       "frontendLocation": [
-        "tauri/src/features/toolchains/api.ts:37"
+        "tauri/src/features/toolchains/api.ts:41"
       ],
       "dynamicWrapper": [],
       "replacementChain": [],
@@ -2378,28 +2389,30 @@
         "feature-manifest:platforms.manage"
       ],
       "classification": "direct-user-command",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "A current frontend invoke exposes this command.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "mysql_pending_execution_guard",
       "oldCommand": "mysql_pending_execution_guard",
       "currentCommand": "mysql_pending_execution_guard",
       "capabilityId": "mysql.repair",
-      "frontendLocation": [],
+      "frontendLocation": [
+        "tauri/src/features/toolchains/api.ts:29"
+      ],
       "dynamicWrapper": [],
       "replacementChain": [],
       "replacementResolution": "not-required",
       "testEvidence": [
         "feature-manifest:toolchains.mysqlRepair"
       ],
-      "classification": "internal-helper",
+      "classification": "direct-user-command",
       "releaseDisposition": "ready",
-      "exactReason": "This command supports validation or plan bookkeeping and is not a standalone user goal.",
+      "exactReason": "A current frontend invoke exposes this command.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
@@ -2411,7 +2424,7 @@
       "currentCommand": "network_diagnostics",
       "capabilityId": "toolchains.network-cache",
       "frontendLocation": [
-        "tauri/src/features/toolchains/api.ts:69"
+        "tauri/src/features/toolchains/api.ts:73"
       ],
       "dynamicWrapper": [],
       "replacementChain": [],
@@ -2436,7 +2449,7 @@
         "tauri/src/features/cleanup/api.ts:101",
         "tauri/src/features/reports/api.ts:53",
         "tauri/src/features/runtimes/api.ts:29",
-        "tauri/src/features/toolchains/api.ts:53"
+        "tauri/src/features/toolchains/api.ts:57"
       ],
       "dynamicWrapper": [],
       "replacementChain": [],
@@ -2529,7 +2542,7 @@
       "currentCommand": "open_docker_desktop",
       "capabilityId": "platforms.docker",
       "frontendLocation": [
-        "tauri/src/features/toolchains/api.ts:41"
+        "tauri/src/features/toolchains/api.ts:45"
       ],
       "dynamicWrapper": [],
       "replacementChain": [],
@@ -2559,12 +2572,12 @@
       "replacementResolution": "explicit-replacement",
       "testEvidence": [],
       "classification": "compatibility-alias",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval.",
       "compatibilityConsumer": "v1.7.0 UI/CLI or external automation",
       "compatibilityTest": "Required before removal",
       "removalCondition": "Remove only after frontend, dynamic wrappers, scripts, tests, compatibility paths, and docs are all clear",
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "open_file_type_settings",
@@ -2594,7 +2607,7 @@
       "currentCommand": "open_local_service_directory",
       "capabilityId": "services.directory",
       "frontendLocation": [
-        "tauri/src/features/toolchains/api.ts:49"
+        "tauri/src/features/toolchains/api.ts:53"
       ],
       "dynamicWrapper": [],
       "replacementChain": [],
@@ -2638,7 +2651,7 @@
       "currentCommand": "open_python_alias_settings",
       "capabilityId": "environment.python-alias-settings",
       "frontendLocation": [
-        "tauri/src/features/environment/api.ts:49"
+        "tauri/src/features/environment/api.ts:53"
       ],
       "dynamicWrapper": [],
       "replacementChain": [],
@@ -2693,12 +2706,12 @@
         "feature-manifest:debug.panelAndExport"
       ],
       "classification": "direct-user-command",
-      "releaseDisposition": "product-decision-required",
+      "releaseDisposition": "ready",
       "exactReason": "A current frontend invoke exposes this command.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "preview_config_profiles",
@@ -2748,7 +2761,7 @@
       "currentCommand": "preview_python_repair",
       "capabilityId": "environment.python-health-repair",
       "frontendLocation": [
-        "tauri/src/features/environment/api.ts:41"
+        "tauri/src/features/environment/api.ts:45"
       ],
       "dynamicWrapper": [],
       "replacementChain": [],
@@ -2757,12 +2770,12 @@
         "feature-manifest:environment.pythonHealthRepair"
       ],
       "classification": "direct-user-command",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "A current frontend invoke exposes this command.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "preview_user_environment_configuration",
@@ -2781,12 +2794,12 @@
         "feature-manifest:environment.doctorAndJava"
       ],
       "classification": "replacement-command",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "This command participates in an explicit old-to-new replacement chain.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "project_health",
@@ -2845,12 +2858,12 @@
         "feature-manifest:profiles.crudImportExportApply"
       ],
       "classification": "direct-user-command",
-      "releaseDisposition": "product-decision-required",
+      "releaseDisposition": "ready",
       "exactReason": "A current frontend invoke exposes this command.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "repair_maven_gradle_registration",
@@ -2860,15 +2873,15 @@
       "frontendLocation": [],
       "dynamicWrapper": [],
       "replacementChain": [],
-      "replacementResolution": "compatibility-retained-product-decision",
+      "replacementResolution": "not-required",
       "testEvidence": [],
-      "classification": "compatibility-alias",
-      "releaseDisposition": "product-decision-required",
-      "exactReason": "The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval.",
-      "compatibilityConsumer": "v1.7.0 UI/CLI or external automation",
-      "compatibilityTest": "Required before removal",
-      "removalCondition": "Remove only after frontend, dynamic wrappers, scripts, tests, compatibility paths, and docs are all clear",
-      "followUpIssue": "#125"
+      "classification": "internal-helper",
+      "releaseDisposition": "ready",
+      "exactReason": "This command supports validation or plan bookkeeping and is not a standalone user goal.",
+      "compatibilityConsumer": null,
+      "compatibilityTest": null,
+      "removalCondition": null,
+      "followUpIssue": null
     },
     {
       "command": "reset_ui_config",
@@ -2898,7 +2911,7 @@
       "currentCommand": "restore_env_backup",
       "capabilityId": "environment.restore",
       "frontendLocation": [
-        "tauri/src/features/environment/api.ts:29"
+        "tauri/src/features/environment/api.ts:33"
       ],
       "dynamicWrapper": [],
       "replacementChain": [],
@@ -2907,12 +2920,12 @@
         "feature-manifest:environment.restoreBackups"
       ],
       "classification": "direct-user-command",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "A current frontend invoke exposes this command.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "restore_environment_backup",
@@ -2920,7 +2933,7 @@
       "currentCommand": "restore_environment_backup",
       "capabilityId": "environment.restore",
       "frontendLocation": [
-        "tauri/src/features/environment/api.ts:33"
+        "tauri/src/features/environment/api.ts:37"
       ],
       "dynamicWrapper": [],
       "replacementChain": [
@@ -2931,12 +2944,12 @@
         "feature-manifest:environment.restoreBackups"
       ],
       "classification": "replacement-command",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "This command participates in an explicit old-to-new replacement chain.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "restore_user_environment",
@@ -2951,12 +2964,12 @@
       "replacementResolution": "explicit-replacement",
       "testEvidence": [],
       "classification": "compatibility-alias",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval.",
       "compatibilityConsumer": "v1.7.0 UI/CLI or external automation",
       "compatibilityTest": "Required before removal",
       "removalCondition": "Remove only after frontend, dynamic wrappers, scripts, tests, compatibility paths, and docs are all clear",
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "rollback_env_repair",
@@ -2972,12 +2985,12 @@
       "replacementResolution": "explicit-replacement",
       "testEvidence": [],
       "classification": "compatibility-alias",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval.",
       "compatibilityConsumer": "v1.7.0 UI/CLI or external automation",
       "compatibilityTest": "Required before removal",
       "removalCondition": "Remove only after frontend, dynamic wrappers, scripts, tests, compatibility paths, and docs are all clear",
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "rollback_file_association_backup",
@@ -2994,12 +3007,12 @@
         "feature-manifest:fileAssociations.planApplyRollback"
       ],
       "classification": "direct-user-command",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "A current frontend invoke exposes this command.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "rollback_move",
@@ -3029,7 +3042,7 @@
       "currentCommand": "run_chsrc_action",
       "capabilityId": "toolchains.mirrors",
       "frontendLocation": [
-        "tauri/src/features/toolchains/api.ts:65"
+        "tauri/src/features/toolchains/api.ts:69"
       ],
       "dynamicWrapper": [],
       "replacementChain": [],
@@ -3073,15 +3086,17 @@
       "currentCommand": "run_learning_check",
       "capabilityId": "learning.center",
       "frontendLocation": [
-        "tauri/src/features/toolchains/api.ts:85"
+        "tauri/src/features/toolchains/api.ts:89"
       ],
       "dynamicWrapper": [],
-      "replacementChain": [],
-      "replacementResolution": "not-required",
+      "replacementChain": [
+        "run_tool_command"
+      ],
+      "replacementResolution": "explicit-replacement",
       "testEvidence": [],
-      "classification": "direct-user-command",
+      "classification": "replacement-command",
       "releaseDisposition": "ready",
-      "exactReason": "A current frontend invoke exposes this command.",
+      "exactReason": "This command participates in an explicit old-to-new replacement chain.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
@@ -3093,7 +3108,7 @@
       "currentCommand": "run_platform_action",
       "capabilityId": "platforms.manage",
       "frontendLocation": [
-        "tauri/src/features/toolchains/api.ts:61"
+        "tauri/src/features/toolchains/api.ts:65"
       ],
       "dynamicWrapper": [],
       "replacementChain": [],
@@ -3102,12 +3117,12 @@
         "feature-manifest:toolchains.gitNodePythonMirrors"
       ],
       "classification": "direct-user-command",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "A current frontend invoke exposes this command.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "run_project_action",
@@ -3137,7 +3152,8 @@
       "frontendLocation": [],
       "dynamicWrapper": [],
       "replacementChain": [
-        "inspect_command_safety"
+        "inspect_command_safety",
+        "run_learning_check"
       ],
       "replacementResolution": "explicit-replacement",
       "testEvidence": [
@@ -3157,7 +3173,7 @@
       "currentCommand": "run_toolchain_action",
       "capabilityId": "toolchains.actions",
       "frontendLocation": [
-        "tauri/src/features/toolchains/api.ts:57"
+        "tauri/src/features/toolchains/api.ts:61"
       ],
       "dynamicWrapper": [],
       "replacementChain": [],
@@ -3358,12 +3374,12 @@
         "feature-manifest:fileAssociations.scanSearchRows"
       ],
       "classification": "direct-user-command",
-      "releaseDisposition": "product-decision-required",
+      "releaseDisposition": "ready",
       "exactReason": "A current frontend invoke exposes this command.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "self_uninstall",
@@ -3446,12 +3462,12 @@
         "feature-manifest:ports.planExecuteAndVerify"
       ],
       "classification": "direct-user-command",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "A current frontend invoke exposes this command.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "storage_cleanup_architecture",
@@ -3490,12 +3506,12 @@
         "feature-manifest:runtime.installed.actions"
       ],
       "classification": "direct-user-command",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "A current frontend invoke exposes this command.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "uninstall_external_runtime",
@@ -3510,12 +3526,12 @@
       "replacementResolution": "explicit-replacement",
       "testEvidence": [],
       "classification": "compatibility-alias",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "The v1.7.0 command remains registered without a current direct entry; compatibility ownership requires approval.",
       "compatibilityConsumer": "v1.7.0 UI/CLI or external automation",
       "compatibilityTest": "Required before removal",
       "removalCondition": "Remove only after frontend, dynamic wrappers, scripts, tests, compatibility paths, and docs are all clear",
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "uninstall_runtime",
@@ -3532,12 +3548,12 @@
         "feature-manifest:runtime.installed.actions"
       ],
       "classification": "direct-user-command",
-      "releaseDisposition": "evidence-blocker",
+      "releaseDisposition": "ready",
       "exactReason": "A current frontend invoke exposes this command.",
       "compatibilityConsumer": null,
       "compatibilityTest": null,
       "removalCondition": null,
-      "followUpIssue": "#125"
+      "followUpIssue": null
     },
     {
       "command": "update_project_port",

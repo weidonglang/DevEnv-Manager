@@ -16,9 +16,16 @@ EXPECTED = {
     "cleanup.dev-cache",
     "cleanup.download-cache",
     "cleanup.move-rollback",
+    "environment.java-stabilize",
+    "environment.python-health-repair",
+    "environment.restore",
     "profiles.apply",
     "projects.configuration",
     "projects.port-config",
+    "runtime.install",
+    "runtime.lifecycle",
+    "runtime.switch",
+    "runtime.uninstall",
 }
 
 
@@ -64,7 +71,7 @@ def main() -> int:
     cases = manifest.get("cases", {})
     missing = sorted(EXPECTED - set(cases))
     failed = sorted(key for key, value in cases.items() if value.get("status") != "passed")
-    if missing or failed or manifest.get("summary") != {"total": 7, "passed": 7, "failed": 0}:
+    if missing or failed or manifest.get("summary") != {"total": 14, "passed": 14, "failed": 0}:
         print(f"Invalid isolated fixture evidence: missing={missing}, failed={failed}")
         return 1
 
@@ -79,8 +86,8 @@ def main() -> int:
     summary = {
         "schemaVersion": 1,
         "evidenceDirectory": output.relative_to(ROOT).as_posix(),
-        "total": 7,
-        "passed": 7,
+        "total": 14,
+        "passed": 14,
         "failed": 0,
         "capabilities": sorted(EXPECTED),
         "manifestSha256": sha256(manifest_path),

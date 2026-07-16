@@ -12,8 +12,7 @@
 - Gitee 国内镜像：https://gitee.com/weidonglang/DevEnv-Manager
 - GitHub Release：https://github.com/weidonglang/DevEnv-Manager/releases
 - Gitee Release：https://gitee.com/weidonglang/DevEnv-Manager/releases
-- v1.8.2 verified RC NSIS SHA256：`858e128f42b774e41772da9c065596c116812355d90c7943636bfaedded321e7`
-- v1.8.2 verified RC MSI SHA256：`ca9f6f0346b68ec4901e18f2d2f499ba0aa053e2f23e6a4503d155d79ca95ac3`
+- v1.8.2 新 RC 正在从最终修复 commit 重新构建；旧 RC 资产已作废，不得发布或上传。
 
 适合：
 
@@ -48,14 +47,26 @@ DevEnv Manager 解决的是 Windows 上多个开发生态互相影响的问题�
 
 ## 1.8.2 Release Candidate
 
-v1.8.2 is the first stability-recovery candidate after the Workbench frontend refactor:
+我们需要向受 v1.8.0 和 v1.8.1 回归问题影响的用户郑重道歉。Workbench 重构后曾出现页面大面积“不可用”、按钮只有短暂提示却没有结果、旧功能入口丢失、深色和高对比度模式难以阅读、端口扫描超时拖累其他页面，以及计划创建后找不到执行入口等问题。这些问题不应由用户反复手测才能发现。
 
-- Restores durable, structured Cleanup flows for disk overview, duplicate files, archives, plans, receipts, and rollback information.
-- Hardens Ports classification and token-gated termination with owner re-check, protected-process refusal, and bounded PID/port verification.
-- Expands File Associations search and plan evidence before any apply operation.
-- Makes Doctor, report export, Environment, and JDK 8 validation results persistent and auditable.
-- Adds automated feature acceptance, backend/frontend drift, selector, toast-only, and data-contract gates.
-- Keeps Runtime v1.9.0 redesign, profile history restore, and full Advanced mode policy/visual work deferred.
+v1.8.2 因此不是继续堆叠新功能，而是一次完整的稳定性恢复和旧功能迁移：
+
+- 以 v1.7.0 为黄金基线盘点 237 条入口和承诺，归一为 87 项用户能力；当前 74 项等价、13 项增强，缺失和降级均为 0。
+- 恢复 Cleanup 的磁盘概览、重复大文件、桌面/下载归档、通用归档、计划执行、回执、回滚、空间搬家和 C 盘扩容闭环。
+- 修复 C 盘扩容把 DiskPart 退出码误当成成功的问题；现在必须读取到扩容前后真实容量增长才算成功，并修复 `0 B` 和命令输出乱码。
+- 恢复 Ports 表格、进程身份、风险与可关闭原因；系统进程、受保护进程、服务拥有进程和无法确认路径的目标不能进入普通强制结束流程。
+- 恢复 Environment 的 JAVA_HOME/PATH/effective tools 证据、Java 稳定化计划、Python 修复、环境备份与回滚；JDK 8 的 `jar` 验证不再误判。
+- 恢复 Projects 的真实根目录、项目类型、检测文件、推荐运行时、IDEA 分析、Java consumer 验证和项目端口配置结果区。
+- 恢复 Reports 的 Doctor、Markdown/JSON 导出、打开位置、复制摘要和持久计划/结果；不再只依赖 toast。
+- 恢复 File Associations 的扩展名搜索、应用选择、计划预览、UserChoice 说明、备份和回滚。
+- 明确 Runtime 的受管/外部边界：外部运行时只读，不允许由 DevEnv Manager 直接切换或删除；受管操作继续走计划、确认令牌和验证。
+- 完成 Toolchains、Windows 服务、WSL 平台和 MySQL 修复的隔离 VM/UAC 验收；MySQL fixture 的系统表恢复后，`ibdata1` 与业务数据哈希保持不变。
+- 完成中英文公共结果字段、Cleanup/Runtime/Settings 进度文案和扩容动态状态适配；新增 648 个双语 key 的一致性门禁，覆盖 29 个 UI 与事件源文件。
+- 建立 static、safe、frontend、sandbox、manual 五层自动验收，检查 backend-only、ui-only、toast-only、字段漂移、selector、风险契约和空白提示。
+
+最终聚合验收为 283 项：240 通过、0 失败、36 项按安全策略跳过、7 项保留为有明确理由的人工或延期项。Rust 154 项测试、Clippy、前端生产构建、195 个稳定 selector、170 个后端命令裁决和 GitHub/Gitee 更新元数据一致性均已通过。
+
+v1.9.0 的 Runtime 数据模型重构继续由 #130 跟踪；Profile 历史版本恢复需要新的持久化模型，Advanced 模式仍属于后续策略和视觉工作。这些后续增强不属于 v1.7.0 旧功能缺失。
 
 Verified RC installer metadata and upgrade/rollback evidence are recorded in [docs/release-v1.8.2.md](docs/release-v1.8.2.md). No v1.8.2 tag or release is created by this PR.
 

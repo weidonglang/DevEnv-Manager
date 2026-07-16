@@ -3,7 +3,7 @@
 This proposal does not modify the formal feature manifest.
 
 - Partial parents: 26
-- Atomic child proposals: 105
+- Atomic child proposals: 106
 
 | Parent | Proposed child | Priority | Command | Implementation | Evidence | Disposition |
 |---|---|---|---|---|---|---|
@@ -37,6 +37,7 @@ This proposal does not modify the formal feature manifest.
 | `environment.doctorAndJava` | `environment.doctorAndJava.inspectEnvReliability` | P0 | `inspect_env_reliability` | equivalent | verified-installed | ready |
 | `environment.doctorAndJava` | `environment.doctorAndJava.environmentHealth` | P0 | `environment_health` | equivalent | verified-automated | ready |
 | `environment.doctorAndJava` | `environment.doctorAndJava.previewUserEnvironmentConfiguration` | P0 | `preview_user_environment_configuration` | equivalent | verified-automated | ready |
+| `environment.doctorAndJava` | `environment.doctorAndJava.applyUserEnvironmentConfiguration` | P0 | `apply_user_environment_configuration` | equivalent | verified-automated | ready |
 | `environment.doctorAndJava` | `environment.doctorAndJava.createJavaStabilizePlan` | P0 | `create_java_stabilize_plan` | equivalent | verified-installed | ready |
 | `environment.doctorAndJava` | `environment.doctorAndJava.applyEnvRepairPlan` | P0 | `apply_env_repair_plan` | equivalent | verified-automated | ready |
 | `environment.doctorAndJava` | `environment.doctorAndJava.cleanupPathEntries` | P0 | `cleanup_path_entries` | equivalent | verified-automated | ready |
@@ -108,7 +109,7 @@ This proposal does not modify the formal feature manifest.
 | `toolchains.mysqlRepair` | `toolchains.mysqlRepair.inspectMysqlRepair` | P1 | `inspect_mysql_repair` | equivalent | verified-automated | ready |
 | `toolchains.mysqlRepair` | `toolchains.mysqlRepair.createMysqlRepairPlan` | P1 | `create_mysql_repair_plan` | equivalent | verified-automated | ready |
 | `toolchains.mysqlRepair` | `toolchains.mysqlRepair.executeMysqlRepairPlan` | P1 | `execute_mysql_repair_plan` | equivalent | verified-automated | ready |
-| `toolchains.mysqlRepair` | `toolchains.mysqlRepair.mysqlPendingExecutionGuard` | P1 | `mysql_pending_execution_guard` | not-applicable | evidence-required | evidence-blocker |
+| `toolchains.mysqlRepair` | `toolchains.mysqlRepair.mysqlPendingExecutionGuard` | P1 | `mysql_pending_execution_guard` | not-applicable | verified-automated | ready |
 | `update.checkDownloadMetadata` | `update.checkDownloadMetadata.checkForUpdates` | P1 | `check_for_updates` | equivalent | verified-installed | ready |
 | `update.checkDownloadMetadata` | `update.checkDownloadMetadata.downloadUpdate` | P1 | `download_update` | equivalent | verified-automated | ready |
 | `update.checkDownloadMetadata` | `update.checkDownloadMetadata.launchUpdateInstaller` | P1 | `launch_update_installer` | equivalent | verified-automated | ready |

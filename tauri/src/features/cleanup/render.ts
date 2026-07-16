@@ -1,7 +1,7 @@
 import { formatBytes } from "../../core/format";
 import type { CleanupCandidate, DiskVolumeInfo, DuplicateGroup, FolderUsageReport, LargeFileItem, MovePlan, MoveResult } from "../../types";
 import { escapeHtml, pageItems, renderActionButton, renderBadge, renderEmptyState, renderMetric, renderObjectTable, renderPagination, valueOf } from "../sharedView";
-import { t } from "../../core/i18n";
+import { localize, t } from "../../core/i18n";
 import { renderFeatureGuide } from "../../components/featureGuide";
 import type { CleanupWorkbenchState } from "./state";
 
@@ -30,22 +30,20 @@ export function renderCleanupWorkbench(state: CleanupWorkbenchState): string {
           ${renderActionButton("rollback-move", t("feature.cleanup.rollbackMove"), "danger")}
           ${renderActionButton("inspect-c-drive-rescue", t("feature.cleanup.cRescue"), "primary")}
           ${renderActionButton("scan-large-files-c", t("feature.cleanup.scanLargeFiles"))}
-          ${renderActionButton("create-expansion-plan", t("feature.cleanup.expansion"))}
-          ${renderActionButton("execute-expansion-plan", t("feature.cleanup.executeExpansion"), "danger")}
         </div>
         ${state.errors.createPlan ? `<div class="error-state" data-testid="cleanup-inline-error">${escapeHtml(state.errors.createPlan)}</div>` : ""}
         <div class="form-grid environment-plan-input">
-          <input id="cleanup-move-source" value="${escapeHtml(state.moveSource)}" placeholder="${t("feature.cleanup.moveSource")}" />
+          <input id="cleanup-move-source" value="${escapeHtml(state.moveSource)}" readonly placeholder="${t("feature.cleanup.moveSource")}" />
           <input id="cleanup-move-target-drive" value="${escapeHtml(state.moveTargetDrive)}" placeholder="${t("feature.cleanup.moveTargetDrive")}" />
           <select id="cleanup-move-mode">
             <option value="archive" ${state.moveMode === "archive" ? "selected" : ""}>${t("feature.cleanup.moveModeArchive")}</option>
             <option value="junction" ${state.moveMode === "junction" ? "selected" : ""}>${t("feature.cleanup.moveModeJunction")}</option>
           </select>
           ${renderActionButton("choose-cleanup-move-source", t("feature.cleanup.chooseMoveSource"))}
-          <label>Partition expansion backup receipt<input id="cleanup-expansion-backup-receipt" data-testid="cleanup-expansion-backup-receipt" value="${escapeHtml(state.expansionBackupReceipt)}" placeholder="External system backup receipt required" /></label>
         </div>
       </section>
       ${renderCDriveRescue(state)}
+      ${renderPartitionExpansion(state)}
       ${renderApplicationUsage(state)}
       ${renderGenericArchive(state)}
       ${renderDuplicateFiles(state)}
@@ -53,9 +51,75 @@ export function renderCleanupWorkbench(state: CleanupWorkbenchState): string {
       ${renderDownloadsArchiveSection(state)}
       ${renderCleanupReport(state)}
       ${renderLargeFiles(state)}
-      <section class="panel"><h2>${t("feature.cleanup.plans")}</h2>${renderCleanupPlan(state)}${state.errors.executeCleanupResult ? `<div class="error-state" data-testid="cleanup-execute-error">${escapeHtml(state.errors.executeCleanupResult)}</div>` : ""}${renderCleanupExecutionResult(state)}${state.errors.utilityOperation ? `<div class="error-state" data-testid="cleanup-utility-operation-error">${escapeHtml(state.errors.utilityOperation)}</div>` : ""}${state.errors.moveOperation ? `<div class="error-state" data-testid="cleanup-move-operation-error">${escapeHtml(state.errors.moveOperation)}</div>` : ""}${state.moveOperationResult ? `<div class="small-note" data-testid="cleanup-move-operation-result">${escapeHtml(state.moveOperationResult)}</div>` : ""}${state.movePlan ? renderObjectTable(state.movePlan, ["planId", "source", "target", "mode", "warnings"]) : ""}${state.errors.expansionResult ? `<div class="error-state" data-testid="cleanup-expansion-error">${escapeHtml(state.errors.expansionResult)}</div>` : ""}${state.expansionPlan ? renderObjectTable(state.expansionPlan, ["planId", "mode", "canExecute", "requiresAdmin", "estimatedAddedBytes", "backupRequired", "explanation"]) : ""}${state.expansionResult ? renderObjectTable(state.expansionResult, ["planId", "success", "beforeFree", "afterFree", "output"]) : ""}</section>
+      <section class="panel"><h2>${t("feature.cleanup.plans")}</h2>${renderCleanupPlan(state)}${state.errors.executeCleanupResult ? `<div class="error-state" data-testid="cleanup-execute-error">${escapeHtml(state.errors.executeCleanupResult)}</div>` : ""}${renderCleanupExecutionResult(state)}${state.errors.utilityOperation ? `<div class="error-state" data-testid="cleanup-utility-operation-error">${escapeHtml(state.errors.utilityOperation)}</div>` : ""}${state.errors.moveOperation ? `<div class="error-state" data-testid="cleanup-move-operation-error">${escapeHtml(state.errors.moveOperation)}</div>` : ""}${state.moveOperationResult ? `<div class="small-note" data-testid="cleanup-move-operation-result">${escapeHtml(state.moveOperationResult)}</div>` : ""}${state.movePlan ? renderObjectTable(state.movePlan, ["planId", "source", "target", "mode", "warnings"]) : ""}</section>
     </div>
   `;
+}
+
+function renderPartitionExpansion(state: CleanupWorkbenchState): string {
+  const plan = state.expansionPlan;
+  const result = state.expansionResult;
+  const verifiedGrowth = result ? Math.max(0, result.afterTotal - result.beforeTotal) : 0;
+  const verificationOutput = result?.success
+    ? localize(`Capacity verification passed: C drive grew by ${formatBytes(verifiedGrowth)}.`, `容量验证通过：C 盘增加了 ${formatBytes(verifiedGrowth)}。`)
+    : result
+      ? `${t("feature.cleanup.expansionVerificationFailed")}${result.output.trim() ? `\n${result.output.trim()}` : ""}`
+      : "";
+  return `<section class="panel" data-testid="cleanup-partition-expansion-section">
+    <div class="panel-head"><div><h2>${t("feature.cleanup.expansion")}</h2><p>${t("feature.cleanup.expansionDetail")}</p></div></div>
+    <div class="toolbar">
+      ${renderActionButton("create-expansion-plan", t("feature.cleanup.expansion"), "primary")}
+      ${renderActionButton("execute-expansion-plan", t("feature.cleanup.executeExpansion"), "danger", !plan?.canExecute)}
+    </div>
+    ${state.errors.expansionResult ? `<div class="error-state" data-testid="cleanup-expansion-error">${escapeHtml(state.errors.expansionResult)}</div>` : ""}
+    <div data-testid="cleanup-expansion-plan-preview">
+      ${plan ? `<dl class="kv-list">
+        <div><dt>${t("feature.cleanup.expansionPlanId")}</dt><dd>${escapeHtml(plan.planId)}</dd></div>
+        <div><dt>${t("feature.cleanup.expansionMode")}</dt><dd>${escapeHtml(expansionModeLabel(plan.mode))}</dd></div>
+        <div><dt>${t("feature.cleanup.estimatedAdded")}</dt><dd>${escapeHtml(formatBytes(plan.estimatedAddedBytes))}</dd></div>
+        <div><dt>${t("feature.cleanup.expansionCanExecute")}</dt><dd>${escapeHtml(plan.canExecute ? t("state.yes") : t("state.no"))}</dd></div>
+        <div><dt>${t("feature.cleanup.expansionRequiresAdmin")}</dt><dd>${escapeHtml(plan.requiresAdmin ? t("state.yes") : t("state.no"))}</dd></div>
+        <div><dt>${t("feature.cleanup.expansionBackupRequired")}</dt><dd>${escapeHtml(plan.backupRequired ? t("state.yes") : t("state.no"))}</dd></div>
+        <div><dt>${t("feature.cleanup.expansionExplanation")}</dt><dd>${escapeHtml(expansionExplanation(plan.mode, plan.explanation))}</dd></div>
+      </dl>` : renderEmptyState(t("feature.cleanup.expansionNoPlan"), t("feature.cleanup.expansionNoPlanDetail"))}
+    </div>
+    <label class="field-label" for="cleanup-expansion-backup-receipt">${t("feature.cleanup.expansionBackupReceipt")}</label>
+    <input id="cleanup-expansion-backup-receipt" data-testid="cleanup-expansion-backup-receipt" value="${escapeHtml(state.expansionBackupReceipt)}" placeholder="${t("feature.cleanup.expansionBackupReceiptPlaceholder")}" ${plan?.canExecute && plan.backupRequired ? "" : "disabled"} />
+    <div data-testid="cleanup-expansion-result">
+      ${result ? `<dl class="kv-list">
+        <div><dt>${t("feature.cleanup.expansionPlanId")}</dt><dd>${escapeHtml(result.planId)}</dd></div>
+        <div><dt>${t("feature.cleanup.expansionExecutionStatus")}</dt><dd>${escapeHtml(result.success ? t("state.yes") : t("state.no"))}</dd></div>
+        <div><dt>${t("feature.cleanup.expansionBeforeTotal")}</dt><dd>${escapeHtml(formatBytes(result.beforeTotal))}</dd></div>
+        <div><dt>${t("feature.cleanup.expansionAfterTotal")}</dt><dd>${escapeHtml(formatBytes(result.afterTotal))}</dd></div>
+        <div><dt>${t("feature.cleanup.expansionActualAdded")}</dt><dd>${escapeHtml(formatBytes(verifiedGrowth))}</dd></div>
+        <div><dt>${t("feature.cleanup.expansionBeforeFree")}</dt><dd>${escapeHtml(formatBytes(result.beforeFree))}</dd></div>
+        <div><dt>${t("feature.cleanup.expansionAfterFree")}</dt><dd>${escapeHtml(formatBytes(result.afterFree))}</dd></div>
+        <div><dt>${t("feature.cleanup.expansionCommandOutput")}</dt><dd>${escapeHtml(verificationOutput)}</dd></div>
+      </dl>` : renderEmptyState(t("feature.cleanup.expansionNoResult"), t("feature.cleanup.expansionNoResultDetail"))}
+    </div>
+  </section>`;
+}
+
+function expansionModeLabel(mode: string): string {
+  const labels: Record<string, string> = {
+    safe_extend_unallocated: t("feature.cleanup.expansionModeSafeExtend"),
+    delete_empty_adjacent_partition_then_extend: t("feature.cleanup.expansionModeDeleteEmpty"),
+    blocked_by_recovery_partition: t("feature.cleanup.expansionModeRecoveryBlocked"),
+    d_drive_not_adjacent_or_has_data: t("feature.cleanup.expansionModeDataBlocked"),
+    different_physical_disk: t("feature.cleanup.expansionModeDifferentDisk"),
+  };
+  return labels[mode] ?? mode;
+}
+
+function expansionExplanation(mode: string, fallback: string): string {
+  const explanations: Record<string, string> = {
+    safe_extend_unallocated: t("feature.cleanup.expansionExplainSafeExtend"),
+    delete_empty_adjacent_partition_then_extend: t("feature.cleanup.expansionExplainDeleteEmpty"),
+    blocked_by_recovery_partition: t("feature.cleanup.expansionExplainRecoveryBlocked"),
+    d_drive_not_adjacent_or_has_data: t("feature.cleanup.expansionExplainDataBlocked"),
+    different_physical_disk: t("feature.cleanup.expansionExplainDifferentDisk"),
+  };
+  return explanations[mode] ?? fallback;
 }
 
 function renderApplicationUsage(state: CleanupWorkbenchState): string {
@@ -69,16 +133,16 @@ function renderApplicationUsage(state: CleanupWorkbenchState): string {
     ...report.gamePlatforms,
   ] : [];
   return `<section class="panel" data-testid="cleanup-application-usage-section">
-    <div class="panel-head"><div><h2>Application storage usage</h2><p>Read-only estimates from known application data locations and Windows uninstall metadata. This never uninstalls applications or deletes install directories.</p></div></div>
-    <div class="toolbar">${renderActionButton("inspect-application-usage", "Scan application usage", "primary")}</div>
+    <div class="panel-head"><div><h2>${localize("Application storage usage", "应用存储占用")}</h2><p>${localize("Read-only estimates from known application data locations and Windows uninstall metadata. This never uninstalls applications or deletes install directories.", "根据已知应用数据目录和 Windows 卸载元数据进行只读估算；不会卸载应用或删除安装目录。")}</p></div></div>
+    <div class="toolbar">${renderActionButton("inspect-application-usage", localize("Scan application usage", "扫描应用存储占用"), "primary")}</div>
     ${state.errors.appUsage ? `<div class="error-state" data-testid="cleanup-application-usage-error">${escapeHtml(state.errors.appUsage)}</div>` : ""}
     <div data-testid="cleanup-application-usage-result">
-      ${report ? `<div class="table-wrap"><table><thead><tr><th>Application</th><th>Path</th><th>Estimated size</th><th>Evidence</th><th>Access</th></tr></thead><tbody>
-        ${appItems.map((item) => `<tr><td>${escapeHtml(item.name)}</td><td>${escapeHtml(item.path || "Not detected")}</td><td>${formatBytes(item.size)}</td><td>Known application data location${item.warnings.length ? `; ${escapeHtml(item.warnings.join("; "))}` : ""}</td><td>${item.path ? `<button data-app-usage-open="${escapeHtml(item.path)}" type="button">Open location</button>` : "Not available"}</td></tr>`).join("")}
-        ${report.installedSoftware.map((item) => `<tr><td>${escapeHtml(item.name)}${item.publisher ? ` - ${escapeHtml(item.publisher)}` : ""}</td><td>${escapeHtml(item.installLocation || "Not reported")}</td><td>${formatBytes(item.estimatedSize)}</td><td>Windows uninstall registry; ${escapeHtml(item.suggestion)}</td><td>${item.installLocation ? `<button data-app-usage-open="${escapeHtml(item.installLocation)}" type="button">Open location</button>` : "Location unavailable"}</td></tr>`).join("")}
-      </tbody></table></div>` : renderEmptyState("Application usage not scanned", "Run the read-only scan to list detected application and installed-software evidence.")}
+      ${report ? `<div class="table-wrap"><table><thead><tr><th>${localize("Application", "应用")}</th><th>${localize("Path", "路径")}</th><th>${localize("Estimated size", "估算大小")}</th><th>${localize("Evidence", "证据")}</th><th>${localize("Access", "访问")}</th></tr></thead><tbody>
+        ${appItems.map((item) => `<tr><td>${escapeHtml(item.name)}</td><td>${escapeHtml(item.path || localize("Not detected", "未检测到"))}</td><td>${formatBytes(item.size)}</td><td>${localize("Known application data location", "已知应用数据目录")}${item.warnings.length ? `; ${escapeHtml(item.warnings.join("; "))}` : ""}</td><td>${item.path ? `<button data-app-usage-open="${escapeHtml(item.path)}" type="button">${localize("Open location", "打开位置")}</button>` : t("state.notAvailable")}</td></tr>`).join("")}
+        ${report.installedSoftware.map((item) => `<tr><td>${escapeHtml(item.name)}${item.publisher ? ` - ${escapeHtml(item.publisher)}` : ""}</td><td>${escapeHtml(item.installLocation || localize("Not reported", "未报告"))}</td><td>${formatBytes(item.estimatedSize)}</td><td>${localize("Windows uninstall registry", "Windows 卸载注册信息")}; ${escapeHtml(item.suggestion)}</td><td>${item.installLocation ? `<button data-app-usage-open="${escapeHtml(item.installLocation)}" type="button">${localize("Open location", "打开位置")}</button>` : localize("Location unavailable", "位置不可用")}</td></tr>`).join("")}
+      </tbody></table></div>` : renderEmptyState(localize("Application usage not scanned", "尚未扫描应用存储占用"), localize("Run the read-only scan to list detected application and installed-software evidence.", "运行只读扫描以列出检测到的应用和已安装软件证据。"))}
     </div>
-    <div class="small-note"><strong>Protected boundary</strong><p>System applications, browser credentials, chat databases, and protected paths are reported only at a safe summary level. Use Windows Apps & Features for uninstall decisions.</p></div>
+    <div class="small-note"><strong>${localize("Protected boundary", "受保护边界")}</strong><p>${localize("System applications, browser credentials, chat databases, and protected paths are reported only at a safe summary level. Use Windows Apps & Features for uninstall decisions.", "系统应用、浏览器凭据、聊天数据库和受保护路径仅提供安全摘要；卸载决策请使用 Windows 应用和功能。")}</p></div>
   </section>`;
 }
 
@@ -86,38 +150,38 @@ function renderGenericArchive(state: CleanupWorkbenchState): string {
   const plan = state.archivePlan;
   const result = state.archiveResult;
   return `<section class="panel" data-testid="cleanup-generic-archive-section">
-    <div class="panel-head"><div><h2>Selected-file archive plan</h2><p>Add allowed regular files, preview source-to-target mappings and conflicts, then confirm execution. Desktop and Downloads bulk archive plans remain separate.</p></div></div>
+    <div class="panel-head"><div><h2>${localize("Selected-file archive plan", "所选文件归档计划")}</h2><p>${localize("Add allowed regular files, preview source-to-target mappings and conflicts, then confirm execution. Desktop and Downloads bulk archive plans remain separate.", "添加允许的普通文件，预览源到目标的映射和冲突后确认执行；桌面和下载批量归档保持独立。")}</p></div></div>
     <div class="form-grid">
-      <input id="cleanup-archive-source" value="${escapeHtml(state.archiveSource)}" readonly placeholder="Choose an allowed file" />
-      <input id="cleanup-archive-source-label" value="${escapeHtml(state.archiveSourceLabel)}" placeholder="Evidence/source label" />
-      <input id="cleanup-archive-target-drive" value="${escapeHtml(state.archiveTargetDrive)}" placeholder="Target drive, for example D" />
+      <input id="cleanup-archive-source" value="${escapeHtml(state.archiveSource)}" readonly placeholder="${localize("Choose an allowed file", "选择允许的文件")}" />
+      <input id="cleanup-archive-source-label" value="${escapeHtml(state.archiveSourceLabel)}" placeholder="${localize("Evidence/source label", "证据或来源标签")}" />
+      <input id="cleanup-archive-target-drive" value="${escapeHtml(state.archiveTargetDrive)}" placeholder="${localize("Target drive, for example D", "目标驱动器，例如 D")}" />
     </div>
     <div class="toolbar">
-      ${renderActionButton("choose-archive-file", "Choose file")}
-      ${renderActionButton("add-archive-plan-item", "Add to archive list")}
-      ${renderActionButton("refresh-archive-plan-items", "Refresh list")}
-      ${renderActionButton("create-generic-archive-plan", "Create execution preview", "primary")}
-      ${renderActionButton("execute-generic-archive-plan", "Execute selected-file archive", "danger")}
+      ${renderActionButton("choose-archive-file", localize("Choose file", "选择文件"))}
+      ${renderActionButton("add-archive-plan-item", localize("Add to archive list", "添加到归档列表"))}
+      ${renderActionButton("refresh-archive-plan-items", localize("Refresh list", "刷新列表"))}
+      ${renderActionButton("create-generic-archive-plan", localize("Create execution preview", "创建执行预览"), "primary")}
+      ${renderActionButton("execute-generic-archive-plan", localize("Execute selected-file archive", "执行所选文件归档"), "danger")}
     </div>
     ${state.errors.archive ? `<div class="error-state" data-testid="cleanup-generic-archive-error">${escapeHtml(state.errors.archive)}</div>` : ""}
-    <div data-testid="cleanup-generic-archive-items">${state.archiveItems.length ? `<div class="table-wrap"><table><thead><tr><th>Source</th><th>Size</th><th>Evidence</th><th>Added</th><th>Action</th></tr></thead><tbody>${state.archiveItems.map((item) => `<tr><td>${escapeHtml(item.path)}</td><td>${formatBytes(item.size)}</td><td>${escapeHtml(item.source)}</td><td>${escapeHtml(item.addedAt)}</td><td><button data-archive-remove="${escapeHtml(item.id)}" type="button">Remove</button></td></tr>`).join("")}</tbody></table></div>` : renderEmptyState("Archive list is empty", "Choose an allowed regular file and add it to the list.")}</div>
+    <div data-testid="cleanup-generic-archive-items">${state.archiveItems.length ? `<div class="table-wrap"><table><thead><tr><th>${localize("Source", "来源")}</th><th>${localize("Size", "大小")}</th><th>${localize("Evidence", "证据")}</th><th>${localize("Added", "添加时间")}</th><th>${localize("Action", "操作")}</th></tr></thead><tbody>${state.archiveItems.map((item) => `<tr><td>${escapeHtml(item.path)}</td><td>${formatBytes(item.size)}</td><td>${escapeHtml(item.source)}</td><td>${escapeHtml(item.addedAt)}</td><td><button data-archive-remove="${escapeHtml(item.id)}" type="button">${localize("Remove", "移除")}</button></td></tr>`).join("")}</tbody></table></div>` : renderEmptyState(localize("Archive list is empty", "归档列表为空"), localize("Choose an allowed regular file and add it to the list.", "选择允许的普通文件并添加到列表。"))}</div>
     <div data-testid="cleanup-generic-archive-plan-preview">${plan ? `<dl class="kv-list">
-      <div><dt>Plan ID</dt><dd>${escapeHtml(plan.planId)}</dd></div>
-      <div><dt>Target root</dt><dd>${escapeHtml(plan.targetRoot)}</dd></div>
-      <div><dt>Estimated bytes</dt><dd>${formatBytes(plan.estimatedBytes)}</dd></div>
-      <div><dt>Risk</dt><dd>${escapeHtml(plan.riskLevel)}</dd></div>
-      ${plan.entries.map((entry) => `<div><dt>${escapeHtml(entry.source)}</dt><dd>${escapeHtml(entry.target)} - SHA-256 ${escapeHtml(entry.sha256)}${entry.conflict ? ` - CONFLICT: ${escapeHtml(entry.conflictReason)}` : " - ready"}</dd></div>`).join("")}
-      <div><dt>Warnings</dt><dd>${escapeHtml(plan.warnings.join("; "))}</dd></div>
-    </dl>` : renderEmptyState("No execution preview", "Create a plan to validate paths, target conflicts, and estimated size.")}</div>
+      <div><dt>${localize("Plan ID", "计划 ID")}</dt><dd>${escapeHtml(plan.planId)}</dd></div>
+      <div><dt>${localize("Target root", "目标根目录")}</dt><dd>${escapeHtml(plan.targetRoot)}</dd></div>
+      <div><dt>${localize("Estimated bytes", "预计大小")}</dt><dd>${formatBytes(plan.estimatedBytes)}</dd></div>
+      <div><dt>${localize("Risk", "风险")}</dt><dd>${escapeHtml(plan.riskLevel)}</dd></div>
+      ${plan.entries.map((entry) => `<div><dt>${escapeHtml(entry.source)}</dt><dd>${escapeHtml(entry.target)} - SHA-256 ${escapeHtml(entry.sha256)}${entry.conflict ? ` - ${localize("CONFLICT", "冲突")}: ${escapeHtml(entry.conflictReason)}` : ` - ${localize("ready", "就绪")}`}</dd></div>`).join("")}
+      <div><dt>${localize("Warnings", "警告")}</dt><dd>${escapeHtml(plan.warnings.join("; "))}</dd></div>
+    </dl>` : renderEmptyState(localize("No execution preview", "尚无执行预览"), localize("Create a plan to validate paths, target conflicts, and estimated size.", "创建计划以验证路径、目标冲突和预计大小。"))}</div>
     <div data-testid="cleanup-generic-archive-result">${result ? `<dl class="kv-list">
-      <div><dt>Status</dt><dd>${result.success ? "Verified" : "Completed with failures"}</dd></div>
-      <div><dt>Moved</dt><dd>${result.movedItems} item(s), ${formatBytes(result.movedBytes)}</dd></div>
-      <div><dt>Skipped</dt><dd>${result.skippedItems}</dd></div>
-      <div><dt>Verified targets</dt><dd>${escapeHtml(result.verifiedTargets.join("; ") || "none")}</dd></div>
-      <div><dt>Failures</dt><dd>${escapeHtml(result.failures.join("; ") || "none")}</dd></div>
-      <div><dt>Receipt</dt><dd>${escapeHtml(result.receiptPath)}</dd></div>
-      <div><dt>Rollback guidance</dt><dd>${escapeHtml(result.rollbackGuidance.join("; ") || "No files moved")}</dd></div>
-    </dl>` : renderEmptyState("No archive execution result", "Execution verification and rollback guidance appear here.")}</div>
+      <div><dt>${localize("Status", "状态")}</dt><dd>${result.success ? localize("Verified", "已验证") : localize("Completed with failures", "完成但存在失败")}</dd></div>
+      <div><dt>${localize("Moved", "已移动")}</dt><dd>${result.movedItems} ${localize("item(s)", "项")}, ${formatBytes(result.movedBytes)}</dd></div>
+      <div><dt>${localize("Skipped", "已跳过")}</dt><dd>${result.skippedItems}</dd></div>
+      <div><dt>${localize("Verified targets", "已验证目标")}</dt><dd>${escapeHtml(result.verifiedTargets.join("; ") || localize("none", "无"))}</dd></div>
+      <div><dt>${localize("Failures", "失败")}</dt><dd>${escapeHtml(result.failures.join("; ") || localize("none", "无"))}</dd></div>
+      <div><dt>${localize("Receipt", "回执")}</dt><dd>${escapeHtml(result.receiptPath)}</dd></div>
+      <div><dt>${localize("Rollback guidance", "回滚说明")}</dt><dd>${escapeHtml(result.rollbackGuidance.join("; ") || localize("No files moved", "没有移动文件"))}</dd></div>
+    </dl>` : renderEmptyState(localize("No archive execution result", "尚无归档执行结果"), localize("Execution verification and rollback guidance appear here.", "执行验证和回滚说明会显示在这里。"))}</div>
   </section>`;
 }
 
@@ -127,7 +191,7 @@ function renderCDriveRescue(state: CleanupWorkbenchState): string {
   const diskOverview = state.diskOverview.length ? state.diskOverview : overview?.volumes ?? [];
   return `<section class="panel" data-testid="cleanup-disk-overview-entry">
     <div class="panel-head"><div><h2>${t("feature.cleanup.cRescue")}</h2><p>${t("feature.cleanup.cRescueDetail")}</p></div></div>
-    <div class="toolbar">${renderActionButton("inspect-disk-overview", "Refresh disk overview")}${renderActionButton("inspect-c-drive-rescue", t("feature.cleanup.cRescue"), "primary")}</div>
+    <div class="toolbar">${renderActionButton("inspect-disk-overview", localize("Refresh disk overview", "刷新磁盘概览"))}${renderActionButton("inspect-c-drive-rescue", t("feature.cleanup.cRescue"), "primary")}</div>
     <div class="metrics">
       ${renderMetric(t("feature.cleanup.cFree"), overview ? formatBytes(overview.cDrive.freeBytes) : t("state.notChecked"))}
       ${renderMetric(t("feature.cleanup.cUsed"), overview ? `${overview.cDrive.usedPercent.toFixed(1)}%` : t("state.notChecked"))}
@@ -150,16 +214,16 @@ function renderCDriveRescue(state: CleanupWorkbenchState): string {
 function renderDuplicateFiles(state: CleanupWorkbenchState): string {
   const paged = pageItems(state.duplicateGroups, state.duplicateGroupsPage, 10);
   return `<section class="panel" data-testid="cleanup-duplicate-large-files-entry">
-    <div class="panel-head"><div><h2>Duplicate large files</h2><p>Read-only duplicate scan. It does not delete files.</p></div></div>
+    <div class="panel-head"><div><h2>${localize("Duplicate large files", "重复大文件")}</h2><p>${localize("Read-only duplicate scan. It does not delete files.", "只读扫描重复文件，不会删除任何文件。")}</p></div></div>
     <div class="form-grid">
-      <input id="cleanup-duplicate-scan-root" data-testid="cleanup-duplicate-scan-root" value="${escapeHtml(state.duplicateScanRoot)}" placeholder="Scan folder (blank uses Downloads)" />
-      <input id="cleanup-duplicate-min-size" data-testid="cleanup-duplicate-min-size" type="number" min="1" step="1" value="${state.duplicateScanMinSizeMb}" aria-label="Minimum duplicate file size in MB" />
+      <input id="cleanup-duplicate-scan-root" data-testid="cleanup-duplicate-scan-root" value="${escapeHtml(state.duplicateScanRoot)}" readonly placeholder="${localize("Scan folder (blank uses Downloads)", "扫描目录（留空时使用下载目录）")}" />
+      <input id="cleanup-duplicate-min-size" data-testid="cleanup-duplicate-min-size" type="number" min="1" step="1" value="${state.duplicateScanMinSizeMb}" aria-label="${localize("Minimum duplicate file size in MB", "重复文件最小大小（MB）")}" />
     </div>
-    <div class="toolbar">${renderActionButton("scan-duplicate-large-files", "Scan duplicate large files")}</div>
+    <div class="toolbar">${renderActionButton("choose-duplicate-scan-root", localize("Choose scan folder", "选择扫描目录"))}${renderActionButton("clear-duplicate-scan-root", localize("Use Downloads", "使用下载目录"))}${renderActionButton("scan-duplicate-large-files", localize("Scan duplicate large files", "扫描重复大文件"))}</div>
     ${state.errors.duplicateFiles ? `<p class="error-text" data-testid="cleanup-duplicate-large-files-error">${escapeHtml(state.errors.duplicateFiles)}</p>` : ""}
     ${renderDuplicateScanStatus(state)}
     <div data-testid="cleanup-duplicate-large-files-result">
-      ${state.duplicateScanStatus === "completedWithResults" ? `<div class="table-wrap"><table><thead><tr><th>Hash</th><th>Size</th><th>Files</th><th>Reclaimable</th><th>Evidence</th></tr></thead><tbody>${paged.items.map(renderDuplicateGroup).join("")}</tbody></table></div>${renderPagination("cleanup-duplicate-large-files", paged.page, paged.totalPages, paged.total)}` : state.duplicateScanStatus === "completedEmpty" ? `<div data-testid="cleanup-duplicate-large-files-scan-result">${renderEmptyState(t("feature.cleanup.noDuplicateGroups"), t("feature.cleanup.duplicateScanCompleteEmptyDetail"))}</div>` : state.duplicateScanStatus === "running" ? `<div class="loading-state" role="status">Scanning duplicate files...</div>` : state.duplicateScanStatus === "failed" ? renderEmptyState("Duplicate scan failed", "Review the persistent error above, adjust the folder, and retry.") : renderEmptyState("No duplicate scan yet", "Run the read-only scan to list duplicate groups.")}
+      ${state.duplicateScanStatus === "completedWithResults" ? `<div class="table-wrap"><table><thead><tr><th>${localize("Hash", "哈希")}</th><th>${localize("Size", "大小")}</th><th>${localize("Files", "文件")}</th><th>${localize("Reclaimable", "可回收")}</th><th>${localize("Evidence", "证据")}</th></tr></thead><tbody>${paged.items.map(renderDuplicateGroup).join("")}</tbody></table></div>${renderPagination("cleanup-duplicate-large-files", paged.page, paged.totalPages, paged.total)}` : state.duplicateScanStatus === "completedEmpty" ? `<div data-testid="cleanup-duplicate-large-files-scan-result">${renderEmptyState(t("feature.cleanup.noDuplicateGroups"), t("feature.cleanup.duplicateScanCompleteEmptyDetail"))}</div>` : state.duplicateScanStatus === "running" ? `<div class="loading-state" role="status">${localize("Scanning duplicate files...", "正在扫描重复文件...")}</div>` : state.duplicateScanStatus === "failed" ? renderEmptyState(localize("Duplicate scan failed", "重复文件扫描失败"), localize("Review the persistent error above, adjust the folder, and retry.", "请查看上方持续显示的错误，调整目录后重试。")) : renderEmptyState(localize("No duplicate scan yet", "尚未扫描重复文件"), localize("Run the read-only scan to list duplicate groups.", "运行只读扫描以列出重复文件组。"))}
     </div>
   </section>`;
 }
@@ -167,20 +231,20 @@ function renderDuplicateFiles(state: CleanupWorkbenchState): string {
 function renderDuplicateScanStatus(state: CleanupWorkbenchState): string {
   if (state.duplicateScanStatus === "notStarted") return "";
   const status = state.duplicateScanStatus === "running"
-    ? "Scanning"
+    ? localize("Scanning", "扫描中")
     : state.duplicateScanStatus === "completedWithResults"
-      ? `Completed with ${state.duplicateGroups.length} duplicate group(s)`
+      ? localize(`Completed with ${state.duplicateGroups.length} duplicate group(s)`, `扫描完成，共 ${state.duplicateGroups.length} 个重复组`)
       : state.duplicateScanStatus === "completedEmpty"
-        ? "Scan complete - no duplicate groups found"
-        : "Scan failed";
-  const root = state.duplicateScanRoot || "Downloads (automatic safe default)";
-  const elapsed = state.duplicateScanElapsedMs ? `${state.duplicateScanElapsedMs} ms` : "In progress";
+        ? localize("Scan complete - no duplicate groups found", "扫描完成，未发现重复组")
+        : localize("Scan failed", "扫描失败");
+  const root = state.duplicateScanRoot || localize("Downloads (automatic safe default)", "下载目录（自动安全默认值）");
+  const elapsed = state.duplicateScanElapsedMs ? `${state.duplicateScanElapsedMs} ms` : localize("In progress", "进行中");
   return `<dl class="kv-list" data-testid="cleanup-duplicate-scan-status">
-    <div><dt>Status</dt><dd>${escapeHtml(status)}</dd></div>
-    <div><dt>Scan folder</dt><dd>${escapeHtml(root)}</dd></div>
-    <div><dt>Minimum size</dt><dd>${state.duplicateScanMinSizeMb} MB</dd></div>
-    <div><dt>Duration</dt><dd>${escapeHtml(elapsed)}</dd></div>
-    ${state.duplicateScanCompletedAt ? `<div><dt>Completed at</dt><dd>${escapeHtml(state.duplicateScanCompletedAt)}</dd></div>` : ""}
+    <div><dt>${localize("Status", "状态")}</dt><dd>${escapeHtml(status)}</dd></div>
+    <div><dt>${localize("Scan folder", "扫描目录")}</dt><dd>${escapeHtml(root)}</dd></div>
+    <div><dt>${localize("Minimum size", "最小大小")}</dt><dd>${state.duplicateScanMinSizeMb} MB</dd></div>
+    <div><dt>${localize("Duration", "耗时")}</dt><dd>${escapeHtml(elapsed)}</dd></div>
+    ${state.duplicateScanCompletedAt ? `<div><dt>${localize("Completed at", "完成时间")}</dt><dd>${escapeHtml(state.duplicateScanCompletedAt)}</dd></div>` : ""}
   </dl>`;
 }
 
@@ -196,37 +260,37 @@ function renderDuplicateGroup(group: DuplicateGroup): string {
 
 function renderDesktopArchiveSection(state: CleanupWorkbenchState): string {
   return `<section class="panel" data-testid="cleanup-desktop-archive-section">
-    <div class="panel-head"><div><h2>Desktop rescue archive</h2><p>Analyze and archive selected desktop clutter through a token-gated move plan.</p></div></div>
+    <div class="panel-head"><div><h2>${localize("Desktop rescue archive", "桌面整理归档")}</h2><p>${localize("Analyze and archive selected desktop clutter through a token-gated move plan.", "分析桌面内容，并通过确认令牌保护的移动计划归档所选文件。")}</p></div></div>
     <div class="toolbar">
-      ${renderActionButton("create-desktop-archive-plan", "Create archive plan")}
-      ${renderActionButton("execute-desktop-archive-plan", "Execute archive plan", "danger")}
+      ${renderActionButton("create-desktop-archive-plan", localize("Create archive plan", "创建归档计划"))}
+      ${renderActionButton("execute-desktop-archive-plan", localize("Execute archive plan", "执行归档计划"), "danger")}
     </div>
     ${state.errors.desktopArchive ? `<p class="error-text" data-testid="cleanup-desktop-archive-error">${escapeHtml(state.errors.desktopArchive)}</p>` : ""}
-    ${state.desktop ? renderFolderArchiveSummary(state.desktop) : renderEmptyState("Folder not analyzed yet", "Refresh C-drive rescue or create an archive plan to analyze this folder.")}
-    <div data-testid="cleanup-desktop-archive-plan-result">${state.desktopArchivePlan ? renderArchivePlan(state.desktopArchivePlan) : renderEmptyState("No archive plan", "Create a plan before executing. High-risk and unsafe items stay skipped.")}</div>
-    <div data-testid="cleanup-desktop-archive-execute-result">${state.desktopArchiveResult ? renderMoveResult(state.desktopArchiveResult) : renderEmptyState("No execution result", "Execution results, skipped items, failures, and report summary appear here.")}</div>
-    <div data-testid="cleanup-desktop-archive-rollback" class="small-note"><strong>Recovery</strong><p>Use the target folder and report summary to move files back manually, or use matching rollback records when available.</p></div>
+    ${state.desktop ? renderFolderArchiveSummary(state.desktop) : renderEmptyState(localize("Folder not analyzed yet", "尚未分析目录"), localize("Refresh C-drive rescue or create an archive plan to analyze this folder.", "刷新 C 盘救援信息或创建归档计划以分析此目录。"))}
+    <div data-testid="cleanup-desktop-archive-plan-result">${state.desktopArchivePlan ? renderArchivePlan(state.desktopArchivePlan) : renderEmptyState(localize("No archive plan", "尚无归档计划"), localize("Create a plan before executing. High-risk and unsafe items stay skipped.", "执行前请先创建计划；高风险和不安全项目会保持跳过。"))}</div>
+    <div data-testid="cleanup-desktop-archive-execute-result">${state.desktopArchiveResult ? renderMoveResult(state.desktopArchiveResult) : renderEmptyState(localize("No execution result", "尚无执行结果"), localize("Execution results, skipped items, failures, and report summary appear here.", "执行结果、跳过项目、失败和报告摘要会显示在这里。"))}</div>
+    <div data-testid="cleanup-desktop-archive-rollback" class="small-note"><strong>${localize("Recovery", "恢复")}</strong><p>${localize("Use the target folder and report summary to move files back manually, or use matching rollback records when available.", "可根据目标目录和报告摘要手动移回文件；存在匹配回滚记录时也可使用回滚。")}</p></div>
   </section>`;
 }
 
 function renderDownloadsArchiveSection(state: CleanupWorkbenchState): string {
   return `<section class="panel" data-testid="cleanup-downloads-archive-section">
-    <div class="panel-head"><div><h2>Downloads rescue archive</h2><p>Analyze and archive selected Downloads clutter through a token-gated move plan.</p></div></div>
+    <div class="panel-head"><div><h2>${localize("Downloads rescue archive", "下载目录整理归档")}</h2><p>${localize("Analyze and archive selected Downloads clutter through a token-gated move plan.", "分析下载目录内容，并通过确认令牌保护的移动计划归档所选文件。")}</p></div></div>
     <div class="toolbar">
-      ${renderActionButton("create-downloads-archive-plan", "Create archive plan")}
-      ${renderActionButton("execute-downloads-archive-plan", "Execute archive plan", "danger")}
+      ${renderActionButton("create-downloads-archive-plan", localize("Create archive plan", "创建归档计划"))}
+      ${renderActionButton("execute-downloads-archive-plan", localize("Execute archive plan", "执行归档计划"), "danger")}
     </div>
     ${state.errors.downloadsArchive ? `<p class="error-text" data-testid="cleanup-downloads-archive-error">${escapeHtml(state.errors.downloadsArchive)}</p>` : ""}
-    ${state.downloads ? renderFolderArchiveSummary(state.downloads) : renderEmptyState("Folder not analyzed yet", "Refresh C-drive rescue or create an archive plan to analyze this folder.")}
-    <div data-testid="cleanup-downloads-archive-plan-result">${state.downloadsArchivePlan ? renderArchivePlan(state.downloadsArchivePlan) : renderEmptyState("No archive plan", "Create a plan before executing. High-risk and unsafe items stay skipped.")}</div>
-    <div data-testid="cleanup-downloads-archive-execute-result">${state.downloadsArchiveResult ? renderMoveResult(state.downloadsArchiveResult) : renderEmptyState("No execution result", "Execution results, skipped items, failures, and report summary appear here.")}</div>
-    <div data-testid="cleanup-downloads-archive-rollback" class="small-note"><strong>Recovery</strong><p>Use the target folder and report summary to move files back manually, or use matching rollback records when available.</p></div>
+    ${state.downloads ? renderFolderArchiveSummary(state.downloads) : renderEmptyState(localize("Folder not analyzed yet", "尚未分析目录"), localize("Refresh C-drive rescue or create an archive plan to analyze this folder.", "刷新 C 盘救援信息或创建归档计划以分析此目录。"))}
+    <div data-testid="cleanup-downloads-archive-plan-result">${state.downloadsArchivePlan ? renderArchivePlan(state.downloadsArchivePlan) : renderEmptyState(localize("No archive plan", "尚无归档计划"), localize("Create a plan before executing. High-risk and unsafe items stay skipped.", "执行前请先创建计划；高风险和不安全项目会保持跳过。"))}</div>
+    <div data-testid="cleanup-downloads-archive-execute-result">${state.downloadsArchiveResult ? renderMoveResult(state.downloadsArchiveResult) : renderEmptyState(localize("No execution result", "尚无执行结果"), localize("Execution results, skipped items, failures, and report summary appear here.", "执行结果、跳过项目、失败和报告摘要会显示在这里。"))}</div>
+    <div data-testid="cleanup-downloads-archive-rollback" class="small-note"><strong>${localize("Recovery", "恢复")}</strong><p>${localize("Use the target folder and report summary to move files back manually, or use matching rollback records when available.", "可根据目标目录和报告摘要手动移回文件；存在匹配回滚记录时也可使用回滚。")}</p></div>
   </section>`;
 }
 
 function renderFolderArchiveSummary(report: FolderUsageReport): string {
   return `<div class="metrics">
-    ${renderMetric("Files/categories", report.categories.length)}
+    ${renderMetric(localize("Files/categories", "文件/类别"), report.categories.length)}
     ${renderMetric(t("feature.cleanup.bytes"), formatBytes(report.totalBytes))}
     ${renderMetric(t("feature.cleanup.path"), report.path)}
   </div>
@@ -238,7 +302,7 @@ function renderFolderArchiveSummary(report: FolderUsageReport): string {
 function renderArchivePlan(plan: MovePlan): string {
   return `<div class="cleanup-plan-panel">
     ${renderObjectTable(plan, ["planId", "source", "target", "mode", "estimatedBytes", "itemCount", "risk", "requiresAdmin", "reversible", "warnings"])}
-    <p class="small-note"><strong>Preview required.</strong> Review source, target, skipped items, and warnings before executing.</p>
+    <p class="small-note"><strong>${localize("Preview required.", "必须先预览。")}</strong> ${localize("Review source, target, skipped items, and warnings before executing.", "执行前请检查来源、目标、跳过项目和警告。")}</p>
   </div>`;
 }
 
@@ -248,7 +312,7 @@ function renderMoveResult(result: MoveResult): string {
       ${renderMetric(t("feature.cleanup.resultSuccess"), result.success ? t("state.yes") : t("state.no"))}
       ${renderMetric(t("feature.cleanup.resultCleanedBytes"), formatBytes(result.movedBytes))}
       ${renderMetric(t("feature.cleanup.resultCleaned"), result.movedItems)}
-      ${renderMetric("Target", result.targetPath)}
+      ${renderMetric(localize("Target", "目标"), result.targetPath)}
     </div>
     ${renderObjectTable(result, ["planId", "sourceBackup", "targetPath", "junctionCreated", "rollbackId"])}
     ${result.failures.length ? `<div class="small-note"><strong>${t("feature.cleanup.resultFailures")}</strong><ul>${result.failures.map((failure) => `<li>${escapeHtml(failure)}</li>`).join("")}</ul></div>` : `<p class="small-note">${t("feature.cleanup.resultNoFailures")}</p>`}

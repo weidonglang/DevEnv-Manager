@@ -20,6 +20,8 @@ path = "examples/isolated_capability_fixtures.rs"
 required-features = ["acceptance-fixtures"]
 
 [features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
 acceptance-fixtures = []
 
 [build-dependencies]

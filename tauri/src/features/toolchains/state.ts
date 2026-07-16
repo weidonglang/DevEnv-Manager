@@ -42,6 +42,9 @@ export type ToolchainWorkbenchState = {
   networkCacheError: string;
   cacheOperationResult: string;
   mysql: MySqlRepairReport | null;
+  mysqlCandidateId: string;
+  mysqlAction: "backup" | "register_service" | "start_service" | "repair_system_schema" | "reset_root_guide" | "dump_guide";
+  mysqlBackupDestination: string;
   mysqlPlan: MySqlRepairPlan | null;
   mysqlResult: OperationResult | null;
   operationError: string;
@@ -94,6 +97,9 @@ export const toolchainWorkbenchInitialState: ToolchainWorkbenchState = {
   networkCacheError: "",
   cacheOperationResult: "",
   mysql: null,
+  mysqlCandidateId: "",
+  mysqlAction: "backup",
+  mysqlBackupDestination: "",
   mysqlPlan: null,
   mysqlResult: null,
   operationError: "",

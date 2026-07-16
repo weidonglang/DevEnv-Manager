@@ -11,11 +11,11 @@ export function bindCleanupEvents(context: FeatureContext, state: CleanupWorkben
   bindCleanupCandidateSelection(context, state);
   bindAction(context.root, "inspect-application-usage", async () => {
     delete state.errors.appUsage;
-    context.progress.start("Scanning application storage usage");
+    context.progress.start(t("feature.cleanup.scanningApplicationUsage"));
     try {
       const [report, installedSoftware] = await Promise.all([inspectAppUsage(), inspectInstalledSoftwareUsage()]);
       state.appUsage = { ...report, installedSoftware };
-      context.progress.done("Application usage scan completed");
+      context.progress.done(t("feature.cleanup.applicationUsageDone"));
     } catch (error) {
       state.errors.appUsage = errorMessage(error);
       context.progress.fail(state.errors.appUsage);
@@ -215,6 +215,22 @@ export function bindCleanupEvents(context: FeatureContext, state: CleanupWorkben
     context.root.innerHTML = renderCleanupWorkbench(state);
     bindCleanupEvents(context, state);
   });
+  bindAction(context.root, "choose-duplicate-scan-root", async () => {
+    try {
+      const selected = await open({ directory: true, multiple: false });
+      if (!selected || Array.isArray(selected)) return;
+      state.duplicateScanRoot = selected;
+      delete state.errors.duplicateFiles;
+    } catch (error) {
+      state.errors.duplicateFiles = errorMessage(error);
+    }
+    renderAndBind(context, state);
+  });
+  bindAction(context.root, "clear-duplicate-scan-root", () => {
+    state.duplicateScanRoot = "";
+    delete state.errors.duplicateFiles;
+    renderAndBind(context, state);
+  });
   bindAction(context.root, "create-move-plan", async () => {
     syncMoveInputs(context, state);
     if (!state.moveSource) {
@@ -322,7 +338,7 @@ export function bindCleanupEvents(context: FeatureContext, state: CleanupWorkben
     state.errors.expansionResult = "";
     state.expansionBackupReceipt = context.root.querySelector<HTMLInputElement>("#cleanup-expansion-backup-receipt")?.value.trim() || "";
     if (state.expansionPlan.backupRequired && !state.expansionBackupReceipt) {
-      state.errors.expansionResult = "Enter the external system backup receipt before executing a partition expansion plan.";
+      state.errors.expansionResult = t("feature.cleanup.expansionBackupReceiptRequired");
       if (!context.isCurrent()) return;
       context.root.innerHTML = renderCleanupWorkbench(state);
       bindCleanupEvents(context, state);
@@ -420,11 +436,11 @@ async function refreshCDriveRescue(context: FeatureContext, state: CleanupWorkbe
 }
 
 async function refreshDiskOverview(context: FeatureContext, state: CleanupWorkbenchState): Promise<void> {
-  context.progress.start("Refreshing disk overview");
+  context.progress.start(t("feature.cleanup.refreshingDiskOverview"));
   try {
     state.diskOverview = await inspectDiskOverview();
     delete state.errors.diskOverview;
-    context.progress.done("Disk overview refreshed");
+    context.progress.done(t("feature.cleanup.diskOverviewDone"));
   } catch (error) {
     state.errors.diskOverview = errorMessage(error);
     context.progress.fail(state.errors.diskOverview);
@@ -459,7 +475,7 @@ async function scanDuplicateFiles(context: FeatureContext, state: CleanupWorkben
   state.duplicateScanElapsedMs = 0;
   state.duplicateScanCompletedAt = "";
   delete state.errors.duplicateFiles;
-  context.progress.start("Scanning duplicate large files");
+  context.progress.start(t("feature.cleanup.scanningDuplicates"));
   context.root.innerHTML = renderCleanupWorkbench(state);
   bindCleanupEvents(context, state);
   const startedAt = performance.now();
@@ -472,7 +488,7 @@ async function scanDuplicateFiles(context: FeatureContext, state: CleanupWorkben
     state.duplicateScanCompletedAt = new Date().toLocaleString();
     state.duplicateScanStatus = state.duplicateGroups.length ? "completedWithResults" : "completedEmpty";
     delete state.errors.duplicateFiles;
-    context.progress.done("Duplicate scan complete");
+    context.progress.done(t("feature.cleanup.duplicateScanDone"));
   } catch (error) {
     state.duplicateScanElapsedMs = Math.max(0, Math.round(performance.now() - startedAt));
     state.duplicateScanCompletedAt = new Date().toLocaleString();
@@ -489,7 +505,7 @@ async function createArchivePlan(context: FeatureContext, state: CleanupWorkbenc
   syncMoveInputs(context, state);
   const targetDrive = state.moveTargetDrive || "D";
   const errorKey = kind === "desktop" ? "desktopArchive" : "downloadsArchive";
-  context.progress.start(kind === "desktop" ? "Creating desktop archive plan" : "Creating downloads archive plan");
+  context.progress.start(kind === "desktop" ? t("feature.cleanup.creatingDesktopArchivePlan") : t("feature.cleanup.creatingDownloadsArchivePlan"));
   try {
     if (kind === "desktop") {
       state.desktopArchivePlan = await createDesktopArchivePlan(targetDrive);

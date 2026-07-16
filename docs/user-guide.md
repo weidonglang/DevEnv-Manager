@@ -35,7 +35,7 @@ Dashboard 默认不执行完整 `scan_ports`。如果端口摘要不可用，会
 
 ### Update / release verification
 
-v1.8.2 候选安装包为 `DevEnv.Manager_1.8.2_x64-setup.exe`。正式发布前请核对候选验收记录中的 SHA256；发布后应用内 Check Update 应显示 latest version `1.8.2`，下载 URL 指向 v1.8.2 asset，checksum 与 manifest 一致。
+旧 v1.8.2 RC 安装包已经作废，不得用于发布。新的 NSIS/MSI 文件名、大小和 SHA256 只以最终修复 commit 的干净构建及 `docs/release-v1.8.2.md` 验收记录为准；发布后应用内“检查更新”应显示最新版本 `1.8.2`，下载地址指向 v1.8.2 正式资产，校验值与更新清单一致。
 
 本手册适用于 Windows 10/11 上的 DevEnv Manager 1.8.2。程序定位是开发环境诊断器与安全操作面板，不替代 npm、pnpm、pip、uv、Maven、Gradle、Cargo、chsrc、Scoop、Chocolatey、WSL 等成熟工具。
 

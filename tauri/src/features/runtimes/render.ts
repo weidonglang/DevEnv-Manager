@@ -1,5 +1,5 @@
 import { escapeHtml, pageItems, renderActionButton, renderMetric, renderPagination } from "../sharedView";
-import { t } from "../../core/i18n";
+import { localize, t } from "../../core/i18n";
 import { renderFeatureGuide } from "../../components/featureGuide";
 import type { RuntimeWorkbenchState } from "./state";
 import { toRuntimeViewModel, type RuntimeRowViewModel } from "./viewModel";
@@ -39,31 +39,31 @@ function renderExternalJdkPanel(state: RuntimeWorkbenchState, rows: RuntimeRowVi
   const java = checks.find((check) => check.id === "java-version");
   const javac = checks.find((check) => check.id === "javac-version");
   const jar = checks.find((check) => check.id === "jar-version");
-  const classification = checks.length ? (java?.success && javac?.success && jar?.success ? "Full JDK" : java?.success ? "JRE/incomplete JDK" : "Not a usable Java runtime") : "Not verified";
+  const classification = checks.length ? (java?.success && javac?.success && jar?.success ? localize("Full JDK", "完整 JDK") : java?.success ? localize("JRE/incomplete JDK", "JRE 或不完整 JDK") : localize("Not a usable Java runtime", "不是可用的 Java 运行时")) : localize("Not verified", "尚未验证");
   return `<section class="panel" data-testid="runtime-external-jdk-section">
-    <div class="panel-head"><div><h2>External JDK verification</h2><p>Read-only verification for Java installations not managed by DevEnv Manager. This does not switch or uninstall the runtime.</p></div></div>
+    <div class="panel-head"><div><h2>${localize("External JDK verification", "外部 JDK 验证")}</h2><p>${localize("Read-only verification for Java installations not managed by DevEnv Manager. This does not switch or uninstall the runtime.", "只读验证不受 DevEnv Manager 管理的 Java 安装；不会切换或卸载运行时。")}</p></div></div>
     <div class="form-grid">
       <select id="external-jdk-candidate" data-testid="runtime-external-jdk-select">
-        <option value="">Select a discovered external JDK</option>
+        <option value="">${localize("Select a discovered external JDK", "选择已发现的外部 JDK")}</option>
         ${candidates.map((candidate) => `<option value="${escapeHtml(candidate.runtimeRoot)}" ${state.externalJdkPath === candidate.runtimeRoot ? "selected" : ""}>${escapeHtml(candidate.version)} - ${escapeHtml(candidate.source)} - ${escapeHtml(candidate.runtimeRoot)}</option>`).join("")}
         ${state.externalJdkPath && !candidates.some((candidate) => candidate.runtimeRoot === state.externalJdkPath) ? `<option value="${escapeHtml(state.externalJdkPath)}" selected>${escapeHtml(state.externalJdkPath)}</option>` : ""}
       </select>
-      <input id="external-jdk-path" value="${escapeHtml(state.externalJdkPath)}" readonly placeholder="Select or choose a JDK root" />
+      <input id="external-jdk-path" value="${escapeHtml(state.externalJdkPath)}" readonly placeholder="${localize("Select or choose a JDK root", "选择或浏览 JDK 根目录")}" />
     </div>
     <div class="toolbar">
-      ${renderActionButton("choose-external-jdk", "Choose JDK root")}
-      ${renderActionButton("verify-external-jdk", "Verify java, javac, and jar", "primary")}
+      ${renderActionButton("choose-external-jdk", localize("Choose JDK root", "选择 JDK 根目录"))}
+      ${renderActionButton("verify-external-jdk", localize("Verify java, javac, and jar", "验证 java、javac 和 jar"), "primary")}
     </div>
     <div data-testid="runtime-external-jdk-result">
       ${state.externalJdkError ? `<div class="error-state">${escapeHtml(state.externalJdkError)}</div>` : ""}
       ${checks.length ? `<dl class="kv-list">
-        <div><dt>Classification</dt><dd>${escapeHtml(classification)}</dd></div>
-        <div><dt>Suggested JAVA_HOME</dt><dd>${escapeHtml(state.externalJdkPath)}</dd></div>
-        <div><dt>java executable</dt><dd>${escapeHtml(`${state.externalJdkPath}\\bin\\java.exe`)}</dd></div>
-        <div><dt>javac executable</dt><dd>${escapeHtml(`${state.externalJdkPath}\\bin\\javac.exe`)}</dd></div>
-        <div><dt>jar executable</dt><dd>${escapeHtml(`${state.externalJdkPath}\\bin\\jar.exe`)}</dd></div>
-        ${checks.map((check) => `<div><dt>${escapeHtml(check.title)}</dt><dd>${check.success ? "PASS" : "FAIL"} - ${escapeHtml(check.detail)}</dd></div>`).join("")}
-      </dl>` : `<div class="empty">No external JDK has been verified.</div>`}
+        <div><dt>${localize("Classification", "分类")}</dt><dd>${escapeHtml(classification)}</dd></div>
+        <div><dt>${localize("Suggested JAVA_HOME", "建议的 JAVA_HOME")}</dt><dd>${escapeHtml(state.externalJdkPath)}</dd></div>
+        <div><dt>${localize("java executable", "java 可执行文件")}</dt><dd>${escapeHtml(`${state.externalJdkPath}\\bin\\java.exe`)}</dd></div>
+        <div><dt>${localize("javac executable", "javac 可执行文件")}</dt><dd>${escapeHtml(`${state.externalJdkPath}\\bin\\javac.exe`)}</dd></div>
+        <div><dt>${localize("jar executable", "jar 可执行文件")}</dt><dd>${escapeHtml(`${state.externalJdkPath}\\bin\\jar.exe`)}</dd></div>
+        ${checks.map((check) => `<div><dt>${escapeHtml(check.title)}</dt><dd>${check.success ? localize("PASS", "通过") : localize("FAIL", "失败")} - ${escapeHtml(check.detail)}</dd></div>`).join("")}
+      </dl>` : `<div class="empty">${localize("No external JDK has been verified.", "尚未验证外部 JDK。")}</div>`}
       ${state.externalJdkResult ? `<div class="small-note">${escapeHtml(state.externalJdkResult)}</div>` : ""}
     </div>
   </section>`;

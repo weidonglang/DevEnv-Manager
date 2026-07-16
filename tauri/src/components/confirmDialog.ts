@@ -37,14 +37,14 @@ export function askForConfirmation(message: string, options: ConfirmOptions = {}
       <div class="confirm-backdrop" role="presentation">
         <section class="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="confirm-dialog-title">
           <div>
-            <h2 id="confirm-dialog-title">${escapeHtml(options.title || (options.danger ? "确认高风险操作" : "确认操作"))}</h2>
+            <h2 id="confirm-dialog-title">${escapeHtml(options.title || (options.danger ? localize("Confirm high-risk operation", "确认高风险操作") : localize("Confirm operation", "确认操作")))}</h2>
             <p>${escapeHtml(message)}</p>
           </div>
           ${options.details?.length ? `<ul>${options.details.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>` : ""}
-          ${required ? `<label class="confirm-required"><span>请输入确认文本</span><input id="confirm-required-input" autocomplete="off" /></label><small>确认文本：${escapeHtml(required)}</small>` : ""}
+          ${required ? `<label class="confirm-required"><span>${localize("Enter the confirmation text", "请输入确认文本")}</span><input id="confirm-required-input" autocomplete="off" /></label><small>${localize("Confirmation text", "确认文本")}：${escapeHtml(required)}</small>` : ""}
           <div class="confirm-actions">
-            <button id="confirm-cancel">${escapeHtml(options.cancelText || "取消")}</button>
-            <button id="confirm-ok" class="${options.danger ? "danger-button" : "primary"}">${escapeHtml(options.confirmText || "确认")}</button>
+            <button id="confirm-cancel">${escapeHtml(options.cancelText || localize("Cancel", "取消"))}</button>
+            <button id="confirm-ok" class="${options.danger ? "danger-button" : "primary"}">${escapeHtml(options.confirmText || localize("Confirm", "确认"))}</button>
           </div>
         </section>
       </div>
@@ -73,24 +73,25 @@ export function askForConfirmation(message: string, options: ConfirmOptions = {}
 export async function confirmRisk(message: string, risk: string) {
   if (risk === "critical") {
     return askForConfirmation(message, {
-      title: "确认极高风险操作",
-      confirmText: "确认执行",
+      title: localize("Confirm critical-risk operation", "确认极高风险操作"),
+      confirmText: localize("Confirm execution", "确认执行"),
       danger: true,
-      requiredText: "我已理解风险并确认执行",
+      requiredText: localize("I understand the risk and confirm execution", "我已理解风险并确认执行"),
       details: [
-        "该操作可能修改环境、进程、服务、文件或数据库状态。",
-        "请确认已经备份重要数据，并理解失败后的恢复方式。",
-        "前端确认只是交互提示，后端仍必须校验一次性 confirmation token。",
+        localize("This operation may modify environment, process, service, file, or database state.", "该操作可能修改环境、进程、服务、文件或数据库状态。"),
+        localize("Confirm that important data is backed up and that you understand recovery after failure.", "请确认已经备份重要数据，并理解失败后的恢复方式。"),
+        localize("Frontend confirmation is only an interaction guard; the backend must still validate a one-time confirmation token.", "前端确认只是交互提示，后端仍必须校验一次性 confirmation token。"),
       ],
     });
   }
   if (risk === "high" || risk === "medium") {
     return askForConfirmation(message, {
-      title: "确认受保护操作",
-      confirmText: "我已阅读风险说明",
+      title: localize("Confirm protected operation", "确认受保护操作"),
+      confirmText: localize("I have read the risk notice", "我已阅读风险说明"),
       danger: risk === "high",
-      details: ["请先核对计划预览、备份信息和影响范围。"],
+      details: [localize("Review the plan preview, backup information, and affected scope first.", "请先核对计划预览、备份信息和影响范围。")],
     });
   }
   return true;
 }
+import { localize } from "../core/i18n";

@@ -23,9 +23,6 @@ export function renderToolchainWorkbench(state: ToolchainWorkbenchState): string
           ${renderActionButton("inspect-toolchains", t("feature.toolchains.inspect"), "primary")}
           ${renderActionButton("inspect-platforms", t("feature.toolchains.inspectPlatforms"))}
           ${renderActionButton("inspect-services", t("feature.toolchains.inspectServices"))}
-          ${renderActionButton("inspect-mysql", t("feature.toolchains.inspectMysql"))}
-          ${renderActionButton("create-mysql-plan", t("feature.toolchains.createMysqlPlan"))}
-          ${renderActionButton("execute-mysql-plan", t("feature.toolchains.executeMysqlPlan"), "danger")}
         </div>
         ${Object.keys(state.errors).length ? `<div class="error-state" data-testid="toolchains-error">${Object.values(state.errors).map((message) => `<p>${escapeHtml(message)}</p>`).join("")}</div>` : ""}
       </section>
@@ -36,10 +33,43 @@ export function renderToolchainWorkbench(state: ToolchainWorkbenchState): string
       ${renderNetworkCache(state)}
       ${renderPlatformManagement(state, vm.platformRows)}
       ${renderLocalServices(state)}
-      <section class="panel" data-testid="toolchains-mysql-section"><h2>${t("feature.toolchains.mysqlRepair")}</h2>${state.operationError ? `<div class="error-state" data-testid="toolchains-mysql-error">${escapeHtml(state.operationError)}</div>` : ""}${renderRows(vm.mysqlRows)}<div data-testid="toolchains-mysql-result">${state.mysqlResult ? renderObjectTable(state.mysqlResult, ["success", "message"]) : `<div class="empty">${t("state.notChecked")}</div>`}</div></section>
+      ${renderMysqlRepair(state, vm.mysqlRows)}
       ${renderLearningCenter(state)}
     </div>
   `;
+}
+
+function renderMysqlRepair(state: ToolchainWorkbenchState, rows: Array<{ label: string; value: string }>): string {
+  const candidates = state.mysql?.candidates || [];
+  const needsBackupDestination = state.mysqlAction === "backup";
+  return `<section class="panel" data-testid="toolchains-mysql-section">
+    <div class="panel-head"><div><h2>${t("feature.toolchains.mysqlRepair")}</h2><p>${label("Choose the exact instance and action, create a guarded plan, then execute it with a durable result.", "选择明确的实例和动作，创建受保护计划后执行，并保留页面内结果。")}</p></div></div>
+    <div class="form-grid" data-testid="toolchains-mysql-controls">
+      <label>${label("Candidate", "候选实例")}<select id="mysql-candidate" data-testid="toolchains-mysql-candidate-select">${candidates.map((candidate) => `<option value="${escapeHtml(candidate.id)}" ${candidate.id === state.mysqlCandidateId ? "selected" : ""}>${escapeHtml(candidate.serviceName || candidate.mysqldPath || candidate.id)}</option>`).join("") || `<option value="">${label("No candidate detected", "未检测到候选实例")}</option>`}</select></label>
+      <label>${label("Action", "动作")}<select id="mysql-action" data-testid="toolchains-mysql-action-select">${mysqlActionOptions(state.mysqlAction)}</select></label>
+      ${needsBackupDestination ? `<label>${label("Backup destination", "备份目标")}<input id="mysql-backup-destination" data-testid="toolchains-mysql-backup-destination" value="${escapeHtml(state.mysqlBackupDestination)}" readonly placeholder="${label("Choose an empty backup directory", "请选择空的备份目录")}" /></label>${renderActionButton("choose-mysql-backup-destination", label("Choose backup directory", "选择备份目录"))}` : ""}
+    </div>
+    <div class="toolbar">
+      ${renderActionButton("inspect-mysql", t("feature.toolchains.inspectMysql"))}
+      ${renderActionButton("create-mysql-plan", t("feature.toolchains.createMysqlPlan"), "primary")}
+      ${renderActionButton("execute-mysql-plan", t("feature.toolchains.executeMysqlPlan"), "danger")}
+    </div>
+    ${state.operationError ? `<div class="error-state" data-testid="toolchains-mysql-error">${escapeHtml(state.operationError)}</div>` : ""}
+    <div class="plan-preview" data-testid="toolchains-mysql-plan-preview">${renderRows(rows)}</div>
+    <div data-testid="toolchains-mysql-result">${state.mysqlResult ? renderObjectTable(state.mysqlResult, ["success", "message"]) : `<div class="empty">${t("state.notChecked")}</div>`}</div>
+  </section>`;
+}
+
+function mysqlActionOptions(selected: ToolchainWorkbenchState["mysqlAction"]): string {
+  const options: Array<[ToolchainWorkbenchState["mysqlAction"], string, string]> = [
+    ["backup", "Back up complete Data directory", "备份完整 Data 目录"],
+    ["register_service", "Register Windows service", "注册 Windows 服务"],
+    ["start_service", "Start Windows service", "启动 Windows 服务"],
+    ["repair_system_schema", "Restore missing system schema", "补回缺失系统库"],
+    ["reset_root_guide", "Generate root recovery guide", "生成 root 恢复向导"],
+    ["dump_guide", "Generate database export guide", "生成业务库导出建议"],
+  ];
+  return options.map(([value, en, zh]) => `<option value="${value}" ${value === selected ? "selected" : ""}>${label(en, zh)}</option>`).join("");
 }
 
 function renderEcosystemOverview(state: ToolchainWorkbenchState): string {
@@ -163,7 +193,7 @@ function renderNetworkCache(state: ToolchainWorkbenchState): string {
     <div class="toolbar">${renderActionButton("inspect-network-diagnostics", label("Run network diagnostics", "运行网络诊断"), "primary")}${renderActionButton("inspect-download-cache", label("Inspect cache", "检查缓存"))}</div>
     ${state.networkCacheError ? `<div class="error-state" data-testid="toolchains-network-cache-error">${escapeHtml(state.networkCacheError)}</div>` : ""}
     <div data-testid="toolchains-network-result">${state.network?.checks.length ? `<div class="table-wrap"><table><thead><tr><th>${label("Target", "目标")}</th><th>${label("Status", "状态")}</th><th>${label("Latency", "耗时")}</th><th>${label("Source", "来源")}</th><th>${label("Risk", "风险")}</th></tr></thead><tbody>${state.network.checks.map((check) => `<tr><td>${escapeHtml(check.name)}<br><small>${escapeHtml(check.url)}</small></td><td>${check.success ? label("Reachable", "可访问") : escapeHtml(check.status)}</td><td>${check.elapsedMs}ms</td><td>network_diagnostics</td><td>readOnly</td></tr>`).join("")}</tbody></table></div>${renderRows(state.network.proxy.map(([name, value]) => ({ label: name, value })))}` : state.network ? `<div class="empty">${label("Diagnostics completed without endpoint results. Review proxy and backend logs.", "诊断已完成但没有端点结果，请检查代理和后端日志。")}</div>` : `<div class="empty">${label("Network diagnostics have not run.", "尚未运行网络诊断。")}</div>`}</div>
-    <div data-testid="toolchains-cache-result">${state.cacheEntries.length ? `<div class="table-wrap"><table><thead><tr><th>${label("File", "文件")}</th><th>${label("Size", "大小")}</th><th>SHA256</th><th>${label("Source", "来源")}</th><th>${label("Risk", "风险")}</th><th>${label("Actions", "操作")}</th></tr></thead><tbody>${state.cacheEntries.map((entry) => `<tr data-testid="toolchains-cache-row"><td>${escapeHtml(entry.name)}<br><small>${escapeHtml(entry.path)}</small></td><td>${formatBytes(entry.size)}</td><td>${escapeHtml(entry.sha256 || label("Not calculated", "未计算"))}</td><td>DevEnv Manager managed downloads</td><td>readOnly</td><td><button type="button" data-cache-open="${escapeHtml(entry.path)}" data-testid="toolchains-cache-open">${label("Open", "打开")}</button><button type="button" data-cache-copy="${escapeHtml(entry.path)}" data-testid="toolchains-cache-copy">${label("Copy", "复制")}</button></td></tr>`).join("")}</tbody></table></div>` : state.cacheInspected ? `<div class="empty">${label("The managed download cache is empty.", "受管下载缓存为空。")}</div>` : `<div class="empty">${label("No managed cache entries loaded. Run cache inspection.", "尚未加载受管缓存，请先检查缓存。")}</div>`}</div>
+    <div data-testid="toolchains-cache-result">${state.cacheEntries.length ? `<div class="table-wrap"><table><thead><tr><th>${label("File", "文件")}</th><th>${label("Size", "大小")}</th><th>SHA256</th><th>${label("Source", "来源")}</th><th>${label("Risk", "风险")}</th><th>${label("Actions", "操作")}</th></tr></thead><tbody>${state.cacheEntries.map((entry) => `<tr data-testid="toolchains-cache-row"><td>${escapeHtml(entry.name)}<br><small>${escapeHtml(entry.path)}</small></td><td>${formatBytes(entry.size)}</td><td>${escapeHtml(entry.sha256 || label("Not calculated", "未计算"))}</td><td>${label("DevEnv Manager managed downloads", "DevEnv Manager 受管下载")}</td><td>readOnly</td><td><button type="button" data-cache-open="${escapeHtml(entry.path)}" data-testid="toolchains-cache-open">${label("Open", "打开")}</button><button type="button" data-cache-copy="${escapeHtml(entry.path)}" data-testid="toolchains-cache-copy">${label("Copy", "复制")}</button></td></tr>`).join("")}</tbody></table></div>` : state.cacheInspected ? `<div class="empty">${label("The managed download cache is empty.", "受管下载缓存为空。")}</div>` : `<div class="empty">${label("No managed cache entries loaded. Run cache inspection.", "尚未加载受管缓存，请先检查缓存。")}</div>`}</div>
     <div data-testid="toolchains-cache-clear-preview">${renderRows([
       { label: label("Target", "目标"), value: label("DevEnv Manager managed download cache only", "仅 DevEnv Manager 受管下载缓存") },
       { label: label("Entries currently listed", "当前条目数"), value: String(state.cacheEntries.length) },

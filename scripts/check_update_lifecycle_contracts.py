@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 
@@ -7,6 +8,11 @@ ROOT = Path(__file__).resolve().parents[1]
 def require(text: str, needle: str, location: str) -> None:
     if needle not in text:
         raise SystemExit(f"Update/lifecycle contract check failed: {location} missing {needle}")
+
+
+def require_pattern(text: str, pattern: str, location: str) -> None:
+    if not re.search(pattern, text):
+        raise SystemExit(f"Update/lifecycle contract check failed: {location} missing token gate pattern")
 
 
 def main() -> None:
@@ -23,7 +29,11 @@ def main() -> None:
         require(events, f'"{action}"', "settings events")
     for command in ("launch_update_installer", "self_uninstall"):
         require(events, f'command: "{command}"', "settings risk flow")
-    require(rust, '"launch_update_installer",\n            &plan_id,\n            confirmation_token', "Rust update token gate")
+    require_pattern(
+        rust,
+        r'require_risk_operation_token\s*\(\s*"launch_update_installer"\s*,\s*&plan_id\s*,\s*confirmation_token\s*\)',
+        "Rust update token gate",
+    )
     require(rust, 'require_risk_operation_token("self_uninstall", "self-uninstall", confirmation_token)', "Rust uninstall token gate")
 
     for selector in (

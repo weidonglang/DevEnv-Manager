@@ -1,4 +1,4 @@
-import { getActiveLocale, t } from "../core/i18n";
+import { getActiveLocale, localize, t } from "../core/i18n";
 
 export type FeatureGuideId =
   | "dashboard"
@@ -222,7 +222,7 @@ export function renderFeatureGuide(id: FeatureGuideId): string {
 
 export function renderRiskLevelGuide(): string {
   return `<details class="feature-help-card">
-    <summary><span>${t("guide.riskLevels")}</span><span class="risk-chip risk-info">Info</span></summary>
+    <summary><span>${t("guide.riskLevels")}</span><span class="risk-chip risk-info">${localize("Info", "信息")}</span></summary>
     <div class="feature-help-card__body">
       <ul>
         <li>${t("guide.riskInfo")}</li>

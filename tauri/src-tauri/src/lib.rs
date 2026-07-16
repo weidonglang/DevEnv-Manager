@@ -2,11 +2,11 @@ mod cleanup;
 mod diagnostics;
 mod env_core;
 mod file_assoc;
+#[cfg(feature = "acceptance-fixtures")]
+mod isolated_acceptance;
 mod mysql_repair;
 mod powershell_runner;
 mod safety;
-#[cfg(feature = "acceptance-fixtures")]
-mod isolated_acceptance;
 
 #[cfg(feature = "acceptance-fixtures")]
 pub use isolated_acceptance::run_isolated_capability_fixtures;
@@ -2892,11 +2892,7 @@ async fn launch_update_installer(
         }
         verify_update_installer_file(&target, update.size, &update.sha256)?;
         let plan_id = format!("update:{}:{}", update.latest_version, update.sha256);
-        require_risk_operation_token(
-            "launch_update_installer",
-            &plan_id,
-            confirmation_token,
-        )?;
+        require_risk_operation_token("launch_update_installer", &plan_id, confirmation_token)?;
         hidden_command(&target)
             .spawn()
             .map_err(|err| format!("启动更新安装器失败：{err}"))?;
@@ -4243,8 +4239,17 @@ fn switch_runtime_blocking(
     path: Option<String>,
 ) -> Result<OperationResult, String> {
     let paths = load_paths()?;
+    switch_runtime_with_paths(&paths, kind, version, path)
+}
+
+fn switch_runtime_with_paths(
+    paths: &AppPaths,
+    kind: String,
+    version: String,
+    path: Option<String>,
+) -> Result<OperationResult, String> {
     let meta = runtime_meta(&kind)?;
-    let mut installed = load_installed(&paths)?;
+    let mut installed = load_installed(paths)?;
     let requested_path = path.as_deref().map(path_key);
     let record = collection(&installed, meta.collection)
         .iter()
@@ -4282,13 +4287,13 @@ fn switch_runtime_blocking(
         .transpose()?
         .unwrap_or_default();
     if meta.kind == "jdk" {
-        create_environment_backup(&paths, &previous_environment)?;
+        create_environment_backup(paths, &previous_environment)?;
     }
     switch_junction(&paths.current().join(meta.link_name), &target, &paths.root)?;
     set_current(&mut installed, meta.kind, Some(selected_version.clone()));
     save_json(&paths.installed_file(), &installed)?;
     if meta.kind == "jdk" {
-        if let Err(error) = refresh_user_java_home(&paths) {
+        if let Err(error) = refresh_user_java_home(paths) {
             if let Some(previous_version) = previous_current.jdk.as_deref() {
                 if let Some(previous_record) = installed.jdks.iter().find(|item| {
                     item.get("version").and_then(Value::as_str) == Some(previous_version)
@@ -4348,8 +4353,17 @@ fn uninstall_runtime_blocking(
     path: Option<String>,
 ) -> Result<OperationResult, String> {
     let paths = load_paths()?;
+    uninstall_runtime_with_paths(&paths, kind, version, path)
+}
+
+fn uninstall_runtime_with_paths(
+    paths: &AppPaths,
+    kind: String,
+    version: String,
+    path: Option<String>,
+) -> Result<OperationResult, String> {
     let meta = runtime_meta(&kind)?;
-    let mut installed = load_installed(&paths)?;
+    let mut installed = load_installed(paths)?;
     let requested_path = path.as_deref().map(path_key);
     let records = collection_mut(&mut installed, meta.collection);
     let index = records
@@ -4373,7 +4387,7 @@ fn uninstall_runtime_blocking(
         .unwrap_or(version.as_str())
         .to_string();
     let target = PathBuf::from(record.get("path").and_then(Value::as_str).unwrap_or(""));
-    let expected_parent = runtime_parent(&paths, meta.collection)?;
+    let expected_parent = runtime_parent(paths, meta.collection)?;
     if target.parent() != Some(expected_parent.as_path()) {
         return Err(format!("拒绝删除非标准受管目录：{}", display_path(&target)));
     }
@@ -4387,7 +4401,7 @@ fn uninstall_runtime_blocking(
     collection_mut(&mut installed, meta.collection).remove(index);
     save_json(&paths.installed_file(), &installed)?;
     if meta.kind == "jdk" {
-        refresh_user_java_home(&paths)?;
+        refresh_user_java_home(paths)?;
     }
     Ok(OperationResult {
         success: true,
@@ -4813,11 +4827,9 @@ fn execute_port_resolution_plan_blocking(
     let pid = plan.pid.to_string();
     let kill = powershell_runner::run_probe_command("taskkill", &["/PID", &pid, "/T", "/F"], 10)
         .map_err(|err| format!("Failed to run taskkill: {err}"))?;
-    let pid_exited = retry_until(
-        PORT_PID_VERIFY_ATTEMPTS,
-        Duration::from_millis(100),
-        || !process_is_running(plan.pid),
-    );
+    let pid_exited = retry_until(PORT_PID_VERIFY_ATTEMPTS, Duration::from_millis(100), || {
+        !process_is_running(plan.pid)
+    });
     let remaining_owners = wait_for_port_release(plan.port)?;
     let port_released = remaining_owners.is_empty();
     let requires_admin = port_failure_requires_admin(&kill);
@@ -4826,7 +4838,13 @@ fn execute_port_resolution_plan_blocking(
     } else {
         port_failure_reason(&kill, pid_exited, port_released)
     };
-    let next_steps = port_resolution_next_steps(&plan, kill.success, pid_exited, port_released, requires_admin);
+    let next_steps = port_resolution_next_steps(
+        &plan,
+        kill.success,
+        pid_exited,
+        port_released,
+        requires_admin,
+    );
     Ok(PortResolutionResult {
         success: kill.success && pid_exited && port_released,
         message: if kill.success && pid_exited && port_released {
@@ -4855,14 +4873,18 @@ fn validate_force_kill_target(
     service_names: &[String],
 ) -> Result<(), String> {
     if BLOCKED_PIDS.contains(&pid) {
-        return Err(format!("PID {pid} is protected and cannot enter force-kill execution"));
+        return Err(format!(
+            "PID {pid} is protected and cannot enter force-kill execution"
+        ));
     }
     if !service_names.is_empty() {
         return Err("service_owned_port: force-kill execution is not allowed".to_string());
     }
     let normalized_name = process_name.trim().to_ascii_lowercase();
     if PROTECTED_FORCE_KILL_PROCESS_NAMES.contains(&normalized_name.as_str()) {
-        return Err(format!("Protected process {process_name} cannot enter force-kill execution"));
+        return Err(format!(
+            "Protected process {process_name} cannot enter force-kill execution"
+        ));
     }
     if process_path.trim().is_empty() {
         return Err("Process path is unavailable; force-kill execution is refused".to_string());
@@ -4926,7 +4948,8 @@ fn port_failure_reason(
         return "系统已接受停止请求，但端口复查仍显示被占用。".to_string();
     }
     if port_failure_requires_admin(result) {
-        return "Windows 拒绝停止该进程，通常需要管理员权限或该进程受服务/系统策略保护。".to_string();
+        return "Windows 拒绝停止该进程，通常需要管理员权限或该进程受服务/系统策略保护。"
+            .to_string();
     }
     if result.exit_code.is_some() {
         return format!(
@@ -4946,7 +4969,9 @@ fn port_resolution_next_steps(
 ) -> Vec<String> {
     let mut steps = Vec::new();
     if requires_admin {
-        steps.push("如确认这是可停止的本地开发进程，请使用管理员权限重新打开应用后再重试。".to_string());
+        steps.push(
+            "如确认这是可停止的本地开发进程，请使用管理员权限重新打开应用后再重试。".to_string(),
+        );
     }
     if !plan.service_names.is_empty() {
         steps.push(format!(
@@ -4958,7 +4983,8 @@ fn port_resolution_next_steps(
         steps.push("复制诊断信息，确认 PID、进程路径和所属项目后再决定是否手动处理。".to_string());
     }
     if !pid_exited {
-        steps.push("如果 PID 仍在运行，请检查它是否有子进程、守护进程或 IDE 自动重启。".to_string());
+        steps
+            .push("如果 PID 仍在运行，请检查它是否有子进程、守护进程或 IDE 自动重启。".to_string());
     }
     if !port_released {
         steps.push("重新扫描端口，确认是否出现新的占用方或原服务自动拉起。".to_string());
@@ -5642,7 +5668,10 @@ fn validate_generic_archive_source(path: &str) -> Result<(PathBuf, u64), String>
         return Err("Only regular files can be executed by a generic archive plan".to_string());
     }
     if archive_path_is_sensitive(&candidate) {
-        return Err("Chat data, browser profiles, and credential-shaped files cannot be archived".to_string());
+        return Err(
+            "Chat data, browser profiles, and credential-shaped files cannot be archived"
+                .to_string(),
+        );
     }
     if cleanup::is_inside_managed_runtime(&candidate)
         || env::current_dir()
@@ -5651,15 +5680,15 @@ fn validate_generic_archive_source(path: &str) -> Result<(PathBuf, u64), String>
         || (cleanup::should_skip_path(&candidate).is_some()
             && !archive_user_root_allowed(&candidate))
     {
-        return Err("System, current-project, and managed runtime paths cannot be archived".to_string());
+        return Err(
+            "System, current-project, and managed runtime paths cannot be archived".to_string(),
+        );
     }
     Ok((candidate, metadata.len()))
 }
 
 fn generic_archive_target_root(target_drive: &str) -> Result<PathBuf, String> {
-    let drive = target_drive
-        .trim()
-        .trim_end_matches([':', '\\', '/']);
+    let drive = target_drive.trim().trim_end_matches([':', '\\', '/']);
     if drive.len() != 1 || !drive.as_bytes()[0].is_ascii_alphabetic() {
         return Err("Archive target must be a drive letter such as D".to_string());
     }
@@ -5768,9 +5797,11 @@ fn build_generic_archive_plan(
         risk_level: "high".to_string(),
         entries,
         warnings: vec![
-            "Files are copied, verified, and then removed from their original locations".to_string(),
+            "Files are copied, verified, and then removed from their original locations"
+                .to_string(),
             "Existing targets and duplicate target names are skipped without overwrite".to_string(),
-            "Use the execution receipt to copy archived files back when rollback is needed".to_string(),
+            "Use the execution receipt to copy archived files back when rollback is needed"
+                .to_string(),
         ],
     })
 }
@@ -5809,11 +5840,17 @@ fn execute_generic_archive_files(plan: &GenericArchivePlan) -> GenericArchiveRes
         for entry in &plan.entries {
             if entry.conflict {
                 skipped_items += 1;
-                failures.push(format!("Skipped {}: {}", entry.source, entry.conflict_reason));
+                failures.push(format!(
+                    "Skipped {}: {}",
+                    entry.source, entry.conflict_reason
+                ));
                 continue;
             }
             let Ok((source, actual_size)) = validate_generic_archive_source(&entry.source) else {
-                failures.push(format!("Source failed safety revalidation: {}", entry.source));
+                failures.push(format!(
+                    "Source failed safety revalidation: {}",
+                    entry.source
+                ));
                 continue;
             };
             if actual_size != entry.size {
@@ -5824,13 +5861,19 @@ fn execute_generic_archive_files(plan: &GenericArchivePlan) -> GenericArchiveRes
                 Ok(sha256) => !sha256.eq_ignore_ascii_case(&entry.sha256),
                 Err(_) => true,
             } {
-                failures.push(format!("Source hash changed after preview: {}", entry.source));
+                failures.push(format!(
+                    "Source hash changed after preview: {}",
+                    entry.source
+                ));
                 continue;
             }
             let target = PathBuf::from(&entry.target);
             if !target.starts_with(&target_root) || target.exists() {
                 skipped_items += 1;
-                failures.push(format!("Target conflict detected at execution: {}", entry.target));
+                failures.push(format!(
+                    "Target conflict detected at execution: {}",
+                    entry.target
+                ));
                 continue;
             }
             let target_parent_valid = target
@@ -5853,12 +5896,17 @@ fn execute_generic_archive_files(plan: &GenericArchivePlan) -> GenericArchiveRes
                             .is_ok_and(|sha256| sha256.eq_ignore_ascii_case(&entry.sha256));
                     if !target_verified {
                         let _ = fs::remove_file(&target);
-                        failures.push(format!("Copied target verification failed: {}", entry.target));
+                        failures.push(format!(
+                            "Copied target verification failed: {}",
+                            entry.target
+                        ));
                         continue;
                     }
                     if let Err(error) = fs::remove_file(&source) {
                         let _ = fs::remove_file(&target);
-                        failures.push(format!("Could not remove source after verified copy: {error}"));
+                        failures.push(format!(
+                            "Could not remove source after verified copy: {error}"
+                        ));
                         continue;
                     }
                     let verified = !source.exists();
@@ -5882,7 +5930,9 @@ fn execute_generic_archive_files(plan: &GenericArchivePlan) -> GenericArchiveRes
                         entry.source, actual_size, copied
                     ));
                 }
-                Err(error) => failures.push(format!("Archive copy failed for {}: {error}", entry.source)),
+                Err(error) => {
+                    failures.push(format!("Archive copy failed for {}: {error}", entry.source))
+                }
             }
         }
     }
@@ -5900,7 +5950,9 @@ fn execute_generic_archive_files(plan: &GenericArchivePlan) -> GenericArchiveRes
     };
     if let Err(error) = save_json(&receipt_path, &result) {
         result.success = false;
-        result.failures.push(format!("Failed to write archive receipt: {error}"));
+        result
+            .failures
+            .push(format!("Failed to write archive receipt: {error}"));
     }
     result
 }
@@ -5910,11 +5962,7 @@ fn execute_generic_archive_plan(
     plan_id: String,
     confirmation_token: Option<String>,
 ) -> Result<GenericArchiveResult, String> {
-    require_risk_operation_token(
-        "execute_generic_archive_plan",
-        &plan_id,
-        confirmation_token,
-    )?;
+    require_risk_operation_token("execute_generic_archive_plan", &plan_id, confirmation_token)?;
     let plan = generic_archive_plan_store()
         .lock()
         .map_err(|_| "Generic archive plan storage is unavailable".to_string())?
@@ -7573,54 +7621,77 @@ async fn apply_python_repair(
             .map_err(|_| "Python 修复预览暂时不可用".to_string())?
             .remove(&plan_id)
             .ok_or_else(|| "Python 修复计划不存在、已应用或已过期".to_string())?;
-        let created = pending.public.created_at.parse::<u64>().unwrap_or(0);
-        if created.saturating_add(10 * 60) < unix_timestamp() {
-            return Err("Python 修复计划已过期，请重新分析和预览".to_string());
-        }
         let environment = user_environment()?;
-        if environment_fingerprint(&environment) != pending.baseline_fingerprint {
-            return Err("用户环境在预览后发生变化，已拒绝覆盖；请重新分析".to_string());
-        }
-        if !Path::new(&pending.public.python_path).is_file() {
-            return Err("预览中的 Python 已不存在".to_string());
-        }
         let paths = load_paths()?;
-        let backup = create_environment_backup(&paths, &environment)?;
-        if pending.repair_pip {
-            run_command_output(
-                PathBuf::from(&pending.public.python_path),
-                &["-m", "ensurepip", "--upgrade"],
-                180,
-            )?;
-            run_command_output(
-                PathBuf::from(&pending.public.python_path),
-                &["-m", "pip", "install", "--upgrade", "pip"],
-                300,
-            )?;
-        }
-        if pending.repair_path {
-            restore_environment_values(
-                environment.get("DEVENV_HOME").map(String::as_str),
-                environment.get("JAVA_HOME").map(String::as_str),
-                &pending.proposed_path,
-            )?;
-            broadcast_environment_change();
-        }
-        let verified = run_command_output(
-            PathBuf::from(&pending.public.python_path),
-            &["-m", "pip", "--version"],
-            60,
-        )?;
-        Ok(OperationResult {
-            success: true,
-            message: format!(
-                "Python 修复完成并回读验证：{}；环境备份：{}",
-                verified.lines().next().unwrap_or("pip 可用"),
-                backup
-            ),
-        })
+        apply_python_repair_pending_with(
+            pending,
+            environment,
+            &paths,
+            run_command_output,
+            |devenv_home, java_home, path| {
+                restore_environment_values(devenv_home, java_home, path)?;
+                broadcast_environment_change();
+                Ok(())
+            },
+        )
     })
     .await?
+}
+
+fn apply_python_repair_pending_with<Run, WriteEnvironment>(
+    pending: PendingPythonRepair,
+    environment: HashMap<String, String>,
+    paths: &AppPaths,
+    mut run: Run,
+    mut write_environment: WriteEnvironment,
+) -> Result<OperationResult, String>
+where
+    Run: FnMut(PathBuf, &[&str], u64) -> Result<String, String>,
+    WriteEnvironment: FnMut(Option<&str>, Option<&str>, &str) -> Result<(), String>,
+{
+    let created = pending.public.created_at.parse::<u64>().unwrap_or(0);
+    if created.saturating_add(10 * 60) < unix_timestamp() {
+        return Err("Python 修复计划已过期，请重新分析和预览".to_string());
+    }
+    if environment_fingerprint(&environment) != pending.baseline_fingerprint {
+        return Err("用户环境在预览后发生变化，已拒绝覆盖；请重新分析".to_string());
+    }
+    if !Path::new(&pending.public.python_path).is_file() {
+        return Err("预览中的 Python 已不存在".to_string());
+    }
+    let backup = create_environment_backup(paths, &environment)?;
+    if pending.repair_pip {
+        run(
+            PathBuf::from(&pending.public.python_path),
+            &["-m", "ensurepip", "--upgrade"],
+            180,
+        )?;
+        run(
+            PathBuf::from(&pending.public.python_path),
+            &["-m", "pip", "install", "--upgrade", "pip"],
+            300,
+        )?;
+    }
+    if pending.repair_path {
+        write_environment(
+            environment.get("DEVENV_HOME").map(String::as_str),
+            environment.get("JAVA_HOME").map(String::as_str),
+            &pending.proposed_path,
+        )?;
+    }
+    let verified = run(
+        PathBuf::from(&pending.public.python_path),
+        &["-m", "pip", "--version"],
+        60,
+    )?;
+    Ok(OperationResult {
+        success: true,
+        message: format!(
+            "Python 修复完成并回读验证：{}；环境备份：{}",
+            verified.lines().next().unwrap_or("pip 可用"),
+            backup
+        ),
+    })
 }
 
 #[tauri::command]
@@ -7741,11 +7812,7 @@ async fn run_toolchain_action(
     );
     let result = run_blocking(move || {
         if worker_action != "git_test_ssh" {
-            require_risk_operation_token(
-                "run_toolchain_action",
-                &plan_id,
-                confirmation_token,
-            )?;
+            require_risk_operation_token("run_toolchain_action", &plan_id, confirmation_token)?;
         }
         run_toolchain_action_blocking(&worker_action, value, secondary)
     })
@@ -8099,7 +8166,14 @@ fn run_chsrc_action_blocking(
 
 fn chsrc_source_allowed(source: &str) -> bool {
     const SOURCES: [&str; 8] = [
-        "official", "npmmirror", "tuna", "aliyun", "ustc", "bfsu", "huawei", "tencent",
+        "official",
+        "npmmirror",
+        "tuna",
+        "aliyun",
+        "ustc",
+        "bfsu",
+        "huawei",
+        "tencent",
     ];
     SOURCES.contains(&source)
 }
@@ -9703,8 +9777,9 @@ fn doctor_repair_action_details(
                 risk_level,
                 requires_backup: true,
                 requires_token: true,
-                next_step: "Review the evidence, backup name, and risk confirmation before execution."
-                    .to_string(),
+                next_step:
+                    "Review the evidence, backup name, and risk confirmation before execution."
+                        .to_string(),
             }
         })
         .collect()
@@ -10248,7 +10323,10 @@ fn rename_config_profile_blocking(id: String, name: String) -> Result<OperationR
     }
     let paths = load_paths()?;
     let mut profiles = load_profiles(&paths)?;
-    if profiles.iter().any(|item| item.id != id && item.name == name) {
+    if profiles
+        .iter()
+        .any(|item| item.id != id && item.name == name)
+    {
         return Err("已存在同名配置模板".to_string());
     }
     let profile = profiles
@@ -13843,8 +13921,7 @@ fn analyze_port_signature(
     let unknown_or_weak = identity == "未识别的本地服务" || identity.contains("仅端口弱证据");
     let risk_level = if !state.eq_ignore_ascii_case("LISTENING") {
         "low"
-    } else if !service_names.is_empty()
-        || matches!(port, 3306 | 5432 | 6379 | 27017 | 9200 | 1433)
+    } else if !service_names.is_empty() || matches!(port, 3306 | 5432 | 6379 | 27017 | 9200 | 1433)
     {
         "high"
     } else if unknown_or_weak && matches!(port, 80 | 443 | 8000 | 8080..=8082 | 8888) {
@@ -14012,7 +14089,10 @@ pub(crate) fn command_text(stdout: &[u8], stderr: &[u8]) -> String {
     const MAX_COMMAND_OUTPUT_CHARS: usize = 32 * 1024;
     let truncate = |value: String| {
         let mut chars = value.trim().chars();
-        let text = chars.by_ref().take(MAX_COMMAND_OUTPUT_CHARS).collect::<String>();
+        let text = chars
+            .by_ref()
+            .take(MAX_COMMAND_OUTPUT_CHARS)
+            .collect::<String>();
         if chars.next().is_some() {
             format!("{text}\n[output truncated by DevEnv Manager]")
         } else {
@@ -16184,7 +16264,13 @@ mod tests {
 
     #[test]
     fn force_kill_rejects_system_protected_and_service_owned_targets() {
-        assert!(validate_force_kill_target(4, "System", r"C:\\Windows\\System32\\ntoskrnl.exe", &[]).is_err());
+        assert!(validate_force_kill_target(
+            4,
+            "System",
+            r"C:\\Windows\\System32\\ntoskrnl.exe",
+            &[]
+        )
+        .is_err());
         for process_name in ["System", "lsass.exe", "svchost.exe", "spoolsv.exe"] {
             assert!(
                 validate_force_kill_target(
@@ -16204,13 +16290,10 @@ mod tests {
             &["ExampleService".to_string()],
         )
         .is_err());
-        assert!(validate_force_kill_target(
-            1234,
-            "python.exe",
-            r"C:\\Python313\\python.exe",
-            &[],
-        )
-        .is_ok());
+        assert!(
+            validate_force_kill_target(1234, "python.exe", r"C:\\Python313\\python.exe", &[],)
+                .is_ok()
+        );
     }
 
     #[test]

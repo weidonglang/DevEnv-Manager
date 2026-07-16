@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 
@@ -7,6 +8,11 @@ ROOT = Path(__file__).resolve().parents[1]
 def require(text: str, needle: str, location: str) -> None:
     if needle not in text:
         raise SystemExit(f"Cleanup recovery workflow check failed: {location} missing {needle}")
+
+
+def require_pattern(text: str, pattern: str, location: str) -> None:
+    if not re.search(pattern, text):
+        raise SystemExit(f"Cleanup recovery workflow check failed: {location} missing token gate pattern")
 
 
 def main() -> None:
@@ -46,7 +52,11 @@ def main() -> None:
 
     require(events, 'command: "execute_generic_archive_plan"', "Cleanup risk flow")
     require(rust, 'command: "execute_generic_archive_plan"', "Rust risk registry")
-    require(rust, 'require_risk_operation_token(\n        "execute_generic_archive_plan"', "Rust archive token gate")
+    require_pattern(
+        rust,
+        r'require_risk_operation_token\s*\(\s*"execute_generic_archive_plan"\s*,\s*&plan_id\s*,\s*confirmation_token\s*\)',
+        "Rust archive token gate",
+    )
     require(rust, "validate_generic_archive_source", "Rust source revalidation")
     require(rust, "target.exists()", "Rust no-overwrite check")
     require(rust, "fs::copy(&source, &target)", "Rust archive copy")

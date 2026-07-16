@@ -12,6 +12,11 @@ import build_v17_release_matrices as baseline
 ROOT = Path(__file__).resolve().parents[1]
 EVIDENCE_COMMIT = "bfcc10fc907184e247aa139d69933b974a4351f9"
 RELEASELAB_PRODUCT_COMMIT = "71cdcd96139791c65308fb9a8a280f56806bf3a1"
+RELEASELAB_EVIDENCE_COMMITS = {
+    "environment.configure": "d9de3f746cb562be5d8f1d30f70d72a9a4055922",
+    "environment.path-cleanup": "294be361b3133140b60326f4e7ef5a4336e064df",
+    "file-associations.backup-rollback": "702e5e5fffedab20bdf790abc936866c4a6c8d45",
+}
 SOURCE_PATH = ROOT / "acceptance" / "v1.7.0-source-records.json"
 NORMALIZED_PATH = ROOT / "acceptance" / "v1.7.0-normalized-capabilities.json"
 NORMALIZED_MD = ROOT / "docs" / "v1.7.0-normalized-capabilities.md"
@@ -258,18 +263,76 @@ EVIDENCE_OVERRIDES = {
     "safety.guide": "verified-installed",
     "cli.workflows": "verified-automated",
     "runner.background-execution": "verified-real-tauri",
+    "environment.configure": "verified-real-tauri",
+    "environment.java-stabilize": "verified-automated",
+    "environment.path-cleanup": "verified-real-tauri",
+    "environment.python-health-repair": "verified-automated",
+    "environment.restore": "verified-automated",
+    "file-associations.backup-rollback": "verified-real-tauri",
     "cleanup.archive-plan": "verified-automated",
     "cleanup.dev-cache": "verified-automated",
     "cleanup.download-cache": "verified-automated",
     "cleanup.move-rollback": "verified-automated",
+    "cleanup.partition-expansion": "verified-real-tauri",
+    "mysql.repair": "verified-real-tauri",
+    "platforms.manage": "verified-real-tauri",
     "profiles.apply": "verified-automated",
     "projects.configuration": "verified-automated",
     "projects.port-config": "verified-automated",
+    "runtime.install": "verified-automated",
+    "runtime.lifecycle": "verified-automated",
+    "runtime.switch": "verified-automated",
+    "runtime.uninstall": "verified-automated",
+    "services.manage": "verified-real-tauri",
     "system.self-uninstall": "verified-installed",
     "update.download-install": "verified-installed",
 }
 
 RELEASELAB_EVIDENCE = {
+    "cleanup.partition-expansion": [
+        "release-lab:artifacts/release-lab/uac-rc/20260716T111438Z/partition-expansion-result.json",
+        "result-sha256:37f36abffdaea09a53a69b0ad98a2b507a9544ec89242e9ffc3c101efc49269b",
+        "restore-verification-sha256:67c6ff42336e2cacc87c09386e54fa61382ac593292fdc90d17f9f0f0e93c8f7",
+        "verified-added-bytes:883932672",
+        "verified-volume:ntfs-healthy",
+    ],
+    "environment.configure": [
+        "release-lab:artifacts/release-lab/new-rc-v1.8.2/d9de3f7/environment-file-associations",
+        "before-sha256:9c71429092d8272c5b24cb67818cd0a57c401f7c9f4dc3c750cde5f1b3f2098b",
+        "after-write-sha256:8140d674f9d2c6ae21787529112347e878033b808950063aaf1ff32bd31fe015",
+        "result-panel:environment-success-durable-result.png",
+    ],
+    "environment.path-cleanup": [
+        "release-lab:artifacts/release-lab/new-rc-v1.8.2/294be36/environment-file-associations",
+        "before-sha256:af377b2d0b9b180e8109a7313cd0a568f1c9041e95696151d8a286cb12b593c0",
+        "after-sha256:f36cf3b10327d2a10fff4d38954f44f185d54b6ee82703c3652adfb4bcb53b50",
+        "noop-sha256:e95b533dbebd726a2795161a6395641fcee112ec799ebbc5d51a7893571744d4",
+    ],
+    "file-associations.backup-rollback": [
+        "release-lab:artifacts/release-lab/new-rc-v1.8.2/702e5e5/environment-file-associations",
+        "before-sha256:e37a38b4343981447b39bdd48a9d2cae8918503cb37fc9ab8701ab5302ce3788",
+        "after-apply-sha256:5e2dbd84b31a5aaede4dd5479504663af210698f9b937ca8f52c6e5e64a88de0",
+        "after-rollback-sha256:5bfbfb8438490a9fc99386e5fe1ddbbaa42cea9c0e9d5f8f34e28f7ef54b4a04",
+        "backup-validation-sha256:f901e3f84a4a7a3d91e0ae8a63bac875d91b1c9d3a00a6957f1c37b0d9d25a10",
+    ],
+    "mysql.repair": [
+        "release-lab:artifacts/release-lab/uac-rc/20260716T111438Z/mysql-repair-service-evidence.json",
+        "evidence-sha256:02db37ce0d2579f58b6ec8407445f42323488cc3c9f39d5adc32e5d5a2bf3970",
+        "restore-verification-sha256:67c6ff42336e2cacc87c09386e54fa61382ac593292fdc90d17f9f0f0e93c8f7",
+        "verification:schema-restored-ibdata-preserved-business-preserved",
+    ],
+    "platforms.manage": [
+        "release-lab:artifacts/release-lab/uac-rc/20260716T111438Z/wsl-platform-evidence.json",
+        "evidence-sha256:f89478c32ab4536b3f63d8e7682b190bf544dcee1441dd7033067cb32381ea6e",
+        "restore-verification-sha256:67c6ff42336e2cacc87c09386e54fa61382ac593292fdc90d17f9f0f0e93c8f7",
+        "verification:virtual-machine-platform-enabled-reboot-pending",
+    ],
+    "services.manage": [
+        "release-lab:artifacts/release-lab/uac-rc/20260716T111438Z/mysql-repair-service-evidence.json",
+        "evidence-sha256:02db37ce0d2579f58b6ec8407445f42323488cc3c9f39d5adc32e5d5a2bf3970",
+        "restore-verification-sha256:67c6ff42336e2cacc87c09386e54fa61382ac593292fdc90d17f9f0f0e93c8f7",
+        "verification:fixture-service-stopped-port-released",
+    ],
     "system.self-uninstall": [
         "release-lab:docs/release-lab-v1.8.2.md#current-rc-matrix",
         "summary-sha256:ebf957ef4eb49499a648618dbbd65135b1c704caedfb7e2ad32338c06ab07dd7",
@@ -283,8 +346,11 @@ RELEASELAB_EVIDENCE = {
 
 ISOLATED_FIXTURE_CAPABILITIES = {
     "cleanup.archive-plan", "cleanup.dev-cache", "cleanup.download-cache",
-    "cleanup.move-rollback", "profiles.apply", "projects.configuration",
-    "projects.port-config",
+    "cleanup.move-rollback", "environment.java-stabilize", "environment.python-health-repair",
+    "environment.restore",
+    "profiles.apply", "projects.configuration",
+    "projects.port-config", "runtime.install", "runtime.lifecycle", "runtime.switch",
+    "runtime.uninstall",
 }
 
 CAPABILITY_COMMAND_OVERRIDES = {
@@ -478,7 +544,10 @@ def build_capabilities(records: list[dict[str, Any]], current: dict[str, Any]) -
             "releaseDisposition": disposition,
             "releaseReason": reason,
             "followUpIssue": "#130" if capability_id.startswith("runtime.") else "#125",
-            "lastVerifiedCommit": RELEASELAB_PRODUCT_COMMIT if capability_id in RELEASELAB_EVIDENCE else EVIDENCE_COMMIT,
+            "lastVerifiedCommit": RELEASELAB_EVIDENCE_COMMITS.get(
+                capability_id,
+                RELEASELAB_PRODUCT_COMMIT if capability_id in RELEASELAB_EVIDENCE else EVIDENCE_COMMIT,
+            ),
             "automatedEvidence": automated,
             "productDecision": {
                 "decision": "included-in-v1.8.2-compatibility-scope",
@@ -587,8 +656,12 @@ def build_backend(current: dict[str, Any], capabilities: list[dict[str, Any]], o
             replacement_resolution = "compatibility-retained-product-decision"
         else:
             replacement_resolution = "not-required"
-        if classification in {"direct-user-command", "dynamic-user-command", "replacement-command", "compatibility-alias"}:
-            disposition = capability["releaseDisposition"] if capability else "product-decision-required"
+        if classification in {"direct-user-command", "dynamic-user-command", "replacement-command"}:
+            disposition = capability["releaseDisposition"] if capability else "ready"
+        elif classification == "compatibility-alias":
+            disposition = capability["releaseDisposition"] if capability else (
+                "ready" if replacement_chain else "product-decision-required"
+            )
         elif classification in {"internal-helper", "bootstrap", "diagnostic"}:
             disposition = "ready"
         else:
@@ -709,6 +782,10 @@ def render_blockers(capabilities: list[dict[str, Any]]) -> str:
         lines.append("")
     lines.extend([
         "## Completed ReleaseLab evidence", "",
+        "- `cleanup.partition-expansion`: the isolated UAC case verified C: grew by 883,932,672 bytes, remained healthy NTFS, and consumed the prepared adjacent extent.",
+        "- `mysql.repair`: the isolated UAC case restored the fixture system schema while preserving the `ibdata1` and business-data SHA256 values.",
+        "- `platforms.manage`: the isolated UAC case enabled VirtualMachinePlatform and recorded the expected pending-reboot state.",
+        "- `services.manage`: the isolated UAC case stopped the fixture Windows service and verified that its development port was released.",
         "- `system.self-uninstall`: N5 passed with a matching high-risk token contract, official uninstaller launch, application exit, cleanup, and retained settings/Profile evidence.",
         "- `update.download-install`: N6 passed with controlled metadata, progress, size mismatch rejection, SHA256 mismatch rejection, verified download, a matching high-risk token contract, and installer launch evidence.",
         "", "## Installer blockers", "", "Count: 0", "",
@@ -729,7 +806,9 @@ def update_issue_matrix(normalized_summary: dict[str, Any]) -> None:
         f"{normalized_summary['byReleaseDisposition'].get('evidence-blocker', 0)} evidence blockers, "
         f"and {normalized_summary['byReleaseDisposition'].get('product-decision-required', 0)} product decisions remain."
     )
-    issue125["labelDisposition"] = "retain blocker pending product approval and approved blocker implementation batch"
+    issue125["labelDisposition"] = (
+        "retain as the post-v1.8.2 historical completeness tracker; current release blockers are zero"
+    )
     payload["adjudicationSummary"] = normalized_summary
     write_json(ISSUES_PATH, payload)
     ISSUES_MD.write_text(baseline.render_issues(payload["issues"]), encoding="utf-8")

@@ -1,4 +1,5 @@
 import type { FeatureContext } from "../../app/featureContext";
+import { open } from "../../api/tauri";
 import { showSafetyNoticeDialog } from "../../components/disclaimerPanel";
 import { clearDebugEntries, debugEntriesAsMarkdown, getDebugEntries, isAdvancedMode, logDebug, setAdvancedMode } from "../../core/debugLog";
 import { localeModeLabel, setLocale, t, type LocaleMode } from "../../core/i18n";
@@ -41,6 +42,20 @@ export function bindSettingsEvents(context: FeatureContext, state: SettingsWorkb
       context.toast(state.operationError, true);
     }
   });
+  bindAction(context.root, "choose-settings-root-dir", async () => {
+    state.operationError = "";
+    try {
+      const selected = await open({ directory: true, multiple: false });
+      if (!selected || Array.isArray(selected)) return;
+      const input = context.root.querySelector<HTMLInputElement>("#settings-root");
+      if (input) input.value = selected;
+      state.operationResult = `Selected root directory: ${selected}`;
+    } catch (error) {
+      state.operationError = errorMessage(error);
+      context.root.innerHTML = renderSettingsWorkbench(state);
+      bindSettingsEvents(context, state);
+    }
+  });
   bindAction(context.root, "toggle-auto-update", async () => {
     state.config = await setAutoCheckUpdate(!state.config?.settings.autoCheckUpdate);
     if (!context.isCurrent()) return;
@@ -50,10 +65,10 @@ export function bindSettingsEvents(context: FeatureContext, state: SettingsWorkb
   bindAction(context.root, "check-for-updates", async () => {
     state.updateError = "";
     state.updateDownload = null;
-    context.progress.start("Checking update metadata");
+    context.progress.start(t("feature.settings.checkingUpdateMetadata"));
     try {
       state.update = await checkForUpdates();
-      context.progress.done("Update metadata loaded");
+      context.progress.done(t("feature.settings.updateMetadataLoaded"));
     } catch (error) {
       state.updateError = errorMessage(error);
       context.progress.fail(state.updateError);
@@ -71,10 +86,10 @@ export function bindSettingsEvents(context: FeatureContext, state: SettingsWorkb
       bindSettingsEvents(context, state);
       return;
     }
-    context.progress.start(`Downloading ${state.update.fileName}`);
+    context.progress.start(t("feature.settings.downloadingUpdate", { fileName: state.update.fileName }));
     try {
       state.updateDownload = await downloadUpdate();
-      context.progress.done("Update downloaded and verified");
+      context.progress.done(t("feature.settings.updateDownloadedVerified"));
     } catch (error) {
       state.updateError = errorMessage(error);
       context.progress.fail(state.updateError);

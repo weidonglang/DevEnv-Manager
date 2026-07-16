@@ -33,15 +33,15 @@
   "summary": {
     "total": 237,
     "byMigrationStatus": {
-      "degraded": 39,
-      "enhanced": 5,
-      "equivalent": 110,
-      "unreviewed": 83
+      "degraded": 13,
+      "enhanced": 7,
+      "equivalent": 137,
+      "unreviewed": 80
     },
     "byReleaseDisposition": {
-      "ready": 87,
-      "release-blocker": 67,
-      "split-required": 83
+      "ready": 106,
+      "release-blocker": 51,
+      "split-required": 80
     }
   },
   "capabilities": [
@@ -767,7 +767,10 @@
       },
       "currentPage": "",
       "currentEntry": "",
-      "currentFrontendComponent": [],
+      "currentFrontendComponent": [
+        "tauri/src/features/cleanup/events.ts",
+        "tauri/src/features/cleanup/render.ts"
+      ],
       "currentBackendCommands": [],
       "currentUserSteps": [],
       "migrationStatus": "unreviewed",
@@ -1179,13 +1182,18 @@
         "rollback": false
       },
       "currentPage": "",
-      "currentEntry": "",
-      "currentFrontendComponent": [],
+      "currentEntry": "download-update",
+      "currentFrontendComponent": [
+        "tauri/src/features/settings/events.ts",
+        "tauri/src/features/settings/render.ts"
+      ],
       "currentBackendCommands": [],
       "currentUserSteps": [],
-      "migrationStatus": "unreviewed",
-      "difference": "Action identifier changed or capability requires command-level mapping.",
-      "automatedEvidence": [],
+      "migrationStatus": "equivalent",
+      "difference": "Exact action identifier remains in current frontend.",
+      "automatedEvidence": [
+        "current-source-action-match"
+      ],
       "realTauriEvidence": [],
       "installedAppEvidence": [],
       "upgradeEvidence": [
@@ -1195,8 +1203,8 @@
         "silent-v1.7.0-recovery-passed"
       ],
       "lastVerifiedCommit": "2f05525b0b685f1386c271849415987c6fde05f3",
-      "releaseDisposition": "split-required",
-      "releaseReason": "Evidence sources were captured, but an explicit product mapping is still required.",
+      "releaseDisposition": "ready",
+      "releaseReason": "Current mapping and available evidence preserve the historical capability.",
       "followUpIssue": "#125",
       "sourceEvidence": [
         "v1.7.0 frontend action"
@@ -1460,7 +1468,10 @@
       },
       "currentPage": "",
       "currentEntry": "",
-      "currentFrontendComponent": [],
+      "currentFrontendComponent": [
+        "tauri/src/acceptance/selectors.ts",
+        "tauri/src/features/toolchains/render.ts"
+      ],
       "currentBackendCommands": [],
       "currentUserSteps": [],
       "migrationStatus": "unreviewed",
@@ -1506,7 +1517,10 @@
       },
       "currentPage": "",
       "currentEntry": "",
-      "currentFrontendComponent": [],
+      "currentFrontendComponent": [
+        "tauri/src/acceptance/selectors.ts",
+        "tauri/src/features/toolchains/render.ts"
+      ],
       "currentBackendCommands": [],
       "currentUserSteps": [],
       "migrationStatus": "unreviewed",
@@ -1554,7 +1568,9 @@
       },
       "currentPage": "",
       "currentEntry": "",
-      "currentFrontendComponent": [],
+      "currentFrontendComponent": [
+        "tauri/src/features/toolchains/render.ts"
+      ],
       "currentBackendCommands": [],
       "currentUserSteps": [],
       "migrationStatus": "unreviewed",
@@ -1838,13 +1854,18 @@
         "rollback": false
       },
       "currentPage": "",
-      "currentEntry": "",
-      "currentFrontendComponent": [],
+      "currentEntry": "open-python-alias-settings",
+      "currentFrontendComponent": [
+        "tauri/src/features/environment/events.ts",
+        "tauri/src/features/environment/render.ts"
+      ],
       "currentBackendCommands": [],
       "currentUserSteps": [],
-      "migrationStatus": "unreviewed",
-      "difference": "Action identifier changed or capability requires command-level mapping.",
-      "automatedEvidence": [],
+      "migrationStatus": "equivalent",
+      "difference": "Exact action identifier remains in current frontend.",
+      "automatedEvidence": [
+        "current-source-action-match"
+      ],
       "realTauriEvidence": [],
       "installedAppEvidence": [],
       "upgradeEvidence": [
@@ -1854,8 +1875,8 @@
         "silent-v1.7.0-recovery-passed"
       ],
       "lastVerifiedCommit": "2f05525b0b685f1386c271849415987c6fde05f3",
-      "releaseDisposition": "split-required",
-      "releaseReason": "Evidence sources were captured, but an explicit product mapping is still required.",
+      "releaseDisposition": "ready",
+      "releaseReason": "Current mapping and available evidence preserve the historical capability.",
       "followUpIssue": "#125",
       "sourceEvidence": [
         "v1.7.0 frontend action"
@@ -2549,10 +2570,7 @@
       },
       "currentPage": "",
       "currentEntry": "",
-      "currentFrontendComponent": [
-        "tauri/src/features/toolchains/events.ts",
-        "tauri/src/features/toolchains/render.ts"
-      ],
+      "currentFrontendComponent": [],
       "currentBackendCommands": [],
       "currentUserSteps": [],
       "migrationStatus": "unreviewed",
@@ -2878,13 +2896,18 @@
         "rollback": false
       },
       "currentPage": "",
-      "currentEntry": "",
-      "currentFrontendComponent": [],
+      "currentEntry": "verify-external-jdk",
+      "currentFrontendComponent": [
+        "tauri/src/features/runtimes/events.ts",
+        "tauri/src/features/runtimes/render.ts"
+      ],
       "currentBackendCommands": [],
       "currentUserSteps": [],
-      "migrationStatus": "unreviewed",
-      "difference": "Action identifier changed or capability requires command-level mapping.",
-      "automatedEvidence": [],
+      "migrationStatus": "equivalent",
+      "difference": "Exact action identifier remains in current frontend.",
+      "automatedEvidence": [
+        "current-source-action-match"
+      ],
       "realTauriEvidence": [],
       "installedAppEvidence": [],
       "upgradeEvidence": [
@@ -2894,8 +2917,8 @@
         "silent-v1.7.0-recovery-passed"
       ],
       "lastVerifiedCommit": "2f05525b0b685f1386c271849415987c6fde05f3",
-      "releaseDisposition": "split-required",
-      "releaseReason": "Evidence sources were captured, but an explicit product mapping is still required.",
+      "releaseDisposition": "ready",
+      "releaseReason": "Current mapping and available evidence preserve the historical capability.",
       "followUpIssue": "#125",
       "sourceEvidence": [
         "v1.7.0 frontend action"
@@ -2982,7 +3005,9 @@
       },
       "currentPage": "cleanup",
       "currentEntry": "add_archive_plan_item",
-      "currentFrontendComponent": [],
+      "currentFrontendComponent": [
+        "tauri/src/features/cleanup/api.ts:117"
+      ],
       "currentBackendCommands": [
         "add_archive_plan_item"
       ],
@@ -2990,9 +3015,11 @@
         "Open cleanup",
         "Invoke add_archive_plan_item"
       ],
-      "migrationStatus": "degraded",
-      "difference": "Backend command remains registered but no exact or recognized dynamic frontend invoke was found.",
-      "automatedEvidence": [],
+      "migrationStatus": "equivalent",
+      "difference": "Exact frontend invoke remains present.",
+      "automatedEvidence": [
+        "feature-manifest:cleanup.genericArchivePlan"
+      ],
       "realTauriEvidence": [],
       "installedAppEvidence": [],
       "upgradeEvidence": [
@@ -3002,8 +3029,8 @@
         "silent-v1.7.0-recovery-passed"
       ],
       "lastVerifiedCommit": "2f05525b0b685f1386c271849415987c6fde05f3",
-      "releaseDisposition": "release-blocker",
-      "releaseReason": "Old user capability is degraded; product adjudication or restoration is required.",
+      "releaseDisposition": "ready",
+      "releaseReason": "Current mapping and available evidence preserve the historical capability.",
       "followUpIssue": "#125",
       "sourceEvidence": [
         "v1.7.0 frontend invoke"
@@ -3096,7 +3123,9 @@
       },
       "currentPage": "environment",
       "currentEntry": "analyze_python_environment",
-      "currentFrontendComponent": [],
+      "currentFrontendComponent": [
+        "tauri/src/features/environment/api.ts:41"
+      ],
       "currentBackendCommands": [
         "analyze_python_environment"
       ],
@@ -3104,9 +3133,11 @@
         "Open environment",
         "Invoke analyze_python_environment"
       ],
-      "migrationStatus": "degraded",
-      "difference": "Backend command remains registered but no exact or recognized dynamic frontend invoke was found.",
-      "automatedEvidence": [],
+      "migrationStatus": "equivalent",
+      "difference": "Exact frontend invoke remains present.",
+      "automatedEvidence": [
+        "feature-manifest:environment.pythonAliasSettings,environment.pythonHealthRepair"
+      ],
       "realTauriEvidence": [],
       "installedAppEvidence": [],
       "upgradeEvidence": [
@@ -3116,8 +3147,8 @@
         "silent-v1.7.0-recovery-passed"
       ],
       "lastVerifiedCommit": "2f05525b0b685f1386c271849415987c6fde05f3",
-      "releaseDisposition": "release-blocker",
-      "releaseReason": "Old user capability is degraded; product adjudication or restoration is required.",
+      "releaseDisposition": "ready",
+      "releaseReason": "Current mapping and available evidence preserve the historical capability.",
       "followUpIssue": "#125",
       "sourceEvidence": [
         "v1.7.0 frontend invoke"
@@ -3266,7 +3297,7 @@
       "currentPage": "environment",
       "currentEntry": "apply_env_repair_plan",
       "currentFrontendComponent": [
-        "tauri/src/features/environment/api.ts:29"
+        "tauri/src/features/environment/api.ts:61"
       ],
       "currentBackendCommands": [
         "apply_env_repair_plan"
@@ -3436,7 +3467,9 @@
       },
       "currentPage": "environment",
       "currentEntry": "apply_python_repair",
-      "currentFrontendComponent": [],
+      "currentFrontendComponent": [
+        "tauri/src/features/environment/api.ts:49"
+      ],
       "currentBackendCommands": [
         "apply_python_repair"
       ],
@@ -3444,9 +3477,11 @@
         "Open environment",
         "Invoke apply_python_repair"
       ],
-      "migrationStatus": "degraded",
-      "difference": "Backend command remains registered but no exact or recognized dynamic frontend invoke was found.",
-      "automatedEvidence": [],
+      "migrationStatus": "equivalent",
+      "difference": "Exact frontend invoke remains present.",
+      "automatedEvidence": [
+        "feature-manifest:environment.pythonHealthRepair"
+      ],
       "realTauriEvidence": [],
       "installedAppEvidence": [],
       "upgradeEvidence": [
@@ -3457,7 +3492,7 @@
       ],
       "lastVerifiedCommit": "2f05525b0b685f1386c271849415987c6fde05f3",
       "releaseDisposition": "release-blocker",
-      "releaseReason": "Old user capability is degraded; product adjudication or restoration is required.",
+      "releaseReason": "State-changing historical capability lacks installed real-Tauri evidence.",
       "followUpIssue": "#125",
       "sourceEvidence": [
         "v1.7.0 frontend invoke"
@@ -3489,7 +3524,9 @@
       },
       "currentPage": "environment",
       "currentEntry": "apply_user_environment_configuration",
-      "currentFrontendComponent": [],
+      "currentFrontendComponent": [
+        "tauri/src/features/environment/api.ts:17"
+      ],
       "currentBackendCommands": [
         "apply_user_environment_configuration"
       ],
@@ -3497,9 +3534,11 @@
         "Open environment",
         "Invoke apply_user_environment_configuration"
       ],
-      "migrationStatus": "degraded",
-      "difference": "Backend command remains registered but no exact or recognized dynamic frontend invoke was found.",
-      "automatedEvidence": [],
+      "migrationStatus": "equivalent",
+      "difference": "Exact frontend invoke remains present.",
+      "automatedEvidence": [
+        "feature-manifest:environment.doctorAndJava"
+      ],
       "realTauriEvidence": [],
       "installedAppEvidence": [],
       "upgradeEvidence": [
@@ -3510,7 +3549,7 @@
       ],
       "lastVerifiedCommit": "2f05525b0b685f1386c271849415987c6fde05f3",
       "releaseDisposition": "release-blocker",
-      "releaseReason": "Old user capability is degraded; product adjudication or restoration is required.",
+      "releaseReason": "State-changing historical capability lacks installed real-Tauri evidence.",
       "followUpIssue": "#125",
       "sourceEvidence": [
         "v1.7.0 frontend invoke"
@@ -3543,7 +3582,9 @@
       },
       "currentPage": "toolchains",
       "currentEntry": "cache_entries",
-      "currentFrontendComponent": [],
+      "currentFrontendComponent": [
+        "tauri/src/features/toolchains/api.ts:77"
+      ],
       "currentBackendCommands": [
         "cache_entries"
       ],
@@ -3551,8 +3592,8 @@
         "Open toolchains",
         "Invoke cache_entries"
       ],
-      "migrationStatus": "degraded",
-      "difference": "Backend command remains registered but no exact or recognized dynamic frontend invoke was found.",
+      "migrationStatus": "equivalent",
+      "difference": "Exact frontend invoke remains present.",
       "automatedEvidence": [
         "feature-manifest:toolchains.gitNodePythonMirrors"
       ],
@@ -3565,8 +3606,8 @@
         "silent-v1.7.0-recovery-passed"
       ],
       "lastVerifiedCommit": "2f05525b0b685f1386c271849415987c6fde05f3",
-      "releaseDisposition": "release-blocker",
-      "releaseReason": "Old user capability is degraded; product adjudication or restoration is required.",
+      "releaseDisposition": "ready",
+      "releaseReason": "Current mapping and available evidence preserve the historical capability.",
       "followUpIssue": "#125",
       "sourceEvidence": [
         "v1.7.0 frontend invoke"
@@ -3829,7 +3870,7 @@
       "currentPage": "cleanup",
       "currentEntry": "cleanup_path_entries",
       "currentFrontendComponent": [
-        "tauri/src/features/environment/api.ts:33"
+        "tauri/src/features/environment/api.ts:65"
       ],
       "currentBackendCommands": [
         "cleanup_path_entries"
@@ -3886,7 +3927,8 @@
       "currentPage": "toolchains",
       "currentEntry": "clear_download_cache",
       "currentFrontendComponent": [
-        "tauri/src/features/cleanup/api.ts:33"
+        "tauri/src/features/cleanup/api.ts:33",
+        "tauri/src/features/toolchains/api.ts:81"
       ],
       "currentBackendCommands": [
         "clear_download_cache"
@@ -3897,7 +3939,9 @@
       ],
       "migrationStatus": "equivalent",
       "difference": "Exact frontend invoke remains present.",
-      "automatedEvidence": [],
+      "automatedEvidence": [
+        "feature-manifest:toolchains.gitNodePythonMirrors"
+      ],
       "realTauriEvidence": [],
       "installedAppEvidence": [],
       "upgradeEvidence": [
@@ -3994,7 +4038,8 @@
       "currentPage": "environment",
       "currentEntry": "preview_user_environment_configuration",
       "currentFrontendComponent": [
-        "tauri/src/features/environment/api.ts:13"
+        "tauri/src/features/environment/api.ts:13",
+        "tauri/src/features/environment/api.ts:17"
       ],
       "currentBackendCommands": [
         "preview_user_environment_configuration",
@@ -4408,7 +4453,7 @@
       "currentPage": "environment",
       "currentEntry": "create_java_stabilize_plan",
       "currentFrontendComponent": [
-        "tauri/src/features/environment/api.ts:25"
+        "tauri/src/features/environment/api.ts:57"
       ],
       "currentBackendCommands": [
         "create_java_stabilize_plan"
@@ -4810,7 +4855,9 @@
       },
       "currentPage": "settings",
       "currentEntry": "download_update",
-      "currentFrontendComponent": [],
+      "currentFrontendComponent": [
+        "tauri/src/features/settings/api.ts:33"
+      ],
       "currentBackendCommands": [
         "download_update"
       ],
@@ -4818,8 +4865,8 @@
         "Open settings",
         "Invoke download_update"
       ],
-      "migrationStatus": "degraded",
-      "difference": "Backend command remains registered but no exact or recognized dynamic frontend invoke was found.",
+      "migrationStatus": "equivalent",
+      "difference": "Exact frontend invoke remains present.",
       "automatedEvidence": [
         "feature-manifest:update.checkDownloadMetadata"
       ],
@@ -4832,8 +4879,8 @@
         "silent-v1.7.0-recovery-passed"
       ],
       "lastVerifiedCommit": "2f05525b0b685f1386c271849415987c6fde05f3",
-      "releaseDisposition": "release-blocker",
-      "releaseReason": "Old user capability is degraded; product adjudication or restoration is required.",
+      "releaseDisposition": "ready",
+      "releaseReason": "Current mapping and available evidence preserve the historical capability.",
       "followUpIssue": "#125",
       "sourceEvidence": [
         "v1.7.0 frontend invoke"
@@ -5035,7 +5082,7 @@
       "currentPage": "toolchains",
       "currentEntry": "execute_mysql_repair_plan",
       "currentFrontendComponent": [
-        "tauri/src/features/toolchains/api.ts:29"
+        "tauri/src/features/toolchains/api.ts:33"
       ],
       "currentBackendCommands": [
         "execute_mysql_repair_plan"
@@ -5665,7 +5712,9 @@
       },
       "currentPage": "cleanup",
       "currentEntry": "inspect_app_usage",
-      "currentFrontendComponent": [],
+      "currentFrontendComponent": [
+        "tauri/src/features/cleanup/api.ts:105"
+      ],
       "currentBackendCommands": [
         "inspect_app_usage"
       ],
@@ -5673,9 +5722,11 @@
         "Open cleanup",
         "Invoke inspect_app_usage"
       ],
-      "migrationStatus": "degraded",
-      "difference": "Backend command remains registered but no exact or recognized dynamic frontend invoke was found.",
-      "automatedEvidence": [],
+      "migrationStatus": "equivalent",
+      "difference": "Exact frontend invoke remains present.",
+      "automatedEvidence": [
+        "feature-manifest:cleanup.applicationUsage"
+      ],
       "realTauriEvidence": [],
       "installedAppEvidence": [],
       "upgradeEvidence": [
@@ -5685,8 +5736,8 @@
         "silent-v1.7.0-recovery-passed"
       ],
       "lastVerifiedCommit": "2f05525b0b685f1386c271849415987c6fde05f3",
-      "releaseDisposition": "release-blocker",
-      "releaseReason": "Old user capability is degraded; product adjudication or restoration is required.",
+      "releaseDisposition": "ready",
+      "releaseReason": "Current mapping and available evidence preserve the historical capability.",
       "followUpIssue": "#125",
       "sourceEvidence": [
         "v1.7.0 frontend invoke"
@@ -5719,7 +5770,7 @@
       "currentPage": "settings",
       "currentEntry": "inspect_command_safety",
       "currentFrontendComponent": [
-        "tauri/src/features/toolchains/api.ts:41"
+        "tauri/src/features/toolchains/api.ts:85"
       ],
       "currentBackendCommands": [
         "inspect_command_safety"
@@ -5906,7 +5957,7 @@
       "migrationStatus": "equivalent",
       "difference": "Exact frontend invoke remains present.",
       "automatedEvidence": [
-        "feature-manifest:environment.doctorAndJava,environment.pathEvidence"
+        "feature-manifest:environment.restoreBackups,environment.doctorAndJava,environment.pathEvidence"
       ],
       "realTauriEvidence": [
         "real-tauri-windows:inspect_env_reliability"
@@ -6080,7 +6131,7 @@
       "migrationStatus": "equivalent",
       "difference": "Exact frontend invoke remains present.",
       "automatedEvidence": [
-        "feature-manifest:ports.planExecuteAndVerify"
+        "feature-manifest:ports.planExecuteAndVerify,services.directory,services.logs,services.manage"
       ],
       "realTauriEvidence": [],
       "installedAppEvidence": [],
@@ -6308,7 +6359,9 @@
       ],
       "migrationStatus": "equivalent",
       "difference": "Exact frontend invoke remains present.",
-      "automatedEvidence": [],
+      "automatedEvidence": [
+        "feature-manifest:toolchains.gitNodePythonMirrors"
+      ],
       "realTauriEvidence": [],
       "installedAppEvidence": [],
       "upgradeEvidence": [
@@ -6531,7 +6584,9 @@
       ],
       "migrationStatus": "equivalent",
       "difference": "Exact frontend invoke remains present.",
-      "automatedEvidence": [],
+      "automatedEvidence": [
+        "feature-manifest:platforms.docker,platforms.manage"
+      ],
       "realTauriEvidence": [],
       "installedAppEvidence": [],
       "upgradeEvidence": [
@@ -6586,7 +6641,9 @@
       ],
       "migrationStatus": "equivalent",
       "difference": "Exact frontend invoke remains present.",
-      "automatedEvidence": [],
+      "automatedEvidence": [
+        "feature-manifest:toolchains.gitNodePythonMirrors"
+      ],
       "realTauriEvidence": [],
       "installedAppEvidence": [],
       "upgradeEvidence": [
@@ -7144,7 +7201,9 @@
       },
       "currentPage": "settings",
       "currentEntry": "launch_update_installer",
-      "currentFrontendComponent": [],
+      "currentFrontendComponent": [
+        "tauri/src/features/settings/api.ts:37"
+      ],
       "currentBackendCommands": [
         "launch_update_installer"
       ],
@@ -7152,8 +7211,8 @@
         "Open settings",
         "Invoke launch_update_installer"
       ],
-      "migrationStatus": "degraded",
-      "difference": "Backend command remains registered but no exact or recognized dynamic frontend invoke was found.",
+      "migrationStatus": "equivalent",
+      "difference": "Exact frontend invoke remains present.",
       "automatedEvidence": [
         "feature-manifest:update.checkDownloadMetadata"
       ],
@@ -7166,8 +7225,8 @@
         "silent-v1.7.0-recovery-passed"
       ],
       "lastVerifiedCommit": "2f05525b0b685f1386c271849415987c6fde05f3",
-      "releaseDisposition": "release-blocker",
-      "releaseReason": "Old user capability is degraded; product adjudication or restoration is required.",
+      "releaseDisposition": "ready",
+      "releaseReason": "Current mapping and available evidence preserve the historical capability.",
       "followUpIssue": "#125",
       "sourceEvidence": [
         "v1.7.0 frontend invoke"
@@ -7199,7 +7258,9 @@
       },
       "currentPage": "cleanup",
       "currentEntry": "list_archive_plan_items",
-      "currentFrontendComponent": [],
+      "currentFrontendComponent": [
+        "tauri/src/features/cleanup/api.ts:113"
+      ],
       "currentBackendCommands": [
         "list_archive_plan_items"
       ],
@@ -7207,9 +7268,11 @@
         "Open cleanup",
         "Invoke list_archive_plan_items"
       ],
-      "migrationStatus": "degraded",
-      "difference": "Backend command remains registered but no exact or recognized dynamic frontend invoke was found.",
-      "automatedEvidence": [],
+      "migrationStatus": "equivalent",
+      "difference": "Exact frontend invoke remains present.",
+      "automatedEvidence": [
+        "feature-manifest:cleanup.genericArchivePlan"
+      ],
       "realTauriEvidence": [],
       "installedAppEvidence": [],
       "upgradeEvidence": [
@@ -7219,8 +7282,8 @@
         "silent-v1.7.0-recovery-passed"
       ],
       "lastVerifiedCommit": "2f05525b0b685f1386c271849415987c6fde05f3",
-      "releaseDisposition": "release-blocker",
-      "releaseReason": "Old user capability is degraded; product adjudication or restoration is required.",
+      "releaseDisposition": "ready",
+      "releaseReason": "Current mapping and available evidence preserve the historical capability.",
       "followUpIssue": "#125",
       "sourceEvidence": [
         "v1.7.0 frontend invoke"
@@ -7316,7 +7379,7 @@
       "currentPage": "environment",
       "currentEntry": "list_env_backups",
       "currentFrontendComponent": [
-        "tauri/src/features/environment/api.ts:17"
+        "tauri/src/features/environment/api.ts:21"
       ],
       "currentBackendCommands": [
         "list_env_backups"
@@ -7327,7 +7390,9 @@
       ],
       "migrationStatus": "equivalent",
       "difference": "Exact frontend invoke remains present.",
-      "automatedEvidence": [],
+      "automatedEvidence": [
+        "feature-manifest:environment.restoreBackups"
+      ],
       "realTauriEvidence": [],
       "installedAppEvidence": [],
       "upgradeEvidence": [
@@ -7372,7 +7437,7 @@
       "currentPage": "environment",
       "currentEntry": "list_environment_backups",
       "currentFrontendComponent": [
-        "tauri/src/features/environment/api.ts:21"
+        "tauri/src/features/environment/api.ts:25"
       ],
       "currentBackendCommands": [
         "list_environment_backups"
@@ -7383,7 +7448,9 @@
       ],
       "migrationStatus": "equivalent",
       "difference": "Exact frontend invoke remains present.",
-      "automatedEvidence": [],
+      "automatedEvidence": [
+        "feature-manifest:environment.restoreBackups"
+      ],
       "realTauriEvidence": [],
       "installedAppEvidence": [],
       "upgradeEvidence": [
@@ -7601,7 +7668,9 @@
       },
       "currentPage": "toolchains",
       "currentEntry": "local_service_logs",
-      "currentFrontendComponent": [],
+      "currentFrontendComponent": [
+        "tauri/src/features/toolchains/api.ts:49"
+      ],
       "currentBackendCommands": [
         "local_service_logs"
       ],
@@ -7609,9 +7678,11 @@
         "Open toolchains",
         "Invoke local_service_logs"
       ],
-      "migrationStatus": "degraded",
-      "difference": "Backend command remains registered but no exact or recognized dynamic frontend invoke was found.",
-      "automatedEvidence": [],
+      "migrationStatus": "equivalent",
+      "difference": "Exact frontend invoke remains present.",
+      "automatedEvidence": [
+        "feature-manifest:services.logs"
+      ],
       "realTauriEvidence": [],
       "installedAppEvidence": [],
       "upgradeEvidence": [
@@ -7621,8 +7692,8 @@
         "silent-v1.7.0-recovery-passed"
       ],
       "lastVerifiedCommit": "2f05525b0b685f1386c271849415987c6fde05f3",
-      "releaseDisposition": "release-blocker",
-      "releaseReason": "Old user capability is degraded; product adjudication or restoration is required.",
+      "releaseDisposition": "ready",
+      "releaseReason": "Current mapping and available evidence preserve the historical capability.",
       "followUpIssue": "#125",
       "sourceEvidence": [
         "v1.7.0 frontend invoke"
@@ -7655,7 +7726,7 @@
       "currentPage": "toolchains",
       "currentEntry": "manage_local_service",
       "currentFrontendComponent": [
-        "tauri/src/features/toolchains/api.ts:33"
+        "tauri/src/features/toolchains/api.ts:37"
       ],
       "currentBackendCommands": [
         "manage_local_service"
@@ -7666,7 +7737,9 @@
       ],
       "migrationStatus": "equivalent",
       "difference": "Exact frontend invoke remains present.",
-      "automatedEvidence": [],
+      "automatedEvidence": [
+        "feature-manifest:services.manage"
+      ],
       "realTauriEvidence": [],
       "installedAppEvidence": [],
       "upgradeEvidence": [
@@ -7710,7 +7783,7 @@
       "currentPage": "toolchains",
       "currentEntry": "manage_system_platform",
       "currentFrontendComponent": [
-        "tauri/src/features/toolchains/api.ts:37"
+        "tauri/src/features/toolchains/api.ts:41"
       ],
       "currentBackendCommands": [
         "manage_system_platform"
@@ -7721,7 +7794,9 @@
       ],
       "migrationStatus": "equivalent",
       "difference": "Exact frontend invoke remains present.",
-      "automatedEvidence": [],
+      "automatedEvidence": [
+        "feature-manifest:platforms.manage"
+      ],
       "realTauriEvidence": [],
       "installedAppEvidence": [],
       "upgradeEvidence": [
@@ -7764,7 +7839,9 @@
       },
       "currentPage": "toolchains",
       "currentEntry": "mysql_pending_execution_guard",
-      "currentFrontendComponent": [],
+      "currentFrontendComponent": [
+        "tauri/src/features/toolchains/api.ts:29"
+      ],
       "currentBackendCommands": [
         "mysql_pending_execution_guard"
       ],
@@ -7772,8 +7849,8 @@
         "Open toolchains",
         "Invoke mysql_pending_execution_guard"
       ],
-      "migrationStatus": "degraded",
-      "difference": "Backend command remains registered but no exact or recognized dynamic frontend invoke was found.",
+      "migrationStatus": "equivalent",
+      "difference": "Exact frontend invoke remains present.",
       "automatedEvidence": [
         "feature-manifest:toolchains.mysqlRepair"
       ],
@@ -7786,8 +7863,8 @@
         "silent-v1.7.0-recovery-passed"
       ],
       "lastVerifiedCommit": "2f05525b0b685f1386c271849415987c6fde05f3",
-      "releaseDisposition": "release-blocker",
-      "releaseReason": "Old user capability is degraded; product adjudication or restoration is required.",
+      "releaseDisposition": "ready",
+      "releaseReason": "Current mapping and available evidence preserve the historical capability.",
       "followUpIssue": "#125",
       "sourceEvidence": [
         "v1.7.0 frontend invoke"
@@ -7820,7 +7897,9 @@
       },
       "currentPage": "toolchains",
       "currentEntry": "network_diagnostics",
-      "currentFrontendComponent": [],
+      "currentFrontendComponent": [
+        "tauri/src/features/toolchains/api.ts:73"
+      ],
       "currentBackendCommands": [
         "network_diagnostics"
       ],
@@ -7828,8 +7907,8 @@
         "Open toolchains",
         "Invoke network_diagnostics"
       ],
-      "migrationStatus": "degraded",
-      "difference": "Backend command remains registered but no exact or recognized dynamic frontend invoke was found.",
+      "migrationStatus": "equivalent",
+      "difference": "Exact frontend invoke remains present.",
       "automatedEvidence": [
         "feature-manifest:toolchains.gitNodePythonMirrors"
       ],
@@ -7842,8 +7921,8 @@
         "silent-v1.7.0-recovery-passed"
       ],
       "lastVerifiedCommit": "2f05525b0b685f1386c271849415987c6fde05f3",
-      "releaseDisposition": "release-blocker",
-      "releaseReason": "Old user capability is degraded; product adjudication or restoration is required.",
+      "releaseDisposition": "ready",
+      "releaseReason": "Current mapping and available evidence preserve the historical capability.",
       "followUpIssue": "#125",
       "sourceEvidence": [
         "v1.7.0 frontend invoke"
@@ -7878,7 +7957,8 @@
       "currentFrontendComponent": [
         "tauri/src/features/cleanup/api.ts:101",
         "tauri/src/features/reports/api.ts:53",
-        "tauri/src/features/runtimes/api.ts:29"
+        "tauri/src/features/runtimes/api.ts:29",
+        "tauri/src/features/toolchains/api.ts:57"
       ],
       "currentBackendCommands": [
         "open_analysis_path"
@@ -7890,7 +7970,7 @@
       "migrationStatus": "equivalent",
       "difference": "Exact frontend invoke remains present.",
       "automatedEvidence": [
-        "feature-manifest:runtime.installed.actions,reports.exports,cleanup.moveExpansionLargeFiles"
+        "feature-manifest:runtime.installed.actions,reports.exports,cleanup.applicationUsage,cleanup.moveExpansionLargeFiles,toolchains.gitNodePythonMirrors,services.logs"
       ],
       "realTauriEvidence": [],
       "installedAppEvidence": [],
@@ -8105,7 +8185,9 @@
       },
       "currentPage": "cleanup",
       "currentEntry": "open_docker_desktop",
-      "currentFrontendComponent": [],
+      "currentFrontendComponent": [
+        "tauri/src/features/toolchains/api.ts:45"
+      ],
       "currentBackendCommands": [
         "open_docker_desktop"
       ],
@@ -8113,9 +8195,11 @@
         "Open cleanup",
         "Invoke open_docker_desktop"
       ],
-      "migrationStatus": "degraded",
-      "difference": "Backend command remains registered but no exact or recognized dynamic frontend invoke was found.",
-      "automatedEvidence": [],
+      "migrationStatus": "equivalent",
+      "difference": "Exact frontend invoke remains present.",
+      "automatedEvidence": [
+        "feature-manifest:platforms.docker"
+      ],
       "realTauriEvidence": [],
       "installedAppEvidence": [],
       "upgradeEvidence": [
@@ -8125,8 +8209,8 @@
         "silent-v1.7.0-recovery-passed"
       ],
       "lastVerifiedCommit": "2f05525b0b685f1386c271849415987c6fde05f3",
-      "releaseDisposition": "release-blocker",
-      "releaseReason": "Old user capability is degraded; product adjudication or restoration is required.",
+      "releaseDisposition": "ready",
+      "releaseReason": "Current mapping and available evidence preserve the historical capability.",
       "followUpIssue": "#125",
       "sourceEvidence": [
         "v1.7.0 frontend invoke"
@@ -8268,7 +8352,9 @@
       },
       "currentPage": "toolchains",
       "currentEntry": "open_local_service_directory",
-      "currentFrontendComponent": [],
+      "currentFrontendComponent": [
+        "tauri/src/features/toolchains/api.ts:53"
+      ],
       "currentBackendCommands": [
         "open_local_service_directory"
       ],
@@ -8276,9 +8362,11 @@
         "Open toolchains",
         "Invoke open_local_service_directory"
       ],
-      "migrationStatus": "degraded",
-      "difference": "Backend command remains registered but no exact or recognized dynamic frontend invoke was found.",
-      "automatedEvidence": [],
+      "migrationStatus": "equivalent",
+      "difference": "Exact frontend invoke remains present.",
+      "automatedEvidence": [
+        "feature-manifest:services.directory"
+      ],
       "realTauriEvidence": [],
       "installedAppEvidence": [],
       "upgradeEvidence": [
@@ -8288,8 +8376,8 @@
         "silent-v1.7.0-recovery-passed"
       ],
       "lastVerifiedCommit": "2f05525b0b685f1386c271849415987c6fde05f3",
-      "releaseDisposition": "release-blocker",
-      "releaseReason": "Old user capability is degraded; product adjudication or restoration is required.",
+      "releaseDisposition": "ready",
+      "releaseReason": "Current mapping and available evidence preserve the historical capability.",
       "followUpIssue": "#125",
       "sourceEvidence": [
         "v1.7.0 frontend invoke"
@@ -8378,7 +8466,9 @@
       },
       "currentPage": "dashboard",
       "currentEntry": "open_python_alias_settings",
-      "currentFrontendComponent": [],
+      "currentFrontendComponent": [
+        "tauri/src/features/environment/api.ts:53"
+      ],
       "currentBackendCommands": [
         "open_python_alias_settings"
       ],
@@ -8386,9 +8476,11 @@
         "Open dashboard",
         "Invoke open_python_alias_settings"
       ],
-      "migrationStatus": "degraded",
-      "difference": "Backend command remains registered but no exact or recognized dynamic frontend invoke was found.",
-      "automatedEvidence": [],
+      "migrationStatus": "equivalent",
+      "difference": "Exact frontend invoke remains present.",
+      "automatedEvidence": [
+        "feature-manifest:environment.pythonAliasSettings"
+      ],
       "realTauriEvidence": [],
       "installedAppEvidence": [],
       "upgradeEvidence": [
@@ -8398,8 +8490,8 @@
         "silent-v1.7.0-recovery-passed"
       ],
       "lastVerifiedCommit": "2f05525b0b685f1386c271849415987c6fde05f3",
-      "releaseDisposition": "release-blocker",
-      "releaseReason": "Old user capability is degraded; product adjudication or restoration is required.",
+      "releaseDisposition": "ready",
+      "releaseReason": "Current mapping and available evidence preserve the historical capability.",
       "followUpIssue": "#125",
       "sourceEvidence": [
         "v1.7.0 frontend invoke"
@@ -8602,7 +8694,9 @@
       },
       "currentPage": "environment",
       "currentEntry": "preview_python_repair",
-      "currentFrontendComponent": [],
+      "currentFrontendComponent": [
+        "tauri/src/features/environment/api.ts:45"
+      ],
       "currentBackendCommands": [
         "preview_python_repair"
       ],
@@ -8610,9 +8704,11 @@
         "Open environment",
         "Invoke preview_python_repair"
       ],
-      "migrationStatus": "degraded",
-      "difference": "Backend command remains registered but no exact or recognized dynamic frontend invoke was found.",
-      "automatedEvidence": [],
+      "migrationStatus": "equivalent",
+      "difference": "Exact frontend invoke remains present.",
+      "automatedEvidence": [
+        "feature-manifest:environment.pythonHealthRepair"
+      ],
       "realTauriEvidence": [],
       "installedAppEvidence": [],
       "upgradeEvidence": [
@@ -8622,8 +8718,8 @@
         "silent-v1.7.0-recovery-passed"
       ],
       "lastVerifiedCommit": "2f05525b0b685f1386c271849415987c6fde05f3",
-      "releaseDisposition": "release-blocker",
-      "releaseReason": "Old user capability is degraded; product adjudication or restoration is required.",
+      "releaseDisposition": "ready",
+      "releaseReason": "Current mapping and available evidence preserve the historical capability.",
       "followUpIssue": "#125",
       "sourceEvidence": [
         "v1.7.0 frontend invoke"
@@ -8712,7 +8808,9 @@
       },
       "currentPage": "cleanup",
       "currentEntry": "remove_archive_plan_item",
-      "currentFrontendComponent": [],
+      "currentFrontendComponent": [
+        "tauri/src/features/cleanup/api.ts:121"
+      ],
       "currentBackendCommands": [
         "remove_archive_plan_item"
       ],
@@ -8720,9 +8818,11 @@
         "Open cleanup",
         "Invoke remove_archive_plan_item"
       ],
-      "migrationStatus": "degraded",
-      "difference": "Backend command remains registered but no exact or recognized dynamic frontend invoke was found.",
-      "automatedEvidence": [],
+      "migrationStatus": "equivalent",
+      "difference": "Exact frontend invoke remains present.",
+      "automatedEvidence": [
+        "feature-manifest:cleanup.genericArchivePlan"
+      ],
       "realTauriEvidence": [],
       "installedAppEvidence": [],
       "upgradeEvidence": [
@@ -8732,8 +8832,8 @@
         "silent-v1.7.0-recovery-passed"
       ],
       "lastVerifiedCommit": "2f05525b0b685f1386c271849415987c6fde05f3",
-      "releaseDisposition": "release-blocker",
-      "releaseReason": "Old user capability is degraded; product adjudication or restoration is required.",
+      "releaseDisposition": "ready",
+      "releaseReason": "Current mapping and available evidence preserve the historical capability.",
       "followUpIssue": "#125",
       "sourceEvidence": [
         "v1.7.0 frontend invoke"
@@ -8885,7 +8985,9 @@
       },
       "currentPage": "environment",
       "currentEntry": "restore_env_backup",
-      "currentFrontendComponent": [],
+      "currentFrontendComponent": [
+        "tauri/src/features/environment/api.ts:33"
+      ],
       "currentBackendCommands": [
         "restore_env_backup"
       ],
@@ -8893,9 +8995,11 @@
         "Open environment",
         "Invoke restore_env_backup"
       ],
-      "migrationStatus": "degraded",
-      "difference": "Backend command remains registered but no exact or recognized dynamic frontend invoke was found.",
-      "automatedEvidence": [],
+      "migrationStatus": "equivalent",
+      "difference": "Exact frontend invoke remains present.",
+      "automatedEvidence": [
+        "feature-manifest:environment.restoreBackups"
+      ],
       "realTauriEvidence": [],
       "installedAppEvidence": [],
       "upgradeEvidence": [
@@ -8906,7 +9010,7 @@
       ],
       "lastVerifiedCommit": "2f05525b0b685f1386c271849415987c6fde05f3",
       "releaseDisposition": "release-blocker",
-      "releaseReason": "Old user capability is degraded; product adjudication or restoration is required.",
+      "releaseReason": "State-changing historical capability lacks installed real-Tauri evidence.",
       "followUpIssue": "#125",
       "sourceEvidence": [
         "v1.7.0 frontend invoke"
@@ -8938,7 +9042,9 @@
       },
       "currentPage": "environment",
       "currentEntry": "restore_environment_backup",
-      "currentFrontendComponent": [],
+      "currentFrontendComponent": [
+        "tauri/src/features/environment/api.ts:37"
+      ],
       "currentBackendCommands": [
         "restore_environment_backup"
       ],
@@ -8946,9 +9052,11 @@
         "Open environment",
         "Invoke restore_environment_backup"
       ],
-      "migrationStatus": "degraded",
-      "difference": "Backend command remains registered but no exact or recognized dynamic frontend invoke was found.",
-      "automatedEvidence": [],
+      "migrationStatus": "equivalent",
+      "difference": "Exact frontend invoke remains present.",
+      "automatedEvidence": [
+        "feature-manifest:environment.restoreBackups"
+      ],
       "realTauriEvidence": [],
       "installedAppEvidence": [],
       "upgradeEvidence": [
@@ -8959,7 +9067,7 @@
       ],
       "lastVerifiedCommit": "2f05525b0b685f1386c271849415987c6fde05f3",
       "releaseDisposition": "release-blocker",
-      "releaseReason": "Old user capability is degraded; product adjudication or restoration is required.",
+      "releaseReason": "State-changing historical capability lacks installed real-Tauri evidence.",
       "followUpIssue": "#125",
       "sourceEvidence": [
         "v1.7.0 frontend invoke"
@@ -8990,18 +9098,22 @@
         "rollback": true
       },
       "currentPage": "environment",
-      "currentEntry": "restore_user_environment",
-      "currentFrontendComponent": [],
+      "currentEntry": "restore_environment_backup",
+      "currentFrontendComponent": [
+        "tauri/src/features/environment/api.ts:37"
+      ],
       "currentBackendCommands": [
-        "restore_user_environment"
+        "restore_environment_backup"
       ],
       "currentUserSteps": [
         "Open environment",
-        "Invoke restore_user_environment"
+        "Invoke restore_environment_backup"
       ],
-      "migrationStatus": "degraded",
-      "difference": "Backend command remains registered but no exact or recognized dynamic frontend invoke was found.",
-      "automatedEvidence": [],
+      "migrationStatus": "enhanced",
+      "difference": "Replaced by explicit plan/result flow: restore_environment_backup.",
+      "automatedEvidence": [
+        "feature-manifest:environment.restoreBackups"
+      ],
       "realTauriEvidence": [],
       "installedAppEvidence": [],
       "upgradeEvidence": [
@@ -9012,7 +9124,7 @@
       ],
       "lastVerifiedCommit": "2f05525b0b685f1386c271849415987c6fde05f3",
       "releaseDisposition": "release-blocker",
-      "releaseReason": "Old user capability is degraded; product adjudication or restoration is required.",
+      "releaseReason": "State-changing historical capability lacks installed real-Tauri evidence.",
       "followUpIssue": "#125",
       "sourceEvidence": [
         "v1.7.0 frontend invoke"
@@ -9158,7 +9270,9 @@
       },
       "currentPage": "toolchains",
       "currentEntry": "run_chsrc_action",
-      "currentFrontendComponent": [],
+      "currentFrontendComponent": [
+        "tauri/src/features/toolchains/api.ts:69"
+      ],
       "currentBackendCommands": [
         "run_chsrc_action"
       ],
@@ -9166,8 +9280,8 @@
         "Open toolchains",
         "Invoke run_chsrc_action"
       ],
-      "migrationStatus": "degraded",
-      "difference": "Backend command remains registered but no exact or recognized dynamic frontend invoke was found.",
+      "migrationStatus": "equivalent",
+      "difference": "Exact frontend invoke remains present.",
       "automatedEvidence": [
         "feature-manifest:toolchains.gitNodePythonMirrors"
       ],
@@ -9181,7 +9295,7 @@
       ],
       "lastVerifiedCommit": "2f05525b0b685f1386c271849415987c6fde05f3",
       "releaseDisposition": "release-blocker",
-      "releaseReason": "Old user capability is degraded; product adjudication or restoration is required.",
+      "releaseReason": "State-changing historical capability lacks installed real-Tauri evidence.",
       "followUpIssue": "#125",
       "sourceEvidence": [
         "v1.7.0 frontend invoke"
@@ -9279,7 +9393,7 @@
       "currentPage": "dashboard",
       "currentEntry": "run_learning_check",
       "currentFrontendComponent": [
-        "tauri/src/features/toolchains/api.ts:45"
+        "tauri/src/features/toolchains/api.ts:89"
       ],
       "currentBackendCommands": [
         "run_learning_check"
@@ -9333,7 +9447,9 @@
       },
       "currentPage": "toolchains",
       "currentEntry": "run_platform_action",
-      "currentFrontendComponent": [],
+      "currentFrontendComponent": [
+        "tauri/src/features/toolchains/api.ts:65"
+      ],
       "currentBackendCommands": [
         "run_platform_action"
       ],
@@ -9341,8 +9457,8 @@
         "Open toolchains",
         "Invoke run_platform_action"
       ],
-      "migrationStatus": "degraded",
-      "difference": "Backend command remains registered but no exact or recognized dynamic frontend invoke was found.",
+      "migrationStatus": "equivalent",
+      "difference": "Exact frontend invoke remains present.",
       "automatedEvidence": [
         "feature-manifest:toolchains.gitNodePythonMirrors"
       ],
@@ -9356,7 +9472,7 @@
       ],
       "lastVerifiedCommit": "2f05525b0b685f1386c271849415987c6fde05f3",
       "releaseDisposition": "release-blocker",
-      "releaseReason": "Old user capability is degraded; product adjudication or restoration is required.",
+      "releaseReason": "State-changing historical capability lacks installed real-Tauri evidence.",
       "followUpIssue": "#125",
       "sourceEvidence": [
         "v1.7.0 frontend invoke"
@@ -9443,19 +9559,23 @@
         "rollback": false
       },
       "currentPage": "dashboard",
-      "currentEntry": "run_tool_command",
-      "currentFrontendComponent": [],
+      "currentEntry": "inspect_command_safety",
+      "currentFrontendComponent": [
+        "tauri/src/features/toolchains/api.ts:85",
+        "tauri/src/features/toolchains/api.ts:89"
+      ],
       "currentBackendCommands": [
-        "run_tool_command"
+        "inspect_command_safety",
+        "run_learning_check"
       ],
       "currentUserSteps": [
         "Open dashboard",
-        "Invoke run_tool_command"
+        "Invoke inspect_command_safety"
       ],
-      "migrationStatus": "degraded",
-      "difference": "Backend command remains registered but no exact or recognized dynamic frontend invoke was found.",
+      "migrationStatus": "enhanced",
+      "difference": "Replaced by explicit plan/result flow: inspect_command_safety, run_learning_check.",
       "automatedEvidence": [
-        "feature-manifest:learning.readOnlyCommandSandbox"
+        "feature-manifest:nav.commandPalette.entry,toolchains.gitNodePythonMirrors,learning.readOnlyCommandSandbox"
       ],
       "realTauriEvidence": [],
       "installedAppEvidence": [],
@@ -9467,7 +9587,7 @@
       ],
       "lastVerifiedCommit": "2f05525b0b685f1386c271849415987c6fde05f3",
       "releaseDisposition": "release-blocker",
-      "releaseReason": "Old user capability is degraded; product adjudication or restoration is required.",
+      "releaseReason": "State-changing historical capability lacks installed real-Tauri evidence.",
       "followUpIssue": "#125",
       "sourceEvidence": [
         "v1.7.0 frontend invoke"
@@ -9499,7 +9619,9 @@
       },
       "currentPage": "toolchains",
       "currentEntry": "run_toolchain_action",
-      "currentFrontendComponent": [],
+      "currentFrontendComponent": [
+        "tauri/src/features/toolchains/api.ts:61"
+      ],
       "currentBackendCommands": [
         "run_toolchain_action"
       ],
@@ -9507,8 +9629,8 @@
         "Open toolchains",
         "Invoke run_toolchain_action"
       ],
-      "migrationStatus": "degraded",
-      "difference": "Backend command remains registered but no exact or recognized dynamic frontend invoke was found.",
+      "migrationStatus": "equivalent",
+      "difference": "Exact frontend invoke remains present.",
       "automatedEvidence": [
         "feature-manifest:toolchains.gitNodePythonMirrors"
       ],
@@ -9522,7 +9644,7 @@
       ],
       "lastVerifiedCommit": "2f05525b0b685f1386c271849415987c6fde05f3",
       "releaseDisposition": "release-blocker",
-      "releaseReason": "Old user capability is degraded; product adjudication or restoration is required.",
+      "releaseReason": "State-changing historical capability lacks installed real-Tauri evidence.",
       "followUpIssue": "#125",
       "sourceEvidence": [
         "v1.7.0 frontend invoke"
@@ -9972,7 +10094,9 @@
       },
       "currentPage": "dashboard",
       "currentEntry": "self_uninstall",
-      "currentFrontendComponent": [],
+      "currentFrontendComponent": [
+        "tauri/src/features/settings/api.ts:41"
+      ],
       "currentBackendCommands": [
         "self_uninstall"
       ],
@@ -9980,9 +10104,11 @@
         "Open dashboard",
         "Invoke self_uninstall"
       ],
-      "migrationStatus": "degraded",
-      "difference": "Backend command remains registered but no exact or recognized dynamic frontend invoke was found.",
-      "automatedEvidence": [],
+      "migrationStatus": "equivalent",
+      "difference": "Exact frontend invoke remains present.",
+      "automatedEvidence": [
+        "feature-manifest:settings.selfUninstall"
+      ],
       "realTauriEvidence": [],
       "installedAppEvidence": [],
       "upgradeEvidence": [
@@ -9993,7 +10119,7 @@
       ],
       "lastVerifiedCommit": "2f05525b0b685f1386c271849415987c6fde05f3",
       "releaseDisposition": "release-blocker",
-      "releaseReason": "Old user capability is degraded; product adjudication or restoration is required.",
+      "releaseReason": "State-changing historical capability lacks installed real-Tauri evidence.",
       "followUpIssue": "#125",
       "sourceEvidence": [
         "v1.7.0 frontend invoke"
@@ -10483,7 +10609,9 @@
       },
       "currentPage": "environment",
       "currentEntry": "verify_external_jdk",
-      "currentFrontendComponent": [],
+      "currentFrontendComponent": [
+        "tauri/src/features/runtimes/api.ts:37"
+      ],
       "currentBackendCommands": [
         "verify_external_jdk"
       ],
@@ -10491,9 +10619,11 @@
         "Open environment",
         "Invoke verify_external_jdk"
       ],
-      "migrationStatus": "degraded",
-      "difference": "Backend command remains registered but no exact or recognized dynamic frontend invoke was found.",
-      "automatedEvidence": [],
+      "migrationStatus": "equivalent",
+      "difference": "Exact frontend invoke remains present.",
+      "automatedEvidence": [
+        "feature-manifest:runtime.externalJdkVerify"
+      ],
       "realTauriEvidence": [],
       "installedAppEvidence": [],
       "upgradeEvidence": [
@@ -10503,8 +10633,8 @@
         "silent-v1.7.0-recovery-passed"
       ],
       "lastVerifiedCommit": "2f05525b0b685f1386c271849415987c6fde05f3",
-      "releaseDisposition": "release-blocker",
-      "releaseReason": "Old user capability is degraded; product adjudication or restoration is required.",
+      "releaseDisposition": "ready",
+      "releaseReason": "Current mapping and available evidence preserve the historical capability.",
       "followUpIssue": "#125",
       "sourceEvidence": [
         "v1.7.0 frontend invoke"

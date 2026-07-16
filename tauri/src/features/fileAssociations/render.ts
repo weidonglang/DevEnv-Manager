@@ -1,5 +1,5 @@
 import { escapeHtml, renderActionButton, renderMetric, renderObjectTable, valueOf } from "../sharedView";
-import { t } from "../../core/i18n";
+import { localize, t } from "../../core/i18n";
 import { renderFeatureGuide } from "../../components/featureGuide";
 import type { FileAssociationUiState } from "./state";
 
@@ -54,7 +54,7 @@ function renderAssociationPlan(plan: NonNullable<FileAssociationUiState["plan"]>
       planFingerprint: plan.planFingerprint,
     }, ["planId", "riskLevel", "targetAppName", "targetExecutable", "backupPath", "requiresConfirmationToken", "planFingerprint"])}
     <div class="table-wrap"><table data-testid="file-associations-plan-changes-table"><thead><tr>
-      <th>Extension</th><th>Current default application</th><th>Current ProgID</th><th>Target application</th><th>Target executable</th><th>Modification location</th><th>UserChoice state</th><th>Risk</th><th>Rollback</th><th>Windows Settings confirmation</th><th>Warnings</th>
+      <th>${localize("Extension", "扩展名")}</th><th>${localize("Current default application", "当前默认应用")}</th><th>${localize("Current ProgID", "当前 ProgID")}</th><th>${localize("Target application", "目标应用")}</th><th>${localize("Target executable", "目标可执行文件")}</th><th>${localize("Modification location", "修改位置")}</th><th>${localize("UserChoice state", "UserChoice 状态")}</th><th>${localize("Risk", "风险")}</th><th>${localize("Rollback", "回滚")}</th><th>${localize("Windows Settings confirmation", "Windows 设置确认")}</th><th>${localize("Warnings", "警告")}</th>
     </tr></thead><tbody>${plan.changes.map((change) => `<tr>
       <td>${escapeHtml(change.extension)}</td>
       <td>${escapeHtml(change.before.currentAppName || t("state.notAvailable"))}</td>
@@ -62,9 +62,9 @@ function renderAssociationPlan(plan: NonNullable<FileAssociationUiState["plan"]>
       <td>${escapeHtml(change.after.appName)}</td>
       <td>${escapeHtml(change.after.executable)}</td>
       <td>${escapeHtml(associationModificationLocation(change.extension, change.applyMode))}</td>
-      <td>${escapeHtml(change.before.source === "userChoice" ? "UserChoice present" : `Source: ${change.before.source}`)}</td>
+      <td>${escapeHtml(change.before.source === "userChoice" ? localize("UserChoice present", "存在 UserChoice") : `${localize("Source", "来源")}: ${change.before.source}`)}</td>
       <td>${escapeHtml(change.risk)}</td>
-      <td>${escapeHtml(plan.backupPath ? `Available: ${plan.backupPath}` : "Not available")}</td>
+      <td>${escapeHtml(plan.backupPath ? `${localize("Available", "可用")}: ${plan.backupPath}` : t("state.notAvailable"))}</td>
       <td>${change.applyMode === "openSystemSettings" || change.before.requiresSystemSettings ? t("state.yes") : t("state.no")}</td>
       <td>${escapeHtml(change.warnings.join("; ") || t("state.notAvailable"))}</td>
     </tr>`).join("")}</tbody></table></div>
@@ -77,12 +77,12 @@ function renderAssociationResults(state: FileAssociationUiState): string {
     ${state.operationError ? `<div class="error-state" data-testid="file-associations-operation-error">${escapeHtml(state.operationError)}</div>` : ""}
     ${result ? `<div class="execution-result ${result.success ? "ok" : "warn"}">
       <div class="metrics">
-        ${renderMetric("Status", result.success ? t("state.yes") : t("state.no"))}
-        ${renderMetric("Items", result.items.length)}
-        ${renderMetric("Backup", result.backupId || result.backupPath || t("state.notAvailable"))}
+        ${renderMetric(localize("Status", "状态"), result.success ? t("state.yes") : t("state.no"))}
+        ${renderMetric(localize("Items", "项目数"), result.items.length)}
+        ${renderMetric(localize("Backup", "备份"), result.backupId || result.backupPath || t("state.notAvailable"))}
       </div>
       ${renderObjectTable(result, ["message", "backupId", "backupPath"])}
-      <div class="table-wrap"><table><thead><tr><th>Extension</th><th>Success</th><th>UserChoice</th><th>Message</th></tr></thead><tbody>${result.items.map((item) => `<tr><td>${escapeHtml(item.extension)}</td><td>${item.success ? t("state.yes") : t("state.no")}</td><td>${item.requiresSystemSettings ? t("state.yes") : t("state.no")}</td><td>${escapeHtml(item.message)}</td></tr>`).join("")}</tbody></table></div>
+      <div class="table-wrap"><table><thead><tr><th>${localize("Extension", "扩展名")}</th><th>${localize("Success", "成功")}</th><th>UserChoice</th><th>${localize("Message", "消息")}</th></tr></thead><tbody>${result.items.map((item) => `<tr><td>${escapeHtml(item.extension)}</td><td>${item.success ? t("state.yes") : t("state.no")}</td><td>${item.requiresSystemSettings ? t("state.yes") : t("state.no")}</td><td>${escapeHtml(item.message)}</td></tr>`).join("")}</tbody></table></div>
     </div>` : `<div class="empty">${state.applyResultMessage ? escapeHtml(state.applyResultMessage) : t("state.notChecked")}</div>`}
   </div>`;
 }

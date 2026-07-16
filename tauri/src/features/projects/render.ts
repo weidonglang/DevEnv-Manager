@@ -11,7 +11,7 @@ export function renderProjectWorkbench(state: ProjectWorkbenchState): string {
       <section class="panel" data-testid="projects-analysis-section">
         <div class="panel-head"><div><h2>${t("route.projects.label")}</h2><p>${t("feature.projects.description")}</p></div></div>
         ${renderFeatureGuide("projects")}
-        <div class="form-grid"><input id="project-path" value="${escapeHtml(state.selectedPath)}" placeholder="${t("feature.projects.path")}" /></div>
+        <div class="form-grid"><input id="project-path" value="${escapeHtml(state.selectedPath)}" readonly placeholder="${t("feature.projects.path")}" /></div>
         ${renderRecentProjects(state)}
         <div class="toolbar">
           ${renderActionButton("choose-project-dir", t("feature.projects.chooseDirectory"))}

@@ -1,5 +1,5 @@
 import { escapeHtml, pageItems, renderActionButton, renderMetric, renderPagination } from "../sharedView";
-import { getLocaleMode, localeModeLabel, t, type LocaleMode } from "../../core/i18n";
+import { getLocaleMode, localize, localeModeLabel, t, type LocaleMode } from "../../core/i18n";
 import { debugEntriesAsMarkdown, getDebugEntries, isAdvancedMode, type DebugEventStatus, type DebugEventType, type DebugLogEntry } from "../../core/debugLog";
 import { renderFeatureGuide, renderRiskLevelGuide } from "../../components/featureGuide";
 import type { SettingsWorkbenchState } from "./state";
@@ -13,9 +13,9 @@ export function renderSettingsWorkbench(state: SettingsWorkbenchState): string {
         <div class="panel-head"><div><h2>${t("settings.title")}</h2><p>${t("settings.description")}</p></div></div>
         ${renderFeatureGuide("settings")}
         <div class="metrics">${renderMetric(t("settings.root"), vm.rootDir, state.errors.config ?? "")}${renderMetric(t("settings.autoUpdates"), vm.autoUpdate)}${renderMetric(t("settings.theme"), vm.theme)}${renderMetric(t("settings.language"), vm.language)}${renderMetric(t("settings.powershell"), vm.powershell, vm.powershellDetail)}</div>
-        <div class="form-grid"><input id="settings-root" value="${escapeHtml(vm.rootInput)}" placeholder="${t("settings.rootDirectory")}" /></div>
+        <div class="form-grid"><input id="settings-root" data-testid="settings-root-directory" value="${escapeHtml(vm.rootInput)}" readonly placeholder="${t("settings.rootDirectory")}" />${renderActionButton("choose-settings-root-dir", localize("Choose root directory", "选择根目录"))}</div>
         <div class="segmented">
-          ${(["light", "dark", "system", "high-contrast"] as const).map((mode) => `<button data-theme-mode="${mode}" class="${state.theme === mode ? "active" : ""}" type="button">${mode}</button>`).join("")}
+          ${(["light", "dark", "system", "high-contrast"] as const).map((mode) => `<button data-theme-mode="${mode}" class="${state.theme === mode ? "active" : ""}" type="button">${themeModeLabel(mode)}</button>`).join("")}
         </div>
         <div class="segmented" aria-label="${t("settings.language")}">
           ${(["auto", "zh-CN", "en-US"] as LocaleMode[]).map((mode) => `<button data-locale-mode="${mode}" class="${getLocaleMode() === mode ? "active" : ""}" type="button">${localeModeLabel(mode)}</button>`).join("")}
@@ -32,12 +32,12 @@ export function renderSettingsWorkbench(state: SettingsWorkbenchState): string {
       ${renderRiskLevelGuide()}
       ${renderUpdatePanel(state, vm.updateRows, vm.updateDownloadRows)}
       <section class="panel" data-testid="settings-uninstall-section">
-        <div class="panel-head"><div><h2>Uninstall DevEnv Manager</h2><p>Starts the registered Windows uninstaller. User configuration is retained unless you explicitly remove it in the uninstaller.</p></div></div>
-        <div class="small-note">The application closes after the official uninstaller starts. This action does not silently delete user configuration or managed runtimes.</div>
-        <div class="toolbar">${renderActionButton("self-uninstall", "Open uninstaller", "danger")}</div>
+        <div class="panel-head"><div><h2>${localize("Uninstall DevEnv Manager", "卸载 DevEnv Manager")}</h2><p>${localize("Starts the registered Windows uninstaller. User configuration is retained unless you explicitly remove it in the uninstaller.", "启动 Windows 已注册的卸载程序。除非在卸载程序中明确选择删除，否则会保留用户配置。")}</p></div></div>
+        <div class="small-note">${localize("The application closes after the official uninstaller starts. This action does not silently delete user configuration or managed runtimes.", "正式卸载程序启动后应用会关闭；此操作不会静默删除用户配置或受管运行时。")}</div>
+        <div class="toolbar">${renderActionButton("self-uninstall", localize("Open uninstaller", "打开卸载程序"), "danger")}</div>
         <div data-testid="settings-uninstall-result">${state.uninstallError ? `<div class="error-state">${escapeHtml(state.uninstallError)}</div>` : state.uninstallResult ? `<div class="small-note">${escapeHtml(state.uninstallResult)}</div>` : `<div class="empty">${t("state.notChecked")}</div>`}</div>
       </section>
-      <section class="panel" data-testid="settings-operation-result"><h2>操作结果</h2>${state.operationError ? `<div class="error-state">${escapeHtml(state.operationError)}</div>` : ""}${state.operationResult ? `<div class="small-note">${escapeHtml(state.operationResult)}</div>` : `<div class="empty">${t("state.notChecked")}</div>`}</section>
+      <section class="panel" data-testid="settings-operation-result"><h2>${localize("Operation result", "操作结果")}</h2>${state.operationError ? `<div class="error-state">${escapeHtml(state.operationError)}</div>` : ""}${state.operationResult ? `<div class="small-note">${escapeHtml(state.operationResult)}</div>` : `<div class="empty">${t("state.notChecked")}</div>`}</section>
       <section class="panel"><h2>${t("settings.powershellRunner")}</h2>${renderRows(vm.powershellRows)}</section>
       ${isAdvancedMode() ? renderDebugPanel(state.debugPage) : ""}
     </div>
@@ -51,16 +51,23 @@ function renderUpdatePanel(
 ): string {
   const download = state.updateDownload;
   return `<section class="panel" data-testid="settings-update-section">
-    <div class="panel-head"><div><h2>${t("settings.updateSource")}</h2><p>Check metadata, download from the selected source, verify size and SHA-256, then confirm before launching the installer.</p></div></div>
+    <div class="panel-head"><div><h2>${t("settings.updateSource")}</h2><p>${localize("Check metadata, download from the selected source, verify size and SHA-256, then confirm before launching the installer.", "检查更新元数据，从所选来源下载并验证大小与 SHA-256，确认后再启动安装程序。")}</p></div></div>
     <div class="toolbar">
       ${renderActionButton("check-for-updates", t("dashboard.checkUpdates"), "primary")}
-      ${renderActionButton("download-update", "Download and verify")}
-      ${renderActionButton("launch-update-installer", "Launch verified installer", "danger")}
+      ${renderActionButton("download-update", localize("Download and verify", "下载并验证"))}
+      ${renderActionButton("launch-update-installer", localize("Launch verified installer", "启动已验证的安装程序"), "danger")}
     </div>
     ${state.updateError ? `<div class="error-state" data-testid="settings-update-error">${escapeHtml(state.updateError)}</div>` : ""}
     ${renderRows(rows)}
-    <div data-testid="settings-update-result">${download ? renderRows(downloadRows) : `<div class="empty">No downloaded update has been verified.</div>`}</div>
+    <div data-testid="settings-update-result">${download ? renderRows(downloadRows) : `<div class="empty">${localize("No downloaded update has been verified.", "尚未验证已下载的更新。")}</div>`}</div>
   </section>`;
+}
+
+function themeModeLabel(mode: "light" | "dark" | "system" | "high-contrast"): string {
+  if (mode === "light") return t("app.theme.light");
+  if (mode === "dark") return t("app.theme.dark");
+  if (mode === "system") return t("app.theme.system");
+  return t("app.theme.highContrast");
 }
 
 function renderRows(rows: Array<{ label: string; value: string }>): string {

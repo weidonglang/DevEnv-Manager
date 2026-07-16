@@ -33,14 +33,14 @@ export function bindRuntimeEvents(context: FeatureContext, state: RuntimeWorkben
       renderAndBind(context, state);
       return;
     }
-    context.progress.start("Verifying external JDK");
+    context.progress.start(t("feature.runtimes.verifyingExternalJdk"));
     try {
       state.externalJdkChecks = await verifyExternalJdk(state.externalJdkPath);
       const requiredPassed = state.externalJdkChecks.filter((check) => check.required).every((check) => check.success);
       state.externalJdkResult = requiredPassed
         ? `External JDK verified. JAVA_HOME can point to ${state.externalJdkPath}.`
         : "External Java verification completed with missing or failed required tools.";
-      context.progress.done("External JDK verification completed");
+      context.progress.done(t("feature.runtimes.externalJdkVerificationDone"));
     } catch (error) {
       state.externalJdkError = errorMessage(error);
       context.progress.fail(state.externalJdkError);

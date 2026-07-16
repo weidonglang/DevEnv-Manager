@@ -7,11 +7,18 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "acceptance" / "feature-manifest.v1.8.2.json"
+BACKEND_DISPOSITIONS = ROOT / "acceptance" / "backend-command-disposition.v1.8.2.json"
 TAURI_SRC = ROOT / "tauri" / "src"
 RUST_SRC = ROOT / "tauri" / "src-tauri" / "src"
 
 INVOKE_RE = re.compile(r"\binvoke(?:<[^>]+>)?\s*\(\s*[\"'`]([A-Za-z0-9_]+)[\"'`]")
 DYNAMIC_COMMAND_RE = re.compile(r"\b(?:installRuntime|installWithRisk|installLatestWithRisk)\s*\([^)]*[\"'`](install_[A-Za-z0-9_]+)[\"'`]", re.DOTALL)
+VARIABLE_INVOKE_RE = re.compile(
+    r"\bconst\s+(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*=\s*(?P<value>[^;]+);"
+    r"(?P<tail>.{0,400}?)\binvoke(?:<[^>]+>)?\s*\(\s*(?P=name)\b",
+    re.DOTALL,
+)
+STRING_COMMAND_RE = re.compile(r"[\"'`]([a-z][a-z0-9_]+)[\"'`]")
 HANDLER_RE = re.compile(r"generate_handler!\s*\[(?P<body>.*?)\]\s*\)", re.DOTALL)
 IDENT_RE = re.compile(r"\b[A-Za-z_][A-Za-z0-9_]*\b")
 
@@ -26,6 +33,8 @@ def frontend_invokes() -> set[str]:
         text = read(path)
         commands.update(INVOKE_RE.findall(text))
         commands.update(DYNAMIC_COMMAND_RE.findall(text))
+        for match in VARIABLE_INVOKE_RE.finditer(text):
+            commands.update(STRING_COMMAND_RE.findall(match.group("value")))
     return commands
 
 
@@ -53,6 +62,32 @@ def allowlisted(manifest: dict) -> dict[str, str]:
     return {item["command"]: item["reason"] for item in manifest.get("commandAllowlist", []) if item.get("command") and item.get("reason")}
 
 
+def backend_dispositions() -> dict[str, dict]:
+    data = json.loads(read(BACKEND_DISPOSITIONS))
+    return {item["command"]: item for item in data.get("commands", []) if item.get("command")}
+
+
+def explained_backend_only(command: str, invokes: set[str], dispositions: dict[str, dict]) -> tuple[bool, str]:
+    item = dispositions.get(command)
+    if not item:
+        return False, "missing backend command disposition"
+    reason = str(item.get("exactReason") or "").strip()
+    if not reason:
+        return False, "backend command disposition has no exact reason"
+    classification = item.get("classification")
+    if classification in {"internal-helper", "bootstrap", "diagnostic"}:
+        return True, f"{classification}: {reason}"
+    replacements = item.get("replacementChain") or []
+    if classification in {"compatibility-alias", "replacement-command"} and replacements:
+        exposed = sorted(command for command in replacements if command in invokes)
+        if exposed:
+            return True, f"{classification}: replaced by {', '.join(exposed)}"
+        return False, f"replacement chain is not exposed by frontend: {', '.join(replacements)}"
+    if classification == "dynamic-user-command" and item.get("dynamicWrapper"):
+        return True, f"dynamic-user-command: {reason}"
+    return False, f"unexplained {classification or 'unknown'} command: {reason}"
+
+
 def p0_backend_only(manifest: dict, invokes: set[str]) -> list[tuple[str, str, str]]:
     failures: list[tuple[str, str, str]] = []
     for page in manifest.get("pages", []):
@@ -73,6 +108,7 @@ def main() -> int:
     registered = registered_commands()
     declared = manifest_commands(manifest)
     allowed = allowlisted(manifest)
+    dispositions = backend_dispositions()
 
     errors: list[str] = []
     warnings: list[str] = []
@@ -89,19 +125,28 @@ def main() -> int:
         errors.append(f"P0 backend-only/unexposed command: {feature_id} ({page_id}) -> {command}")
 
     backend_only = sorted((registered - invokes) - set(allowed))
-    if backend_only:
-        warnings.append("backend-only registered commands not used by frontend: " + ", ".join(backend_only[:60]))
-        if len(backend_only) > 60:
-            warnings.append(f"... {len(backend_only) - 60} more backend-only commands omitted")
+    explained: list[str] = []
+    for command in backend_only:
+        accepted, reason = explained_backend_only(command, invokes, dispositions)
+        if accepted:
+            explained.append(f"{command} ({reason})")
+        else:
+            errors.append(f"unexplained backend-only command: {command} ({reason})")
 
     manifest_uncovered = sorted((registered - declared) - set(allowed))
-    if manifest_uncovered:
-        warnings.append("registered commands not covered by feature manifest: " + ", ".join(manifest_uncovered[:60]))
-        if len(manifest_uncovered) > 60:
-            warnings.append(f"... {len(manifest_uncovered) - 60} more uncovered commands omitted")
+    unexplained_manifest = []
+    for command in manifest_uncovered:
+        item = dispositions.get(command)
+        if not item or not str(item.get("exactReason") or "").strip():
+            unexplained_manifest.append(command)
+    if unexplained_manifest:
+        errors.append("registered commands lack manifest coverage and disposition reason: " + ", ".join(unexplained_manifest))
 
     for warning in warnings:
         print("WARNING:", warning)
+
+    if explained:
+        print(f"Explained backend-only commands: {len(explained)}")
 
     if errors:
         print("Backend/UI drift check failed.")

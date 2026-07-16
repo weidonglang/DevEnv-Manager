@@ -20,6 +20,10 @@ export function t(key: TranslationKey, params: Record<string, string | number> =
   return template.replace(/\{(\w+)\}/g, (_, name: string) => String(params[name] ?? `{${name}}`));
 }
 
+export function localize(english: string, chinese: string): string {
+  return getActiveLocale() === "zh-CN" ? chinese : english;
+}
+
 export function setLocale(mode: LocaleMode): void {
   localeMode = isLocaleMode(mode) ? mode : "auto";
   localStorage.setItem(STORAGE_KEY, localeMode);

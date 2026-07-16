@@ -2,14 +2,14 @@
   "schemaVersion": 1,
   "version": "1.8.2",
   "summary": {
-    "total": 27,
+    "total": 26,
     "byPriority": {
       "P0": 15,
-      "P1": 12
+      "P1": 11
     },
     "byDisposition": {
       "deferred-nonblocking": 2,
-      "split-required": 25
+      "split-required": 24
     }
   },
   "features": [
@@ -426,13 +426,18 @@
         "route": "environment",
         "testIds": [
           "environment-doctor-section",
-          "environment-operation-result"
+          "environment-operation-result",
+          "environment-configuration-section",
+          "environment-configuration-preview",
+          "environment-configuration-result",
+          "environment-path-cleanup-result"
         ]
       },
       "backendCommands": [
         "inspect_env_reliability",
         "environment_health",
         "preview_user_environment_configuration",
+        "apply_user_environment_configuration",
         "create_java_stabilize_plan",
         "apply_env_repair_plan",
         "cleanup_path_entries"
@@ -1084,48 +1089,6 @@
       "followUpIssue": "#125"
     },
     {
-      "featureId": "toolchains.gitNodePythonMirrors",
-      "priority": "P1",
-      "targetVersion": "v1.8.2",
-      "oldFeature": true,
-      "currentStatus": "partial",
-      "currentEntry": {
-        "route": "toolchains",
-        "testIds": [
-          "toolchains-overview-section",
-          "toolchains-result"
-        ]
-      },
-      "backendCommands": [
-        "inspect_command_safety",
-        "run_toolchain_action",
-        "run_platform_action",
-        "run_chsrc_action",
-        "network_diagnostics",
-        "cache_entries"
-      ],
-      "completedContent": [
-        "riskContract",
-        "resultPanelVisible",
-        "debugContract",
-        "reportContract"
-      ],
-      "unfinishedContent": "Exact remaining sub-capabilities are not adjudicated.",
-      "userImpact": "Cannot claim complete old-feature migration until sub-capabilities are split and evidenced.",
-      "affectsStartup": false,
-      "affectsSafety": true,
-      "affectsData": false,
-      "affectsOldCoreCapability": true,
-      "automatedEvidence": [
-        "feature-manifest:toolchains.gitNodePythonMirrors"
-      ],
-      "realTauriEvidence": [],
-      "installedAppEvidence": [],
-      "releaseDisposition": "split-required",
-      "releaseReason": "Feature aggregates multiple historical capabilities; split before ready/blocker adjudication.",
-      "followUpIssue": "#125"
-    },
-    {
       "featureId": "toolchains.mysqlRepair",
       "priority": "P1",
       "targetVersion": "v1.8.2",
@@ -1175,7 +1138,8 @@
         "route": "settings",
         "testIds": [
           "settings-update-section",
-          "settings-update-result"
+          "settings-update-result",
+          "settings-update-error"
         ]
       },
       "backendCommands": [

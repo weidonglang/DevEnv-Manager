@@ -1,5 +1,5 @@
 import { invoke } from "../../core/invoke";
-import type { CacheEntry, CommandRunResult, CommandSafetyAssessment, LocalServiceStatus, MySqlRepairPlan, MySqlRepairReport, NetworkDiagnostics, OperationResult, PlatformReport, SystemPlatformReport, ToolchainReport } from "../../types";
+import type { CacheEntry, CommandRunResult, CommandSafetyAssessment, LocalServiceStatus, MySqlExecutionGuard, MySqlRepairPlan, MySqlRepairReport, NetworkDiagnostics, OperationResult, PlatformReport, SystemPlatformReport, ToolchainReport } from "../../types";
 
 export function inspectToolchains(): Promise<ToolchainReport> {
   return invoke<ToolchainReport>("inspect_toolchains");
@@ -23,6 +23,10 @@ export function inspectMySqlRepair(): Promise<MySqlRepairReport> {
 
 export function createMySqlRepairPlan(candidateId: string, action: string): Promise<MySqlRepairPlan> {
   return invoke<MySqlRepairPlan>("create_mysql_repair_plan", { candidateId, action });
+}
+
+export function mysqlPendingExecutionGuard(planId: string): Promise<MySqlExecutionGuard> {
+  return invoke<MySqlExecutionGuard>("mysql_pending_execution_guard", { planId });
 }
 
 export function executeMySqlRepairPlan(planId: string, backupDestination: string, confirmationToken: string | null): Promise<OperationResult> {

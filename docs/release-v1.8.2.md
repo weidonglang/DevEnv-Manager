@@ -1,6 +1,6 @@
 # DevEnv Manager v1.8.2 Release Candidate
 
-v1.8.2 is the first stability-recovery candidate after the Workbench frontend refactor. It restores and hardens core workflows that regressed or lost visible entries after v1.7.0. It does not claim complete restoration of every historical or advanced feature.
+v1.8.2 is the stability-recovery candidate after the Workbench frontend refactor. The v1.7.0 audit accounts for all 237 source records as 87 user capabilities: 74 equivalent and 13 enhanced, with no missing or degraded historical capability. New v1.9.0 redesign work remains separately tracked.
 
 ## Fixed
 
@@ -43,19 +43,21 @@ The golden pre-refactor baseline is commit `55f4a6cfc2d91582f20566b813d4706af4ef
 - Runtime full redesign, unified multi-version verification, and expanded Maven/Gradle version selection remain tracked by #130 for v1.9.0.
 - Profile history restore remains deferred until durable backend history storage and commands exist.
 - Advanced mode policy and remaining visual polish are not treated as complete in this release candidate.
-- MySQL repair execution remains manual unless a disposable MySQL fixture is available.
+- Safe-mode automation does not repeat destructive database, service, Windows-feature, or partition mutations. Those paths have retained disposable ReleaseLab/UAC evidence.
 
 ## Release Verification Summary
 
-The aggregate acceptance report contains 212 cases: 181 passed, 0 failed, 26 safely skipped, and 5 manual or deferred. P0 and P1 failure counts are both zero.
+The aggregate acceptance report contains 283 cases: 240 passed, 0 failed, 36 safely skipped, and 7 manual or deferred. P0 and P1 failure counts are both zero.
 
 - Eleven skipped cases are read-only Tauri commands that require a running backend. Registration, frontend wiring, selectors, and response rendering were checked automatically; the installed Windows smoke covered the release-critical Cleanup, Ports, Reports, Environment, File Associations, Settings, and Update paths.
 - Fifteen skipped cases are dry-run or plan commands that require app-specific state or a confirmation token. Static command/argument contracts and plan/result selectors passed; targeted installed smoke created Cleanup, archive, Doctor, Java, File Association, and Ports plans without applying unrelated system changes.
 - `ports.planExecuteAndVerify.safeSmoke` is manual in the generic safe runner because process termination must not target arbitrary processes. It was completed against a disposable Python listener, with PID exit, port release, and empty remaining-owner verification.
-- `toolchains.mysqlRepair.safeSmoke` remains manual because no disposable MySQL fixture was available. No production MySQL repair was attempted.
+- `toolchains.mysqlRepair.safeSmoke`, `services.manage.safeSmoke`, and `platforms.manage.safeSmoke` remain manual in the generic safe runner so CI never mutates a developer machine. Disposable ReleaseLab fixtures verified MySQL schema repair and data preservation, service stop/port release, and the WSL platform change with its pending-reboot result.
 - `runtime.v19.fullRedesign` is deferred to #130, `profiles.historyRestore` is deferred until durable history storage exists, and `advanced.mode` remains a P2 visual/policy review item. These do not remove the v1.8.2 core paths listed in the feature comparison above.
 
-Final gates passed: 134 Rust tests, Clippy with warnings denied, the 107-module frontend production build, frontend acceptance with 80 stable selectors, repository hygiene, safety wording, frontend data/action/quality contracts, Tauri command contracts, and GitHub CI quality.
+Final gates passed: 154 Rust tests, Clippy with warnings denied, the 109-module frontend production build, frontend acceptance with 195 stable selectors, 648 aligned English/Chinese locale keys across 29 UI/event sources, repository hygiene, safety wording, frontend data/action/quality contracts, Tauri command contracts, and release-disposition checks.
+
+The isolated UAC batch also verified C-drive growth of 883,932,672 bytes with healthy NTFS, MySQL system-schema restoration with preserved `ibdata1` and business-data hashes, service stop with port release, and the VirtualMachinePlatform state change. After the batch, the VM checkpoint restoration was verified by exact C/recovery partition geometry, fixture removal, closed application state, and a settings SHA256 match. Profile presence was not part of that checkpoint's preflight scope; independent N3/N4/N5 upgrade and rollback evidence covers Profile preservation.
 
 The rollback evidence is anchored to the pre-upgrade baseline and final machine state:
 
@@ -76,17 +78,10 @@ The v1.7.0 installer was freshly downloaded and its SHA256 re-verified during #1
 
 ## Final RC Candidate Evidence
 
-The following binaries were built from a clean detached worktree at commit `d0686455c0fb4971660456b093bd92aaa00a6df7` and are the only v1.8.2 assets accepted by the RC verification.
-
-| Asset | Size | SHA256 | Verification |
-|---|---:|---|---|
-| `DevEnv.Manager_1.8.2_x64-setup.exe` | 2,675,263 bytes | `858e128f42b774e41772da9c065596c116812355d90c7943636bfaedded321e7` | silent v1.7.0 upgrade, installed-app smoke, uninstall, and v1.7.0 rollback passed |
-| `DevEnv.Manager_1.8.2_x64_en-US.msi` | 4,517,888 bytes | `ca9f6f0346b68ec4901e18f2d2f499ba0aa053e2f23e6a4503d155d79ca95ac3` | install, installed-app launch, and uninstall passed; Windows Installer status 0 |
-
-The interactive NSIS flow recognized v1.7.0 and delegated to the old NSIS uninstaller, but desktop automation could not drive that nested installer window. The same verified NSIS asset completed the upgrade with `/S` and exit code 0. A fully interactive upgrade remains a final manual release check rather than completed automated evidence.
+The earlier RC assets built at `d0686455c0fb4971660456b093bd92aaa00a6df7` are superseded by post-RC fixes for capacity verification, DiskPart decoding, dynamic bilingual labels, and the expanded i18n gate. They must not be uploaded or published. New NSIS/MSI size and SHA256 values will be recorded only after a clean commit build and final installed smoke.
 
 Upgrade verification retained the root directory, update sources, theme, safety-disclaimer state, and one existing profile. Cleanup was limited to read-only scans and plan previews. File Associations was limited to search, executable selection, and plan preview. Environment changes, archive execution, cleanup deletion, and association apply were not executed.
 
 The disposable port test terminated only its own Python process and verified `pidExited = true`, `portReleased = true`, and no remaining owner. After NSIS and MSI verification, the machine was restored to the verified v1.7.0 installer. v1.7.0 started with the retained v1.8.2-compatible configuration and opened Environment Doctor, Ports, Space Analysis, File Associations, Runtime, and Update. The final installed version is v1.7.0.
 
-This PR must not create a tag, GitHub Release, or Gitee Release. Those actions require explicit final approval after review.
+This PR must not create a tag, GitHub Release, or Gitee Release until the new clean-commit RC assets and online metadata are verified.

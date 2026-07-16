@@ -5,7 +5,7 @@
   "summary": {
     "partialParents": 26,
     "parentsWithProposal": 26,
-    "atomicChildren": 105,
+    "atomicChildren": 106,
     "unresolvedParents": 0
   },
   "children": [
@@ -479,6 +479,22 @@
       "userGoal": "Complete the Preview User Environment Configuration step within environment.doctorAndJava",
       "commands": [
         "preview_user_environment_configuration"
+      ],
+      "implementationStatus": "equivalent",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
+      "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
+    },
+    {
+      "newFeatureId": "environment.doctorAndJava.applyUserEnvironmentConfiguration",
+      "parentFeatureId": "environment.doctorAndJava",
+      "oldCapabilityIds": [
+        "environment.configure"
+      ],
+      "priority": "P0",
+      "userGoal": "Complete the Apply User Environment Configuration step within environment.doctorAndJava",
+      "commands": [
+        "apply_user_environment_configuration"
       ],
       "implementationStatus": "equivalent",
       "evidenceStatus": "verified-automated",
@@ -1638,8 +1654,8 @@
         "mysql_pending_execution_guard"
       ],
       "implementationStatus": "not-applicable",
-      "evidenceStatus": "evidence-required",
-      "releaseDisposition": "evidence-blocker",
+      "evidenceStatus": "verified-automated",
+      "releaseDisposition": "ready",
       "reason": "Atomic command-level proposal only; the formal manifest is unchanged."
     },
     {

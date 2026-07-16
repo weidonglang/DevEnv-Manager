@@ -1,8 +1,91 @@
 import type { FeatureContext } from "../app/featureContext";
 import { finishDebug, logDebug } from "../core/debugLog";
-import { t } from "../core/i18n";
+import { localize, t } from "../core/i18n";
 
 export type SafeResult<T> = { ok: true; value: T } | { ok: false; error: string };
+
+const objectFieldLabels: Record<string, readonly [string, string]> = {
+  actions: ["Actions", "操作"],
+  afterScore: ["Score after repair", "修复后评分"],
+  allowed: ["Allowed", "是否允许"],
+  applied: ["Applied", "已应用"],
+  backupId: ["Backup ID", "备份 ID"],
+  backupName: ["Backup name", "备份名称"],
+  backupPath: ["Backup path", "备份路径"],
+  beforeScore: ["Score before repair", "修复前评分"],
+  command: ["Command", "命令"],
+  commandLine: ["Command line", "命令行"],
+  commands: ["Commands", "命令"],
+  createdAt: ["Created at", "创建时间"],
+  disclaimer: ["Safety notice", "安全说明"],
+  elapsedMs: ["Elapsed time (ms)", "耗时（毫秒）"],
+  elevated: ["Administrator", "管理员权限"],
+  estimatedBytes: ["Estimated size", "预计大小"],
+  executable: ["Executable", "可执行文件"],
+  exitCode: ["Exit code", "退出码"],
+  exportedAt: ["Exported at", "导出时间"],
+  extensions: ["Extensions", "扩展名"],
+  finishedAt: ["Finished at", "完成时间"],
+  itemCount: ["Item count", "项目数量"],
+  junctionCreated: ["Junction created", "已创建 Junction"],
+  manualSelectionRequired: ["Manual selection required", "需要手动选择"],
+  matchedDisplayName: ["Matched application", "匹配的应用"],
+  message: ["Message", "消息"],
+  missingRequirements: ["Missing requirements", "缺少的依赖"],
+  mode: ["Mode", "模式"],
+  nextStep: ["Next step", "下一步"],
+  normalizedQuery: ["Normalized query", "规范化查询"],
+  parentPid: ["Parent PID", "父进程 PID"],
+  parentProcessName: ["Parent process", "父进程"],
+  pathAdded: ["PATH entry added", "已添加 PATH 项"],
+  pid: ["PID", "PID"],
+  pidExited: ["Process exited", "进程已退出"],
+  planFingerprint: ["Plan fingerprint", "计划指纹"],
+  planId: ["Plan ID", "计划 ID"],
+  port: ["Port", "端口"],
+  portReleased: ["Port released", "端口已释放"],
+  previewId: ["Preview ID", "预览 ID"],
+  processName: ["Process name", "进程名称"],
+  processPath: ["Process path", "进程路径"],
+  profileId: ["Profile ID", "配置档案 ID"],
+  profileName: ["Profile name", "配置档案名称"],
+  profiles: ["Profiles", "配置档案"],
+  protocol: ["Protocol", "协议"],
+  pythonPath: ["Python path", "Python 路径"],
+  query: ["Query", "查询内容"],
+  readableError: ["Error", "错误说明"],
+  reason: ["Reason", "原因"],
+  releaseCheckedAt: ["Release verified at", "释放验证时间"],
+  remaining: ["Remaining items", "剩余项目"],
+  requiresAdmin: ["Administrator required", "需要管理员权限"],
+  requiresConfirmation: ["Confirmation required", "需要确认"],
+  requiresConfirmationToken: ["Confirmation token required", "需要确认令牌"],
+  requiresTerminalRestart: ["Terminal restart required", "需要重启终端"],
+  returnCode: ["Return code", "返回码"],
+  reversible: ["Reversible", "可回滚"],
+  risk: ["Risk", "风险"],
+  riskLevel: ["Risk level", "风险等级"],
+  riskSummary: ["Risk summary", "风险摘要"],
+  rollbackAvailable: ["Rollback available", "可以回滚"],
+  rollbackId: ["Rollback ID", "回滚 ID"],
+  runtimeSwitches: ["Runtime switches", "运行时切换"],
+  source: ["Source", "来源"],
+  sourceBackup: ["Source backup", "源目录备份"],
+  startedAt: ["Started at", "开始时间"],
+  status: ["Status", "状态"],
+  step: ["Step", "步骤"],
+  success: ["Success", "是否成功"],
+  target: ["Target", "目标"],
+  targetAppName: ["Target application", "目标应用"],
+  targetExecutable: ["Target executable", "目标程序"],
+  targetPath: ["Target path", "目标路径"],
+  updatedAt: ["Updated at", "更新时间"],
+  warnings: ["Warnings", "警告"],
+  willCleanupPath: ["Will clean PATH", "将清理 PATH"],
+  willConfigureEnvironment: ["Will configure environment", "将配置环境"],
+  willInstall: ["Will install", "将执行安装"],
+  willWriteEnvironment: ["Will write environment", "将写入环境"],
+};
 
 export function escapeHtml(value: unknown): string {
   return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char] || char);
@@ -16,6 +99,7 @@ export function valueOf(source: unknown, path: string, fallback: unknown = t("st
   if (Array.isArray(value)) return String(value.length);
   if (value === null || value === undefined || value === "") return String(fallback);
   if (typeof value === "object") return Object.keys(value).length ? t("state.available") : String(fallback);
+  if (typeof value === "boolean") return t(value ? "state.yes" : "state.no");
   return String(value);
 }
 
@@ -41,12 +125,20 @@ export function renderErrorState(title: string, detail: string, retryAction: str
 
 export function renderObjectTable(data: unknown, keys: string[]): string {
   return `<dl class="kv-list">${keys
-    .map((key) => `<div><dt>${escapeHtml(key)}</dt><dd>${escapeHtml(valueOf(data, key))}</dd></div>`)
+    .map((key) => `<div><dt>${escapeHtml(objectFieldLabel(key))}</dt><dd>${escapeHtml(valueOf(data, key))}</dd></div>`)
     .join("")}</dl>`;
 }
 
-export function renderActionButton(id: string, label: string, tone = "secondary"): string {
-  return `<button class="button button--${tone} ${tone}" data-action="${id}" data-testid="${escapeHtml(actionTestId(id))}" type="button">${escapeHtml(label)}</button>`;
+function objectFieldLabel(key: string): string {
+  const label = objectFieldLabels[key];
+  if (label) return localize(label[0], label[1]);
+  return key
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/^./, (character) => character.toUpperCase());
+}
+
+export function renderActionButton(id: string, label: string, tone = "secondary", disabled = false): string {
+  return `<button class="button button--${tone} ${tone}" data-action="${id}" data-testid="${escapeHtml(actionTestId(id))}" type="button"${disabled ? " disabled aria-disabled=\"true\"" : ""}>${escapeHtml(label)}</button>`;
 }
 
 function actionTestId(id: string): string {
@@ -55,6 +147,8 @@ function actionTestId(id: string): string {
     "execute-port-plan": "ports-execute-plan",
     "inspect-c-drive-rescue": "cleanup-disk-overview-action",
     "inspect-disk-overview": "cleanup-disk-overview-action",
+    "create-expansion-plan": "cleanup-expansion-create-action",
+    "execute-expansion-plan": "cleanup-expansion-execute-action",
     "scan-duplicate-large-files": "cleanup-duplicate-large-files-action",
     "create-desktop-archive-plan": "cleanup-desktop-archive-plan-action",
     "execute-desktop-archive-plan": "cleanup-desktop-archive-execute-action",
