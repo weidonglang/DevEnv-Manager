@@ -30,12 +30,16 @@ pub use clean_plan::create_cleanup_plan;
 pub use clean_report::export_cleanup_report;
 pub use desktop::inspect_desktop;
 pub use dev_cache::clean_dev_cache;
+#[cfg(feature = "acceptance-fixtures")]
+pub(crate) use dev_cache::clean_dev_cache_isolated;
 pub use disk::inspect_disk_overview;
 pub use downloads::inspect_downloads;
 pub use duplicates::scan_duplicate_large_files_with_progress;
 pub use expansion::{create_c_drive_expansion_plan, execute_c_drive_expansion};
 pub use large_files::scan_large_files_with_progress;
 pub use migration::execute_move_plan;
+#[cfg(feature = "acceptance-fixtures")]
+pub(crate) use migration::execute_isolated_move_plan;
 pub use model::{
     AppUsageReport, CleanupPlan, CleanupResult, CleanupScanReport, DiskVolumeInfo, DuplicateGroup,
     ExpansionPlan, ExpansionResult, FolderUsageReport, InstalledSoftwareUsage, LargeFileItem,
@@ -54,6 +58,8 @@ pub use protect::{
 pub use report::inspect_maintenance_overview;
 pub use rollback::{list_rollback_records, rollback_move};
 pub use safe_clean::{clean_managed_download_cache, clean_selected_targets};
+#[cfg(feature = "acceptance-fixtures")]
+pub(crate) use safe_clean::clean_managed_download_cache_isolated;
 pub use scan::scan_cleanup_targets;
 pub use software::inspect_installed_software_usage;
 

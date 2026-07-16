@@ -26,7 +26,7 @@ const actionCommandSpecs: Array<Omit<PaletteCommand, "title"> & { titleKey: Tran
   { id: "reports:doctor", titleKey: "palette.reportsDoctor", view: "reports", action: "export-doctor-markdown", safe: true },
   { id: "reports:environment", titleKey: "palette.reportsEnvironment", view: "reports", action: "export-environment-report", safe: true },
   { id: "reports:assoc", titleKey: "palette.reportsAssoc", view: "reports", action: "export-file-association-report", safe: true },
-  { id: "settings:update", titleKey: "palette.settingsUpdate", view: "settings", action: "check-update", safe: true },
+  { id: "settings:update", titleKey: "palette.settingsUpdate", view: "settings", action: "check-for-updates", safe: true },
   { id: "theme:light", titleKey: "palette.themeLight", safe: true, run: () => applyTheme("light") },
   { id: "theme:dark", titleKey: "palette.themeDark", safe: true, run: () => applyTheme("dark") },
   { id: "theme:system", titleKey: "palette.themeSystem", safe: true, run: () => applyTheme("system") },
@@ -80,7 +80,7 @@ export function registerCommandPalette(): void {
     palette = document.createElement("div");
     palette.className = "command-palette";
     palette.innerHTML = `
-      <div class="command-palette__panel" role="dialog" aria-modal="true" aria-label="${t("app.commandPalette")}">
+      <div class="command-palette__panel" data-testid="command-palette-panel" role="dialog" aria-modal="true" aria-label="${t("app.commandPalette")}">
         <input class="command-palette__search" type="search" placeholder="${t("palette.search")}" aria-label="${t("palette.search")}" autofocus />
         <div class="command-palette__list" role="listbox"></div>
       </div>

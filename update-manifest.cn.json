@@ -1,28 +1,28 @@
 {
   "schemaVersion": 2,
   "channel": "stable",
-  "version": "1.8.1",
-  "date": "2026-07-07",
+  "version": "1.8.2",
+  "date": "2026-07-16",
   "notes": [
-    "v1.8.1 热修复：修复端口扫描 / netstat 超时导致 Dashboard 整页加载失败的问题，新增 Auto / zh-CN / en-US 应用级语言选项，恢复首次启动安全声明和每页功能/风险说明，并补齐 GitHub + Gitee 发布元数据一致性。"
+    "v1.8.2 稳定版恢复并加固前端重构后的清理、端口、环境、项目、报告、文件关联、运行时边界、中英文动态内容以及深色/高对比度可读性；加入自动验收与 NSIS/MSI 安装、升级、回滚、UAC 和安全验证。Runtime 最终重构继续由 v1.9.0 / #130 跟踪。"
   ],
   "assets": [
     {
       "platform": "windows-x64",
-      "fileName": "DevEnv.Manager_1.8.1_x64-setup.exe",
-      "size": 2626160,
-      "sha256": "366eea864333bc1927da182d8409462b53676da8b4a8432c24a5aa2d2def8de6",
-      "primaryUrl": "https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.8.1/DevEnv.Manager_1.8.1_x64-setup.exe",
+      "fileName": "DevEnv.Manager_1.8.2_x64-setup.exe",
+      "size": 2775318,
+      "sha256": "b910f56674abca837baaff662e159d6025d66dce933c2f758af34211a27e49a6",
+      "primaryUrl": "https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.8.2/DevEnv.Manager_1.8.2_x64-setup.exe",
       "mirrors": [
         {
           "name": "Gitee Release",
           "region": "cn",
-          "url": "https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.8.1/DevEnv.Manager_1.8.1_x64-setup.exe"
+          "url": "https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.8.2/DevEnv.Manager_1.8.2_x64-setup.exe"
         },
         {
           "name": "GitHub Release",
           "region": "global",
-          "url": "https://github.com/weidonglang/DevEnv-Manager/releases/download/v1.8.1/DevEnv.Manager_1.8.1_x64-setup.exe"
+          "url": "https://github.com/weidonglang/DevEnv-Manager/releases/download/v1.8.2/DevEnv.Manager_1.8.2_x64-setup.exe"
         }
       ]
     }

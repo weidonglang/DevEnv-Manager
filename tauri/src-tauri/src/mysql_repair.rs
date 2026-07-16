@@ -1075,6 +1075,9 @@ fn copy_tree(source: &Path, destination: &Path) -> Result<(u64, usize, bool, boo
     if !source.is_dir() {
         return Err("Data 目录不存在或不可读".to_string());
     }
+    if !destination.is_absolute() {
+        return Err("备份目标必须是绝对路径（例如 C:\\DevEnv-Backups\\mysql-data），不能使用相对路径或全角盘符".to_string());
+    }
     let source_canonical = source
         .canonicalize()
         .map_err(|e| format!("解析 Data 目录失败：{e}"))?;
@@ -1302,6 +1305,19 @@ mod tests {
             .join("data")
             .join("backup");
         assert!(copy_tree(&source, &disguised).is_err());
+    }
+
+    #[test]
+    fn backup_rejects_relative_or_fullwidth_drive_destination() {
+        let source = tempfile::tempdir().unwrap();
+        fs::write(source.path().join("ibdata1"), b"fixture").unwrap();
+        for destination in [
+            PathBuf::from("relative-backup"),
+            PathBuf::from("C：\\DevEnv-Backups\\mysql-data"),
+        ] {
+            let error = copy_tree(source.path(), &destination).unwrap_err();
+            assert!(error.contains("绝对路径"), "unexpected error: {error}");
+        }
     }
 
     #[test]

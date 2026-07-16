@@ -2,9 +2,14 @@ mod cleanup;
 mod diagnostics;
 mod env_core;
 mod file_assoc;
+#[cfg(feature = "acceptance-fixtures")]
+mod isolated_acceptance;
 mod mysql_repair;
 mod powershell_runner;
 mod safety;
+
+#[cfg(feature = "acceptance-fixtures")]
+pub use isolated_acceptance::run_isolated_capability_fixtures;
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -21,7 +26,8 @@ use std::sync::{
     atomic::{AtomicBool, AtomicU64, Ordering},
     Mutex, OnceLock,
 };
-use std::time::Instant;
+use std::thread;
+use std::time::{Duration, Instant};
 use tauri::Emitter;
 use tempfile::Builder as TempBuilder;
 use zip::ZipArchive;
@@ -46,6 +52,21 @@ const MANAGED_PATHS: [&str; 8] = [
     r"%DEVENV_HOME%\tools\npm-global",
 ];
 const BLOCKED_PIDS: [u32; 2] = [0, 4];
+const PROTECTED_FORCE_KILL_PROCESS_NAMES: [&str; 11] = [
+    "system",
+    "registry",
+    "smss.exe",
+    "csrss.exe",
+    "wininit.exe",
+    "services.exe",
+    "lsass.exe",
+    "svchost.exe",
+    "winlogon.exe",
+    "spoolsv.exe",
+    "securityhealthservice.exe",
+];
+const PORT_PID_VERIFY_ATTEMPTS: usize = 20;
+const PORT_RELEASE_VERIFY_ATTEMPTS: usize = 4;
 const BLOCKED_NAMES: [&str; 9] = [
     "system",
     "idle",
@@ -401,6 +422,7 @@ struct PortResolutionPlan {
     plan_id: String,
     pid: u32,
     port: u16,
+    protocol: String,
     process_name: String,
     process_path: String,
     command_line: String,
@@ -427,6 +449,13 @@ struct ChildProcessSummary {
 struct PortResolutionResult {
     success: bool,
     message: String,
+    target_port: u16,
+    target_pid: u32,
+    process_name: String,
+    service_owned: bool,
+    requires_admin: bool,
+    failure_reason: String,
+    next_steps: Vec<String>,
     pid_exited: bool,
     port_released: bool,
     release_checked_at: String,
@@ -514,6 +543,44 @@ struct ArchivePlanItem {
     suggestion: String,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct GenericArchivePlanEntry {
+    id: String,
+    source: String,
+    target: String,
+    size: u64,
+    sha256: String,
+    conflict: bool,
+    conflict_reason: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct GenericArchivePlan {
+    plan_id: String,
+    created_at: String,
+    target_root: String,
+    estimated_bytes: u64,
+    risk_level: String,
+    entries: Vec<GenericArchivePlanEntry>,
+    warnings: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct GenericArchiveResult {
+    plan_id: String,
+    success: bool,
+    moved_items: usize,
+    moved_bytes: u64,
+    skipped_items: usize,
+    failures: Vec<String>,
+    verified_targets: Vec<String>,
+    rollback_guidance: Vec<String>,
+    receipt_path: String,
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct CommandRunResult {
@@ -585,10 +652,24 @@ struct DoctorRepairResult {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
+struct DoctorRepairActionDetail {
+    action_id: String,
+    title: String,
+    reason: String,
+    evidence: Vec<String>,
+    risk_level: String,
+    requires_backup: bool,
+    requires_token: bool,
+    next_step: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 struct DoctorRepairPlan {
     plan_id: String,
     before_score: u8,
     actions: Vec<String>,
+    action_details: Vec<DoctorRepairActionDetail>,
     will_cleanup_path: bool,
     will_configure_environment: bool,
     backup_name: String,
@@ -627,6 +708,7 @@ struct PythonAnalysis {
     launcher_path: String,
     launcher_output: String,
     first_python_on_path: String,
+    first_python3_on_path: String,
     first_pip_on_path: String,
     python_m_pip_available: bool,
     managed_python_available: bool,
@@ -845,6 +927,7 @@ struct GitEnvironment {
     github_ssh_status: String,
     github_https_status: String,
     git_lfs: ToolState,
+    global_config_path: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -854,6 +937,7 @@ struct NodeEcosystem {
     npm_prefix: String,
     npm_registry: String,
     pnpm_store_path: String,
+    npm_config_path: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -862,6 +946,7 @@ struct PythonEcosystem {
     tools: Vec<ToolState>,
     pip_config: String,
     pip_index_url: String,
+    pip_config_path: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -900,6 +985,7 @@ struct DotnetEnvironment {
     dotnet: ToolState,
     sdks: Vec<String>,
     runtimes: Vec<String>,
+    nuget_config_path: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -977,6 +1063,11 @@ struct LocalServiceStatus {
     service_name: String,
     service_state: String,
     binary_path: String,
+    executable_path: String,
+    install_directory: String,
+    path_status: String,
+    log_path: String,
+    log_path_reason: String,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -1053,7 +1144,25 @@ struct UpdateCheckResult {
     failed_sources: Vec<String>,
     mirrors: Vec<UpdateMirror>,
     file_name: String,
+    platform: String,
+    size: u64,
     checked_at: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct UpdateDownloadResult {
+    success: bool,
+    version: String,
+    platform: String,
+    file_name: String,
+    file_path: String,
+    size: u64,
+    sha256: String,
+    source_name: String,
+    source_url: String,
+    verified: bool,
+    message: String,
 }
 
 #[derive(Debug, Clone)]
@@ -1086,6 +1195,8 @@ static PORT_RESOLUTION_PLANS: OnceLock<Mutex<HashMap<String, PortResolutionPlan>
 static PROFILE_APPLY_PLANS: OnceLock<Mutex<HashMap<String, PendingProfileApplyPlan>>> =
     OnceLock::new();
 static DOCTOR_REPAIR_PLANS: OnceLock<Mutex<HashMap<String, PendingDoctorRepairPlan>>> =
+    OnceLock::new();
+static GENERIC_ARCHIVE_PLANS: OnceLock<Mutex<HashMap<String, GenericArchivePlan>>> =
     OnceLock::new();
 
 fn confirmation_tokens() -> &'static Mutex<HashMap<String, ConfirmationToken>> {
@@ -1213,7 +1324,7 @@ const RISK_OPERATION_REGISTRY: &[RiskOperationSpec] = &[
         command: "install_jdk",
         action_id: "install_jdk",
         risk_level: "high",
-        requires_backup: true,
+        requires_backup: false,
         requires_token: true,
         description: "Install managed JDK and optionally switch current runtime",
     },
@@ -1274,6 +1385,30 @@ const RISK_OPERATION_REGISTRY: &[RiskOperationSpec] = &[
         description: "启动、停止或重启本地数据库 Windows 服务",
     },
     RiskOperationSpec {
+        command: "run_toolchain_action",
+        action_id: "run_toolchain_action",
+        risk_level: "high",
+        requires_backup: true,
+        requires_token: true,
+        description: "Run an allowlisted Git, Node, or Python ecosystem configuration action",
+    },
+    RiskOperationSpec {
+        command: "run_platform_action",
+        action_id: "run_platform_action",
+        risk_level: "high",
+        requires_backup: true,
+        requires_token: true,
+        description: "Run an allowlisted Go, Rust, Maven, or Gradle configuration action",
+    },
+    RiskOperationSpec {
+        command: "run_chsrc_action",
+        action_id: "run_chsrc_action",
+        risk_level: "high",
+        requires_backup: true,
+        requires_token: true,
+        description: "Change or reset an allowlisted chsrc ecosystem source",
+    },
+    RiskOperationSpec {
         command: "stop_local_service",
         action_id: "stop_local_service",
         risk_level: "high",
@@ -1314,12 +1449,28 @@ const RISK_OPERATION_REGISTRY: &[RiskOperationSpec] = &[
         description: "执行空间搬家或归档计划",
     },
     RiskOperationSpec {
+        command: "execute_generic_archive_plan",
+        action_id: "execute_generic_archive_plan",
+        risk_level: "high",
+        requires_backup: false,
+        requires_token: true,
+        description: "Execute a selected-file archive plan without overwriting conflicts",
+    },
+    RiskOperationSpec {
         command: "execute_expansion_plan",
         action_id: "execute_expansion_plan",
         risk_level: "critical",
         requires_backup: true,
         requires_token: true,
         description: "执行磁盘扩容计划",
+    },
+    RiskOperationSpec {
+        command: "execute_cleanup_plan",
+        action_id: "execute_cleanup_plan",
+        risk_level: "medium",
+        requires_backup: false,
+        requires_token: true,
+        description: "鎵ц宸查瑙堢殑瀹夊叏娓呯悊璁″垝",
     },
     RiskOperationSpec {
         command: "clear_download_cache",
@@ -1376,6 +1527,22 @@ const RISK_OPERATION_REGISTRY: &[RiskOperationSpec] = &[
         requires_backup: true,
         requires_token: true,
         description: "回滚文件默认打开方式备份",
+    },
+    RiskOperationSpec {
+        command: "launch_update_installer",
+        action_id: "launch_update_installer",
+        risk_level: "high",
+        requires_backup: false,
+        requires_token: true,
+        description: "Launch a verified DevEnv Manager update installer",
+    },
+    RiskOperationSpec {
+        command: "self_uninstall",
+        action_id: "self_uninstall",
+        risk_level: "high",
+        requires_backup: false,
+        requires_token: true,
+        description: "Launch the registered DevEnv Manager uninstaller",
     },
 ];
 
@@ -1561,9 +1728,22 @@ fn app_snapshot() -> AppSnapshot {
 
 #[tauri::command]
 fn load_config() -> Result<ConfigView, String> {
-    let settings = load_settings()?;
-    let paths = AppPaths::new(PathBuf::from(&settings.root_dir));
-    paths.ensure().map_err(|err| err.to_string())?;
+    let mut settings = load_settings()?;
+    let mut paths = AppPaths::new(PathBuf::from(&settings.root_dir));
+    if let Err(error) = paths.ensure() {
+        if !should_recover_unwritable_initial_root(&settings) {
+            return Err(error.to_string());
+        }
+        let recovered_root = default_root_dir();
+        if path_key(&display_path(&recovered_root)) == path_key(&settings.root_dir) {
+            return Err(error.to_string());
+        }
+        let recovered_paths = AppPaths::new(recovered_root);
+        recovered_paths.ensure().map_err(|err| err.to_string())?;
+        settings.root_dir = display_path(&recovered_paths.root);
+        save_json(&settings_file(), &settings)?;
+        paths = recovered_paths;
+    }
     let installed = load_installed(&paths)?;
     Ok(ConfigView {
         settings,
@@ -1693,8 +1873,10 @@ async fn create_cleanup_plan(
 #[tauri::command]
 async fn clean_selected_targets(
     plan: cleanup::CleanupPlan,
+    confirmation_token: Option<String>,
 ) -> Result<cleanup::CleanupResult, String> {
     run_blocking(move || {
+        require_risk_operation_token("execute_cleanup_plan", &plan.plan_id, confirmation_token)?;
         let paths = load_paths()?;
         cleanup::clean_selected_targets(&paths.root, plan)
     })
@@ -2522,6 +2704,8 @@ fn check_for_updates_blocking() -> Result<UpdateCheckResult, String> {
             failed_sources,
             mirrors: normalized_mirrors(&asset),
             file_name: asset.file_name,
+            platform: asset.platform,
+            size: asset.size,
             checked_at: current_timestamp(),
         });
     }
@@ -2626,11 +2810,11 @@ fn normalized_mirrors(asset: &UpdateAsset) -> Vec<UpdateMirror> {
 }
 
 #[tauri::command]
-async fn download_update(app: tauri::AppHandle) -> Result<OperationResult, String> {
+async fn download_update(app: tauri::AppHandle) -> Result<UpdateDownloadResult, String> {
     run_blocking(move || download_update_blocking(app)).await?
 }
 
-fn download_update_blocking(app: tauri::AppHandle) -> Result<OperationResult, String> {
+fn download_update_blocking(app: tauri::AppHandle) -> Result<UpdateDownloadResult, String> {
     let update = check_for_updates_blocking()?;
     if !update.update_available {
         return Err("当前已经是最新版本".to_string());
@@ -2659,9 +2843,27 @@ fn download_update_blocking(app: tauri::AppHandle) -> Result<OperationResult, St
             Some((&app, &task, 8, 95)),
         ) {
             Ok(()) => {
+                let (actual_size, actual_sha256) =
+                    match verify_update_installer_file(&target, update.size, &update.sha256) {
+                        Ok(verified) => verified,
+                        Err(error) => {
+                            let _ = fs::remove_file(&target);
+                            failures.push(format!("{}: {error}", mirror.name));
+                            continue;
+                        }
+                    };
                 emit_task_progress(&app, &task, 100, "更新安装包已通过 SHA256 校验");
-                return Ok(OperationResult {
+                return Ok(UpdateDownloadResult {
                     success: true,
+                    version: update.latest_version,
+                    platform: update.platform,
+                    file_name: update.file_name,
+                    file_path: display_path(&target),
+                    size: actual_size,
+                    sha256: actual_sha256,
+                    source_name: mirror.name,
+                    source_url: mirror.url,
+                    verified: true,
                     message: format!("更新安装包已就绪：{}", display_path(target)),
                 });
             }
@@ -2673,8 +2875,11 @@ fn download_update_blocking(app: tauri::AppHandle) -> Result<OperationResult, St
 }
 
 #[tauri::command]
-async fn launch_update_installer(app: tauri::AppHandle) -> Result<OperationResult, String> {
-    let result = run_blocking(|| {
+async fn launch_update_installer(
+    app: tauri::AppHandle,
+    confirmation_token: Option<String>,
+) -> Result<OperationResult, String> {
+    let result = run_blocking(move || {
         let update = check_for_updates_blocking()?;
         if !update.update_available {
             return Err("当前已经是最新版本".to_string());
@@ -2685,10 +2890,9 @@ async fn launch_update_installer(app: tauri::AppHandle) -> Result<OperationResul
         if !target.is_file() {
             return Err("更新安装包尚未下载，请先点击下载更新".to_string());
         }
-        let actual = file_sha256(&target)?;
-        if !actual.eq_ignore_ascii_case(&update.sha256) {
-            return Err("更新安装包 SHA256 校验失败，已拒绝启动".to_string());
-        }
+        verify_update_installer_file(&target, update.size, &update.sha256)?;
+        let plan_id = format!("update:{}:{}", update.latest_version, update.sha256);
+        require_risk_operation_token("launch_update_installer", &plan_id, confirmation_token)?;
         hidden_command(&target)
             .spawn()
             .map_err(|err| format!("启动更新安装器失败：{err}"))?;
@@ -2707,6 +2911,27 @@ fn validate_update_checksum(value: &str) -> Result<(), String> {
         return Err("更新清单缺少有效 SHA256，已拒绝下载".to_string());
     }
     Ok(())
+}
+
+fn verify_update_installer_file(
+    path: &Path,
+    expected_size: u64,
+    expected_sha256: &str,
+) -> Result<(u64, String), String> {
+    validate_update_checksum(expected_sha256)?;
+    let actual_size = fs::metadata(path)
+        .map_err(|error| format!("读取更新安装包信息失败：{error}"))?
+        .len();
+    if expected_size > 0 && actual_size != expected_size {
+        return Err(format!(
+            "更新安装包大小不匹配：预期 {expected_size}，实际 {actual_size}"
+        ));
+    }
+    let actual_sha256 = file_sha256(path)?;
+    if !actual_sha256.eq_ignore_ascii_case(expected_sha256) {
+        return Err("更新安装包 SHA256 校验失败，已拒绝启动".to_string());
+    }
+    Ok((actual_size, actual_sha256))
 }
 
 fn validate_update_manifest(manifest: &UpdateManifest) -> Result<(), String> {
@@ -3046,6 +3271,39 @@ fn cleanup_path_entries_blocking() -> Result<OperationResult, String> {
         .or_else(|| environment.get("PATH"))
         .cloned()
         .unwrap_or_default();
+    let (new_path, removed) = cleaned_path_value(&paths, &old_path);
+
+    if new_path == old_path {
+        return Ok(OperationResult {
+            success: true,
+            message: "PATH 没有需要清理的真实失效或重复项".to_string(),
+        });
+    }
+
+    let backup_name = create_environment_backup(&paths, &environment)?;
+    restore_environment_values(
+        environment.get("DEVENV_HOME").map(String::as_str),
+        environment.get("JAVA_HOME").map(String::as_str),
+        &new_path,
+    )?;
+    broadcast_environment_change();
+    Ok(OperationResult {
+        success: true,
+        message: if removed == 0 {
+            format!("PATH 已规范化；备份：{backup_name}")
+        } else {
+            format!(
+                "已清理 {removed} 个真实失效、重复或空 PATH 项，托管待安装路径已保留；备份：{backup_name}"
+            )
+        },
+    })
+}
+
+fn cleaned_path_value(paths: &AppPaths, old_path: &str) -> (String, usize) {
+    if old_path.is_empty() {
+        return (String::new(), 0);
+    }
+
     let mut seen = BTreeSet::new();
     let mut retained = Vec::new();
     let mut removed = 0_usize;
@@ -3053,6 +3311,7 @@ fn cleanup_path_entries_blocking() -> Result<OperationResult, String> {
     for entry in old_path.split(';') {
         let entry = entry.trim();
         if entry.is_empty() {
+            removed += 1;
             continue;
         }
         let key = path_key(entry);
@@ -3060,34 +3319,15 @@ fn cleanup_path_entries_blocking() -> Result<OperationResult, String> {
             removed += 1;
             continue;
         }
-        let expanded = expand_environment_path(entry, &paths);
-        if !Path::new(&expanded).exists() && !is_managed_pending_path(&expanded, &paths) {
+        let expanded = expand_environment_path(entry, paths);
+        if !Path::new(&expanded).exists() && !is_managed_pending_path(&expanded, paths) {
             removed += 1;
             continue;
         }
         retained.push(entry.to_string());
     }
 
-    let new_path = retained.join(";");
-    let backup_name = if removed > 0 {
-        Some(create_environment_backup(&paths, &environment)?)
-    } else {
-        None
-    };
-    let java_home = environment.get("JAVA_HOME").map(String::as_str);
-    set_user_environment_values(&paths, java_home, &new_path)?;
-    broadcast_environment_change();
-    Ok(OperationResult {
-        success: true,
-        message: if removed == 0 {
-            "PATH 没有需要清理的真实失效或重复项".to_string()
-        } else {
-            format!(
-                "已清理 {removed} 个真实失效或重复 PATH，托管待安装路径已保留；备份：{}",
-                backup_name.unwrap_or_default()
-            )
-        },
-    })
+    (retained.join(";"), removed)
 }
 
 #[tauri::command]
@@ -3999,8 +4239,17 @@ fn switch_runtime_blocking(
     path: Option<String>,
 ) -> Result<OperationResult, String> {
     let paths = load_paths()?;
+    switch_runtime_with_paths(&paths, kind, version, path)
+}
+
+fn switch_runtime_with_paths(
+    paths: &AppPaths,
+    kind: String,
+    version: String,
+    path: Option<String>,
+) -> Result<OperationResult, String> {
     let meta = runtime_meta(&kind)?;
-    let mut installed = load_installed(&paths)?;
+    let mut installed = load_installed(paths)?;
     let requested_path = path.as_deref().map(path_key);
     let record = collection(&installed, meta.collection)
         .iter()
@@ -4038,13 +4287,13 @@ fn switch_runtime_blocking(
         .transpose()?
         .unwrap_or_default();
     if meta.kind == "jdk" {
-        create_environment_backup(&paths, &previous_environment)?;
+        create_environment_backup(paths, &previous_environment)?;
     }
     switch_junction(&paths.current().join(meta.link_name), &target, &paths.root)?;
     set_current(&mut installed, meta.kind, Some(selected_version.clone()));
     save_json(&paths.installed_file(), &installed)?;
     if meta.kind == "jdk" {
-        if let Err(error) = refresh_user_java_home(&paths) {
+        if let Err(error) = refresh_user_java_home(paths) {
             if let Some(previous_version) = previous_current.jdk.as_deref() {
                 if let Some(previous_record) = installed.jdks.iter().find(|item| {
                     item.get("version").and_then(Value::as_str) == Some(previous_version)
@@ -4104,8 +4353,17 @@ fn uninstall_runtime_blocking(
     path: Option<String>,
 ) -> Result<OperationResult, String> {
     let paths = load_paths()?;
+    uninstall_runtime_with_paths(&paths, kind, version, path)
+}
+
+fn uninstall_runtime_with_paths(
+    paths: &AppPaths,
+    kind: String,
+    version: String,
+    path: Option<String>,
+) -> Result<OperationResult, String> {
     let meta = runtime_meta(&kind)?;
-    let mut installed = load_installed(&paths)?;
+    let mut installed = load_installed(paths)?;
     let requested_path = path.as_deref().map(path_key);
     let records = collection_mut(&mut installed, meta.collection);
     let index = records
@@ -4129,7 +4387,7 @@ fn uninstall_runtime_blocking(
         .unwrap_or(version.as_str())
         .to_string();
     let target = PathBuf::from(record.get("path").and_then(Value::as_str).unwrap_or(""));
-    let expected_parent = runtime_parent(&paths, meta.collection)?;
+    let expected_parent = runtime_parent(paths, meta.collection)?;
     if target.parent() != Some(expected_parent.as_path()) {
         return Err(format!("拒绝删除非标准受管目录：{}", display_path(&target)));
     }
@@ -4143,7 +4401,7 @@ fn uninstall_runtime_blocking(
     collection_mut(&mut installed, meta.collection).remove(index);
     save_json(&paths.installed_file(), &installed)?;
     if meta.kind == "jdk" {
-        refresh_user_java_home(&paths)?;
+        refresh_user_java_home(paths)?;
     }
     Ok(OperationResult {
         success: true,
@@ -4260,16 +4518,20 @@ async fn scan_ports() -> Result<Vec<PortRecord>, String> {
 }
 
 fn scan_ports_blocking() -> Result<Vec<PortRecord>, String> {
-    let output = powershell_runner::run_probe_command("netstat", &["-ano"], 5)
-        .map_err(|err| format!("无法执行 netstat: {err}"))?;
-    if !output.success {
-        return Err(format!(
-            "netstat failed: {}",
-            powershell_runner::native_command_message(&output)
-        ));
+    match powershell_runner::run_probe_command("netstat", &["-ano"], 5) {
+        Ok(output) if output.success => parse_netstat_ports(&output.stdout),
+        Ok(output) => parse_powershell_ports().map_err(|fallback| {
+            format!(
+                "netstat failed: {}; fallback failed: {fallback}",
+                powershell_runner::native_command_message(&output)
+            )
+        }),
+        Err(err) => parse_powershell_ports()
+            .map_err(|fallback| format!("无法执行 netstat: {err}; fallback failed: {fallback}")),
     }
+}
 
-    let text = output.stdout;
+fn parse_netstat_ports(text: &str) -> Result<Vec<PortRecord>, String> {
     let system = sysinfo::System::new_all();
     let services = windows_service_map();
     let mut records = Vec::new();
@@ -4296,50 +4558,149 @@ fn scan_ports_blocking() -> Result<Vec<PortRecord>, String> {
             continue;
         };
         let pid = pid_text.parse::<u32>().unwrap_or(0);
-        let process_name = process_name(&system, pid);
-        let (process_path, command_line, parent_pid, parent_process_name) =
-            process_details(&system, pid);
-        let service_names = services.get(&pid).cloned().unwrap_or_default();
-        let signature = analyze_port_signature(
-            local_port,
-            &state,
-            &process_name,
-            &process_path,
-            &command_line,
-            &service_names,
-        );
-        let command_line = redact_command_line(&command_line);
-        let common_usage = signature.identity.clone();
-        let explanation = signature.explanation.clone();
-        let risk = signature.risk.clone();
+        records.push(build_port_record(
+            &system,
+            &services,
+            PortRecordSeed {
+                local_port,
+                protocol,
+                local_address,
+                remote_address: remote.to_string(),
+                state,
+                pid,
+            },
+        ));
+    }
+    finish_port_records(records)
+}
 
-        records.push(PortRecord {
-            protocol,
-            local_address,
-            local_port,
-            remote_address: remote.to_string(),
-            state,
-            pid,
-            process_name,
-            process_path,
-            command_line,
-            parent_pid,
-            parent_process_name,
-            service_names,
-            common_usage,
-            explanation,
-            risk,
-            identity: signature.identity,
-            confidence: signature.confidence,
-            evidence_count: signature.evidence.len(),
-            conflict_count: signature.conflict_evidence.len(),
-            risk_level: signature.risk_level,
-            recommendation: signature.recommendation,
-            evidence: signature.evidence,
-            conflict_evidence: signature.conflict_evidence,
+fn parse_powershell_ports() -> Result<Vec<PortRecord>, String> {
+    let script = r#"
+$ErrorActionPreference = 'Stop'
+$tcp = Get-NetTCPConnection -ErrorAction Stop | Select-Object `
+  @{Name='Protocol';Expression={'TCP'}}, LocalAddress, LocalPort, RemoteAddress, RemotePort, State, OwningProcess
+$udp = @()
+try {
+  $udp = Get-NetUDPEndpoint -ErrorAction Stop | Select-Object `
+    @{Name='Protocol';Expression={'UDP'}}, LocalAddress, LocalPort, @{Name='RemoteAddress';Expression={'*'}}, @{Name='RemotePort';Expression={'*'}}, @{Name='State';Expression={'LISTENING'}}, OwningProcess
+} catch {}
+@($tcp) + @($udp) | ConvertTo-Csv -NoTypeInformation
+"#;
+    let output = powershell_runner::run_powershell_script(script, Vec::new(), 8)?;
+    if !output.success {
+        let message = if output.stderr.trim().is_empty() {
+            output.stdout.trim().to_string()
+        } else {
+            output.stderr.trim().to_string()
+        };
+        return Err(if message.is_empty() {
+            "PowerShell port fallback failed".to_string()
+        } else {
+            message
         });
     }
+    let system = sysinfo::System::new_all();
+    let services = windows_service_map();
+    let mut records = Vec::new();
+    for line in output.stdout.lines().skip(1) {
+        let columns = parse_csv_line(line);
+        if columns.len() < 7 {
+            continue;
+        }
+        let protocol = columns[0].trim().to_ascii_uppercase();
+        if protocol != "TCP" && protocol != "UDP" {
+            continue;
+        }
+        let local_address = columns[1].trim().to_string();
+        let Ok(local_port) = columns[2].trim().parse::<u16>() else {
+            continue;
+        };
+        let remote_address = match (columns[3].trim(), columns[4].trim()) {
+            ("", _) => "*".to_string(),
+            (address, "") | (address, "0") | (address, "*") => address.to_string(),
+            (address, port) => format!("{address}:{port}"),
+        };
+        let state = if protocol == "UDP" {
+            "LISTENING".to_string()
+        } else {
+            columns[5].trim().to_string()
+        };
+        let pid = columns[6].trim().parse::<u32>().unwrap_or(0);
+        records.push(build_port_record(
+            &system,
+            &services,
+            PortRecordSeed {
+                local_port,
+                protocol,
+                local_address,
+                remote_address,
+                state,
+                pid,
+            },
+        ));
+    }
+    finish_port_records(records)
+}
 
+struct PortRecordSeed {
+    local_port: u16,
+    protocol: String,
+    local_address: String,
+    remote_address: String,
+    state: String,
+    pid: u32,
+}
+
+fn build_port_record(
+    system: &sysinfo::System,
+    services: &std::collections::HashMap<u32, Vec<String>>,
+    seed: PortRecordSeed,
+) -> PortRecord {
+    let process_name = process_name(system, seed.pid);
+    let (process_path, command_line, parent_pid, parent_process_name) =
+        process_details(system, seed.pid);
+    let service_names = services.get(&seed.pid).cloned().unwrap_or_default();
+    let signature = analyze_port_signature(
+        seed.local_port,
+        &seed.state,
+        &process_name,
+        &process_path,
+        &command_line,
+        &service_names,
+    );
+    let command_line = redact_command_line(&command_line);
+    let common_usage = signature.identity.clone();
+    let explanation = signature.explanation.clone();
+    let risk = signature.risk.clone();
+
+    PortRecord {
+        protocol: seed.protocol,
+        local_address: seed.local_address,
+        local_port: seed.local_port,
+        remote_address: seed.remote_address,
+        state: seed.state,
+        pid: seed.pid,
+        process_name,
+        process_path,
+        command_line,
+        parent_pid,
+        parent_process_name,
+        service_names,
+        common_usage,
+        explanation,
+        risk,
+        identity: signature.identity,
+        confidence: signature.confidence,
+        evidence_count: signature.evidence.len(),
+        conflict_count: signature.conflict_evidence.len(),
+        risk_level: signature.risk_level,
+        recommendation: signature.recommendation,
+        evidence: signature.evidence,
+        conflict_evidence: signature.conflict_evidence,
+    }
+}
+
+fn finish_port_records(mut records: Vec<PortRecord>) -> Result<Vec<PortRecord>, String> {
     records.sort_by(|a, b| {
         a.local_port
             .cmp(&b.local_port)
@@ -4387,17 +4748,26 @@ fn create_port_resolution_plan_blocking(pid: u32, port: u16) -> Result<PortResol
         .collect::<Vec<_>>();
     let mut warnings = Vec::new();
     if !record.service_names.is_empty() {
-        warnings
-            .push("Windows service owns this port; prefer stopping the service first".to_string());
+        return Err(
+            "service_owned_port: Windows service owns this port; use service management instead"
+                .to_string(),
+        );
     }
+    validate_force_kill_target(
+        record.pid,
+        &record.process_name,
+        &record.process_path,
+        &record.service_names,
+    )?;
     if matches!(port, 3306 | 5432 | 6379 | 27017 | 9200 | 1433) || record.risk_level == "high" {
-        warnings.push("Sensitive database or middleware port".to_string());
+        warnings.push("sensitive_service_port".to_string());
     }
     let plan_id = port_resolution_plan_id(record);
     let plan = PortResolutionPlan {
         plan_id: plan_id.clone(),
         pid,
         port,
+        protocol: record.protocol.clone(),
         process_name: record.process_name.clone(),
         process_path: record.process_path.clone(),
         command_line: record.command_line.clone(),
@@ -4408,13 +4778,12 @@ fn create_port_resolution_plan_blocking(pid: u32, port: u16) -> Result<PortResol
         service_names: record.service_names.clone(),
         related_ports,
         project_root: project_root_from_command_line(&record.command_line),
-        risk_level: record.risk_level.clone(),
+        risk_level: "high".to_string(),
         warnings,
         recommended_actions: vec![
-            "Open the project directory".to_string(),
-            "Change the project port".to_string(),
-            "Stop the owning service when applicable".to_string(),
-            "Terminate the process and verify port release".to_string(),
+            "open_project_or_process_location".to_string(),
+            "change_project_port_when_possible".to_string(),
+            "terminate_process_and_verify_release".to_string(),
         ],
     };
     port_resolution_plans()
@@ -4449,31 +4818,181 @@ fn execute_port_resolution_plan_blocking(
     {
         return Err("Port owner changed; execution refused".to_string());
     }
+    validate_force_kill_target(
+        plan.pid,
+        &plan.process_name,
+        &plan.process_path,
+        &plan.service_names,
+    )?;
     let pid = plan.pid.to_string();
-    let kill = powershell_runner::run_probe_command("taskkill", &["/PID", &pid, "/T"], 10)
+    let kill = powershell_runner::run_probe_command("taskkill", &["/PID", &pid, "/T", "/F"], 10)
         .map_err(|err| format!("Failed to run taskkill: {err}"))?;
-    let remaining = scan_ports_blocking().unwrap_or_default();
-    let remaining_owners = remaining
-        .into_iter()
-        .filter(|item| item.local_port == plan.port && item.state.eq_ignore_ascii_case("LISTENING"))
-        .collect::<Vec<_>>();
-    let pid_exited = process_name(&sysinfo::System::new_all(), plan.pid).is_empty();
+    let pid_exited = retry_until(PORT_PID_VERIFY_ATTEMPTS, Duration::from_millis(100), || {
+        !process_is_running(plan.pid)
+    });
+    let remaining_owners = wait_for_port_release(plan.port)?;
     let port_released = remaining_owners.is_empty();
+    let requires_admin = port_failure_requires_admin(&kill);
+    let failure_reason = if kill.success && pid_exited && port_released {
+        String::new()
+    } else {
+        port_failure_reason(&kill, pid_exited, port_released)
+    };
+    let next_steps = port_resolution_next_steps(
+        &plan,
+        kill.success,
+        pid_exited,
+        port_released,
+        requires_admin,
+    );
     Ok(PortResolutionResult {
-        success: kill.success && port_released,
-        message: if kill.success {
-            format!("Port {} resolution executed", plan.port)
+        success: kill.success && pid_exited && port_released,
+        message: if kill.success && pid_exited && port_released {
+            format!("端口 {} 已释放", plan.port)
         } else {
-            format!(
-                "taskkill failed: {}",
-                powershell_runner::native_command_message(&kill)
-            )
+            "端口释放未完成，请查看失败原因和下一步建议".to_string()
         },
+        target_port: plan.port,
+        target_pid: plan.pid,
+        process_name: plan.process_name,
+        service_owned: !plan.service_names.is_empty(),
+        requires_admin,
+        failure_reason,
+        next_steps,
         pid_exited,
         port_released,
         release_checked_at: unix_timestamp().to_string(),
         remaining_owners,
     })
+}
+
+fn validate_force_kill_target(
+    pid: u32,
+    process_name: &str,
+    process_path: &str,
+    service_names: &[String],
+) -> Result<(), String> {
+    if BLOCKED_PIDS.contains(&pid) {
+        return Err(format!(
+            "PID {pid} is protected and cannot enter force-kill execution"
+        ));
+    }
+    if !service_names.is_empty() {
+        return Err("service_owned_port: force-kill execution is not allowed".to_string());
+    }
+    let normalized_name = process_name.trim().to_ascii_lowercase();
+    if PROTECTED_FORCE_KILL_PROCESS_NAMES.contains(&normalized_name.as_str()) {
+        return Err(format!(
+            "Protected process {process_name} cannot enter force-kill execution"
+        ));
+    }
+    if process_path.trim().is_empty() {
+        return Err("Process path is unavailable; force-kill execution is refused".to_string());
+    }
+    Ok(())
+}
+
+fn retry_until<F>(attempts: usize, delay: Duration, mut predicate: F) -> bool
+where
+    F: FnMut() -> bool,
+{
+    for attempt in 0..attempts.max(1) {
+        if predicate() {
+            return true;
+        }
+        if attempt + 1 < attempts {
+            thread::sleep(delay);
+        }
+    }
+    false
+}
+
+fn wait_for_port_release(port: u16) -> Result<Vec<PortRecord>, String> {
+    let mut remaining_owners = Vec::new();
+    for attempt in 0..PORT_RELEASE_VERIFY_ATTEMPTS {
+        remaining_owners = scan_ports_blocking()?
+            .into_iter()
+            .filter(|item| item.local_port == port && item.state.eq_ignore_ascii_case("LISTENING"))
+            .collect();
+        if remaining_owners.is_empty() {
+            return Ok(remaining_owners);
+        }
+        if attempt + 1 < PORT_RELEASE_VERIFY_ATTEMPTS {
+            thread::sleep(Duration::from_millis(200));
+        }
+    }
+    Ok(remaining_owners)
+}
+
+fn port_failure_requires_admin(result: &powershell_runner::NativeCommandResult) -> bool {
+    let text = format!("{} {}", result.stdout, result.stderr).to_ascii_lowercase();
+    !result.success
+        && (text.contains("access is denied")
+            || text.contains("access denied")
+            || text.contains("拒绝访问")
+            || result.exit_code == Some(5))
+}
+
+fn port_failure_reason(
+    result: &powershell_runner::NativeCommandResult,
+    pid_exited: bool,
+    port_released: bool,
+) -> String {
+    if result.timed_out {
+        return format!("停止进程超时，{} ms 后仍未完成。", result.elapsed_ms);
+    }
+    if port_released && !pid_exited {
+        return "端口已释放，但原 PID 仍在运行，可能只是关闭了监听套接字。".to_string();
+    }
+    if result.success && !port_released {
+        return "系统已接受停止请求，但端口复查仍显示被占用。".to_string();
+    }
+    if port_failure_requires_admin(result) {
+        return "Windows 拒绝停止该进程，通常需要管理员权限或该进程受服务/系统策略保护。"
+            .to_string();
+    }
+    if result.exit_code.is_some() {
+        return format!(
+            "停止进程命令返回退出码 {:?}，未确认端口释放。",
+            result.exit_code
+        );
+    }
+    "停止进程失败，未确认端口释放。".to_string()
+}
+
+fn port_resolution_next_steps(
+    plan: &PortResolutionPlan,
+    kill_success: bool,
+    pid_exited: bool,
+    port_released: bool,
+    requires_admin: bool,
+) -> Vec<String> {
+    let mut steps = Vec::new();
+    if requires_admin {
+        steps.push(
+            "如确认这是可停止的本地开发进程，请使用管理员权限重新打开应用后再重试。".to_string(),
+        );
+    }
+    if !plan.service_names.is_empty() {
+        steps.push(format!(
+            "该端口由 Windows 服务托管，请优先通过服务管理器处理：{}。",
+            plan.service_names.join(", ")
+        ));
+    }
+    if !kill_success {
+        steps.push("复制诊断信息，确认 PID、进程路径和所属项目后再决定是否手动处理。".to_string());
+    }
+    if !pid_exited {
+        steps
+            .push("如果 PID 仍在运行，请检查它是否有子进程、守护进程或 IDE 自动重启。".to_string());
+    }
+    if !port_released {
+        steps.push("重新扫描端口，确认是否出现新的占用方或原服务自动拉起。".to_string());
+    }
+    if steps.is_empty() {
+        steps.push("重新扫描端口确认没有新的占用方。".to_string());
+    }
+    steps
 }
 
 fn port_resolution_plan_id(record: &PortRecord) -> String {
@@ -4960,14 +5479,21 @@ fn network_diagnostics_blocking() -> NetworkDiagnostics {
     ];
     let client = reqwest::blocking::Client::builder()
         .user_agent("DevEnvManager/2.0")
-        .timeout(std::time::Duration::from_secs(15))
+        .timeout(std::time::Duration::from_secs(10))
         .build();
-    let checks = endpoints
+    let Ok(client) = client else {
+        return NetworkDiagnostics {
+            checks: Vec::new(),
+            proxy: proxy_state(),
+        };
+    };
+    let workers = endpoints
         .into_iter()
         .map(|(name, url)| {
-            let started = Instant::now();
-            match &client {
-                Ok(client) => match client.get(url).send() {
+            let client = client.clone();
+            std::thread::spawn(move || {
+                let started = Instant::now();
+                match client.get(url).send() {
                     Ok(response) => NetworkCheck {
                         name: name.to_string(),
                         url: url.to_string(),
@@ -4982,16 +5508,13 @@ fn network_diagnostics_blocking() -> NetworkDiagnostics {
                         status: network_error(&err),
                         elapsed_ms: started.elapsed().as_millis(),
                     },
-                },
-                Err(err) => NetworkCheck {
-                    name: name.to_string(),
-                    url: url.to_string(),
-                    success: false,
-                    status: err.to_string(),
-                    elapsed_ms: started.elapsed().as_millis(),
-                },
-            }
+                }
+            })
         })
+        .collect::<Vec<_>>();
+    let checks = workers
+        .into_iter()
+        .filter_map(|worker| worker.join().ok())
         .collect();
     NetworkDiagnostics {
         checks,
@@ -5129,6 +5652,328 @@ fn remove_archive_plan_item(id: String) -> Result<OperationResult, String> {
         }
         .to_string(),
     })
+}
+
+fn generic_archive_plan_store() -> &'static Mutex<HashMap<String, GenericArchivePlan>> {
+    GENERIC_ARCHIVE_PLANS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn validate_generic_archive_source(path: &str) -> Result<(PathBuf, u64), String> {
+    let candidate = PathBuf::from(path.trim())
+        .canonicalize()
+        .map_err(|error| format!("Archive source no longer resolves: {error}"))?;
+    let metadata = fs::symlink_metadata(&candidate)
+        .map_err(|error| format!("Cannot read archive source: {error}"))?;
+    if !metadata.is_file() || metadata.file_type().is_symlink() {
+        return Err("Only regular files can be executed by a generic archive plan".to_string());
+    }
+    if archive_path_is_sensitive(&candidate) {
+        return Err(
+            "Chat data, browser profiles, and credential-shaped files cannot be archived"
+                .to_string(),
+        );
+    }
+    if cleanup::is_inside_managed_runtime(&candidate)
+        || env::current_dir()
+            .ok()
+            .is_some_and(|root| candidate.starts_with(root))
+        || (cleanup::should_skip_path(&candidate).is_some()
+            && !archive_user_root_allowed(&candidate))
+    {
+        return Err(
+            "System, current-project, and managed runtime paths cannot be archived".to_string(),
+        );
+    }
+    Ok((candidate, metadata.len()))
+}
+
+fn generic_archive_target_root(target_drive: &str) -> Result<PathBuf, String> {
+    let drive = target_drive.trim().trim_end_matches([':', '\\', '/']);
+    if drive.len() != 1 || !drive.as_bytes()[0].is_ascii_alphabetic() {
+        return Err("Archive target must be a drive letter such as D".to_string());
+    }
+    let drive = drive.to_ascii_uppercase();
+    if drive == "C" {
+        return Err("Generic archive target must not be the system C drive".to_string());
+    }
+    Ok(PathBuf::from(format!(
+        "{drive}:\\DevEnvArchive\\Selected-{}",
+        filename_timestamp()
+    )))
+}
+
+fn path_is_reparse_point(path: &Path) -> bool {
+    let Ok(metadata) = fs::symlink_metadata(path) else {
+        return false;
+    };
+    if metadata.file_type().is_symlink() {
+        return true;
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x0400;
+        metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
+    }
+    #[cfg(not(windows))]
+    false
+}
+
+fn validate_archive_target_boundary(target_root: &Path) -> Result<PathBuf, String> {
+    let mut cursor = Some(target_root);
+    while let Some(path) = cursor {
+        if path.exists() && path_is_reparse_point(path) {
+            return Err(format!(
+                "Archive target contains a symbolic link, Junction, or reparse point: {}",
+                display_path(path)
+            ));
+        }
+        cursor = path.parent();
+    }
+    fs::create_dir_all(target_root)
+        .map_err(|error| format!("Cannot create archive target: {error}"))?;
+    let canonical = target_root
+        .canonicalize()
+        .map_err(|error| format!("Cannot resolve archive target: {error}"))?;
+    if path_key(&display_path(&canonical)).starts_with("c:\\") {
+        return Err("Archive target resolved onto the system C drive".to_string());
+    }
+    Ok(canonical)
+}
+
+fn build_generic_archive_plan(
+    items: Vec<ArchivePlanItem>,
+    target_root: PathBuf,
+) -> Result<GenericArchivePlan, String> {
+    if items.is_empty() {
+        return Err("Add at least one file to the archive plan first".to_string());
+    }
+    let mut entries = Vec::new();
+    let mut targets = BTreeSet::new();
+    let mut estimated_bytes = 0_u64;
+    for item in items {
+        let (source, actual_size) = validate_generic_archive_source(&item.path)?;
+        let file_name = source
+            .file_name()
+            .ok_or_else(|| "Archive source has no file name".to_string())?;
+        let target = target_root.join(file_name);
+        let source_sha256 = file_sha256(&source)?;
+        let target_key = path_key(&display_path(&target));
+        let duplicate_target = !targets.insert(target_key);
+        let conflict = duplicate_target || target.exists();
+        entries.push(GenericArchivePlanEntry {
+            id: item.id,
+            source: display_path(&source),
+            target: display_path(&target),
+            size: actual_size,
+            sha256: source_sha256,
+            conflict,
+            conflict_reason: if duplicate_target {
+                "Another selected file has the same target name".to_string()
+            } else if target.exists() {
+                "Target already exists; execution will not overwrite it".to_string()
+            } else {
+                String::new()
+            },
+        });
+        estimated_bytes = estimated_bytes.saturating_add(actual_size);
+    }
+    let created_at = current_timestamp();
+    let mut hasher = Sha256::new();
+    hasher.update(display_path(&target_root).as_bytes());
+    hasher.update(created_at.as_bytes());
+    for entry in &entries {
+        hasher.update(entry.id.as_bytes());
+        hasher.update(entry.source.as_bytes());
+        hasher.update(entry.target.as_bytes());
+        hasher.update(entry.size.to_le_bytes());
+        hasher.update(entry.sha256.as_bytes());
+    }
+    Ok(GenericArchivePlan {
+        plan_id: format!("generic-archive-{:x}", hasher.finalize()),
+        created_at,
+        target_root: display_path(target_root),
+        estimated_bytes,
+        risk_level: "high".to_string(),
+        entries,
+        warnings: vec![
+            "Files are copied, verified, and then removed from their original locations"
+                .to_string(),
+            "Existing targets and duplicate target names are skipped without overwrite".to_string(),
+            "Use the execution receipt to copy archived files back when rollback is needed"
+                .to_string(),
+        ],
+    })
+}
+
+#[tauri::command]
+fn create_generic_archive_plan(target_drive: String) -> Result<GenericArchivePlan, String> {
+    let paths = load_paths()?;
+    let plan = build_generic_archive_plan(
+        load_archive_plan(&paths)?,
+        generic_archive_target_root(&target_drive)?,
+    )?;
+    let mut store = generic_archive_plan_store()
+        .lock()
+        .map_err(|_| "Generic archive plan storage is unavailable".to_string())?;
+    if store.len() >= 20 {
+        store.clear();
+    }
+    store.insert(plan.plan_id.clone(), plan.clone());
+    Ok(plan)
+}
+
+fn execute_generic_archive_files(plan: &GenericArchivePlan) -> GenericArchiveResult {
+    let target_root = PathBuf::from(&plan.target_root);
+    let mut moved_items = 0_usize;
+    let mut moved_bytes = 0_u64;
+    let mut skipped_items = 0_usize;
+    let mut failures = Vec::new();
+    let mut verified_targets = Vec::new();
+    let mut rollback_guidance = Vec::new();
+    if let Err(error) = validate_archive_target_boundary(&target_root) {
+        failures.push(error);
+    } else {
+        let canonical_target_root = target_root
+            .canonicalize()
+            .unwrap_or_else(|_| target_root.clone());
+        for entry in &plan.entries {
+            if entry.conflict {
+                skipped_items += 1;
+                failures.push(format!(
+                    "Skipped {}: {}",
+                    entry.source, entry.conflict_reason
+                ));
+                continue;
+            }
+            let Ok((source, actual_size)) = validate_generic_archive_source(&entry.source) else {
+                failures.push(format!(
+                    "Source failed safety revalidation: {}",
+                    entry.source
+                ));
+                continue;
+            };
+            if actual_size != entry.size {
+                failures.push(format!("Source changed after preview: {}", entry.source));
+                continue;
+            }
+            if match file_sha256(&source) {
+                Ok(sha256) => !sha256.eq_ignore_ascii_case(&entry.sha256),
+                Err(_) => true,
+            } {
+                failures.push(format!(
+                    "Source hash changed after preview: {}",
+                    entry.source
+                ));
+                continue;
+            }
+            let target = PathBuf::from(&entry.target);
+            if !target.starts_with(&target_root) || target.exists() {
+                skipped_items += 1;
+                failures.push(format!(
+                    "Target conflict detected at execution: {}",
+                    entry.target
+                ));
+                continue;
+            }
+            let target_parent_valid = target
+                .parent()
+                .and_then(|parent| parent.canonicalize().ok())
+                .is_some_and(|parent| parent == canonical_target_root);
+            if !target_parent_valid || target.parent().is_some_and(path_is_reparse_point) {
+                failures.push(format!(
+                    "Archive target parent failed canonical boundary validation: {}",
+                    entry.target
+                ));
+                continue;
+            }
+            match fs::copy(&source, &target) {
+                Ok(copied) if copied == actual_size => {
+                    let target_verified = target
+                        .metadata()
+                        .is_ok_and(|metadata| metadata.len() == actual_size)
+                        && file_sha256(&target)
+                            .is_ok_and(|sha256| sha256.eq_ignore_ascii_case(&entry.sha256));
+                    if !target_verified {
+                        let _ = fs::remove_file(&target);
+                        failures.push(format!(
+                            "Copied target verification failed: {}",
+                            entry.target
+                        ));
+                        continue;
+                    }
+                    if let Err(error) = fs::remove_file(&source) {
+                        let _ = fs::remove_file(&target);
+                        failures.push(format!(
+                            "Could not remove source after verified copy: {error}"
+                        ));
+                        continue;
+                    }
+                    let verified = !source.exists();
+                    if verified {
+                        moved_items += 1;
+                        moved_bytes = moved_bytes.saturating_add(actual_size);
+                        verified_targets.push(display_path(&target));
+                        rollback_guidance.push(format!(
+                            "Copy {} back to {} after confirming the original path is free",
+                            display_path(&target),
+                            entry.source
+                        ));
+                    } else {
+                        failures.push(format!("Post-move verification failed: {}", entry.source));
+                    }
+                }
+                Ok(copied) => {
+                    let _ = fs::remove_file(&target);
+                    failures.push(format!(
+                        "Copied byte count mismatch for {}: expected {}, copied {}",
+                        entry.source, actual_size, copied
+                    ));
+                }
+                Err(error) => {
+                    failures.push(format!("Archive copy failed for {}: {error}", entry.source))
+                }
+            }
+        }
+    }
+    let receipt_path = target_root.join(format!("archive-receipt-{}.json", plan.plan_id));
+    let mut result = GenericArchiveResult {
+        plan_id: plan.plan_id.clone(),
+        success: failures.is_empty() && moved_items > 0,
+        moved_items,
+        moved_bytes,
+        skipped_items,
+        failures,
+        verified_targets,
+        rollback_guidance,
+        receipt_path: display_path(&receipt_path),
+    };
+    if let Err(error) = save_json(&receipt_path, &result) {
+        result.success = false;
+        result
+            .failures
+            .push(format!("Failed to write archive receipt: {error}"));
+    }
+    result
+}
+
+#[tauri::command]
+fn execute_generic_archive_plan(
+    plan_id: String,
+    confirmation_token: Option<String>,
+) -> Result<GenericArchiveResult, String> {
+    require_risk_operation_token("execute_generic_archive_plan", &plan_id, confirmation_token)?;
+    let plan = generic_archive_plan_store()
+        .lock()
+        .map_err(|_| "Generic archive plan storage is unavailable".to_string())?
+        .remove(&plan_id)
+        .ok_or_else(|| "Generic archive plan is missing, expired, or already used".to_string())?;
+    let result = execute_generic_archive_files(&plan);
+    let paths = load_paths()?;
+    let mut items = load_archive_plan(&paths)?;
+    items.retain(|item| Path::new(&item.path).is_file());
+    save_json(&archive_plan_file(&paths), &items)?;
+    Ok(result)
 }
 
 #[tauri::command]
@@ -5936,12 +6781,150 @@ fn doctor_report_text(report: DoctorReport, format: String) -> Result<String, St
 }
 
 #[tauri::command]
+async fn export_port_report(format: String) -> Result<String, String> {
+    run_blocking(move || export_port_report_blocking(format)).await?
+}
+
+fn export_port_report_blocking(format: String) -> Result<String, String> {
+    let records = scan_ports_blocking();
+    let history = port_history().unwrap_or_default();
+    let services = inspect_local_services_blocking().unwrap_or_default();
+    let scan_error = records.as_ref().err().cloned();
+    let records = records.unwrap_or_default();
+    let value = json!({
+        "generatedAt": current_timestamp(),
+        "scanError": scan_error,
+        "ports": records,
+        "history": history,
+        "services": services,
+    });
+    write_report_file("port-report", &format, value, port_report_markdown)
+}
+
+#[tauri::command]
+async fn export_project_report(format: String) -> Result<String, String> {
+    run_blocking(move || export_project_report_blocking(format)).await?
+}
+
+fn export_project_report_blocking(format: String) -> Result<String, String> {
+    let paths = load_paths()?;
+    let root = paths.root.clone();
+    let analysis = analyze_project_blocking(&root);
+    let preview = preview_project_configuration(display_path(&root)).ok();
+    let ports = inspect_project_port_configs_blocking(&root).unwrap_or_default();
+    let idea = inspect_idea_project_blocking(&root).ok();
+    let traces = diagnostics::inspect_agent_traces(Some(root.as_path()));
+    let value = json!({
+        "generatedAt": current_timestamp(),
+        "root": display_path(&root),
+        "analysisError": analysis.as_ref().err().cloned(),
+        "analysis": analysis.ok(),
+        "preview": preview,
+        "ports": ports,
+        "idea": idea,
+        "agentTraces": traces,
+    });
+    write_report_file("project-report", &format, value, project_report_markdown)
+}
+
+fn write_report_file(
+    prefix: &str,
+    format: &str,
+    mut value: serde_json::Value,
+    markdown: fn(&serde_json::Value) -> String,
+) -> Result<String, String> {
+    let paths = load_paths()?;
+    fs::create_dir_all(paths.logs()).map_err(|err| format!("创建报告目录失败：{err}"))?;
+    redact_json_value(&mut value);
+    let extension = if format == "json" { "json" } else { "md" };
+    let target = paths
+        .logs()
+        .join(format!("{prefix}-{}.{}", filename_timestamp(), extension));
+    let text = if format == "json" {
+        serde_json::to_string_pretty(&value).map_err(|err| format!("生成 JSON 报告失败：{err}"))?
+    } else {
+        markdown(&value)
+    };
+    fs::write(&target, redact_report_text(&text)).map_err(|err| format!("写入报告失败：{err}"))?;
+    Ok(display_path(target))
+}
+
+fn port_report_markdown(value: &serde_json::Value) -> String {
+    let ports = value["ports"].as_array().map(Vec::len).unwrap_or(0);
+    let services = value["services"].as_array().map(Vec::len).unwrap_or(0);
+    let history = value["history"].as_array().map(Vec::len).unwrap_or(0);
+    let mut text = String::new();
+    text.push_str("# DevEnv Manager 端口报告\n\n");
+    text.push_str(&format!(
+        "生成时间：{}\n\n",
+        value["generatedAt"].as_str().unwrap_or("")
+    ));
+    if let Some(error) = value["scanError"].as_str() {
+        text.push_str(&format!("端口扫描错误：{error}\n\n"));
+    }
+    text.push_str(&format!(
+        "- 端口记录：{ports}\n- 服务记录：{services}\n- 历史记录：{history}\n\n"
+    ));
+    text.push_str("## 原始数据\n\n```json\n");
+    text.push_str(&serde_json::to_string_pretty(value).unwrap_or_default());
+    text.push_str("\n```\n");
+    text
+}
+
+fn project_report_markdown(value: &serde_json::Value) -> String {
+    let ports = value["ports"].as_array().map(Vec::len).unwrap_or(0);
+    let mut text = String::new();
+    text.push_str("# DevEnv Manager 项目报告\n\n");
+    text.push_str(&format!(
+        "生成时间：{}\n",
+        value["generatedAt"].as_str().unwrap_or("")
+    ));
+    text.push_str(&format!(
+        "项目根目录：{}\n\n",
+        value["root"].as_str().unwrap_or("")
+    ));
+    if let Some(error) = value["analysisError"].as_str() {
+        text.push_str(&format!("项目分析错误：{error}\n\n"));
+    }
+    text.push_str(&format!("- 项目端口配置：{ports}\n"));
+    text.push_str(&format!(
+        "- 配置预览：{}\n",
+        if value["preview"].is_null() {
+            "未生成"
+        } else {
+            "已生成"
+        }
+    ));
+    text.push_str(&format!(
+        "- IDEA 信息：{}\n",
+        if value["idea"].is_null() {
+            "未发现"
+        } else {
+            "已发现"
+        }
+    ));
+    text.push_str(&format!(
+        "- Agent Trace：{}\n\n",
+        if value["agentTraces"].is_null() {
+            "未发现"
+        } else {
+            "已发现"
+        }
+    ));
+    text.push_str("## 原始数据\n\n```json\n");
+    text.push_str(&serde_json::to_string_pretty(value).unwrap_or_default());
+    text.push_str("\n```\n");
+    text
+}
+
+#[tauri::command]
 async fn analyze_python_environment() -> Result<PythonAnalysis, String> {
     run_blocking(|| Ok(analyze_python_environment_blocking())).await?
 }
 
 fn analyze_python_environment_blocking() -> PythonAnalysis {
     let first_python_on_path = find_on_path("python").unwrap_or_default();
+    let first_python3_on_path = find_on_path("python3").unwrap_or_default();
     let first_pip_on_path = find_on_path("pip").unwrap_or_default();
     let current_python = detect_runtime("Python", "python", &["--version"]).map(|runtime| {
         let status = if runtime
@@ -6130,6 +7113,7 @@ fn analyze_python_environment_blocking() -> PythonAnalysis {
         launcher_path,
         launcher_output,
         first_python_on_path,
+        first_python3_on_path,
         first_pip_on_path,
         python_m_pip_available,
         managed_python_available,
@@ -6637,54 +7621,77 @@ async fn apply_python_repair(
             .map_err(|_| "Python 修复预览暂时不可用".to_string())?
             .remove(&plan_id)
             .ok_or_else(|| "Python 修复计划不存在、已应用或已过期".to_string())?;
-        let created = pending.public.created_at.parse::<u64>().unwrap_or(0);
-        if created.saturating_add(10 * 60) < unix_timestamp() {
-            return Err("Python 修复计划已过期，请重新分析和预览".to_string());
-        }
         let environment = user_environment()?;
-        if environment_fingerprint(&environment) != pending.baseline_fingerprint {
-            return Err("用户环境在预览后发生变化，已拒绝覆盖；请重新分析".to_string());
-        }
-        if !Path::new(&pending.public.python_path).is_file() {
-            return Err("预览中的 Python 已不存在".to_string());
-        }
         let paths = load_paths()?;
-        let backup = create_environment_backup(&paths, &environment)?;
-        if pending.repair_pip {
-            run_command_output(
-                PathBuf::from(&pending.public.python_path),
-                &["-m", "ensurepip", "--upgrade"],
-                180,
-            )?;
-            run_command_output(
-                PathBuf::from(&pending.public.python_path),
-                &["-m", "pip", "install", "--upgrade", "pip"],
-                300,
-            )?;
-        }
-        if pending.repair_path {
-            restore_environment_values(
-                environment.get("DEVENV_HOME").map(String::as_str),
-                environment.get("JAVA_HOME").map(String::as_str),
-                &pending.proposed_path,
-            )?;
-            broadcast_environment_change();
-        }
-        let verified = run_command_output(
-            PathBuf::from(&pending.public.python_path),
-            &["-m", "pip", "--version"],
-            60,
-        )?;
-        Ok(OperationResult {
-            success: true,
-            message: format!(
-                "Python 修复完成并回读验证：{}；环境备份：{}",
-                verified.lines().next().unwrap_or("pip 可用"),
-                backup
-            ),
-        })
+        apply_python_repair_pending_with(
+            pending,
+            environment,
+            &paths,
+            run_command_output,
+            |devenv_home, java_home, path| {
+                restore_environment_values(devenv_home, java_home, path)?;
+                broadcast_environment_change();
+                Ok(())
+            },
+        )
     })
     .await?
+}
+
+fn apply_python_repair_pending_with<Run, WriteEnvironment>(
+    pending: PendingPythonRepair,
+    environment: HashMap<String, String>,
+    paths: &AppPaths,
+    mut run: Run,
+    mut write_environment: WriteEnvironment,
+) -> Result<OperationResult, String>
+where
+    Run: FnMut(PathBuf, &[&str], u64) -> Result<String, String>,
+    WriteEnvironment: FnMut(Option<&str>, Option<&str>, &str) -> Result<(), String>,
+{
+    let created = pending.public.created_at.parse::<u64>().unwrap_or(0);
+    if created.saturating_add(10 * 60) < unix_timestamp() {
+        return Err("Python 修复计划已过期，请重新分析和预览".to_string());
+    }
+    if environment_fingerprint(&environment) != pending.baseline_fingerprint {
+        return Err("用户环境在预览后发生变化，已拒绝覆盖；请重新分析".to_string());
+    }
+    if !Path::new(&pending.public.python_path).is_file() {
+        return Err("预览中的 Python 已不存在".to_string());
+    }
+    let backup = create_environment_backup(paths, &environment)?;
+    if pending.repair_pip {
+        run(
+            PathBuf::from(&pending.public.python_path),
+            &["-m", "ensurepip", "--upgrade"],
+            180,
+        )?;
+        run(
+            PathBuf::from(&pending.public.python_path),
+            &["-m", "pip", "install", "--upgrade", "pip"],
+            300,
+        )?;
+    }
+    if pending.repair_path {
+        write_environment(
+            environment.get("DEVENV_HOME").map(String::as_str),
+            environment.get("JAVA_HOME").map(String::as_str),
+            &pending.proposed_path,
+        )?;
+    }
+    let verified = run(
+        PathBuf::from(&pending.public.python_path),
+        &["-m", "pip", "--version"],
+        60,
+    )?;
+    Ok(OperationResult {
+        success: true,
+        message: format!(
+            "Python 修复完成并回读验证：{}；环境备份：{}",
+            verified.lines().next().unwrap_or("pip 可用"),
+            backup
+        ),
+    })
 }
 
 #[tauri::command]
@@ -6706,7 +7713,8 @@ fn inspect_toolchains_blocking() -> Result<ToolchainReport, String> {
         resolve_tool(&paths, "git"),
         &["config", "--global", "user.email"],
     );
-    let ssh_dir = dirs::home_dir().unwrap_or_default().join(".ssh");
+    let home = dirs::home_dir().unwrap_or_default();
+    let ssh_dir = home.join(".ssh");
     let public_key_path = ["id_ed25519.pub", "id_rsa.pub"]
         .iter()
         .map(|name| ssh_dir.join(name))
@@ -6762,17 +7770,24 @@ fn inspect_toolchains_blocking() -> Result<ToolchainReport, String> {
             github_ssh_status,
             github_https_status,
             git_lfs,
+            global_config_path: display_path(home.join(".gitconfig")),
         },
         node: NodeEcosystem {
             tools: node_tools,
             npm_prefix,
             npm_registry,
             pnpm_store_path,
+            npm_config_path: display_path(home.join(".npmrc")),
         },
         python: PythonEcosystem {
             tools: python_tools,
             pip_config,
             pip_index_url,
+            pip_config_path: display_path(
+                dirs::config_dir()
+                    .unwrap_or_else(|| home.join("AppData/Roaming"))
+                    .join("pip/pip.ini"),
+            ),
         },
         generated_at: current_timestamp(),
     })
@@ -6784,13 +7799,24 @@ async fn run_toolchain_action(
     action: String,
     value: Option<String>,
     secondary: Option<String>,
+    confirmation_token: Option<String>,
 ) -> Result<OperationResult, String> {
     let task = toolchain_action_title(&action).to_string();
     emit_task_progress(&app, &task, 5, "正在准备操作");
     let worker_action = action.clone();
-    let result =
-        run_blocking(move || run_toolchain_action_blocking(&worker_action, value, secondary))
-            .await?;
+    let plan_id = format!(
+        "{}:{}:{}",
+        action.trim(),
+        value.as_deref().unwrap_or("").trim(),
+        secondary.as_deref().unwrap_or("").trim()
+    );
+    let result = run_blocking(move || {
+        if worker_action != "git_test_ssh" {
+            require_risk_operation_token("run_toolchain_action", &plan_id, confirmation_token)?;
+        }
+        run_toolchain_action_blocking(&worker_action, value, secondary)
+    })
+    .await?;
     emit_task_progress(
         &app,
         &task,
@@ -6994,10 +8020,10 @@ fn inspect_platform_toolchains_blocking() -> Result<PlatformReport, String> {
         .map(str::to_string)
         .collect();
 
+    let home = dirs::home_dir().unwrap_or_default();
     let npm_registry = command_value(resolve_tool(&paths, "npm"), &["config", "get", "registry"]);
     let python = resolve_tool(&paths, "python");
     let pip_config = command_value(python, &["-m", "pip", "config", "list"]);
-    let home = dirs::home_dir().unwrap_or_default();
     let maven_settings_path = home.join(".m2/settings.xml");
     let gradle_init_path = home.join(".gradle/init.gradle");
     let chsrc = probe_tool("chsrc", resolve_tool(&paths, "chsrc"), &["--version"]);
@@ -7026,6 +8052,7 @@ fn inspect_platform_toolchains_blocking() -> Result<PlatformReport, String> {
             dotnet,
             sdks,
             runtimes,
+            nuget_config_path: display_path(home.join(".nuget/NuGet/NuGet.Config")),
         },
         mirrors: MirrorCenter {
             npm_registry,
@@ -7079,8 +8106,21 @@ async fn run_chsrc_action(
     action: String,
     target: String,
     source: Option<String>,
+    confirmation_token: Option<String>,
 ) -> Result<OperationResult, String> {
-    run_blocking(move || run_chsrc_action_blocking(&action, &target, source.as_deref())).await?
+    let plan_id = format!(
+        "{}:{}:{}",
+        action.trim(),
+        target.trim(),
+        source.as_deref().unwrap_or("").trim()
+    );
+    run_blocking(move || {
+        if !matches!(action.as_str(), "get" | "list" | "measure") {
+            require_risk_operation_token("run_chsrc_action", &plan_id, confirmation_token)?;
+        }
+        run_chsrc_action_blocking(&action, &target, source.as_deref())
+    })
+    .await?
 }
 
 fn run_chsrc_action_blocking(
@@ -7107,12 +8147,7 @@ fn run_chsrc_action_blocking(
         "reset" => run_action_command(&paths, executable, &["reset", &target])?,
         "set" => {
             let source = source.unwrap_or_default().trim().to_ascii_lowercase();
-            if source.is_empty()
-                || source.len() > 40
-                || !source
-                    .chars()
-                    .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | '.'))
-            {
+            if !chsrc_source_allowed(&source) {
                 return Err("镜像源只能填写 chsrc 列出的源 ID；不接受自定义 URL".to_string());
             }
             run_action_command(&paths, executable, &["set", &target, &source])?
@@ -7129,16 +8164,40 @@ fn run_chsrc_action_blocking(
     })
 }
 
+fn chsrc_source_allowed(source: &str) -> bool {
+    const SOURCES: [&str; 8] = [
+        "official",
+        "npmmirror",
+        "tuna",
+        "aliyun",
+        "ustc",
+        "bfsu",
+        "huawei",
+        "tencent",
+    ];
+    SOURCES.contains(&source)
+}
+
 #[tauri::command]
 async fn run_platform_action(
     app: tauri::AppHandle,
     action: String,
     value: Option<String>,
+    confirmation_token: Option<String>,
 ) -> Result<OperationResult, String> {
     let task = platform_action_title(&action).to_string();
     emit_task_progress(&app, &task, 5, "正在准备操作");
     let worker_action = action.clone();
-    let result = run_blocking(move || run_platform_action_blocking(&worker_action, value)).await?;
+    let plan_id = format!(
+        "{}:{}",
+        action.trim(),
+        value.as_deref().unwrap_or("").trim()
+    );
+    let result = run_blocking(move || {
+        require_risk_operation_token("run_platform_action", &plan_id, confirmation_token)?;
+        run_platform_action_blocking(&worker_action, value)
+    })
+    .await?;
     emit_task_progress(
         &app,
         &task,
@@ -7512,6 +8571,38 @@ fn inspect_local_services_blocking() -> Result<Vec<LocalServiceStatus>, String> 
                 .filter(|items| !items.is_empty())
                 .or_else(|| service.map(|item| vec![item.name.clone()]))
                 .unwrap_or_default();
+            let executable = service.and_then(|item| service_executable_path(&item.path_name));
+            let install_directory = executable
+                .as_ref()
+                .and_then(|path| path.parent())
+                .filter(|path| path.is_dir())
+                .map(display_path)
+                .unwrap_or_default();
+            let executable_path = executable
+                .as_ref()
+                .map(display_path)
+                .unwrap_or_default();
+            let path_status = if service.is_none() {
+                "No installed Windows service was found for this database definition.".to_string()
+            } else if executable_path.is_empty() {
+                "The Windows service exists, but its configured executable could not be resolved to an existing file.".to_string()
+            } else if install_directory.is_empty() {
+                "The service executable was resolved, but its parent directory is not accessible.".to_string()
+            } else {
+                "Executable and installation directory verified by the backend.".to_string()
+            };
+            let application_log = service.and_then(|_| windows_application_event_log_path());
+            let log_path = application_log
+                .as_ref()
+                .map(display_path)
+                .unwrap_or_default();
+            let log_path_reason = if service.is_none() {
+                "No installed Windows service is available for event-log inspection.".to_string()
+            } else if log_path.is_empty() {
+                "The Windows Application event log file is not accessible; event entries can still be queried through the backend.".to_string()
+            } else {
+                "This is the Windows Application event log queried by the service log action, not a guessed database log directory.".to_string()
+            };
             LocalServiceStatus {
                 id: id.to_string(),
                 name: name.to_string(),
@@ -7542,9 +8633,20 @@ fn inspect_local_services_blocking() -> Result<Vec<LocalServiceStatus>, String> 
                 binary_path: service
                     .map(|item| item.path_name.clone())
                     .unwrap_or_default(),
+                executable_path,
+                install_directory,
+                path_status,
+                log_path,
+                log_path_reason,
             }
         })
         .collect())
+}
+
+fn windows_application_event_log_path() -> Option<PathBuf> {
+    let windows = std::env::var_os("WINDIR").map(PathBuf::from)?;
+    let path = windows.join("System32/winevt/Logs/Application.evtx");
+    path.is_file().then_some(path)
 }
 
 #[tauri::command]
@@ -8591,6 +9693,7 @@ async fn create_doctor_repair_plan() -> Result<DoctorRepairPlan, String> {
 fn create_doctor_repair_plan_blocking() -> Result<DoctorRepairPlan, String> {
     let before = run_doctor_blocking()?;
     let actions = doctor_repair_actions(&before);
+    let action_details = doctor_repair_action_details(&before, &actions);
     let will_cleanup_path = actions.iter().any(|item| item == "cleanup_path");
     let will_configure_environment = actions.iter().any(|item| item == "configure_env");
     let actions_fingerprint = doctor_actions_fingerprint(&actions, before.score);
@@ -8608,6 +9711,7 @@ fn create_doctor_repair_plan_blocking() -> Result<DoctorRepairPlan, String> {
         plan_id: plan_id.clone(),
         before_score: before.score,
         actions,
+        action_details,
         will_cleanup_path,
         will_configure_environment,
         backup_name: format!("doctor-repair-env-backup-{}", unix_timestamp()),
@@ -8627,6 +9731,58 @@ fn create_doctor_repair_plan_blocking() -> Result<DoctorRepairPlan, String> {
             },
         );
     Ok(plan)
+}
+
+fn doctor_repair_action_details(
+    report: &DoctorReport,
+    actions: &[String],
+) -> Vec<DoctorRepairActionDetail> {
+    actions
+        .iter()
+        .map(|action| {
+            let checks = report
+                .checks
+                .iter()
+                .filter(|check| check.fix_action.as_deref() == Some(action.as_str()))
+                .collect::<Vec<_>>();
+            let title = checks
+                .first()
+                .map(|check| check.title.clone())
+                .unwrap_or_else(|| action.clone());
+            let reason = checks
+                .iter()
+                .map(|check| check.detail.clone())
+                .find(|detail| !detail.trim().is_empty())
+                .unwrap_or_else(|| "Doctor identified a repairable issue.".to_string());
+            let evidence = checks
+                .iter()
+                .map(|check| format!("{}: {}", check.title, check.detail))
+                .collect::<Vec<_>>();
+            let risk_level = checks
+                .iter()
+                .map(|check| check.severity.as_str())
+                .max_by_key(|severity| match *severity {
+                    "critical" => 4,
+                    "high" => 3,
+                    "medium" | "warning" => 2,
+                    _ => 1,
+                })
+                .unwrap_or("high")
+                .to_string();
+            DoctorRepairActionDetail {
+                action_id: action.clone(),
+                title,
+                reason,
+                evidence,
+                risk_level,
+                requires_backup: true,
+                requires_token: true,
+                next_step:
+                    "Review the evidence, backup name, and risk confirmation before execution."
+                        .to_string(),
+            }
+        })
+        .collect()
 }
 
 fn doctor_repair_actions(report: &DoctorReport) -> Vec<String> {
@@ -9095,11 +10251,9 @@ fn apply_config_profile_blocking(id: String) -> Result<OperationResult, String> 
             applied.push(format!("{kind} {version}"));
         }
     }
-    if let Err(error) = restore_environment_values(
-        profile.devenv_home.as_deref(),
-        profile.java_home.as_deref(),
-        &profile.path,
-    ) {
+    if let Err(error) = write_profile_environment(&profile, |devenv_home, java_home, path| {
+        restore_environment_values(devenv_home, java_home, path)
+    }) {
         restore_current_versions(&before_versions);
         let _ = restore_environment_values(
             before_environment.get("DEVENV_HOME").map(String::as_str),
@@ -9126,6 +10280,17 @@ fn apply_config_profile_blocking(id: String) -> Result<OperationResult, String> 
     })
 }
 
+fn write_profile_environment<F>(profile: &ConfigProfile, writer: F) -> Result<(), String>
+where
+    F: FnOnce(Option<&str>, Option<&str>, &str) -> Result<(), String>,
+{
+    writer(
+        profile.devenv_home.as_deref(),
+        profile.java_home.as_deref(),
+        &profile.path,
+    )
+}
+
 #[tauri::command]
 async fn delete_config_profile(id: String) -> Result<OperationResult, String> {
     run_blocking(move || delete_config_profile_blocking(id)).await?
@@ -9143,6 +10308,71 @@ fn delete_config_profile_blocking(id: String) -> Result<OperationResult, String>
     Ok(OperationResult {
         success: true,
         message: "已删除配置模板".to_string(),
+    })
+}
+
+#[tauri::command]
+async fn rename_config_profile(id: String, name: String) -> Result<OperationResult, String> {
+    run_blocking(move || rename_config_profile_blocking(id, name)).await?
+}
+
+fn rename_config_profile_blocking(id: String, name: String) -> Result<OperationResult, String> {
+    let name = name.trim();
+    if name.is_empty() {
+        return Err("配置模板名称不能为空".to_string());
+    }
+    let paths = load_paths()?;
+    let mut profiles = load_profiles(&paths)?;
+    if profiles
+        .iter()
+        .any(|item| item.id != id && item.name == name)
+    {
+        return Err("已存在同名配置模板".to_string());
+    }
+    let profile = profiles
+        .iter_mut()
+        .find(|item| item.id == id)
+        .ok_or_else(|| "没有找到配置模板".to_string())?;
+    profile.name = name.to_string();
+    save_json(&paths.profiles_file(), &profiles)?;
+    Ok(OperationResult {
+        success: true,
+        message: format!("已重命名配置模板：{name}"),
+    })
+}
+
+#[tauri::command]
+async fn copy_config_profile(id: String, name: String) -> Result<OperationResult, String> {
+    run_blocking(move || copy_config_profile_blocking(id, name)).await?
+}
+
+fn copy_config_profile_blocking(id: String, name: String) -> Result<OperationResult, String> {
+    let paths = load_paths()?;
+    let mut profiles = load_profiles(&paths)?;
+    let source = profiles
+        .iter()
+        .find(|item| item.id == id)
+        .cloned()
+        .ok_or_else(|| "没有找到配置模板".to_string())?;
+    let mut name = name.trim().to_string();
+    if name.is_empty() {
+        name = format!("{} copy", source.name);
+    }
+    if profiles.iter().any(|item| item.name == name) {
+        return Err("已存在同名配置模板".to_string());
+    }
+    let mut profile = source;
+    profile.id = format!(
+        "profile-copy-{}",
+        current_timestamp().replace([' ', ':', '.', '{', '}', ','], "-")
+    );
+    profile.name = name.clone();
+    profile.created_at = current_timestamp();
+    profiles.push(profile);
+    save_json(&paths.profiles_file(), &profiles)?;
+    Ok(OperationResult {
+        success: true,
+        message: format!("已复制配置模板：{name}"),
     })
 }
 
@@ -9372,15 +10602,19 @@ fn portable_runtime_root(executable: &Path, kind: &str) -> Result<PathBuf, Strin
 }
 
 #[tauri::command]
-async fn self_uninstall(app: tauri::AppHandle) -> Result<OperationResult, String> {
-    let result = run_blocking(self_uninstall_blocking).await??;
+async fn self_uninstall(
+    app: tauri::AppHandle,
+    confirmation_token: Option<String>,
+) -> Result<OperationResult, String> {
+    let result = run_blocking(move || self_uninstall_blocking(confirmation_token)).await??;
     app.exit(0);
     Ok(result)
 }
 
-fn self_uninstall_blocking() -> Result<OperationResult, String> {
+fn self_uninstall_blocking(confirmation_token: Option<String>) -> Result<OperationResult, String> {
     let entry = find_self_uninstall_entry()
         .ok_or_else(|| "没有找到 DevEnv Manager 的卸载入口，请从 Windows 设置中卸载".to_string())?;
+    require_risk_operation_token("self_uninstall", "self-uninstall", confirmation_token)?;
     launch_uninstall_string(&entry.uninstall_string)?;
     Ok(OperationResult {
         success: true,
@@ -9514,6 +10748,12 @@ fn apply_project_configuration(
         &project_plan_id,
         confirmation_token,
     )?;
+    apply_project_configuration_blocking(request)
+}
+
+fn apply_project_configuration_blocking(
+    request: ProjectConfigApplyRequest,
+) -> Result<OperationResult, String> {
     let root = PathBuf::from(request.project_path.trim());
     analyze_project_blocking(&root)?;
     if request.files.len() > 4 {
@@ -9728,6 +10968,7 @@ async fn powershell_runner_status() -> Result<powershell_runner::PowerShellResul
 }
 
 pub fn run() {
+    suppress_system_error_dialogs();
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
@@ -9832,6 +11073,8 @@ pub fn run() {
             export_doctor_report,
             export_doctor_report_json,
             doctor_report_text,
+            export_port_report,
+            export_project_report,
             analyze_python_environment,
             export_python_diagnostic_report,
             preview_python_repair,
@@ -9863,6 +11106,8 @@ pub fn run() {
             add_archive_plan_item,
             list_archive_plan_items,
             remove_archive_plan_item,
+            create_generic_archive_plan,
+            execute_generic_archive_plan,
             clear_download_cache,
             inspect_command_safety,
             run_tool_command,
@@ -9876,6 +11121,8 @@ pub fn run() {
             save_config_profile,
             apply_config_profile,
             delete_config_profile,
+            rename_config_profile,
+            copy_config_profile,
             export_config_profiles,
             preview_config_profiles,
             import_config_profiles,
@@ -9899,6 +11146,26 @@ pub fn run() {
         .run(tauri::generate_context!())
         .expect("error while running DevEnv Manager");
 }
+
+#[cfg(windows)]
+fn suppress_system_error_dialogs() {
+    const SEM_FAILCRITICALERRORS: u32 = 0x0001;
+    const SEM_NOGPFAULTERRORBOX: u32 = 0x0002;
+
+    #[link(name = "kernel32")]
+    unsafe extern "system" {
+        fn SetErrorMode(mode: u32) -> u32;
+    }
+
+    // Probe targets are untrusted external executables. Loader failures must be
+    // returned to the workbench instead of blocking it with a system dialog.
+    unsafe {
+        SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
+    }
+}
+
+#[cfg(not(windows))]
+fn suppress_system_error_dialogs() {}
 
 pub fn cli_main() -> i32 {
     match run_cli(std::env::args().skip(1).collect()) {
@@ -10285,13 +11552,61 @@ impl ExpandHome for Path {
 }
 
 fn default_root_dir() -> PathBuf {
-    if cfg!(windows) && Path::new("D:\\").exists() {
-        PathBuf::from("D:\\DevEnvManager")
-    } else {
-        dirs::home_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
-            .join(APP_NAME)
+    #[cfg(windows)]
+    {
+        for drive in [Path::new("D:\\"), Path::new("C:\\")] {
+            if let Some(root) = writable_managed_root(drive) {
+                return root;
+            }
+        }
     }
+    dirs::home_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join(APP_NAME)
+}
+
+fn writable_managed_root(base: &Path) -> Option<PathBuf> {
+    if !base.is_dir() {
+        return None;
+    }
+    let managed_root = base.join(APP_NAME);
+    if !managed_root.exists() {
+        return match fs::create_dir(&managed_root) {
+            Ok(()) => {
+                let _ = fs::remove_dir(&managed_root);
+                Some(managed_root)
+            }
+            Err(_) => None,
+        };
+    }
+    if !managed_root.is_dir() {
+        return None;
+    }
+    let probe = managed_root.join(format!(
+        ".devenv-manager-root-probe-{}-{}",
+        std::process::id(),
+        SAVE_JSON_COUNTER.fetch_add(1, Ordering::Relaxed)
+    ));
+    match fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&probe)
+    {
+        Ok(file) => {
+            drop(file);
+            let _ = fs::remove_file(probe);
+            Some(managed_root)
+        }
+        Err(_) => None,
+    }
+}
+
+fn should_recover_unwritable_initial_root(settings: &Settings) -> bool {
+    cfg!(windows)
+        && !settings.safety_disclaimer_accepted
+        && settings.safety_disclaimer_version == 0
+        && settings.safety_disclaimer_accepted_at.is_none()
+        && path_key(&settings.root_dir) == path_key(r"D:\DevEnvManager")
 }
 
 fn normalize_root_dir(input: &str) -> Result<PathBuf, String> {
@@ -12068,6 +13383,12 @@ fn process_name(system: &sysinfo::System, pid: u32) -> String {
         })
 }
 
+fn process_is_running(pid: u32) -> bool {
+    sysinfo::System::new_all()
+        .process(sysinfo::Pid::from_u32(pid))
+        .is_some()
+}
+
 fn classify_source(path: &str) -> String {
     let lower = path.to_ascii_lowercase();
     if lower.contains("\\devenvmanager\\") {
@@ -12252,14 +13573,7 @@ fn windows_service_map() -> std::collections::HashMap<u32, Vec<String>> {
             };
             let services = columns
                 .get(2)
-                .map(|value| {
-                    value
-                        .split(',')
-                        .map(str::trim)
-                        .filter(|item| !item.is_empty() && !item.eq_ignore_ascii_case("N/A"))
-                        .map(str::to_string)
-                        .collect::<Vec<_>>()
-                })
+                .map(|value| tasklist_service_names(value))
                 .unwrap_or_default();
             if !services.is_empty() {
                 result.insert(pid, services);
@@ -12267,6 +13581,21 @@ fn windows_service_map() -> std::collections::HashMap<u32, Vec<String>> {
         }
     }
     result
+}
+
+fn tasklist_service_names(value: &str) -> Vec<String> {
+    value
+        .split(',')
+        .map(str::trim)
+        .filter(|item| {
+            !item.is_empty()
+                && !matches!(
+                    item.to_ascii_lowercase().as_str(),
+                    "n/a" | "none" | "-" | "不适用" | "暂缺" | "无"
+                )
+        })
+        .map(str::to_string)
+        .collect()
 }
 
 fn parse_csv_line(line: &str) -> Vec<String> {
@@ -12613,7 +13942,8 @@ fn analyze_port_signature(
     let unknown_or_weak = identity == "未识别的本地服务" || identity.contains("仅端口弱证据");
     let risk_level = if !state.eq_ignore_ascii_case("LISTENING") {
         "low"
-    } else if matches!(port, 3306 | 5432 | 6379 | 27017 | 9200 | 1433) {
+    } else if !service_names.is_empty() || matches!(port, 3306 | 5432 | 6379 | 27017 | 9200 | 1433)
+    {
         "high"
     } else if unknown_or_weak && matches!(port, 80 | 443 | 8000 | 8080..=8082 | 8888) {
         "low"
@@ -12631,6 +13961,8 @@ fn analyze_port_signature(
     .to_string();
     let recommendation = if !state.eq_ignore_ascii_case("LISTENING") {
         "这是已有连接记录，优先确认远端地址，不建议结束进程。"
+    } else if !service_names.is_empty() {
+        "这是 Windows 服务托管的端口，建议先通过服务管理器或服务详情处理，不走普通进程释放流程。"
     } else if confidence < 40 {
         "识别证据不足，先打开进程位置或查看详情再操作。"
     } else if risk_level == "high" {
@@ -12775,8 +14107,21 @@ fn apply_managed_environment(paths: &AppPaths, command: &mut Command) {
 }
 
 pub(crate) fn command_text(stdout: &[u8], stderr: &[u8]) -> String {
-    let stdout = decode_command_stream(stdout).trim().to_string();
-    let stderr = decode_command_stream(stderr).trim().to_string();
+    const MAX_COMMAND_OUTPUT_CHARS: usize = 32 * 1024;
+    let truncate = |value: String| {
+        let mut chars = value.trim().chars();
+        let text = chars
+            .by_ref()
+            .take(MAX_COMMAND_OUTPUT_CHARS)
+            .collect::<String>();
+        if chars.next().is_some() {
+            format!("{text}\n[output truncated by DevEnv Manager]")
+        } else {
+            text
+        }
+    };
+    let stdout = truncate(decode_command_stream(stdout));
+    let stderr = truncate(decode_command_stream(stderr));
     [stdout, stderr]
         .into_iter()
         .filter(|item| !item.is_empty())
@@ -12811,6 +14156,41 @@ pub(crate) fn decode_command_stream(bytes: &[u8]) -> String {
 
 #[cfg(windows)]
 fn decode_windows_ansi(bytes: &[u8]) -> Option<String> {
+    const CODE_PAGE_CANDIDATES: [(u32, i32); 7] = [
+        (0, 8),    // CP_ACP: prefer the machine's configured ANSI code page.
+        (1, 6),    // CP_OEMCP: native console tools commonly use the OEM code page.
+        (936, 0),  // Simplified Chinese (GBK).
+        (950, 0),  // Traditional Chinese (Big5).
+        (932, 0),  // Japanese (Shift-JIS).
+        (949, 0),  // Korean.
+        (1252, 0), // Western European.
+    ];
+
+    if bytes.is_empty() {
+        return Some(String::new());
+    }
+
+    let mut best: Option<(i32, String)> = None;
+    for (code_page, preference) in CODE_PAGE_CANDIDATES {
+        let Some(value) = decode_windows_code_page(bytes, code_page, true) else {
+            continue;
+        };
+        let score = decoded_text_score(&value) + preference;
+        if best
+            .as_ref()
+            .map(|(best_score, _)| score > *best_score)
+            .unwrap_or(true)
+        {
+            best = Some((score, value));
+        }
+    }
+
+    best.map(|(_, value)| value)
+        .or_else(|| decode_windows_code_page(bytes, 0, false))
+}
+
+#[cfg(windows)]
+fn decode_windows_code_page(bytes: &[u8], code_page: u32, strict: bool) -> Option<String> {
     #[link(name = "kernel32")]
     extern "system" {
         fn MultiByteToWideChar(
@@ -12825,10 +14205,12 @@ fn decode_windows_ansi(bytes: &[u8]) -> Option<String> {
     if bytes.is_empty() || bytes.len() > i32::MAX as usize {
         return Some(String::new());
     }
+    const MB_ERR_INVALID_CHARS: u32 = 0x0000_0008;
+    let flags = if strict { MB_ERR_INVALID_CHARS } else { 0 };
     let required = unsafe {
         MultiByteToWideChar(
-            0,
-            0,
+            code_page,
+            flags,
             bytes.as_ptr(),
             bytes.len() as i32,
             std::ptr::null_mut(),
@@ -12841,8 +14223,8 @@ fn decode_windows_ansi(bytes: &[u8]) -> Option<String> {
     let mut words = vec![0_u16; required as usize];
     let written = unsafe {
         MultiByteToWideChar(
-            0,
-            0,
+            code_page,
+            flags,
             bytes.as_ptr(),
             bytes.len() as i32,
             words.as_mut_ptr(),
@@ -12850,6 +14232,36 @@ fn decode_windows_ansi(bytes: &[u8]) -> Option<String> {
         )
     };
     (written > 0).then(|| String::from_utf16_lossy(&words[..written as usize]))
+}
+
+#[cfg(windows)]
+fn decoded_text_score(value: &str) -> i32 {
+    value
+        .chars()
+        .map(|character| {
+            if character == '\u{fffd}' {
+                -20
+            } else if character.is_control() && !matches!(character, '\r' | '\n' | '\t') {
+                -10
+            } else if character.is_ascii() {
+                1
+            } else if matches!(
+                character,
+                '\u{3400}'..='\u{4dbf}'
+                    | '\u{4e00}'..='\u{9fff}'
+                    | '\u{3040}'..='\u{30ff}'
+                    | '\u{ac00}'..='\u{d7af}'
+            ) {
+                3
+            } else if character.is_alphabetic() {
+                1
+            } else if matches!(character, '\u{00a0}'..='\u{00ff}') {
+                -3
+            } else {
+                0
+            }
+        })
+        .sum()
 }
 
 #[cfg(not(windows))]
@@ -13836,10 +15248,7 @@ fn redact_windows_user_paths(text: &str) -> String {
 }
 
 fn filename_timestamp() -> String {
-    format!("{:?}", std::time::SystemTime::now())
-        .chars()
-        .map(|ch| if ch.is_ascii_alphanumeric() { ch } else { '-' })
-        .collect()
+    unix_timestamp().to_string()
 }
 
 fn slug(value: &str) -> String {
@@ -14134,7 +15543,7 @@ where
 
 fn current_timestamp() -> String {
     // Keep dependencies lean; second precision is enough for audit records.
-    format!("{:?}", std::time::SystemTime::now())
+    unix_timestamp().to_string()
 }
 
 fn unix_timestamp() -> u64 {
@@ -14157,6 +15566,58 @@ mod tests {
     use super::*;
 
     #[test]
+    fn writable_managed_root_accepts_writable_directory() {
+        let base = tempfile::tempdir().unwrap();
+        let expected = base.path().join(APP_NAME);
+        assert_eq!(writable_managed_root(base.path()), Some(expected.clone()));
+        assert!(!expected.exists());
+        assert!(fs::read_dir(base.path()).unwrap().all(|entry| !entry
+            .unwrap()
+            .file_name()
+            .to_string_lossy()
+            .starts_with(".devenv-manager-root-probe-")));
+    }
+
+    #[test]
+    fn writable_managed_root_accepts_existing_writable_managed_directory() {
+        let base = tempfile::tempdir().unwrap();
+        let managed_root = base.path().join(APP_NAME);
+        fs::create_dir(&managed_root).unwrap();
+        assert_eq!(
+            writable_managed_root(base.path()),
+            Some(managed_root.clone())
+        );
+        assert!(managed_root.is_dir());
+        assert!(fs::read_dir(&managed_root).unwrap().next().is_none());
+    }
+
+    #[test]
+    fn writable_managed_root_rejects_missing_base_and_file_collision() {
+        let base = tempfile::tempdir().unwrap();
+        let missing = base.path().join("missing");
+        assert_eq!(writable_managed_root(&missing), None);
+
+        let managed_root = base.path().join(APP_NAME);
+        fs::write(&managed_root, b"collision").unwrap();
+        assert_eq!(writable_managed_root(base.path()), None);
+    }
+
+    #[test]
+    fn initial_unaccepted_legacy_default_is_recoverable_only_before_user_setup() {
+        let mut settings = default_settings();
+        settings.root_dir = r"D:\DevEnvManager".to_string();
+        assert_eq!(
+            should_recover_unwritable_initial_root(&settings),
+            cfg!(windows)
+        );
+
+        settings.safety_disclaimer_accepted = true;
+        settings.safety_disclaimer_version = SAFETY_DISCLAIMER_VERSION;
+        settings.safety_disclaimer_accepted_at = Some("2026-07-13T00:00:00Z".to_string());
+        assert!(!should_recover_unwritable_initial_root(&settings));
+    }
+
+    #[test]
     fn merge_path_adds_managed_entries_once() {
         let merged = merge_path(r"C:\Tools;%DEVENV_HOME%\current\node;C:\Tools;C:\Windows");
         let parts: Vec<&str> = merged.split(';').collect();
@@ -14169,6 +15630,26 @@ mod tests {
             1
         );
         assert_eq!(parts.iter().filter(|item| **item == r"C:\Tools").count(), 1);
+    }
+
+    #[test]
+    fn path_cleanup_does_not_change_an_empty_or_clean_path() {
+        let root = tempfile::tempdir().unwrap();
+        let paths = AppPaths::new(root.path().join("DevEnvManager"));
+        let existing = display_path(root.path());
+
+        assert_eq!(cleaned_path_value(&paths, ""), (String::new(), 0));
+        assert_eq!(cleaned_path_value(&paths, &existing), (existing.clone(), 0));
+    }
+
+    #[test]
+    fn path_cleanup_counts_empty_and_duplicate_entries_as_changes() {
+        let root = tempfile::tempdir().unwrap();
+        let paths = AppPaths::new(root.path().join("DevEnvManager"));
+        let existing = display_path(root.path());
+        let input = format!("{existing};{existing};");
+
+        assert_eq!(cleaned_path_value(&paths, &input), (existing, 2));
     }
 
     #[test]
@@ -14332,6 +15813,31 @@ mod tests {
     fn chsrc_rejects_unknown_target_before_execution() {
         let error = run_chsrc_action_blocking("get", "unknown-target", None).unwrap_err();
         assert!(error.contains("白名单"));
+    }
+
+    #[test]
+    fn chsrc_source_allowlist_rejects_urls_and_unknown_ids() {
+        assert!(chsrc_source_allowed("official"));
+        assert!(chsrc_source_allowed("tuna"));
+        assert!(!chsrc_source_allowed("https://example.invalid/simple"));
+        assert!(!chsrc_source_allowed("custom-source"));
+    }
+
+    #[test]
+    fn ecosystem_write_commands_are_registered_as_token_gated() {
+        for command in [
+            "run_toolchain_action",
+            "run_platform_action",
+            "run_chsrc_action",
+        ] {
+            let spec = RISK_OPERATION_REGISTRY
+                .iter()
+                .find(|spec| spec.command == command)
+                .unwrap();
+            assert_eq!(spec.action_id, command);
+            assert_eq!(spec.risk_level, "high");
+            assert!(spec.requires_token);
+        }
     }
 
     #[test]
@@ -14634,6 +16140,7 @@ mod tests {
             "update_project_port",
             "rollback_move",
             "execute_move_plan",
+            "execute_generic_archive_plan",
             "execute_expansion_plan",
             "clear_download_cache",
             "clean_dev_cache",
@@ -14642,6 +16149,8 @@ mod tests {
             "execute_mysql_repair_plan",
             "apply_file_association_plan",
             "rollback_file_association_backup",
+            "launch_update_installer",
+            "self_uninstall",
         ] {
             let spec = risk_operation_spec(command).unwrap_or_else(|| panic!("missing {command}"));
             assert!(spec.requires_token);
@@ -14741,6 +16250,120 @@ mod tests {
         assert_eq!(signature.identity, "未识别的本地服务");
         assert!(signature.confidence < 40);
         assert_eq!(signature.risk_level, "low");
+    }
+
+    #[test]
+    fn service_owned_port_is_high_risk_and_not_low() {
+        let signature = analyze_port_signature(
+            43595,
+            "LISTENING",
+            "tomcat10.exe",
+            r"C:\Program Files\Apache Software Foundation\Tomcat 10.1\bin\tomcat10.exe",
+            r#""C:\Program Files\Apache Software Foundation\Tomcat 10.1\bin\tomcat10.exe" //RS//Tomcat10"#,
+            &["Tomcat10".to_string()],
+        );
+        assert_eq!(signature.identity, "Tomcat");
+        assert_eq!(signature.risk_level, "high");
+        assert!(signature.recommendation.contains("Windows 服务托管"));
+    }
+
+    #[test]
+    fn tasklist_no_service_markers_are_not_service_names() {
+        for marker in ["N/A", "n/a", "None", "-", "不适用", "暂缺", "无"] {
+            assert!(tasklist_service_names(marker).is_empty(), "marker={marker}");
+        }
+        assert_eq!(
+            tasklist_service_names("Dnscache, EventLog"),
+            vec!["Dnscache".to_string(), "EventLog".to_string()]
+        );
+    }
+
+    #[test]
+    fn missing_process_is_not_reported_as_running() {
+        assert!(!process_is_running(u32::MAX));
+    }
+
+    #[test]
+    fn force_kill_rejects_system_protected_and_service_owned_targets() {
+        assert!(validate_force_kill_target(
+            4,
+            "System",
+            r"C:\\Windows\\System32\\ntoskrnl.exe",
+            &[]
+        )
+        .is_err());
+        for process_name in ["System", "lsass.exe", "svchost.exe", "spoolsv.exe"] {
+            assert!(
+                validate_force_kill_target(
+                    1234,
+                    process_name,
+                    &format!(r"C:\\Windows\\System32\\{process_name}"),
+                    &[],
+                )
+                .is_err(),
+                "process_name={process_name}"
+            );
+        }
+        assert!(validate_force_kill_target(
+            1234,
+            "python.exe",
+            r"C:\\Python313\\python.exe",
+            &["ExampleService".to_string()],
+        )
+        .is_err());
+        assert!(
+            validate_force_kill_target(1234, "python.exe", r"C:\\Python313\\python.exe", &[],)
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn pid_exit_verification_retries_are_bounded() {
+        let mut calls = 0;
+        let exited = retry_until(5, Duration::ZERO, || {
+            calls += 1;
+            calls == 3
+        });
+        assert!(exited);
+        assert_eq!(calls, 3);
+    }
+
+    #[test]
+    fn port_release_verification_retries_are_bounded() {
+        let mut calls = 0;
+        let released = retry_until(4, Duration::ZERO, || {
+            calls += 1;
+            false
+        });
+        assert!(!released);
+        assert_eq!(calls, 4);
+    }
+
+    #[test]
+    fn doctor_plan_details_include_evidence_and_safety_requirements() {
+        let report = DoctorReport {
+            score: 70,
+            summary: "PATH needs attention".to_string(),
+            checks: vec![DoctorCheck {
+                id: "path".to_string(),
+                title: "PATH check".to_string(),
+                category: "environment".to_string(),
+                status: "warning".to_string(),
+                severity: "high".to_string(),
+                detail: "Duplicate PATH entry".to_string(),
+                fix_action: Some("cleanup_path".to_string()),
+            }],
+            suggestions: Vec::new(),
+            generated_at: "1".to_string(),
+        };
+        let details = doctor_repair_action_details(&report, &["cleanup_path".to_string()]);
+        assert_eq!(details.len(), 1);
+        assert_eq!(details[0].action_id, "cleanup_path");
+        assert_eq!(details[0].risk_level, "high");
+        assert!(details[0].requires_backup);
+        assert!(details[0].requires_token);
+        assert!(details[0].evidence[0].contains("Duplicate PATH entry"));
+        assert!(!details[0].next_step.is_empty());
     }
 
     #[test]
@@ -14929,6 +16552,38 @@ mod tests {
     }
 
     #[test]
+    #[cfg(windows)]
+    fn command_stream_decodes_gbk_independently_of_system_locale() {
+        let bytes = [190, 220, 190, 248, 183, 195, 206, 202];
+        assert_eq!(decode_command_stream(&bytes), "拒绝访问");
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn command_stream_preserves_cp1252_text() {
+        let bytes = [
+            b'A', b'c', b'c', 0xe8, b's', b' ', b'r', b'e', b'f', b'u', b's', 0xe9,
+        ];
+        assert_eq!(decode_command_stream(&bytes), "Accès refusé");
+    }
+
+    #[test]
+    fn command_text_caps_each_output_stream() {
+        let oversized = vec![b'x'; 40 * 1024];
+        let text = command_text(&oversized, &oversized);
+        assert!(text.contains("[output truncated by DevEnv Manager]"));
+        assert!(text.len() < 70 * 1024);
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn command_stream_scoring_prefers_cp1252_letters_over_oem_glyphs() {
+        let cp1252_score = decoded_text_score("Accès refusé") + 8;
+        let oem_score = decoded_text_score("AccΦs refusΘ") + 6;
+        assert!(cp1252_score > oem_score);
+    }
+
+    #[test]
     fn cleanup_architecture_enables_only_phase2_safe_categories() {
         let architecture = cleanup::architecture();
         assert_eq!(architecture.status, "safe-clean-and-analysis-phase-3");
@@ -14972,6 +16627,17 @@ mod tests {
         assert!(validate_update_checksum(&"a".repeat(64)).is_ok());
         assert!(validate_update_checksum(&"g".repeat(64)).is_err());
         assert!(validate_update_checksum("abc").is_err());
+    }
+
+    #[test]
+    fn update_installer_verification_rejects_size_and_hash_mismatch() {
+        let root = tempfile::tempdir().unwrap();
+        let installer = root.path().join("update.exe");
+        fs::write(&installer, b"verified-update").unwrap();
+        let sha256 = file_sha256(&installer).unwrap();
+        assert!(verify_update_installer_file(&installer, 15, &sha256).is_ok());
+        assert!(verify_update_installer_file(&installer, 14, &sha256).is_err());
+        assert!(verify_update_installer_file(&installer, 15, &"a".repeat(64)).is_err());
     }
 
     #[test]
@@ -15036,6 +16702,32 @@ mod tests {
         assert!(!archive_path_is_sensitive(Path::new(
             r"C:\Users\test\Downloads\archive.zip"
         )));
+    }
+
+    #[test]
+    fn generic_archive_moves_and_verifies_only_fixture_file() {
+        let source_root = tempfile::tempdir().unwrap();
+        let target_root = tempfile::tempdir_in(env::current_dir().unwrap()).unwrap();
+        let source_dir = source_root.path().join("source");
+        let target_dir = target_root.path().join("target");
+        fs::create_dir_all(&source_dir).unwrap();
+        let source = source_dir.join("notes.txt");
+        fs::write(&source, b"archive fixture").unwrap();
+        let item = ArchivePlanItem {
+            id: "fixture-item".to_string(),
+            path: display_path(&source),
+            size: 15,
+            source: "unit-test".to_string(),
+            added_at: "0".to_string(),
+            suggestion: String::new(),
+        };
+        let plan = build_generic_archive_plan(vec![item], target_dir.clone()).unwrap();
+        let result = execute_generic_archive_files(&plan);
+        assert!(result.success);
+        assert_eq!(result.moved_items, 1);
+        assert!(!source.exists());
+        assert!(target_dir.join("notes.txt").is_file());
+        assert!(Path::new(&result.receipt_path).is_file());
     }
 
     #[test]

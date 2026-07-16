@@ -44,8 +44,10 @@ HIGH_RISK_EXECUTE_COMMANDS = {
     "stop_local_service",
     "apply_project_configuration",
     "update_project_port",
+    "execute_cleanup_plan",
     "execute_move_plan",
     "rollback_move",
+    "execute_expansion_plan",
     "execute_c_drive_expansion",
     "clear_download_cache",
     "clean_dev_cache",
@@ -224,6 +226,8 @@ def main() -> int:
         return fail("Workbench startup must gate first launch on safety disclaimer acceptance")
 
     feature_guide = (SRC / "components" / "featureGuide.ts").read_text(encoding="utf-8")
+    if "<details" not in feature_guide or "<summary" not in feature_guide:
+        return fail("Feature guides must be collapsed by default with details/summary")
     for required_phrase in [
         "guide.whatDoes",
         "guide.whatNot",
@@ -250,6 +254,48 @@ def main() -> int:
     refresh_body = dashboard_events.split("export async function refreshDashboard", 1)[-1].split("context.root.innerHTML", 1)[0]
     if "getPortSummary" in refresh_body or "scan_ports" in refresh_body:
         return fail("Dashboard default refresh must not run port scan")
+
+    ports_events = (SRC / "features" / "ports" / "events.ts").read_text(encoding="utf-8")
+    if "Promise.allSettled" not in ports_events or "scanError" not in ports_events:
+        return fail("Ports workbench must isolate scan/history/service failures")
+
+    reports_render = (SRC / "features" / "reports" / "render.ts").read_text(encoding="utf-8")
+    reports_events = (SRC / "features" / "reports" / "events.ts").read_text(encoding="utf-8")
+    for required in [
+        "export-port-report",
+        "export-project-report",
+        "exportPortReport",
+        "exportProjectReport",
+    ]:
+        if required not in reports_render + reports_events:
+            return fail(f"Reports workbench missing export coverage for {required}")
+
+    cleanup_render = (SRC / "features" / "cleanup" / "render.ts").read_text(encoding="utf-8")
+    cleanup_events = (SRC / "features" / "cleanup" / "events.ts").read_text(encoding="utf-8")
+    for required in [
+        "inspect-c-drive-rescue",
+        "scan-large-files-c",
+        "execute-expansion-plan",
+        "execute-cleanup-plan",
+        "createCDriveExpansionPlan",
+        "executeCDriveExpansion",
+        "cleanSelectedTargets",
+        "inspectPartitionLayout",
+        "scanLargeFiles",
+        'renderPagination("cleanup-large-files"',
+    ]:
+        if required not in cleanup_render + cleanup_events:
+            return fail(f"Cleanup workbench missing C drive rescue coverage for {required}")
+    if 'command: "execute_expansion_plan"' not in cleanup_events or 'riskLevel: "critical"' not in cleanup_events:
+        return fail("C drive expansion execution must use the critical execute_expansion_plan token contract")
+    if 'command: "execute_cleanup_plan"' not in cleanup_events or 'planId: "clear-download-cache"' not in cleanup_events:
+        return fail("Cleanup plan and download cache execution must use backend-matching token contracts")
+
+    runtimes_render = (SRC / "features" / "runtimes" / "render.ts").read_text(encoding="utf-8")
+    runtimes_events = (SRC / "features" / "runtimes" / "events.ts").read_text(encoding="utf-8")
+    for required in ["node-version", "python-version", "go-version", "install-maven", "install-gradle", "install_maven_latest", "install_gradle_latest"]:
+        if required not in runtimes_render + runtimes_events:
+            return fail(f"Runtimes workbench missing multi-version install coverage for {required}")
 
     risk_text = (SRC / "ui" / "components" / "riskUx.ts").read_text(encoding="utf-8") + (
         SRC / "core" / "risk.ts"

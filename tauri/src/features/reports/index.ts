@@ -6,10 +6,11 @@ export * from "./types";
 import type { FeatureContext } from "../../app/featureContext";
 import { bindReportEvents } from "./events";
 import { renderReportsWorkbench } from "./render";
-import { reportsWorkbenchInitialState } from "./state";
+import { readPersistedReportsState, type ReportsWorkbenchState } from "./state";
+
+const persistedReportsState: ReportsWorkbenchState = readPersistedReportsState();
 
 export function mountReportsFeature(context: FeatureContext): void {
-  const state = { ...reportsWorkbenchInitialState };
-  context.root.innerHTML = renderReportsWorkbench(state);
-  bindReportEvents(context, state);
+  context.root.innerHTML = renderReportsWorkbench(persistedReportsState);
+  bindReportEvents(context, persistedReportsState);
 }

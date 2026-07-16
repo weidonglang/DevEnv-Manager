@@ -80,6 +80,10 @@ pub(crate) fn now_string() -> String {
 }
 
 pub(crate) fn app_config_dir() -> PathBuf {
+    #[cfg(feature = "acceptance-fixtures")]
+    if let Some(path) = env::var_os("DEVENV_ACCEPTANCE_CONFIG_DIR") {
+        return PathBuf::from(path);
+    }
     dirs::data_local_dir()
         .or_else(dirs::home_dir)
         .unwrap_or_else(|| PathBuf::from("."))
@@ -109,6 +113,15 @@ pub(crate) fn split_path(value: &str) -> Vec<String> {
 }
 
 pub(crate) fn user_environment() -> Result<HashMap<String, String>, String> {
+    #[cfg(feature = "acceptance-fixtures")]
+    if let Some(path) = env::var_os("DEVENV_ACCEPTANCE_ENV_STORE") {
+        let path = PathBuf::from(path);
+        return if path.is_file() {
+            read_json(&path)
+        } else {
+            Ok(HashMap::new())
+        };
+    }
     #[cfg(windows)]
     {
         let hkcu = RegKey::predef(HKEY_CURRENT_USER);
@@ -134,6 +147,26 @@ pub(crate) fn process_environment() -> HashMap<String, String> {
 }
 
 pub(crate) fn set_user_environment(values: &HashMap<String, Option<String>>) -> Result<(), String> {
+    #[cfg(feature = "acceptance-fixtures")]
+    if let Some(path) = env::var_os("DEVENV_ACCEPTANCE_ENV_STORE") {
+        let path = PathBuf::from(path);
+        let mut current = if path.is_file() {
+            read_json::<HashMap<String, String>>(&path)?
+        } else {
+            HashMap::new()
+        };
+        for (name, value) in values {
+            match value {
+                Some(value) => {
+                    current.insert(name.clone(), value.clone());
+                }
+                None => {
+                    current.remove(name);
+                }
+            }
+        }
+        return write_json(&path, &current);
+    }
     #[cfg(windows)]
     {
         let hkcu = RegKey::predef(HKEY_CURRENT_USER);
@@ -160,6 +193,10 @@ pub(crate) fn set_user_environment(values: &HashMap<String, Option<String>>) -> 
 }
 
 pub(crate) fn broadcast_environment_change() {
+    #[cfg(feature = "acceptance-fixtures")]
+    if env::var_os("DEVENV_ACCEPTANCE_ENV_STORE").is_some() {
+        return;
+    }
     #[cfg(windows)]
     {
         let script = r#"

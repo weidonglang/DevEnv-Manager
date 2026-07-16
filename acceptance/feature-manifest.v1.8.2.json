@@ -1,0 +1,2900 @@
+{
+  "version": "1.8.2",
+  "commandAllowlist": [
+    {
+      "command": "accept_safety_disclaimer",
+      "priority": "P1",
+      "reason": "Startup safety gate command, covered by safety and settings acceptance."
+    },
+    {
+      "command": "safety_disclaimer",
+      "priority": "P1",
+      "reason": "Read-only safety text command, covered by startup/manual acceptance."
+    },
+    {
+      "command": "load_config",
+      "priority": "P1",
+      "reason": "Bootstrap config command, covered by settings and startup smoke."
+    }
+  ],
+  "pages": [
+    {
+      "pageId": "dashboard",
+      "displayName": "Dashboard",
+      "priority": "P1",
+      "features": [
+        {
+          "featureId": "nav.dashboard.entry",
+          "id": "nav.dashboard.entry",
+          "domain": "Workbench",
+          "userVisibleName": "Dashboard navigation entry",
+          "name": "Dashboard navigation entry",
+          "priority": "P1",
+          "targetVersion": "v1.8.2",
+          "status": "partial",
+          "oldFeature": true,
+          "oldEntry": "Sidebar > Dashboard",
+          "currentEntry": "Sidebar > Dashboard",
+          "frontendComponent": "DashboardPage",
+          "frontendEntry": {
+            "route": "dashboard",
+            "testIds": [
+              "nav-dashboard",
+              "dashboard-summary-section"
+            ]
+          },
+          "selectors": {
+            "entry": "nav-dashboard",
+            "section": "dashboard-summary-section",
+            "result": "dashboard-summary-section",
+            "error": "dashboard-error"
+          },
+          "backendCommands": [
+            "app_snapshot",
+            "environment_health",
+            "powershell_runner_status",
+            "scan_ports"
+          ],
+          "backendExists": true,
+          "frontendWired": true,
+          "riskLevel": "readOnly",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "requiresLoading": true,
+          "requiresResultArea": true,
+          "requiresErrorArea": true,
+          "requiresDebug": true,
+          "requiresReport": false,
+          "requiresRiskPlan": false,
+          "requiresToken": false,
+          "requiresVerify": false,
+          "requiresRollback": false,
+          "requiresPagination": false,
+          "requiresI18n": true,
+          "requiresDarkReadable": true,
+          "safeSmokeMode": "readOnly",
+          "manualOnlyReason": null,
+          "deferredReason": null,
+          "testModes": [
+            "static",
+            "frontend",
+            "safe"
+          ],
+          "manualAllowed": false,
+          "acceptanceChecks": [
+            "navigationEntry",
+            "frontendEntryVisible",
+            "backendCommandRegistered",
+            "noUnavailableFlood",
+            "debugContract"
+          ]
+        },
+        {
+          "featureId": "nav.commandPalette.entry",
+          "id": "nav.commandPalette.entry",
+          "domain": "Workbench",
+          "userVisibleName": "Command palette",
+          "name": "Command palette",
+          "priority": "P1",
+          "targetVersion": "v1.8.2",
+          "status": "partial",
+          "oldFeature": true,
+          "oldEntry": "Header > Command panel",
+          "currentEntry": "Header > Command panel",
+          "frontendComponent": "CommandPalette",
+          "frontendEntry": {
+            "route": "global",
+            "testIds": [
+              "command-palette-open",
+              "command-palette-panel"
+            ]
+          },
+          "selectors": {
+            "entry": "command-palette-open",
+            "section": "command-palette-panel",
+            "result": "command-palette-result",
+            "error": "command-palette-error"
+          },
+          "backendCommands": [
+            "inspect_command_safety"
+          ],
+          "backendExists": true,
+          "frontendWired": true,
+          "riskLevel": "medium",
+          "requiresTauri": true,
+          "requiresWindows": false,
+          "requiresLoading": true,
+          "requiresResultArea": true,
+          "requiresErrorArea": true,
+          "requiresDebug": true,
+          "requiresReport": false,
+          "requiresRiskPlan": true,
+          "requiresToken": true,
+          "requiresVerify": false,
+          "requiresRollback": false,
+          "requiresPagination": false,
+          "requiresI18n": true,
+          "requiresDarkReadable": true,
+          "safeSmokeMode": "dryRun",
+          "manualOnlyReason": null,
+          "deferredReason": null,
+          "testModes": [
+            "static",
+            "frontend"
+          ],
+          "manualAllowed": false,
+          "acceptanceChecks": [
+            "selectorPresent",
+            "riskContract",
+            "debugContract"
+          ]
+        }
+      ]
+    },
+    {
+      "pageId": "runtimes",
+      "displayName": "Runtime",
+      "priority": "P0",
+      "features": [
+        {
+          "featureId": "runtime.install.groups",
+          "id": "runtime.install.groups",
+          "domain": "Runtime",
+          "userVisibleName": "Runtime install groups",
+          "name": "Runtime install groups",
+          "priority": "P0",
+          "targetVersion": "v1.8.2",
+          "status": "partial",
+          "oldFeature": true,
+          "oldEntry": "Runtime > Install",
+          "currentEntry": "Runtime > Install",
+          "frontendComponent": "RuntimePage",
+          "frontendEntry": {
+            "route": "runtimes",
+            "testIds": [
+              "runtime-install-jdk-group",
+              "runtime-install-node-group",
+              "runtime-install-python-group",
+              "runtime-install-go-group",
+              "runtime-install-maven-group",
+              "runtime-install-gradle-group"
+            ]
+          },
+          "selectors": {
+            "entry": "runtime-install-section",
+            "primaryAction": "install-jdk",
+            "result": "runtime-operation-result",
+            "error": "runtime-operation-error"
+          },
+          "backendCommands": [
+            "jdk_distributions",
+            "install_jdk",
+            "install_node",
+            "install_python",
+            "install_go",
+            "install_maven_latest",
+            "install_gradle_latest"
+          ],
+          "backendExists": true,
+          "frontendWired": true,
+          "riskLevel": "high",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "requiresLoading": true,
+          "requiresResultArea": true,
+          "requiresErrorArea": true,
+          "requiresDebug": true,
+          "requiresReport": true,
+          "requiresRiskPlan": true,
+          "requiresToken": true,
+          "requiresVerify": true,
+          "requiresRollback": false,
+          "requiresPagination": false,
+          "requiresI18n": true,
+          "requiresDarkReadable": true,
+          "safeSmokeMode": "dryRun",
+          "manualOnlyReason": null,
+          "deferredReason": null,
+          "testModes": [
+            "static",
+            "frontend",
+            "safe"
+          ],
+          "manualAllowed": false,
+          "acceptanceChecks": [
+            "selectorsPresent",
+            "riskContract",
+            "resultPanelVisible",
+            "debugContract",
+            "reportContract"
+          ]
+        },
+        {
+          "featureId": "runtime.installed.actions",
+          "id": "runtime.installed.actions",
+          "domain": "Runtime",
+          "userVisibleName": "Managed and external runtime actions",
+          "name": "Managed and external runtime actions",
+          "priority": "P0",
+          "targetVersion": "v1.8.2",
+          "status": "partial",
+          "oldFeature": true,
+          "oldEntry": "Runtime > Installed",
+          "currentEntry": "Runtime > Installed",
+          "frontendComponent": "RuntimePage",
+          "frontendEntry": {
+            "route": "runtimes",
+            "testIds": [
+              "runtime-installed-list",
+              "runtime-operation-result"
+            ]
+          },
+          "selectors": {
+            "entry": "runtime-installed-list",
+            "primaryAction": "refresh-runtimes",
+            "result": "runtime-operation-result",
+            "error": "runtime-operation-error"
+          },
+          "backendCommands": [
+            "discover_runtimes",
+            "inspect_runtime_strong_verification",
+            "switch_runtime",
+            "uninstall_runtime",
+            "open_analysis_path",
+            "open_apps_features"
+          ],
+          "backendExists": true,
+          "frontendWired": true,
+          "riskLevel": "high",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "requiresLoading": true,
+          "requiresResultArea": true,
+          "requiresErrorArea": true,
+          "requiresDebug": true,
+          "requiresReport": true,
+          "requiresRiskPlan": true,
+          "requiresToken": true,
+          "requiresVerify": true,
+          "requiresRollback": false,
+          "requiresPagination": true,
+          "requiresI18n": true,
+          "requiresDarkReadable": true,
+          "safeSmokeMode": "dryRun",
+          "manualOnlyReason": null,
+          "deferredReason": null,
+          "testModes": [
+            "static",
+            "frontend",
+            "safe"
+          ],
+          "manualAllowed": false,
+          "acceptanceChecks": [
+            "noExternalDirectUninstall",
+            "managedActionsVisible",
+            "resultPanelVisible",
+            "debugContract",
+            "riskContract",
+            "reportContract"
+          ]
+        },
+        {
+          "featureId": "runtime.externalJdkVerify",
+          "id": "runtime.externalJdkVerify",
+          "domain": "Runtime",
+          "userVisibleName": "External JDK read-only verification",
+          "name": "External JDK read-only verification",
+          "priority": "P1",
+          "targetVersion": "v1.8.2",
+          "status": "implemented",
+          "oldFeature": true,
+          "oldEntry": "Runtime > Verify external JDK",
+          "currentEntry": "Runtime > External JDK verification",
+          "frontendComponent": "RuntimeExternalJdkPanel",
+          "frontendEntry": {
+            "route": "runtimes",
+            "testIds": [
+              "runtime-external-jdk-section",
+              "runtime-external-jdk-select",
+              "runtime-external-jdk-result"
+            ]
+          },
+          "selectors": {
+            "entry": "runtime-external-jdk-section",
+            "primaryAction": "verify-external-jdk",
+            "result": "runtime-external-jdk-result",
+            "error": "runtime-external-jdk-result"
+          },
+          "backendCommands": [
+            "verify_external_jdk"
+          ],
+          "backendExists": true,
+          "frontendWired": true,
+          "riskLevel": "readOnly",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "requiresLoading": true,
+          "requiresResultArea": true,
+          "requiresErrorArea": true,
+          "requiresDebug": true,
+          "requiresReport": false,
+          "requiresRiskPlan": false,
+          "requiresToken": false,
+          "requiresVerify": true,
+          "requiresRollback": false,
+          "requiresPagination": false,
+          "requiresI18n": true,
+          "requiresDarkReadable": true,
+          "safeSmokeMode": "readOnly",
+          "manualOnlyReason": null,
+          "deferredReason": null,
+          "testModes": [
+            "static",
+            "frontend",
+            "safe"
+          ],
+          "manualAllowed": false,
+          "acceptanceChecks": [
+            "selectorsPresent",
+            "resultPanelVisible",
+            "debugContract",
+            "noReportNeeded"
+          ]
+        },
+        {
+          "featureId": "runtime.v19.fullRedesign",
+          "id": "runtime.v19.fullRedesign",
+          "domain": "Runtime",
+          "userVisibleName": "Runtime v1.9.0 architecture redesign",
+          "name": "Runtime v1.9.0 architecture redesign",
+          "priority": "P1",
+          "targetVersion": "v1.9.0",
+          "status": "deferred",
+          "oldFeature": false,
+          "oldEntry": null,
+          "currentEntry": null,
+          "frontendComponent": "RuntimePage",
+          "frontendEntry": {
+            "route": "runtimes",
+            "testIds": [
+              "runtime-installed-list"
+            ]
+          },
+          "selectors": {
+            "entry": "runtime-installed-list",
+            "result": "runtime-operation-result",
+            "error": "runtime-operation-error"
+          },
+          "backendCommands": [],
+          "backendExists": false,
+          "frontendWired": false,
+          "riskLevel": "medium",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "requiresLoading": true,
+          "requiresResultArea": true,
+          "requiresErrorArea": true,
+          "requiresDebug": true,
+          "requiresReport": true,
+          "requiresRiskPlan": true,
+          "requiresToken": true,
+          "requiresVerify": true,
+          "requiresRollback": false,
+          "requiresPagination": true,
+          "requiresI18n": true,
+          "requiresDarkReadable": true,
+          "safeSmokeMode": "manual",
+          "manualOnlyReason": "Large runtime model redesign belongs to #130 and v1.9.0.",
+          "deferredReason": "Tracked by #130; v1.8.2 only keeps basic action and safety coverage.",
+          "testModes": [
+            "static",
+            "manual"
+          ],
+          "manualAllowed": true,
+          "acceptanceChecks": [
+            "deferredReasonPresent",
+            "debugContract",
+            "riskContract",
+            "noReportNeeded"
+          ]
+        }
+      ]
+    },
+    {
+      "pageId": "environment",
+      "displayName": "Environment",
+      "priority": "P0",
+      "features": [
+        {
+          "featureId": "environment.pythonAliasSettings",
+          "id": "environment.pythonAliasSettings",
+          "domain": "Environment",
+          "userVisibleName": "Windows Python execution alias settings",
+          "name": "Windows Python execution alias settings",
+          "priority": "P1",
+          "targetVersion": "v1.8.2",
+          "status": "implemented",
+          "oldFeature": true,
+          "oldEntry": "Environment > Python aliases",
+          "currentEntry": "Environment > Python health > Execution aliases",
+          "frontendComponent": "EnvironmentPythonHealthPanel",
+          "frontendEntry": {
+            "route": "environment",
+            "testIds": [
+              "environment-python-health-section",
+              "environment-python-alias-result"
+            ]
+          },
+          "selectors": {
+            "entry": "environment-python-health-section",
+            "primaryAction": "open-python-alias-settings",
+            "result": "environment-python-alias-result",
+            "error": "environment-python-alias-result"
+          },
+          "backendCommands": [
+            "analyze_python_environment",
+            "open_python_alias_settings"
+          ],
+          "backendExists": true,
+          "frontendWired": true,
+          "riskLevel": "readOnly",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "requiresLoading": true,
+          "requiresResultArea": true,
+          "requiresErrorArea": true,
+          "requiresDebug": true,
+          "requiresReport": false,
+          "requiresRiskPlan": false,
+          "requiresToken": false,
+          "requiresVerify": true,
+          "requiresRollback": false,
+          "requiresPagination": false,
+          "requiresI18n": true,
+          "requiresDarkReadable": true,
+          "safeSmokeMode": "readOnly",
+          "manualOnlyReason": null,
+          "deferredReason": null,
+          "testModes": [
+            "static",
+            "frontend",
+            "safe"
+          ],
+          "manualAllowed": false,
+          "acceptanceChecks": [
+            "selectorsPresent",
+            "resultPanelVisible",
+            "debugContract",
+            "noReportNeeded"
+          ]
+        },
+        {
+          "featureId": "environment.pythonHealthRepair",
+          "id": "environment.pythonHealthRepair",
+          "domain": "Environment",
+          "userVisibleName": "Python health analysis and guarded repair",
+          "name": "Python health analysis and guarded repair",
+          "priority": "P0",
+          "targetVersion": "v1.8.2",
+          "status": "implemented",
+          "oldFeature": true,
+          "oldEntry": "Environment > Python repair",
+          "currentEntry": "Environment > Python health and repair",
+          "frontendComponent": "EnvironmentPythonHealthPanel",
+          "frontendEntry": {
+            "route": "environment",
+            "testIds": [
+              "environment-python-health-section",
+              "environment-python-analysis-result",
+              "environment-python-plan-preview",
+              "environment-python-repair-result"
+            ]
+          },
+          "selectors": {
+            "entry": "environment-python-health-section",
+            "primaryAction": "preview-python-repair",
+            "result": "environment-python-repair-result",
+            "error": "environment-python-repair-result"
+          },
+          "backendCommands": [
+            "analyze_python_environment",
+            "preview_python_repair",
+            "apply_python_repair"
+          ],
+          "backendExists": true,
+          "frontendWired": true,
+          "riskLevel": "high",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "requiresLoading": true,
+          "requiresResultArea": true,
+          "requiresErrorArea": true,
+          "requiresDebug": true,
+          "requiresReport": false,
+          "requiresRiskPlan": true,
+          "requiresToken": true,
+          "requiresVerify": true,
+          "requiresRollback": true,
+          "requiresPagination": false,
+          "requiresI18n": true,
+          "requiresDarkReadable": true,
+          "safeSmokeMode": "dryRun",
+          "manualOnlyReason": null,
+          "deferredReason": null,
+          "testModes": [
+            "static",
+            "frontend",
+            "safe"
+          ],
+          "manualAllowed": false,
+          "acceptanceChecks": [
+            "selectorsPresent",
+            "riskContract",
+            "resultPanelVisible",
+            "debugContract",
+            "noReportNeeded"
+          ]
+        },
+        {
+          "featureId": "environment.restoreBackups",
+          "id": "environment.restoreBackups",
+          "domain": "Environment",
+          "userVisibleName": "Environment backup preview and restore",
+          "name": "Environment backup preview and restore",
+          "priority": "P0",
+          "targetVersion": "v1.8.2",
+          "status": "implemented",
+          "oldFeature": true,
+          "oldEntry": "Environment > Restore backup",
+          "currentEntry": "Environment > Restore environment backup",
+          "frontendComponent": "EnvironmentRestorePanel",
+          "frontendEntry": {
+            "route": "environment",
+            "testIds": [
+              "environment-restore-section",
+              "environment-backup-select",
+              "environment-restore-plan-preview",
+              "environment-restore-result"
+            ]
+          },
+          "selectors": {
+            "entry": "environment-restore-section",
+            "primaryAction": "create-environment-restore-plan",
+            "result": "environment-restore-result",
+            "error": "environment-restore-result"
+          },
+          "backendCommands": [
+            "list_env_backups",
+            "inspect_env_backup",
+            "restore_env_backup",
+            "list_environment_backups",
+            "restore_environment_backup",
+            "inspect_env_reliability"
+          ],
+          "backendExists": true,
+          "frontendWired": true,
+          "riskLevel": "high",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "requiresLoading": true,
+          "requiresResultArea": true,
+          "requiresErrorArea": true,
+          "requiresDebug": true,
+          "requiresReport": false,
+          "requiresRiskPlan": true,
+          "requiresToken": true,
+          "requiresVerify": true,
+          "requiresRollback": true,
+          "requiresPagination": false,
+          "requiresI18n": true,
+          "requiresDarkReadable": true,
+          "safeSmokeMode": "dryRun",
+          "manualOnlyReason": null,
+          "deferredReason": null,
+          "testModes": [
+            "static",
+            "frontend",
+            "safe"
+          ],
+          "manualAllowed": false,
+          "acceptanceChecks": [
+            "selectorsPresent",
+            "riskContract",
+            "resultPanelVisible",
+            "debugContract",
+            "noReportNeeded"
+          ]
+        },
+        {
+          "featureId": "environment.doctorAndJava",
+          "id": "environment.doctorAndJava",
+          "domain": "Environment",
+          "userVisibleName": "Environment doctor and Java reliability",
+          "name": "Environment doctor and Java reliability",
+          "priority": "P0",
+          "targetVersion": "v1.8.2",
+          "status": "partial",
+          "oldFeature": true,
+          "oldEntry": "Environment > Doctor",
+          "currentEntry": "Environment > Doctor",
+          "frontendComponent": "EnvironmentPage",
+          "frontendEntry": {
+            "route": "environment",
+            "testIds": [
+              "environment-doctor-section",
+              "environment-operation-result",
+              "environment-configuration-section",
+              "environment-configuration-preview",
+              "environment-configuration-result",
+              "environment-path-cleanup-result"
+            ]
+          },
+          "selectors": {
+            "entry": "environment-doctor-section",
+            "primaryAction": "apply-user-environment-configuration",
+            "result": "environment-configuration-result",
+            "error": "environment-configuration-error"
+          },
+          "backendCommands": [
+            "inspect_env_reliability",
+            "environment_health",
+            "preview_user_environment_configuration",
+            "apply_user_environment_configuration",
+            "create_java_stabilize_plan",
+            "apply_env_repair_plan",
+            "cleanup_path_entries"
+          ],
+          "backendExists": true,
+          "frontendWired": true,
+          "riskLevel": "high",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "requiresLoading": true,
+          "requiresResultArea": true,
+          "requiresErrorArea": true,
+          "requiresDebug": true,
+          "requiresReport": true,
+          "requiresRiskPlan": true,
+          "requiresToken": true,
+          "requiresVerify": true,
+          "requiresRollback": true,
+          "requiresPagination": false,
+          "requiresI18n": true,
+          "requiresDarkReadable": true,
+          "safeSmokeMode": "dryRun",
+          "manualOnlyReason": null,
+          "deferredReason": null,
+          "testModes": [
+            "static",
+            "frontend",
+            "safe"
+          ],
+          "manualAllowed": false,
+          "acceptanceChecks": [
+            "resultPanelVisible",
+            "riskContract",
+            "reportContract",
+            "debugContract"
+          ]
+        },
+        {
+          "featureId": "environment.pathEvidence",
+          "id": "environment.pathEvidence",
+          "domain": "Environment",
+          "userVisibleName": "PATH and tool evidence",
+          "name": "PATH and tool evidence",
+          "priority": "P0",
+          "targetVersion": "v1.8.2",
+          "status": "partial",
+          "oldFeature": true,
+          "oldEntry": "Environment > PATH",
+          "currentEntry": "Environment > PATH",
+          "frontendComponent": "EnvironmentPage",
+          "frontendEntry": {
+            "route": "environment",
+            "testIds": [
+              "environment-path-section",
+              "environment-operation-result"
+            ]
+          },
+          "selectors": {
+            "entry": "environment-path-section",
+            "result": "environment-operation-result",
+            "error": "environment-operation-error"
+          },
+          "backendCommands": [
+            "inspect_env_reliability",
+            "environment_health"
+          ],
+          "backendExists": true,
+          "frontendWired": true,
+          "riskLevel": "readOnly",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "requiresLoading": true,
+          "requiresResultArea": true,
+          "requiresErrorArea": true,
+          "requiresDebug": true,
+          "requiresReport": true,
+          "requiresRiskPlan": false,
+          "requiresToken": false,
+          "requiresVerify": true,
+          "requiresRollback": false,
+          "requiresPagination": true,
+          "requiresI18n": true,
+          "requiresDarkReadable": true,
+          "safeSmokeMode": "readOnly",
+          "manualOnlyReason": null,
+          "deferredReason": null,
+          "testModes": [
+            "static",
+            "frontend",
+            "safe"
+          ],
+          "manualAllowed": false,
+          "acceptanceChecks": [
+            "fieldContract",
+            "resultPanelVisible",
+            "reportContract",
+            "debugContract"
+          ]
+        }
+      ]
+    },
+    {
+      "pageId": "reports",
+      "displayName": "DoctorReports",
+      "priority": "P0",
+      "features": [
+        {
+          "featureId": "doctor.runAndRepair",
+          "id": "doctor.runAndRepair",
+          "domain": "DoctorReports",
+          "userVisibleName": "Doctor run and repair plan",
+          "name": "Doctor run and repair plan",
+          "priority": "P0",
+          "targetVersion": "v1.8.2",
+          "status": "partial",
+          "oldFeature": true,
+          "oldEntry": "Reports > Doctor",
+          "currentEntry": "Reports > Doctor",
+          "frontendComponent": "ReportsPage",
+          "frontendEntry": {
+            "route": "reports",
+            "testIds": [
+              "reports-doctor-section",
+              "reports-doctor-result"
+            ]
+          },
+          "selectors": {
+            "entry": "reports-doctor-section",
+            "primaryAction": "run-doctor",
+            "result": "reports-doctor-result",
+            "error": "reports-doctor-error"
+          },
+          "backendCommands": [
+            "run_doctor",
+            "doctor_report_text",
+            "create_doctor_repair_plan",
+            "execute_doctor_repair_plan"
+          ],
+          "backendExists": true,
+          "frontendWired": true,
+          "riskLevel": "high",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "requiresLoading": true,
+          "requiresResultArea": true,
+          "requiresErrorArea": true,
+          "requiresDebug": true,
+          "requiresReport": true,
+          "requiresRiskPlan": true,
+          "requiresToken": true,
+          "requiresVerify": true,
+          "requiresRollback": true,
+          "requiresPagination": false,
+          "requiresI18n": true,
+          "requiresDarkReadable": true,
+          "safeSmokeMode": "dryRun",
+          "manualOnlyReason": null,
+          "deferredReason": null,
+          "testModes": [
+            "static",
+            "frontend",
+            "safe"
+          ],
+          "manualAllowed": false,
+          "acceptanceChecks": [
+            "resultPanelVisible",
+            "riskContract",
+            "reportContract",
+            "debugContract"
+          ]
+        },
+        {
+          "featureId": "reports.exports",
+          "id": "reports.exports",
+          "domain": "DoctorReports",
+          "userVisibleName": "Report export surface",
+          "name": "Report export surface",
+          "priority": "P0",
+          "targetVersion": "v1.8.2",
+          "status": "partial",
+          "oldFeature": true,
+          "oldEntry": "Reports > Export",
+          "currentEntry": "Reports > Export",
+          "frontendComponent": "ReportsPage",
+          "frontendEntry": {
+            "route": "reports",
+            "testIds": [
+              "reports-export-section",
+              "reports-export-result"
+            ]
+          },
+          "selectors": {
+            "entry": "reports-export-section",
+            "primaryAction": "export-doctor-report",
+            "result": "reports-export-result",
+            "error": "reports-export-error"
+          },
+          "backendCommands": [
+            "export_doctor_report",
+            "export_doctor_report_json",
+            "export_env_reliability_report",
+            "export_python_diagnostic_report",
+            "export_file_association_report",
+            "export_cleanup_report",
+            "export_port_report",
+            "export_project_report",
+            "open_analysis_path"
+          ],
+          "backendExists": true,
+          "frontendWired": true,
+          "riskLevel": "readOnlyWritesReport",
+          "requiresTauri": true,
+          "requiresWindows": false,
+          "requiresLoading": true,
+          "requiresResultArea": true,
+          "requiresErrorArea": true,
+          "requiresDebug": true,
+          "requiresReport": true,
+          "requiresRiskPlan": false,
+          "requiresToken": false,
+          "requiresVerify": true,
+          "requiresRollback": false,
+          "requiresPagination": false,
+          "requiresI18n": true,
+          "requiresDarkReadable": true,
+          "safeSmokeMode": "tempFile",
+          "manualOnlyReason": null,
+          "deferredReason": null,
+          "testModes": [
+            "static",
+            "frontend",
+            "safe"
+          ],
+          "manualAllowed": false,
+          "acceptanceChecks": [
+            "resultPanelVisible",
+            "reportContract",
+            "debugContract",
+            "noToastOnly"
+          ]
+        }
+      ]
+    },
+    {
+      "pageId": "cleanup",
+      "displayName": "Cleanup",
+      "priority": "P0",
+      "features": [
+        {
+          "featureId": "cleanup.applicationUsage",
+          "id": "cleanup.applicationUsage",
+          "domain": "Cleanup",
+          "userVisibleName": "Read-only application storage usage",
+          "name": "Read-only application storage usage",
+          "priority": "P1",
+          "targetVersion": "v1.8.2",
+          "status": "implemented",
+          "oldFeature": true,
+          "oldEntry": "Cleanup > Application usage",
+          "currentEntry": "Cleanup > Application storage usage",
+          "frontendComponent": "CleanupApplicationUsagePanel",
+          "frontendEntry": {
+            "route": "cleanup",
+            "testIds": [
+              "cleanup-application-usage-section",
+              "cleanup-application-usage-result",
+              "cleanup-application-usage-error"
+            ]
+          },
+          "selectors": {
+            "entry": "cleanup-application-usage-section",
+            "primaryAction": "inspect-application-usage",
+            "result": "cleanup-application-usage-result",
+            "error": "cleanup-application-usage-error"
+          },
+          "backendCommands": [
+            "inspect_app_usage",
+            "inspect_installed_software_usage",
+            "open_analysis_path"
+          ],
+          "backendExists": true,
+          "frontendWired": true,
+          "riskLevel": "readOnly",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "requiresLoading": true,
+          "requiresResultArea": true,
+          "requiresErrorArea": true,
+          "requiresDebug": true,
+          "requiresReport": false,
+          "requiresRiskPlan": false,
+          "requiresToken": false,
+          "requiresVerify": true,
+          "requiresRollback": false,
+          "requiresPagination": false,
+          "requiresI18n": true,
+          "requiresDarkReadable": true,
+          "safeSmokeMode": "readOnly",
+          "manualOnlyReason": null,
+          "deferredReason": null,
+          "testModes": [
+            "static",
+            "frontend",
+            "safe"
+          ],
+          "manualAllowed": false,
+          "acceptanceChecks": [
+            "selectorsPresent",
+            "resultPanelVisible",
+            "debugContract",
+            "noReportNeeded"
+          ]
+        },
+        {
+          "featureId": "cleanup.genericArchivePlan",
+          "id": "cleanup.genericArchivePlan",
+          "domain": "Cleanup",
+          "userVisibleName": "Generic selected-file archive plan",
+          "name": "Generic selected-file archive plan",
+          "priority": "P0",
+          "targetVersion": "v1.8.2",
+          "status": "implemented",
+          "oldFeature": true,
+          "oldEntry": "Cleanup > Archive list",
+          "currentEntry": "Cleanup > Selected-file archive plan",
+          "frontendComponent": "CleanupGenericArchivePanel",
+          "frontendEntry": {
+            "route": "cleanup",
+            "testIds": [
+              "cleanup-generic-archive-section",
+              "cleanup-generic-archive-items",
+              "cleanup-generic-archive-plan-preview",
+              "cleanup-generic-archive-result",
+              "cleanup-generic-archive-error"
+            ]
+          },
+          "selectors": {
+            "entry": "cleanup-generic-archive-section",
+            "primaryAction": "create-generic-archive-plan",
+            "result": "cleanup-generic-archive-result",
+            "error": "cleanup-generic-archive-error"
+          },
+          "backendCommands": [
+            "add_archive_plan_item",
+            "list_archive_plan_items",
+            "remove_archive_plan_item",
+            "create_generic_archive_plan",
+            "execute_generic_archive_plan"
+          ],
+          "backendExists": true,
+          "frontendWired": true,
+          "riskLevel": "high",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "requiresLoading": true,
+          "requiresResultArea": true,
+          "requiresErrorArea": true,
+          "requiresDebug": true,
+          "requiresReport": false,
+          "requiresRiskPlan": true,
+          "requiresToken": true,
+          "requiresVerify": true,
+          "requiresRollback": true,
+          "requiresPagination": false,
+          "requiresI18n": true,
+          "requiresDarkReadable": true,
+          "safeSmokeMode": "tempFile",
+          "manualOnlyReason": null,
+          "deferredReason": null,
+          "testModes": [
+            "static",
+            "frontend",
+            "safe"
+          ],
+          "manualAllowed": false,
+          "acceptanceChecks": [
+            "selectorsPresent",
+            "riskContract",
+            "resultPanelVisible",
+            "debugContract",
+            "noReportNeeded"
+          ]
+        },
+        {
+          "featureId": "cleanup.cDriveRescue",
+          "id": "cleanup.cDriveRescue",
+          "domain": "Cleanup",
+          "userVisibleName": "C drive rescue and maintenance overview",
+          "name": "C drive rescue and maintenance overview",
+          "priority": "P0",
+          "targetVersion": "v1.8.2",
+          "status": "partial",
+          "oldFeature": true,
+          "oldEntry": "Cleanup > C rescue",
+          "currentEntry": "Cleanup > C rescue",
+          "frontendComponent": "CleanupPage",
+          "frontendEntry": {
+            "route": "cleanup",
+            "testIds": [
+              "cleanup-disk-overview-entry",
+              "cleanup-disk-overview-action",
+              "cleanup-disk-overview-result"
+            ]
+          },
+          "selectors": {
+            "entry": "cleanup-disk-overview-entry",
+            "primaryAction": "cleanup-disk-overview-action",
+            "result": "cleanup-disk-overview-result",
+            "error": "cleanup-inline-error"
+          },
+          "backendCommands": [
+            "inspect_maintenance_overview",
+            "inspect_partition_layout",
+            "inspect_desktop",
+            "inspect_downloads",
+            "storage_cleanup_architecture"
+          ],
+          "backendExists": true,
+          "frontendWired": true,
+          "riskLevel": "readOnly",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "requiresLoading": true,
+          "requiresResultArea": true,
+          "requiresErrorArea": true,
+          "requiresDebug": true,
+          "requiresReport": true,
+          "requiresRiskPlan": false,
+          "requiresToken": false,
+          "requiresVerify": true,
+          "requiresRollback": false,
+          "requiresPagination": false,
+          "requiresI18n": true,
+          "requiresDarkReadable": true,
+          "safeSmokeMode": "readOnly",
+          "manualOnlyReason": null,
+          "deferredReason": null,
+          "testModes": [
+            "static",
+            "frontend",
+            "safe"
+          ],
+          "manualAllowed": false,
+          "acceptanceChecks": [
+            "frontendEntryVisible",
+            "resultPanelVisible",
+            "reportContract",
+            "debugContract"
+          ]
+        },
+        {
+          "featureId": "cleanup.diskOverview.ui",
+          "id": "cleanup.diskOverview.ui",
+          "domain": "Cleanup",
+          "userVisibleName": "Multi-disk overview",
+          "name": "Multi-disk overview",
+          "priority": "P0",
+          "targetVersion": "v1.8.2",
+          "status": "partial",
+          "oldFeature": true,
+          "oldEntry": "Cleanup > Disk overview",
+          "currentEntry": "Cleanup > Multi-disk overview",
+          "frontendComponent": "CleanupPage",
+          "frontendEntry": {
+            "route": "cleanup",
+            "testIds": [
+              "cleanup-disk-overview-entry",
+              "cleanup-disk-overview-action",
+              "cleanup-disk-overview-result"
+            ]
+          },
+          "selectors": {
+            "entry": "cleanup-disk-overview-entry",
+            "primaryAction": "cleanup-disk-overview-action",
+            "result": "cleanup-disk-overview-result",
+            "error": "cleanup-inline-error"
+          },
+          "backendCommands": [
+            "inspect_disk_overview"
+          ],
+          "backendExists": true,
+          "frontendWired": true,
+          "riskLevel": "readOnly",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "requiresLoading": true,
+          "requiresResultArea": true,
+          "requiresErrorArea": true,
+          "requiresDebug": true,
+          "requiresReport": true,
+          "requiresRiskPlan": false,
+          "requiresToken": false,
+          "requiresVerify": true,
+          "requiresRollback": false,
+          "requiresPagination": false,
+          "requiresI18n": true,
+          "requiresDarkReadable": true,
+          "safeSmokeMode": "readOnly",
+          "manualOnlyReason": null,
+          "deferredReason": null,
+          "expectedFailureReason": null,
+          "testModes": [
+            "static",
+            "frontend",
+            "safe"
+          ],
+          "manualAllowed": false,
+          "acceptanceChecks": [
+            "backendCommandRegistered",
+            "resultPanelVisible",
+            "debugContract",
+            "reportContract"
+          ]
+        },
+        {
+          "featureId": "cleanup.duplicateLargeFiles.ui",
+          "id": "cleanup.duplicateLargeFiles.ui",
+          "domain": "Cleanup",
+          "userVisibleName": "Duplicate large files",
+          "name": "Duplicate large files",
+          "priority": "P0",
+          "targetVersion": "v1.8.2",
+          "status": "partial",
+          "oldFeature": true,
+          "oldEntry": "Cleanup > Duplicate files",
+          "currentEntry": "Cleanup > Duplicate large files",
+          "frontendComponent": "CleanupPage",
+          "frontendEntry": {
+            "route": "cleanup",
+            "testIds": [
+              "cleanup-duplicate-large-files-entry",
+              "cleanup-duplicate-large-files-action",
+              "cleanup-duplicate-large-files-result"
+            ]
+          },
+          "selectors": {
+            "entry": "cleanup-duplicate-large-files-entry",
+            "primaryAction": "cleanup-duplicate-large-files-action",
+            "result": "cleanup-duplicate-large-files-result",
+            "error": "cleanup-duplicate-large-files-error"
+          },
+          "backendCommands": [
+            "scan_duplicate_large_files"
+          ],
+          "backendExists": true,
+          "frontendWired": true,
+          "riskLevel": "readOnly",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "requiresLoading": true,
+          "requiresResultArea": true,
+          "requiresErrorArea": true,
+          "requiresDebug": true,
+          "requiresReport": true,
+          "requiresRiskPlan": false,
+          "requiresToken": false,
+          "requiresVerify": true,
+          "requiresRollback": false,
+          "requiresPagination": true,
+          "requiresI18n": true,
+          "requiresDarkReadable": true,
+          "safeSmokeMode": "readOnlyTempDir",
+          "manualOnlyReason": null,
+          "deferredReason": null,
+          "expectedFailureReason": null,
+          "testModes": [
+            "static",
+            "frontend",
+            "safe"
+          ],
+          "manualAllowed": false,
+          "acceptanceChecks": [
+            "backendCommandRegistered",
+            "resultPanelVisible",
+            "noToastOnly",
+            "debugContract",
+            "reportContract"
+          ]
+        },
+        {
+          "featureId": "cleanup.desktopArchive.ui",
+          "id": "cleanup.desktopArchive.ui",
+          "domain": "Cleanup",
+          "userVisibleName": "Desktop archive",
+          "name": "Desktop archive",
+          "priority": "P0",
+          "targetVersion": "v1.8.2",
+          "status": "partial",
+          "oldFeature": true,
+          "oldEntry": "Cleanup > Desktop rescue",
+          "currentEntry": "Cleanup > Desktop rescue archive",
+          "frontendComponent": "CleanupPage",
+          "frontendEntry": {
+            "route": "cleanup",
+            "testIds": [
+              "cleanup-desktop-archive-section",
+              "cleanup-desktop-archive-plan-action",
+              "cleanup-desktop-archive-plan-result",
+              "cleanup-desktop-archive-execute-action",
+              "cleanup-desktop-archive-execute-result",
+              "cleanup-desktop-archive-rollback"
+            ]
+          },
+          "selectors": {
+            "entry": "cleanup-desktop-archive-section",
+            "primaryAction": "cleanup-desktop-archive-plan-action",
+            "result": "cleanup-desktop-archive-execute-result",
+            "error": "cleanup-desktop-archive-error"
+          },
+          "backendCommands": [
+            "create_desktop_archive_plan",
+            "execute_desktop_archive_plan"
+          ],
+          "backendExists": true,
+          "frontendWired": true,
+          "riskLevel": "high",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "requiresLoading": true,
+          "requiresResultArea": true,
+          "requiresErrorArea": true,
+          "requiresDebug": true,
+          "requiresReport": true,
+          "requiresRiskPlan": true,
+          "requiresToken": true,
+          "requiresVerify": true,
+          "requiresRollback": true,
+          "requiresPagination": false,
+          "requiresI18n": true,
+          "requiresDarkReadable": true,
+          "safeSmokeMode": "dryRun",
+          "manualOnlyReason": null,
+          "deferredReason": null,
+          "expectedFailureReason": null,
+          "testModes": [
+            "static",
+            "frontend",
+            "safe"
+          ],
+          "manualAllowed": false,
+          "acceptanceChecks": [
+            "backendCommandRegistered",
+            "riskContract",
+            "resultPanelVisible",
+            "debugContract",
+            "reportContract"
+          ]
+        },
+        {
+          "featureId": "cleanup.downloadsArchive.ui",
+          "id": "cleanup.downloadsArchive.ui",
+          "domain": "Cleanup",
+          "userVisibleName": "Downloads archive",
+          "name": "Downloads archive",
+          "priority": "P0",
+          "targetVersion": "v1.8.2",
+          "status": "partial",
+          "oldFeature": true,
+          "oldEntry": "Cleanup > Downloads rescue",
+          "currentEntry": "Cleanup > Downloads rescue archive",
+          "frontendComponent": "CleanupPage",
+          "frontendEntry": {
+            "route": "cleanup",
+            "testIds": [
+              "cleanup-downloads-archive-section",
+              "cleanup-downloads-archive-plan-action",
+              "cleanup-downloads-archive-plan-result",
+              "cleanup-downloads-archive-execute-action",
+              "cleanup-downloads-archive-execute-result",
+              "cleanup-downloads-archive-rollback"
+            ]
+          },
+          "selectors": {
+            "entry": "cleanup-downloads-archive-section",
+            "primaryAction": "cleanup-downloads-archive-plan-action",
+            "result": "cleanup-downloads-archive-execute-result",
+            "error": "cleanup-downloads-archive-error"
+          },
+          "backendCommands": [
+            "create_downloads_archive_plan",
+            "execute_downloads_archive_plan"
+          ],
+          "backendExists": true,
+          "frontendWired": true,
+          "riskLevel": "high",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "requiresLoading": true,
+          "requiresResultArea": true,
+          "requiresErrorArea": true,
+          "requiresDebug": true,
+          "requiresReport": true,
+          "requiresRiskPlan": true,
+          "requiresToken": true,
+          "requiresVerify": true,
+          "requiresRollback": true,
+          "requiresPagination": false,
+          "requiresI18n": true,
+          "requiresDarkReadable": true,
+          "safeSmokeMode": "dryRun",
+          "manualOnlyReason": null,
+          "deferredReason": null,
+          "expectedFailureReason": null,
+          "testModes": [
+            "static",
+            "frontend",
+            "safe"
+          ],
+          "manualAllowed": false,
+          "acceptanceChecks": [
+            "backendCommandRegistered",
+            "riskContract",
+            "resultPanelVisible",
+            "debugContract",
+            "reportContract"
+          ]
+        },
+        {
+          "featureId": "cleanup.planExecuteAndVerify",
+          "id": "cleanup.planExecuteAndVerify",
+          "domain": "Cleanup",
+          "userVisibleName": "Cleanup selection, plan, execute and verification",
+          "name": "Cleanup selection, plan, execute and verification",
+          "priority": "P0",
+          "targetVersion": "v1.8.2",
+          "status": "partial",
+          "oldFeature": true,
+          "oldEntry": "Cleanup > Safe clean",
+          "currentEntry": "Cleanup > Safe clean",
+          "frontendComponent": "CleanupPage",
+          "frontendEntry": {
+            "route": "cleanup",
+            "testIds": [
+              "scan-cleanup",
+              "create-cleanup-plan",
+              "execute-cleanup-plan",
+              "cleanup-operation-result"
+            ]
+          },
+          "selectors": {
+            "entry": "scan-cleanup",
+            "primaryAction": "create-cleanup-plan",
+            "result": "cleanup-operation-result",
+            "error": "cleanup-inline-error"
+          },
+          "backendCommands": [
+            "scan_cleanup_targets",
+            "create_cleanup_plan",
+            "clean_selected_targets",
+            "export_cleanup_report"
+          ],
+          "backendExists": true,
+          "frontendWired": true,
+          "riskLevel": "high",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "requiresLoading": true,
+          "requiresResultArea": true,
+          "requiresErrorArea": true,
+          "requiresDebug": true,
+          "requiresReport": true,
+          "requiresRiskPlan": true,
+          "requiresToken": true,
+          "requiresVerify": true,
+          "requiresRollback": false,
+          "requiresPagination": true,
+          "requiresI18n": true,
+          "requiresDarkReadable": true,
+          "safeSmokeMode": "dryRun",
+          "manualOnlyReason": null,
+          "deferredReason": null,
+          "testModes": [
+            "static",
+            "frontend",
+            "safe"
+          ],
+          "manualAllowed": false,
+          "acceptanceChecks": [
+            "planPreviewVisible",
+            "resultPanelVisible",
+            "noToastOnly",
+            "reportContract",
+            "debugContract",
+            "riskContract"
+          ]
+        },
+        {
+          "featureId": "cleanup.moveExpansionLargeFiles",
+          "id": "cleanup.moveExpansionLargeFiles",
+          "domain": "Cleanup",
+          "userVisibleName": "Move files, large files, expansion plan",
+          "name": "Move files, large files, expansion plan",
+          "priority": "P1",
+          "targetVersion": "v1.8.2",
+          "status": "partial",
+          "oldFeature": true,
+          "oldEntry": "Cleanup > Move and expansion",
+          "currentEntry": "Cleanup > Move and expansion",
+          "frontendComponent": "CleanupPage",
+          "frontendEntry": {
+            "route": "cleanup",
+            "testIds": [
+              "scan-large-files-c",
+              "create-move-plan",
+              "create-expansion-plan"
+            ]
+          },
+          "selectors": {
+            "entry": "cleanup-large-files",
+            "primaryAction": "scan-large-files-c",
+            "result": "cleanup-operation-result",
+            "error": "cleanup-inline-error"
+          },
+          "backendCommands": [
+            "scan_large_files",
+            "open_analysis_path",
+            "create_move_plan",
+            "execute_move_plan",
+            "rollback_move",
+            "create_c_drive_expansion_plan",
+            "execute_c_drive_expansion"
+          ],
+          "backendExists": true,
+          "frontendWired": true,
+          "riskLevel": "high",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "requiresLoading": true,
+          "requiresResultArea": true,
+          "requiresErrorArea": true,
+          "requiresDebug": true,
+          "requiresReport": true,
+          "requiresRiskPlan": true,
+          "requiresToken": true,
+          "requiresVerify": true,
+          "requiresRollback": true,
+          "requiresPagination": true,
+          "requiresI18n": true,
+          "requiresDarkReadable": true,
+          "safeSmokeMode": "dryRun",
+          "manualOnlyReason": null,
+          "deferredReason": null,
+          "testModes": [
+            "static",
+            "frontend",
+            "safe"
+          ],
+          "manualAllowed": false,
+          "acceptanceChecks": [
+            "riskContract",
+            "resultPanelVisible",
+            "reportContract",
+            "debugContract"
+          ]
+        }
+      ]
+    },
+    {
+      "pageId": "ports",
+      "displayName": "Ports",
+      "priority": "P0",
+      "features": [
+        {
+          "featureId": "ports.scanTableAndReasons",
+          "id": "ports.scanTableAndReasons",
+          "domain": "Ports",
+          "userVisibleName": "Port scan table and closeability reasons",
+          "name": "Port scan table and closeability reasons",
+          "priority": "P0",
+          "targetVersion": "v1.8.2",
+          "status": "partial",
+          "oldFeature": true,
+          "oldEntry": "Ports > Scan",
+          "currentEntry": "Ports > Scan",
+          "frontendComponent": "PortsPage",
+          "frontendEntry": {
+            "route": "ports",
+            "testIds": [
+              "ports-table-section",
+              "ports-row",
+              "ports-row-closeability-reason"
+            ]
+          },
+          "selectors": {
+            "entry": "ports-table-section",
+            "primaryAction": "scan-ports",
+            "result": "ports-table-section",
+            "error": "ports-inline-guidance"
+          },
+          "backendCommands": [
+            "scan_ports",
+            "port_history"
+          ],
+          "backendExists": true,
+          "frontendWired": true,
+          "riskLevel": "readOnly",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "requiresLoading": true,
+          "requiresResultArea": true,
+          "requiresErrorArea": true,
+          "requiresDebug": true,
+          "requiresReport": true,
+          "requiresRiskPlan": false,
+          "requiresToken": false,
+          "requiresVerify": true,
+          "requiresRollback": false,
+          "requiresPagination": true,
+          "requiresI18n": true,
+          "requiresDarkReadable": true,
+          "safeSmokeMode": "readOnly",
+          "manualOnlyReason": null,
+          "deferredReason": null,
+          "testModes": [
+            "static",
+            "frontend",
+            "safe"
+          ],
+          "manualAllowed": false,
+          "acceptanceChecks": [
+            "tableVisible",
+            "rowReasonVisible",
+            "reportContract",
+            "debugContract"
+          ]
+        },
+        {
+          "featureId": "ports.planExecuteAndVerify",
+          "id": "ports.planExecuteAndVerify",
+          "domain": "Ports",
+          "userVisibleName": "Port plan, token, execute and release verification",
+          "name": "Port plan, token, execute and release verification",
+          "priority": "P0",
+          "targetVersion": "v1.8.2",
+          "status": "partial",
+          "oldFeature": true,
+          "oldEntry": "Ports > Resolve",
+          "currentEntry": "Ports > Resolve",
+          "frontendComponent": "PortsPage",
+          "frontendEntry": {
+            "route": "ports",
+            "testIds": [
+              "ports-create-plan",
+              "ports-plan-preview",
+              "ports-execute-plan",
+              "ports-execute-result"
+            ]
+          },
+          "selectors": {
+            "entry": "ports-table-section",
+            "primaryAction": "ports-create-plan",
+            "result": "ports-execute-result",
+            "error": "ports-inline-guidance"
+          },
+          "backendCommands": [
+            "create_port_resolution_plan",
+            "execute_port_resolution_plan",
+            "inspect_local_services",
+            "stop_local_service",
+            "open_process_location"
+          ],
+          "backendExists": true,
+          "frontendWired": true,
+          "riskLevel": "high",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "requiresLoading": true,
+          "requiresResultArea": true,
+          "requiresErrorArea": true,
+          "requiresDebug": true,
+          "requiresReport": true,
+          "requiresRiskPlan": true,
+          "requiresToken": true,
+          "requiresVerify": true,
+          "requiresRollback": false,
+          "requiresPagination": false,
+          "requiresI18n": true,
+          "requiresDarkReadable": true,
+          "safeSmokeMode": "manual",
+          "manualOnlyReason": "Safe mode does not terminate arbitrary processes; the disposable listener sandbox is automated and retained installed-app evidence covers the guarded product flow.",
+          "deferredReason": null,
+          "testModes": [
+            "static",
+            "frontend",
+            "safe",
+            "manual"
+          ],
+          "manualAllowed": true,
+          "acceptanceChecks": [
+            "riskContract",
+            "resultPanelVisible",
+            "noToastOnly",
+            "manualDisposablePortSmoke",
+            "debugContract",
+            "reportContract"
+          ]
+        }
+      ]
+    },
+    {
+      "pageId": "projects",
+      "displayName": "Projects",
+      "priority": "P1",
+      "features": [
+        {
+          "featureId": "projects.analysisAndVerify",
+          "id": "projects.analysisAndVerify",
+          "domain": "Projects",
+          "userVisibleName": "Project analysis, IDEA inspect, Java consumer verify",
+          "name": "Project analysis, IDEA inspect, Java consumer verify",
+          "priority": "P1",
+          "targetVersion": "v1.8.2",
+          "status": "partial",
+          "oldFeature": true,
+          "oldEntry": "Projects > Analyze",
+          "currentEntry": "Projects > Analyze",
+          "frontendComponent": "ProjectsPage",
+          "frontendEntry": {
+            "route": "projects",
+            "testIds": [
+              "projects-analysis-section",
+              "projects-result"
+            ]
+          },
+          "selectors": {
+            "entry": "projects-analysis-section",
+            "primaryAction": "analyze-project",
+            "result": "projects-result",
+            "error": "projects-error"
+          },
+          "backendCommands": [
+            "analyze_project",
+            "inspect_idea_project",
+            "verify_java_consumer_environment",
+            "verify_nacos_java_environment",
+            "verify_nexus_java_environment",
+            "inspect_project_port_configs"
+          ],
+          "backendExists": true,
+          "frontendWired": true,
+          "riskLevel": "medium",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "requiresLoading": true,
+          "requiresResultArea": true,
+          "requiresErrorArea": true,
+          "requiresDebug": true,
+          "requiresReport": true,
+          "requiresRiskPlan": false,
+          "requiresToken": false,
+          "requiresVerify": true,
+          "requiresRollback": false,
+          "requiresPagination": true,
+          "requiresI18n": true,
+          "requiresDarkReadable": true,
+          "safeSmokeMode": "readOnly",
+          "manualOnlyReason": null,
+          "deferredReason": null,
+          "testModes": [
+            "static",
+            "frontend",
+            "safe"
+          ],
+          "manualAllowed": false,
+          "acceptanceChecks": [
+            "resultPanelVisible",
+            "reportContract",
+            "debugContract"
+          ]
+        },
+        {
+          "featureId": "projects.configApply",
+          "id": "projects.configApply",
+          "domain": "Projects",
+          "userVisibleName": "Project config preview and apply",
+          "name": "Project config preview and apply",
+          "priority": "P1",
+          "targetVersion": "v1.8.2",
+          "status": "partial",
+          "oldFeature": true,
+          "oldEntry": "Projects > Apply config",
+          "currentEntry": "Projects > Apply config",
+          "frontendComponent": "ProjectsPage",
+          "frontendEntry": {
+            "route": "projects",
+            "testIds": [
+              "projects-config-plan",
+              "projects-apply-result"
+            ]
+          },
+          "selectors": {
+            "entry": "projects-config-plan",
+            "primaryAction": "create-project-config-preview",
+            "result": "projects-apply-result",
+            "error": "projects-error"
+          },
+          "backendCommands": [
+            "preview_project_configuration",
+            "apply_project_configuration",
+            "generate_vscode_config"
+          ],
+          "backendExists": true,
+          "frontendWired": true,
+          "riskLevel": "high",
+          "requiresTauri": true,
+          "requiresWindows": false,
+          "requiresLoading": true,
+          "requiresResultArea": true,
+          "requiresErrorArea": true,
+          "requiresDebug": true,
+          "requiresReport": true,
+          "requiresRiskPlan": true,
+          "requiresToken": true,
+          "requiresVerify": true,
+          "requiresRollback": true,
+          "requiresPagination": false,
+          "requiresI18n": true,
+          "requiresDarkReadable": true,
+          "safeSmokeMode": "dryRun",
+          "manualOnlyReason": null,
+          "deferredReason": null,
+          "testModes": [
+            "static",
+            "frontend",
+            "safe"
+          ],
+          "manualAllowed": false,
+          "acceptanceChecks": [
+            "riskContract",
+            "resultPanelVisible",
+            "debugContract",
+            "reportContract"
+          ]
+        }
+      ]
+    },
+    {
+      "pageId": "toolchains",
+      "displayName": "Toolchains",
+      "priority": "P1",
+      "features": [
+        {
+          "featureId": "toolchains.gitNodePythonMirrors",
+          "id": "toolchains.gitNodePythonMirrors",
+          "domain": "Toolchains",
+          "userVisibleName": "Git, Node, Python, Rust, .NET, mirrors, network and managed cache",
+          "name": "Git, Node, Python, Rust, .NET, mirrors, network and managed cache",
+          "priority": "P1",
+          "targetVersion": "v1.8.2",
+          "status": "implemented",
+          "oldFeature": true,
+          "oldEntry": "Toolchains",
+          "currentEntry": "Toolchains",
+          "frontendComponent": "ToolchainsPage",
+          "frontendEntry": {
+            "route": "toolchains",
+            "testIds": [
+              "toolchains-overview-section",
+              "toolchains-result",
+              "toolchains-ecosystems-result",
+              "toolchains-action-preview",
+              "toolchains-action-result",
+              "toolchains-mirror-preview",
+              "toolchains-mirror-result",
+              "toolchains-network-result",
+              "toolchains-cache-result",
+              "toolchains-cache-operation-result"
+            ]
+          },
+          "selectors": {
+            "entry": "toolchains-overview-section",
+            "primaryAction": "inspect-toolchains",
+            "result": "toolchains-action-result",
+            "error": "toolchains-action-error",
+            "plan": "toolchains-action-preview"
+          },
+          "backendCommands": [
+            "inspect_toolchains",
+            "inspect_platform_toolchains",
+            "inspect_command_safety",
+            "run_toolchain_action",
+            "run_platform_action",
+            "run_chsrc_action",
+            "network_diagnostics",
+            "cache_entries",
+            "clear_download_cache",
+            "open_analysis_path"
+          ],
+          "backendExists": true,
+          "frontendWired": true,
+          "riskLevel": "medium",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "requiresLoading": true,
+          "requiresResultArea": true,
+          "requiresErrorArea": true,
+          "requiresDebug": true,
+          "requiresReport": true,
+          "requiresRiskPlan": true,
+          "requiresToken": true,
+          "requiresVerify": true,
+          "requiresRollback": false,
+          "requiresPagination": false,
+          "requiresI18n": true,
+          "requiresDarkReadable": true,
+          "safeSmokeMode": "dryRun",
+          "manualOnlyReason": null,
+          "deferredReason": null,
+          "testModes": [
+            "static",
+            "frontend",
+            "safe"
+          ],
+          "manualAllowed": false,
+          "acceptanceChecks": [
+            "riskContract",
+            "resultPanelVisible",
+            "debugContract",
+            "reportContract",
+            "ecosystemDiagnostics",
+            "allowlistedActions",
+            "mirrorPreviewVerifyRollback",
+            "networkCacheResult"
+          ]
+        },
+        {
+          "featureId": "platforms.docker",
+          "id": "platforms.docker",
+          "domain": "Toolchains",
+          "userVisibleName": "Docker Desktop discovery and launch",
+          "name": "Docker Desktop discovery and launch",
+          "priority": "P1",
+          "targetVersion": "v1.8.2",
+          "status": "implemented",
+          "oldFeature": true,
+          "oldEntry": "Platforms > Docker Desktop",
+          "currentEntry": "Toolchains > Platforms > Docker Desktop",
+          "frontendComponent": "ToolchainsPage",
+          "frontendEntry": { "route": "toolchains", "testIds": ["platform-docker-section", "platform-docker-result"] },
+          "selectors": { "entry": "platform-docker-section", "primaryAction": "open-docker-desktop", "result": "platform-docker-result", "error": "platform-docker-result" },
+          "backendCommands": ["inspect_system_platforms", "open_docker_desktop"],
+          "backendExists": true,
+          "frontendWired": true,
+          "riskLevel": "readOnly",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "requiresLoading": true,
+          "requiresResultArea": true,
+          "requiresErrorArea": true,
+          "requiresDebug": true,
+          "requiresReport": false,
+          "requiresRiskPlan": false,
+          "requiresToken": false,
+          "requiresVerify": true,
+          "requiresRollback": false,
+          "requiresPagination": false,
+          "requiresI18n": true,
+          "requiresDarkReadable": true,
+          "safeSmokeMode": "readOnly",
+          "manualOnlyReason": null,
+          "deferredReason": null,
+          "testModes": ["static", "frontend", "safe"],
+          "manualAllowed": false,
+          "acceptanceChecks": ["frontendEntryVisible", "backendCommandRegistered", "resultPanelVisible", "durableErrors", "debugContract"]
+        },
+        {
+          "featureId": "platforms.manage",
+          "id": "platforms.manage",
+          "domain": "Toolchains",
+          "userVisibleName": "Docker and WSL guarded management",
+          "name": "Docker and WSL guarded management",
+          "priority": "P1",
+          "targetVersion": "v1.8.2",
+          "status": "implemented",
+          "oldFeature": true,
+          "oldEntry": "Platforms > System platform",
+          "currentEntry": "Toolchains > Guarded platform operation",
+          "frontendComponent": "ToolchainsPage",
+          "frontendEntry": { "route": "toolchains", "testIds": ["platform-operation-section", "platform-operation-preview", "platform-operation-result"] },
+          "selectors": { "entry": "platform-operation-section", "primaryAction": "execute-platform-action", "result": "platform-operation-result", "error": "platform-operation-result", "plan": "platform-operation-preview" },
+          "backendCommands": ["inspect_system_platforms", "manage_system_platform"],
+          "backendExists": true,
+          "frontendWired": true,
+          "riskLevel": "high",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "requiresLoading": true,
+          "requiresResultArea": true,
+          "requiresErrorArea": true,
+          "requiresDebug": true,
+          "requiresReport": false,
+          "requiresRiskPlan": true,
+          "requiresToken": true,
+          "requiresVerify": true,
+          "requiresRollback": false,
+          "requiresPagination": false,
+          "requiresI18n": true,
+          "requiresDarkReadable": true,
+          "safeSmokeMode": "manual",
+          "manualOnlyReason": "Safe mode does not repeat Windows feature mutations; retained ReleaseLab UAC evidence covers the disposable-VM platform change and pending-reboot result.",
+          "deferredReason": null,
+          "testModes": ["static", "frontend", "safe", "manual"],
+          "manualAllowed": true,
+          "acceptanceChecks": ["riskContract", "resultPanelVisible", "durableErrors", "postExecutionVerification", "debugContract"]
+        },
+        {
+          "featureId": "services.directory",
+          "id": "services.directory",
+          "domain": "Toolchains",
+          "userVisibleName": "Local service installation directory",
+          "name": "Local service installation directory",
+          "priority": "P1",
+          "targetVersion": "v1.8.2",
+          "status": "implemented",
+          "oldFeature": true,
+          "oldEntry": "Local services > Directory",
+          "currentEntry": "Toolchains > Selected service > Installation directory",
+          "frontendComponent": "ToolchainsPage",
+          "frontendEntry": { "route": "toolchains", "testIds": ["local-service-directory-section", "local-service-directory-result"] },
+          "selectors": { "entry": "local-service-directory-section", "primaryAction": "open-service-directory", "result": "local-service-directory-result", "error": "local-service-directory-result" },
+          "backendCommands": ["inspect_local_services", "open_local_service_directory"],
+          "backendExists": true,
+          "frontendWired": true,
+          "riskLevel": "readOnly",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "requiresLoading": true,
+          "requiresResultArea": true,
+          "requiresErrorArea": true,
+          "requiresDebug": true,
+          "requiresReport": false,
+          "requiresRiskPlan": false,
+          "requiresToken": false,
+          "requiresVerify": true,
+          "requiresRollback": false,
+          "requiresPagination": false,
+          "requiresI18n": true,
+          "requiresDarkReadable": true,
+          "safeSmokeMode": "readOnly",
+          "manualOnlyReason": null,
+          "deferredReason": null,
+          "testModes": ["static", "frontend", "safe"],
+          "manualAllowed": false,
+          "acceptanceChecks": ["rowSelection", "backendPathEvidence", "resultPanelVisible", "durableErrors", "debugContract"]
+        },
+        {
+          "featureId": "services.logs",
+          "id": "services.logs",
+          "domain": "Toolchains",
+          "userVisibleName": "Local service event logs",
+          "name": "Local service event logs",
+          "priority": "P1",
+          "targetVersion": "v1.8.2",
+          "status": "implemented",
+          "oldFeature": true,
+          "oldEntry": "Local services > Logs",
+          "currentEntry": "Toolchains > Selected service > Service logs",
+          "frontendComponent": "ToolchainsPage",
+          "frontendEntry": { "route": "toolchains", "testIds": ["local-service-logs-section", "local-service-logs-result"] },
+          "selectors": { "entry": "local-service-logs-section", "primaryAction": "inspect-service-logs", "result": "local-service-logs-result", "error": "local-service-logs-result" },
+          "backendCommands": ["inspect_local_services", "local_service_logs", "open_analysis_path"],
+          "backendExists": true,
+          "frontendWired": true,
+          "riskLevel": "readOnly",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "requiresLoading": true,
+          "requiresResultArea": true,
+          "requiresErrorArea": true,
+          "requiresDebug": true,
+          "requiresReport": false,
+          "requiresRiskPlan": false,
+          "requiresToken": false,
+          "requiresVerify": true,
+          "requiresRollback": false,
+          "requiresPagination": false,
+          "requiresI18n": true,
+          "requiresDarkReadable": true,
+          "safeSmokeMode": "readOnly",
+          "manualOnlyReason": null,
+          "deferredReason": null,
+          "testModes": ["static", "frontend", "safe"],
+          "manualAllowed": false,
+          "acceptanceChecks": ["rowSelection", "backendPathEvidence", "resultPanelVisible", "durableErrors", "debugContract"]
+        },
+        {
+          "featureId": "services.manage",
+          "id": "services.manage",
+          "domain": "Toolchains",
+          "userVisibleName": "Selected local service management",
+          "name": "Selected local service management",
+          "priority": "P1",
+          "targetVersion": "v1.8.2",
+          "status": "implemented",
+          "oldFeature": true,
+          "oldEntry": "Local services > Manage",
+          "currentEntry": "Toolchains > Selected service > Guarded service management",
+          "frontendComponent": "ToolchainsPage",
+          "frontendEntry": { "route": "toolchains", "testIds": ["local-services-table", "local-service-operation-preview", "local-service-operation-result"] },
+          "selectors": { "entry": "local-services-table", "primaryAction": "manage-local-service", "result": "local-service-operation-result", "error": "local-service-operation-result", "plan": "local-service-operation-preview" },
+          "backendCommands": ["inspect_local_services", "manage_local_service"],
+          "backendExists": true,
+          "frontendWired": true,
+          "riskLevel": "high",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "requiresLoading": true,
+          "requiresResultArea": true,
+          "requiresErrorArea": true,
+          "requiresDebug": true,
+          "requiresReport": false,
+          "requiresRiskPlan": true,
+          "requiresToken": true,
+          "requiresVerify": true,
+          "requiresRollback": false,
+          "requiresPagination": false,
+          "requiresI18n": true,
+          "requiresDarkReadable": true,
+          "safeSmokeMode": "manual",
+          "manualOnlyReason": "Safe mode does not repeat service mutations; retained ReleaseLab UAC evidence covers the allowlisted fixture service stop and port-release verification.",
+          "deferredReason": null,
+          "testModes": ["static", "frontend", "safe", "manual"],
+          "manualAllowed": true,
+          "acceptanceChecks": ["explicitRowSelection", "riskContract", "resultPanelVisible", "postExecutionVerification", "debugContract"]
+        },
+        {
+          "featureId": "toolchains.mysqlRepair",
+          "id": "toolchains.mysqlRepair",
+          "domain": "Toolchains",
+          "userVisibleName": "MySQL inspect and repair",
+          "name": "MySQL inspect and repair",
+          "priority": "P1",
+          "targetVersion": "v1.8.2",
+          "status": "partial",
+          "oldFeature": true,
+          "oldEntry": "Toolchains > MySQL",
+          "currentEntry": "Toolchains > MySQL",
+          "frontendComponent": "ToolchainsPage",
+          "frontendEntry": {
+            "route": "toolchains",
+            "testIds": [
+              "toolchains-mysql-section",
+              "toolchains-mysql-result"
+            ]
+          },
+          "selectors": {
+            "entry": "toolchains-mysql-section",
+            "primaryAction": "inspect-mysql",
+            "result": "toolchains-mysql-result",
+            "error": "toolchains-error"
+          },
+          "backendCommands": [
+            "inspect_mysql_repair",
+            "create_mysql_repair_plan",
+            "execute_mysql_repair_plan",
+            "mysql_pending_execution_guard"
+          ],
+          "backendExists": true,
+          "frontendWired": true,
+          "riskLevel": "critical",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "requiresLoading": true,
+          "requiresResultArea": true,
+          "requiresErrorArea": true,
+          "requiresDebug": true,
+          "requiresReport": true,
+          "requiresRiskPlan": true,
+          "requiresToken": true,
+          "requiresVerify": true,
+          "requiresRollback": true,
+          "requiresPagination": false,
+          "requiresI18n": true,
+          "requiresDarkReadable": true,
+          "safeSmokeMode": "manual",
+          "manualOnlyReason": "Safe mode does not repeat database repair; retained ReleaseLab UAC evidence covers the disposable MySQL fixture, backup guard, schema restoration, and data preservation.",
+          "deferredReason": null,
+          "testModes": [
+            "static",
+            "frontend",
+            "manual"
+          ],
+          "manualAllowed": true,
+          "acceptanceChecks": [
+            "riskContract",
+            "resultPanelVisible",
+            "debugContract",
+            "reportContract"
+          ]
+        }
+      ]
+    },
+    {
+      "pageId": "fileAssociations",
+      "displayName": "FileAssociations",
+      "priority": "P0",
+      "features": [
+        {
+          "featureId": "fileAssociations.scanSearchRows",
+          "id": "fileAssociations.scanSearchRows",
+          "domain": "FileAssociations",
+          "userVisibleName": "File association scan, search and row action",
+          "name": "File association scan, search and row action",
+          "priority": "P0",
+          "targetVersion": "v1.8.2",
+          "status": "implemented",
+          "oldFeature": true,
+          "oldEntry": "File associations",
+          "currentEntry": "File associations",
+          "frontendComponent": "FileAssociationsPage",
+          "frontendEntry": {
+            "route": "fileAssociations",
+            "testIds": [
+              "file-associations-search-input",
+              "file-associations-records-table"
+            ]
+          },
+          "selectors": {
+            "entry": "file-associations-search-input",
+            "primaryAction": "scan-associations",
+            "result": "file-associations-records-table",
+            "error": "file-associations-error"
+          },
+          "backendCommands": [
+            "scan_file_associations",
+            "search_file_association_app",
+            "open_default_apps_settings",
+            "open_file_type_settings"
+          ],
+          "backendExists": true,
+          "frontendWired": true,
+          "riskLevel": "readOnly",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "requiresLoading": true,
+          "requiresResultArea": true,
+          "requiresErrorArea": true,
+          "requiresDebug": true,
+          "requiresReport": true,
+          "requiresRiskPlan": false,
+          "requiresToken": false,
+          "requiresVerify": true,
+          "requiresRollback": false,
+          "requiresPagination": true,
+          "requiresI18n": true,
+          "requiresDarkReadable": true,
+          "safeSmokeMode": "readOnly",
+          "manualOnlyReason": null,
+          "deferredReason": null,
+          "testModes": [
+            "static",
+            "frontend",
+            "safe"
+          ],
+          "manualAllowed": false,
+          "acceptanceChecks": [
+            "tableVisible",
+            "resultPanelVisible",
+            "reportContract",
+            "debugContract"
+          ]
+        },
+        {
+          "featureId": "fileAssociations.planApplyRollback",
+          "id": "fileAssociations.planApplyRollback",
+          "domain": "FileAssociations",
+          "userVisibleName": "Association plan, backup, apply and rollback",
+          "name": "Association plan, backup, apply and rollback",
+          "priority": "P0",
+          "targetVersion": "v1.8.2",
+          "status": "partial",
+          "oldFeature": true,
+          "oldEntry": "File associations > Apply",
+          "currentEntry": "File associations > Apply",
+          "frontendComponent": "FileAssociationsPage",
+          "frontendEntry": {
+            "route": "fileAssociations",
+            "testIds": [
+              "file-associations-create-plan",
+              "file-associations-plan-preview",
+              "file-associations-rollback-info"
+            ]
+          },
+          "selectors": {
+            "entry": "file-associations-create-plan",
+            "primaryAction": "file-associations-create-plan",
+            "result": "file-associations-plan-preview",
+            "error": "file-associations-error"
+          },
+          "backendCommands": [
+            "create_file_association_plan",
+            "apply_file_association_plan",
+            "list_file_association_backups",
+            "rollback_file_association_backup"
+          ],
+          "backendExists": true,
+          "frontendWired": true,
+          "riskLevel": "high",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "requiresLoading": true,
+          "requiresResultArea": true,
+          "requiresErrorArea": true,
+          "requiresDebug": true,
+          "requiresReport": true,
+          "requiresRiskPlan": true,
+          "requiresToken": true,
+          "requiresVerify": true,
+          "requiresRollback": true,
+          "requiresPagination": false,
+          "requiresI18n": true,
+          "requiresDarkReadable": true,
+          "safeSmokeMode": "dryRun",
+          "manualOnlyReason": null,
+          "deferredReason": null,
+          "testModes": [
+            "static",
+            "frontend",
+            "safe"
+          ],
+          "manualAllowed": false,
+          "acceptanceChecks": [
+            "riskContract",
+            "resultPanelVisible",
+            "noToastOnly",
+            "reportContract",
+            "debugContract"
+          ]
+        }
+      ]
+    },
+    {
+      "pageId": "profiles",
+      "displayName": "Profiles",
+      "priority": "P1",
+      "features": [
+        {
+          "featureId": "profiles.crudImportExportApply",
+          "id": "profiles.crudImportExportApply",
+          "domain": "Profiles",
+          "userVisibleName": "Profiles CRUD, import/export and apply",
+          "name": "Profiles CRUD, import/export and apply",
+          "priority": "P1",
+          "targetVersion": "v1.8.2",
+          "status": "partial",
+          "oldFeature": true,
+          "oldEntry": "Profiles",
+          "currentEntry": "Profiles",
+          "frontendComponent": "ProfilesPage",
+          "frontendEntry": {
+            "route": "profiles",
+            "testIds": [
+              "profiles-list",
+              "profiles-result"
+            ]
+          },
+          "selectors": {
+            "entry": "profiles-list",
+            "primaryAction": "create-profile",
+            "result": "profiles-result",
+            "error": "profiles-error"
+          },
+          "backendCommands": [
+            "list_config_profiles",
+            "save_config_profile",
+            "delete_config_profile",
+            "rename_config_profile",
+            "copy_config_profile",
+            "export_config_profiles",
+            "import_config_profiles",
+            "create_profile_apply_plan",
+            "execute_profile_apply_plan"
+          ],
+          "backendExists": true,
+          "frontendWired": true,
+          "riskLevel": "high",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "requiresLoading": true,
+          "requiresResultArea": true,
+          "requiresErrorArea": true,
+          "requiresDebug": true,
+          "requiresReport": true,
+          "requiresRiskPlan": true,
+          "requiresToken": true,
+          "requiresVerify": true,
+          "requiresRollback": true,
+          "requiresPagination": true,
+          "requiresI18n": true,
+          "requiresDarkReadable": true,
+          "safeSmokeMode": "dryRun",
+          "manualOnlyReason": null,
+          "deferredReason": null,
+          "testModes": [
+            "static",
+            "frontend",
+            "safe"
+          ],
+          "manualAllowed": false,
+          "acceptanceChecks": [
+            "riskContract",
+            "resultPanelVisible",
+            "debugContract",
+            "reportContract"
+          ]
+        },
+        {
+          "featureId": "profiles.historyRestore",
+          "id": "profiles.historyRestore",
+          "domain": "Profiles",
+          "userVisibleName": "Profile history restore",
+          "name": "Profile history restore",
+          "priority": "P1",
+          "targetVersion": "v1.8.2-follow-up",
+          "status": "deferred",
+          "oldFeature": false,
+          "oldEntry": null,
+          "currentEntry": null,
+          "frontendComponent": "ProfilesPage",
+          "frontendEntry": {
+            "route": "profiles",
+            "testIds": [
+              "profiles-history-restore"
+            ]
+          },
+          "selectors": {
+            "entry": "profiles-history-restore",
+            "result": "profiles-result",
+            "error": "profiles-error"
+          },
+          "backendCommands": [],
+          "backendExists": false,
+          "frontendWired": false,
+          "riskLevel": "high",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "requiresLoading": true,
+          "requiresResultArea": true,
+          "requiresErrorArea": true,
+          "requiresDebug": true,
+          "requiresReport": true,
+          "requiresRiskPlan": true,
+          "requiresToken": true,
+          "requiresVerify": true,
+          "requiresRollback": true,
+          "requiresPagination": true,
+          "requiresI18n": true,
+          "requiresDarkReadable": true,
+          "safeSmokeMode": "manual",
+          "manualOnlyReason": "No durable profile-history backend model/storage/command exists yet.",
+          "deferredReason": "No durable profile-history backend model/storage/command; target v1.8.2 follow-up or v1.9.0.",
+          "testModes": [
+            "static",
+            "manual"
+          ],
+          "manualAllowed": true,
+          "acceptanceChecks": [
+            "deferredReasonPresent",
+            "debugContract",
+            "riskContract",
+            "noReportNeeded"
+          ]
+        }
+      ]
+    },
+    {
+      "pageId": "learningCenter",
+      "displayName": "LearningCenter",
+      "priority": "P1",
+      "features": [
+        {
+          "featureId": "learning.readOnlyCommandSandbox",
+          "id": "learning.readOnlyCommandSandbox",
+          "domain": "LearningCenter",
+          "userVisibleName": "Read-only command sandbox",
+          "name": "Read-only command sandbox",
+          "priority": "P1",
+          "targetVersion": "v1.8.2",
+          "status": "partial",
+          "oldFeature": true,
+          "oldEntry": "Learning Center",
+          "currentEntry": "Learning Center",
+          "frontendComponent": "LearningCenterPage",
+          "frontendEntry": {
+            "route": "learning",
+            "testIds": [
+              "learning-center-section",
+              "learning-command-result"
+            ]
+          },
+          "selectors": {
+            "entry": "learning-center-section",
+            "primaryAction": "run-learning-command",
+            "result": "learning-command-result",
+            "error": "learning-command-error"
+          },
+          "backendCommands": [
+            "run_tool_command",
+            "inspect_command_safety"
+          ],
+          "backendExists": true,
+          "frontendWired": true,
+          "riskLevel": "readOnly",
+          "requiresTauri": true,
+          "requiresWindows": false,
+          "requiresLoading": true,
+          "requiresResultArea": true,
+          "requiresErrorArea": true,
+          "requiresDebug": true,
+          "requiresReport": false,
+          "requiresRiskPlan": false,
+          "requiresToken": false,
+          "requiresVerify": false,
+          "requiresRollback": false,
+          "requiresPagination": false,
+          "requiresI18n": true,
+          "requiresDarkReadable": true,
+          "safeSmokeMode": "readOnly",
+          "manualOnlyReason": null,
+          "deferredReason": null,
+          "testModes": [
+            "static",
+            "frontend",
+            "safe"
+          ],
+          "manualAllowed": false,
+          "acceptanceChecks": [
+            "dangerousCommandRejected",
+            "resultPanelVisible",
+            "debugContract"
+          ]
+        }
+      ]
+    },
+    {
+      "pageId": "settings",
+      "displayName": "Settings",
+      "priority": "P1",
+      "features": [
+        {
+          "featureId": "settings.themeLanguageSafety",
+          "id": "settings.themeLanguageSafety",
+          "domain": "Settings",
+          "userVisibleName": "Theme, language and safety disclaimer",
+          "name": "Theme, language and safety disclaimer",
+          "priority": "P1",
+          "targetVersion": "v1.8.2",
+          "status": "partial",
+          "oldFeature": true,
+          "oldEntry": "Settings",
+          "currentEntry": "Settings",
+          "frontendComponent": "SettingsPage",
+          "frontendEntry": {
+            "route": "settings",
+            "testIds": [
+              "settings-theme-section",
+              "settings-debug-section"
+            ]
+          },
+          "selectors": {
+            "entry": "settings-theme-section",
+            "primaryAction": "settings-save-language",
+            "result": "settings-operation-result",
+            "error": "settings-error"
+          },
+          "backendCommands": [
+            "load_config",
+            "set_root_dir",
+            "set_auto_check_update",
+            "reset_ui_config",
+            "open_app_config_dir"
+          ],
+          "backendExists": true,
+          "frontendWired": true,
+          "riskLevel": "low",
+          "requiresTauri": true,
+          "requiresWindows": false,
+          "requiresLoading": true,
+          "requiresResultArea": true,
+          "requiresErrorArea": true,
+          "requiresDebug": true,
+          "requiresReport": false,
+          "requiresRiskPlan": false,
+          "requiresToken": false,
+          "requiresVerify": true,
+          "requiresRollback": false,
+          "requiresPagination": false,
+          "requiresI18n": true,
+          "requiresDarkReadable": true,
+          "safeSmokeMode": "dryRun",
+          "manualOnlyReason": null,
+          "deferredReason": null,
+          "testModes": [
+            "static",
+            "frontend",
+            "safe",
+            "manual"
+          ],
+          "manualAllowed": true,
+          "acceptanceChecks": [
+            "darkHighContrastManual",
+            "resultPanelVisible",
+            "debugContract"
+          ]
+        },
+        {
+          "featureId": "settings.selfUninstall",
+          "id": "settings.selfUninstall",
+          "domain": "Settings",
+          "userVisibleName": "Open the registered application uninstaller",
+          "name": "Open the registered application uninstaller",
+          "priority": "P1",
+          "targetVersion": "v1.8.2",
+          "status": "implemented",
+          "oldFeature": true,
+          "oldEntry": "Toolbox > Self uninstall",
+          "currentEntry": "Settings > Uninstall DevEnv Manager",
+          "frontendComponent": "SettingsUninstallPanel",
+          "frontendEntry": {
+            "route": "settings",
+            "testIds": [
+              "settings-uninstall-section",
+              "settings-uninstall-result"
+            ]
+          },
+          "selectors": {
+            "entry": "settings-uninstall-section",
+            "primaryAction": "self-uninstall",
+            "result": "settings-uninstall-result",
+            "error": "settings-uninstall-result"
+          },
+          "backendCommands": [
+            "self_uninstall"
+          ],
+          "backendExists": true,
+          "frontendWired": true,
+          "riskLevel": "high",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "requiresLoading": true,
+          "requiresResultArea": true,
+          "requiresErrorArea": true,
+          "requiresDebug": true,
+          "requiresReport": false,
+          "requiresRiskPlan": true,
+          "requiresToken": true,
+          "requiresVerify": true,
+          "requiresRollback": false,
+          "requiresPagination": false,
+          "requiresI18n": true,
+          "requiresDarkReadable": true,
+          "safeSmokeMode": "dryRun",
+          "manualOnlyReason": "Launching the real uninstaller remains an installed-app and VM gate.",
+          "deferredReason": null,
+          "testModes": [
+            "static",
+            "frontend",
+            "safe",
+            "manual"
+          ],
+          "manualAllowed": true,
+          "acceptanceChecks": [
+            "riskContract",
+            "resultPanelVisible",
+            "debugContract"
+          ]
+        },
+        {
+          "featureId": "debug.panelAndExport",
+          "id": "debug.panelAndExport",
+          "domain": "Debug",
+          "userVisibleName": "Debug panel and export",
+          "name": "Debug panel and export",
+          "priority": "P1",
+          "targetVersion": "v1.8.2",
+          "status": "partial",
+          "oldFeature": true,
+          "oldEntry": "Settings > Debug",
+          "currentEntry": "Settings > Debug",
+          "frontendComponent": "SettingsPage",
+          "frontendEntry": {
+            "route": "settings",
+            "testIds": [
+              "settings-debug-section",
+              "settings-debug-export"
+            ]
+          },
+          "selectors": {
+            "entry": "settings-debug-section",
+            "primaryAction": "copy-debug-log",
+            "result": "settings-debug-section",
+            "error": "settings-error"
+          },
+          "backendCommands": [
+            "powershell_runner_status"
+          ],
+          "backendExists": true,
+          "frontendWired": true,
+          "riskLevel": "readOnly",
+          "requiresTauri": true,
+          "requiresWindows": false,
+          "requiresLoading": false,
+          "requiresResultArea": true,
+          "requiresErrorArea": true,
+          "requiresDebug": true,
+          "requiresReport": false,
+          "requiresRiskPlan": false,
+          "requiresToken": false,
+          "requiresVerify": false,
+          "requiresRollback": false,
+          "requiresPagination": true,
+          "requiresI18n": true,
+          "requiresDarkReadable": true,
+          "safeSmokeMode": "readOnly",
+          "manualOnlyReason": null,
+          "deferredReason": null,
+          "testModes": [
+            "static",
+            "frontend",
+            "safe"
+          ],
+          "manualAllowed": false,
+          "acceptanceChecks": [
+            "debugContract",
+            "noBlankToast"
+          ]
+        }
+      ]
+    },
+    {
+      "pageId": "update",
+      "displayName": "Update",
+      "priority": "P1",
+      "features": [
+        {
+          "featureId": "update.checkDownloadMetadata",
+          "id": "update.checkDownloadMetadata",
+          "domain": "Update",
+          "userVisibleName": "Update check, sources and checksum metadata",
+          "name": "Update check, sources and checksum metadata",
+          "priority": "P1",
+          "targetVersion": "v1.8.2",
+          "status": "partial",
+          "oldFeature": true,
+          "oldEntry": "Settings > Update",
+          "currentEntry": "Settings > Update",
+          "frontendComponent": "UpdatePanel",
+          "frontendEntry": {
+            "route": "settings",
+            "testIds": [
+              "settings-update-section",
+              "settings-update-result",
+              "settings-update-error"
+            ]
+          },
+          "selectors": {
+            "entry": "settings-update-section",
+            "primaryAction": "check-for-updates",
+            "result": "settings-update-result",
+            "error": "settings-error"
+          },
+          "backendCommands": [
+            "check_for_updates",
+            "download_update",
+            "launch_update_installer"
+          ],
+          "backendExists": true,
+          "frontendWired": true,
+          "riskLevel": "high",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "requiresLoading": true,
+          "requiresResultArea": true,
+          "requiresErrorArea": true,
+          "requiresDebug": true,
+          "requiresReport": true,
+          "requiresRiskPlan": true,
+          "requiresToken": true,
+          "requiresVerify": true,
+          "requiresRollback": false,
+          "requiresPagination": false,
+          "requiresI18n": true,
+          "requiresDarkReadable": true,
+          "safeSmokeMode": "dryRun",
+          "manualOnlyReason": null,
+          "deferredReason": null,
+          "testModes": [
+            "static",
+            "frontend",
+            "safe"
+          ],
+          "manualAllowed": false,
+          "acceptanceChecks": [
+            "riskContract",
+            "resultPanelVisible",
+            "debugContract",
+            "reportContract"
+          ]
+        }
+      ]
+    },
+    {
+      "pageId": "advanced",
+      "displayName": "Advanced",
+      "priority": "P2",
+      "features": [
+        {
+          "featureId": "advanced.mode",
+          "id": "advanced.mode",
+          "domain": "Advanced",
+          "userVisibleName": "Advanced mode entry and warnings",
+          "name": "Advanced mode entry and warnings",
+          "priority": "P2",
+          "targetVersion": "v1.8.2",
+          "status": "manualOnly",
+          "oldFeature": true,
+          "oldEntry": "Settings > Advanced",
+          "currentEntry": "Settings > Advanced",
+          "frontendComponent": "SettingsPage",
+          "frontendEntry": {
+            "route": "settings",
+            "testIds": [
+              "settings-advanced-section"
+            ]
+          },
+          "selectors": {
+            "entry": "settings-advanced-section",
+            "result": "settings-operation-result",
+            "error": "settings-error"
+          },
+          "backendCommands": [],
+          "backendExists": false,
+          "frontendWired": true,
+          "riskLevel": "high",
+          "requiresTauri": false,
+          "requiresWindows": false,
+          "requiresLoading": false,
+          "requiresResultArea": true,
+          "requiresErrorArea": true,
+          "requiresDebug": true,
+          "requiresReport": false,
+          "requiresRiskPlan": true,
+          "requiresToken": true,
+          "requiresVerify": false,
+          "requiresRollback": false,
+          "requiresPagination": false,
+          "requiresI18n": true,
+          "requiresDarkReadable": true,
+          "safeSmokeMode": "manual",
+          "manualOnlyReason": "Advanced mode is primarily visual and policy UX.",
+          "deferredReason": null,
+          "testModes": [
+            "static",
+            "manual"
+          ],
+          "manualAllowed": true,
+          "acceptanceChecks": [
+            "manualVisual",
+            "debugContract",
+            "riskContract"
+          ]
+        }
+      ]
+    },
+    {
+      "pageId": "quality",
+      "displayName": "GlobalQuality",
+      "priority": "P0",
+      "features": [
+        {
+          "featureId": "quality.noBlankToastNoUnavailableFlood",
+          "id": "quality.noBlankToastNoUnavailableFlood",
+          "domain": "GlobalQuality",
+          "userVisibleName": "No blank toast, durable errors, no unavailable flood",
+          "name": "No blank toast, durable errors, no unavailable flood",
+          "priority": "P0",
+          "targetVersion": "v1.8.2",
+          "status": "uiOnly",
+          "oldFeature": false,
+          "oldEntry": null,
+          "currentEntry": "Global",
+          "frontendComponent": "GlobalShell",
+          "frontendEntry": {
+            "route": "global",
+            "testIds": [
+              "global-toast-region",
+              "global-persistent-error",
+              "global-persistent-result",
+              "global-risk-dialog",
+              "global-risk-result",
+              "global-debug-status"
+            ]
+          },
+          "selectors": {
+            "entry": "global-toast-region",
+            "result": "global-persistent-result",
+            "error": "global-persistent-error"
+          },
+          "backendCommands": [],
+          "backendExists": false,
+          "frontendWired": true,
+          "riskLevel": "readOnly",
+          "requiresTauri": false,
+          "requiresWindows": false,
+          "requiresLoading": false,
+          "requiresResultArea": true,
+          "requiresErrorArea": true,
+          "requiresDebug": true,
+          "requiresReport": false,
+          "requiresRiskPlan": false,
+          "requiresToken": false,
+          "requiresVerify": false,
+          "requiresRollback": false,
+          "requiresPagination": false,
+          "requiresI18n": true,
+          "requiresDarkReadable": true,
+          "safeSmokeMode": "frontendOnly",
+          "manualOnlyReason": null,
+          "deferredReason": null,
+          "testModes": [
+            "static",
+            "frontend",
+            "manual"
+          ],
+          "manualAllowed": true,
+          "acceptanceChecks": [
+            "noBlankToast",
+            "noUnavailableFlood",
+            "durableErrors",
+            "wideLayoutManual",
+            "darkHighContrastManual",
+            "debugContract"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,12 +1,14 @@
-import { renderActionButton, renderMetric, renderObjectTable, valueOf } from "../sharedView";
+import { escapeHtml, renderActionButton, renderMetric } from "../sharedView";
 import { t } from "../../core/i18n";
 import { renderFeatureGuide } from "../../components/featureGuide";
 import type { DashboardState } from "./state";
+import { toDashboardViewModel } from "./viewModel";
 
 export function renderDashboard(state: DashboardState): string {
+  const vm = toDashboardViewModel(state);
   return `
     <div class="feature-layout dashboard-view">
-      <section class="panel">
+      <section class="panel" data-testid="dashboard-summary-section">
         <div class="panel-head"><div><h2>${t("dashboard.title")}</h2><p>${t("dashboard.description")}</p></div></div>
         ${renderFeatureGuide("dashboard")}
         ${renderHealthCards(state)}
@@ -14,22 +16,23 @@ export function renderDashboard(state: DashboardState): string {
       </section>
       <section class="panel">
         <h2>${t("dashboard.environmentSummary")}</h2>
-        ${renderObjectTable(state.snapshot, ["rootDir", "devenvHome", "javaHome", "managedRuntimes", "tools"])}
+        ${renderDashboardRows(vm.environmentRows)}
       </section>
     </div>
   `;
 }
 
 export function renderHealthCards(state: DashboardState): string {
+  const vm = toDashboardViewModel(state);
   return `<div class="metrics">
-    ${renderMetric(t("dashboard.rootDirectory"), valueOf(state.snapshot, "rootDir", t("state.notAvailable")), state.errors.snapshot ?? "")}
-    ${renderMetric(t("dashboard.discoveredTools"), valueOf(state.snapshot, "tools", t("state.notAvailable")))}
+    ${renderMetric(t("dashboard.rootDirectory"), vm.rootDirectory, state.errors.snapshot ?? "")}
+    ${renderMetric(t("dashboard.discoveredTools"), vm.discoveredTools)}
     ${renderPortsMetric(state)}
-    ${renderMetric(t("dashboard.pathWarnings"), state.errors.health ? t("state.notAvailable") : state.health.length, state.errors.health ?? "")}
-    ${renderMetric(t("dashboard.jdkStatus"), valueOf(state.snapshot, "javaHome", t("state.notAvailable")))}
-    ${renderMetric(t("dashboard.pythonStatus"), valueOf(state.snapshot, "python.version", t("state.notAvailable")))}
-    ${renderMetric(t("dashboard.powershellRunner"), valueOf(state.powershell, "status", t("state.notAvailable")), state.errors.powershell ?? "")}
-    ${renderMetric(t("dashboard.updateStatus"), state.errors.update ? t("state.notAvailable") : valueOf(state.update, "latestVersion", t("state.notChecked")), state.errors.update ?? "")}
+    ${renderMetric(t("dashboard.pathWarnings"), vm.pathWarnings, vm.pathWarningsDetail)}
+    ${renderMetric(t("dashboard.jdkStatus"), vm.jdkStatus, vm.jdkDetail)}
+    ${renderMetric(t("dashboard.pythonStatus"), vm.pythonStatus, vm.pythonDetail)}
+    ${renderMetric(t("dashboard.powershellRunner"), vm.powershellRunner, vm.powershellDetail)}
+    ${renderMetric(t("dashboard.updateStatus"), vm.updateStatus, vm.updateDetail)}
   </div>`;
 }
 
@@ -54,4 +57,8 @@ function renderPortsMetric(state: DashboardState): string {
     return renderMetric(t("dashboard.portRecords"), state.ports.length);
   }
   return renderMetric(t("dashboard.portRecords"), t("dashboard.portsNotScanned"), t("dashboard.portsNotScannedDetail"));
+}
+
+function renderDashboardRows(rows: Array<{ label: string; value: string }>): string {
+  return `<dl class="kv-list">${rows.map((row) => `<div><dt>${escapeHtml(row.label)}</dt><dd>${escapeHtml(row.value)}</dd></div>`).join("")}</dl>`;
 }

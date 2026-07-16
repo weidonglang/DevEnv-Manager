@@ -2,6 +2,7 @@ use super::disk::inspect_disk_overview;
 use super::model::{ExpansionPlan, ExpansionResult};
 use super::partition::inspect_partition_layout;
 use super::utils::unique_id;
+use crate::powershell_runner;
 use std::process::Command;
 
 pub fn create_c_drive_expansion_plan() -> Result<ExpansionPlan, String> {
@@ -75,9 +76,18 @@ fn c_drive_totals() -> (u64, u64) {
     inspect_disk_overview()
         .unwrap_or_default()
         .into_iter()
-        .find(|item| item.drive.eq_ignore_ascii_case("C:"))
+        .find(|item| {
+            item.drive
+                .trim()
+                .trim_end_matches(['\\', '/'])
+                .eq_ignore_ascii_case("C:")
+        })
         .map(|item| (item.total_bytes, item.free_bytes))
         .unwrap_or_default()
+}
+
+fn verified_capacity_growth(before_total: u64, after_total: u64) -> Option<u64> {
+    (before_total > 0 && after_total > before_total).then(|| after_total - before_total)
 }
 
 pub fn execute_c_drive_expansion(plan: ExpansionPlan) -> ExpansionResult {
@@ -136,8 +146,8 @@ pub fn execute_c_drive_expansion(plan: ExpansionPlan) -> ExpansionResult {
                         result.success = output.status.success();
                         result.output = format!(
                             "{}{}",
-                            String::from_utf8_lossy(&output.stdout),
-                            String::from_utf8_lossy(&output.stderr)
+                            powershell_runner::decode_output(&output.stdout),
+                            powershell_runner::decode_output(&output.stderr)
                         );
                     }
                     Err(err) => result.output = format!("执行 diskpart 失败：{err}"),
@@ -150,9 +160,31 @@ pub fn execute_c_drive_expansion(plan: ExpansionPlan) -> ExpansionResult {
     {
         result.output = "C 盘扩容仅支持 Windows".to_string();
     }
-    let (after_total, after_free) = c_drive_totals();
+    let (mut after_total, mut after_free) = c_drive_totals();
+    if result.success {
+        for _ in 0..10 {
+            if verified_capacity_growth(before_total, after_total).is_some() {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(500));
+            (after_total, after_free) = c_drive_totals();
+        }
+    }
     result.after_total = after_total;
     result.after_free = after_free;
+    if result.success {
+        if let Some(growth) = verified_capacity_growth(before_total, after_total) {
+            result.output = format!(
+                "DiskPart completed successfully; verified C drive growth of {growth} bytes."
+            );
+        } else {
+            result.success = false;
+            result.output = format!(
+                "DiskPart returned success, but capacity verification could not prove that C drive grew.\n{}",
+                result.output.trim()
+            );
+        }
+    }
     result.report_markdown = expansion_report(&plan, &result);
     result
 }
@@ -183,5 +215,20 @@ mod tests {
         });
         assert!(!result.success);
         assert!(result.output.contains("不可执行"));
+    }
+
+    #[test]
+    fn c_drive_mount_normalization_accepts_windows_root() {
+        assert!(r"C:\"
+            .trim_end_matches(['\\', '/'])
+            .eq_ignore_ascii_case("C:"));
+    }
+
+    #[test]
+    fn capacity_verification_rejects_zero_and_no_growth() {
+        assert_eq!(verified_capacity_growth(0, 100), None);
+        assert_eq!(verified_capacity_growth(100, 100), None);
+        assert_eq!(verified_capacity_growth(100, 99), None);
+        assert_eq!(verified_capacity_growth(100, 125), Some(25));
     }
 }

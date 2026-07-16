@@ -1,6 +1,6 @@
 [package]
 name = "dailytools-tauri"
-version = "1.8.1"
+version = "1.8.2"
 description = "A lightweight Tauri rewrite of DevEnv Manager."
 authors = ["weidonglang"]
 edition = "2021"
@@ -13,6 +13,16 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 [[bin]]
 name = "devenv"
 path = "src/bin/devenv.rs"
+
+[[example]]
+name = "isolated-capability-fixtures"
+path = "examples/isolated_capability_fixtures.rs"
+required-features = ["acceptance-fixtures"]
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
+acceptance-fixtures = []
 
 [build-dependencies]
 tauri-build = { version = "2.4.1", features = [] }

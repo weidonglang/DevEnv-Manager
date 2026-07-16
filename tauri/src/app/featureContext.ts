@@ -16,6 +16,9 @@ export type RiskController = {
 
 export type FeatureContext = {
   root: HTMLElement;
+  view: WorkbenchView;
+  navigationId: number;
+  isCurrent: () => boolean;
   invoke: typeof invoke;
   toast: ToastController;
   risk: RiskController;

@@ -1,11 +1,13 @@
 {
   "name": "dailytools-tauri",
   "private": true,
-  "version": "1.8.1",
+  "version": "1.8.2",
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 1420",
     "build": "tsc && vite build",
+    "acceptance:frontend": "node scripts/service-selection-acceptance.mjs && node scripts/toolchain-action-acceptance.mjs && node scripts/acceptance-frontend.mjs",
+    "acceptance:static": "node scripts/acceptance-static.mjs",
     "preview": "vite preview --host 127.0.0.1",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",

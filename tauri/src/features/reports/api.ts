@@ -1,5 +1,5 @@
 import { invoke } from "../../core/invoke";
-import type { DoctorReport, OperationResult } from "../../types";
+import type { DoctorRepairPlan, DoctorRepairResult, DoctorReport, OperationResult } from "../../types";
 
 export function runDoctorReport(): Promise<DoctorReport> {
   return invoke<DoctorReport>("run_doctor");
@@ -17,6 +17,14 @@ export function doctorReportText(report: DoctorReport, format: "markdown" | "jso
   return invoke<string>("doctor_report_text", { report, format });
 }
 
+export function createDoctorRepairPlan(): Promise<DoctorRepairPlan> {
+  return invoke<DoctorRepairPlan>("create_doctor_repair_plan");
+}
+
+export function executeDoctorRepairPlan(planId: string, confirmationToken: string): Promise<DoctorRepairResult> {
+  return invoke<DoctorRepairResult>("execute_doctor_repair_plan", { planId, confirmationToken });
+}
+
 export function exportEnvReliabilityReport(format: "markdown" | "json"): Promise<string> {
   return invoke<string>("export_env_reliability_report", { format });
 }
@@ -31,4 +39,16 @@ export function exportFileAssociationReport(): Promise<string> {
 
 export function exportCleanupReport(format: "markdown" | "json"): Promise<string> {
   return invoke<string>("export_cleanup_report", { format });
+}
+
+export function exportPortReport(format: "markdown" | "json"): Promise<string> {
+  return invoke<string>("export_port_report", { format });
+}
+
+export function exportProjectReport(format: "markdown" | "json"): Promise<string> {
+  return invoke<string>("export_project_report", { format });
+}
+
+export function openReportLocation(path: string): Promise<OperationResult> {
+  return invoke<OperationResult>("open_analysis_path", { path });
 }

@@ -189,15 +189,15 @@ pub fn create_java_stabilize_plan(
     if !jdk.join("bin/jar.exe").is_file() {
         return Err("Target JDK is missing bin\\jar.exe".to_string());
     }
-    for (tool, args) in [
-        ("java.exe", &["-version"][..]),
-        ("javac.exe", &["-version"][..]),
-        ("jar.exe", &["--help"][..]),
-    ] {
+    for tool in ["java.exe", "javac.exe", "jar.exe"] {
         let executable = jdk.join("bin").join(tool);
-        let output = crate::powershell_runner::run_probe_command(&executable, args, 10)
+        let output = crate::powershell_runner::run_probe_command(
+            &executable,
+            java_probe_arguments(tool),
+            10,
+        )
             .map_err(|err| format!("Failed to run {tool}: {err}"))?;
-        if !output.success {
+        if !java_probe_succeeded(tool, &output) {
             return Err(format!(
                 "{tool} probe failed: {}",
                 crate::powershell_runner::native_command_message(&output)
@@ -213,6 +213,26 @@ pub fn create_java_stabilize_plan(
             remove_stale_devenv_entries: true,
         },
     )
+}
+
+fn java_probe_arguments(tool: &str) -> &'static [&'static str] {
+    if tool.eq_ignore_ascii_case("jar.exe") {
+        // JDK 8 does not support jar --help. With no arguments it prints usage
+        // and exits 1, while modern JDKs may exit successfully.
+        &[]
+    } else {
+        &["-version"]
+    }
+}
+
+fn java_probe_succeeded(
+    tool: &str,
+    output: &crate::powershell_runner::NativeCommandResult,
+) -> bool {
+    output.success
+        || (tool.eq_ignore_ascii_case("jar.exe")
+            && !output.timed_out
+            && output.exit_code == Some(1))
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -271,6 +291,26 @@ pub(crate) fn proposed_path_with_jdk(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn probe_result(success: bool, exit_code: Option<i32>, timed_out: bool) -> crate::powershell_runner::NativeCommandResult {
+        crate::powershell_runner::NativeCommandResult {
+            success,
+            exit_code,
+            stdout: String::new(),
+            stderr: String::new(),
+            elapsed_ms: 1,
+            timed_out,
+            executable: "jar.exe".to_string(),
+        }
+    }
+
+    #[test]
+    fn jdk8_jar_usage_exit_is_accepted_without_help_switch() {
+        assert!(java_probe_arguments("jar.exe").is_empty());
+        assert!(java_probe_succeeded("jar.exe", &probe_result(false, Some(1), false)));
+        assert!(!java_probe_succeeded("jar.exe", &probe_result(false, Some(1), true)));
+        assert!(!java_probe_succeeded("java.exe", &probe_result(false, Some(1), false)));
+    }
 
     #[test]
     fn java_home_rejects_indirect_reference() {

@@ -6,6 +6,7 @@ use serde::Deserialize;
 #[serde(rename_all = "PascalCase")]
 struct RawPartition {
     disk_number: Option<u64>,
+    disk_size: Option<u64>,
     partition_number: Option<u64>,
     drive_letter: Option<String>,
     size: Option<u64>,
@@ -69,7 +70,8 @@ pub(crate) fn parse_partition_layout_json(text: &str) -> Result<PartitionLayoutR
         .min_by_key(|item| item.offset.unwrap_or(u64::MAX));
     let unallocated_after_c = adjacent_raw
         .and_then(|next| next.offset)
-        .and_then(|offset| offset.checked_sub(c_end))
+        .or(c_raw.disk_size)
+        .and_then(|next_offset| next_offset.checked_sub(c_end))
         .filter(|gap| *gap > 16 * 1024 * 1024);
     let adjacent_right = adjacent_raw.map(to_info);
     let recovery_partition_blocks = adjacent_right.as_ref().is_some_and(|item| item.is_recovery);
@@ -140,9 +142,11 @@ pub fn inspect_partition_layout() -> Result<PartitionLayoutReport, String> {
         let script = r#"
 $parts = Get-Partition | ForEach-Object {
   $vol = $null
+  $disk = Get-Disk -Number $_.DiskNumber -ErrorAction Stop
   if ($_.DriveLetter) { $vol = Get-Volume -DriveLetter $_.DriveLetter -ErrorAction SilentlyContinue }
   [pscustomobject]@{
     DiskNumber=$_.DiskNumber
+    DiskSize=[uint64]$disk.Size
     PartitionNumber=$_.PartitionNumber
     DriveLetter=[string]$_.DriveLetter
     Size=[uint64]$_.Size
@@ -192,5 +196,25 @@ mod tests {
         ]"#, 100_u64 * 1024 * 1024, 1024_u64 * 1024, 50_u64 * 1024 * 1024, 200_u64 * 1024 * 1024, 50_u64 * 1024 * 1024)).unwrap();
         assert!(report.unallocated_after_c.unwrap() > 16 * 1024 * 1024);
         assert!(report.can_extend_safely);
+    }
+
+    #[test]
+    fn partition_parser_detects_unallocated_at_end_of_disk() {
+        let mib = 1024_u64 * 1024;
+        let report = parse_partition_layout_json(r#"[
+          {"DiskNumber":0,"DiskSize":500,"PartitionNumber":1,"DriveLetter":"C","Size":300,"Offset":100,"Type":"Basic","IsBoot":true,"IsSystem":true,"FileSystem":"NTFS","SizeRemaining":100}
+        ]"#).unwrap();
+        assert_eq!(report.unallocated_after_c, None);
+        assert!(
+            !report.can_extend_safely,
+            "small end gaps remain below the safety threshold"
+        );
+
+        let report = parse_partition_layout_json(&format!(r#"[
+          {{"DiskNumber":0,"DiskSize":{},"PartitionNumber":1,"DriveLetter":"C","Size":{},"Offset":{},"Type":"Basic","IsBoot":true,"IsSystem":true,"FileSystem":"NTFS","SizeRemaining":100}}
+        ]"#, 500 * mib, 300 * mib, 100 * mib)).unwrap();
+        assert_eq!(report.unallocated_after_c, Some(100 * mib));
+        assert!(report.can_extend_safely);
+        assert!(report.adjacent_right.is_none());
     }
 }

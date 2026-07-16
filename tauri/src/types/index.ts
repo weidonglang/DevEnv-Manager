@@ -101,6 +101,14 @@ export type EnvBackupRecord = {
   pathEntryCount: number;
   sourcePlanId?: string;
 };
+export type EnvBackupDiff = {
+  backupName: string;
+  currentJavaHome?: string;
+  backupJavaHome?: string;
+  currentPathEntries: number;
+  backupPathEntries: number;
+  changedVariables: string[];
+};
 export type EnvReliabilitySnapshot = {
   generatedAt: string;
   userEnv: {
@@ -263,6 +271,7 @@ export type PortResolutionPlan = {
   planId: string;
   pid: number;
   port: number;
+  protocol: string;
   processName: string;
   processPath: string;
   commandLine: string;
@@ -280,6 +289,13 @@ export type PortResolutionPlan = {
 export type PortResolutionResult = {
   success: boolean;
   message: string;
+  targetPort: number;
+  targetPid: number;
+  processName: string;
+  serviceOwned: boolean;
+  requiresAdmin: boolean;
+  failureReason: string;
+  nextSteps: string[];
   pidExited: boolean;
   portReleased: boolean;
   releaseCheckedAt: string;
@@ -410,6 +426,7 @@ export type PythonAnalysis = {
   launcherPath: string;
   launcherOutput: string;
   firstPythonOnPath: string;
+  firstPython3OnPath: string;
   firstPipOnPath: string;
   pythonMPipAvailable: boolean;
   managedPythonAvailable: boolean;
@@ -526,17 +543,20 @@ export type ToolchainReport = {
     githubSshStatus: string;
     githubHttpsStatus: string;
     gitLfs: ToolState;
+    globalConfigPath: string;
   };
   node: {
     tools: ToolState[];
     npmPrefix: string;
     npmRegistry: string;
     pnpmStorePath: string;
+    npmConfigPath: string;
   };
   python: {
     tools: ToolState[];
     pipConfig: string;
     pipIndexUrl: string;
+    pipConfigPath: string;
   };
   generatedAt: string;
 };
@@ -560,6 +580,7 @@ export type PlatformReport = {
     dotnet: ToolState;
     sdks: string[];
     runtimes: string[];
+    nugetConfigPath: string;
   };
   mirrors: {
     npmRegistry: string;
@@ -614,6 +635,11 @@ export type LocalServiceStatus = {
   serviceName: string;
   serviceState: string;
   binaryPath: string;
+  executablePath: string;
+  installDirectory: string;
+  pathStatus: string;
+  logPath: string;
+  logPathReason: string;
 };
 
 export type MySqlCandidate = {
@@ -686,6 +712,7 @@ export type MySqlRepairPlan = {
 
 export type ConfirmationTokenView = {
   token: string;
+  command: string;
   actionId: string;
   planId: string;
   riskLevel: string;
@@ -726,7 +753,23 @@ export type UpdateCheckResult = {
     url: string;
   }>;
   fileName: string;
+  platform: string;
+  size: number;
   checkedAt: string;
+};
+
+export type UpdateDownloadResult = {
+  success: boolean;
+  version: string;
+  platform: string;
+  fileName: string;
+  filePath: string;
+  size: number;
+  sha256: string;
+  sourceName: string;
+  sourceUrl: string;
+  verified: boolean;
+  message: string;
 };
 
 export type FileAssociationSource = "userChoice" | "hkcu" | "hklm" | "unknown";
@@ -826,6 +869,7 @@ export type FileAssociationPlan = {
   changes: FileAssociationChange[];
   backupPath: string;
   warnings: string[];
+  riskLevel: "high";
   requiresConfirmationToken: boolean;
   planFingerprint: string;
 };
@@ -879,6 +923,16 @@ export type DoctorRepairPlan = {
   planId: string;
   beforeScore: number;
   actions: string[];
+  actionDetails: Array<{
+    actionId: string;
+    title: string;
+    reason: string;
+    evidence: string[];
+    riskLevel: string;
+    requiresBackup: boolean;
+    requiresToken: boolean;
+    nextStep: string;
+  }>;
   willCleanupPath: boolean;
   willConfigureEnvironment: boolean;
   backupName: string;
@@ -1124,6 +1178,36 @@ export type ArchivePlanItem = {
   source: string;
   addedAt: string;
   suggestion: string;
+};
+
+export type GenericArchivePlan = {
+  planId: string;
+  createdAt: string;
+  targetRoot: string;
+  estimatedBytes: number;
+  riskLevel: string;
+  entries: Array<{
+    id: string;
+    source: string;
+    target: string;
+    size: number;
+    sha256: string;
+    conflict: boolean;
+    conflictReason: string;
+  }>;
+  warnings: string[];
+};
+
+export type GenericArchiveResult = {
+  planId: string;
+  success: boolean;
+  movedItems: number;
+  movedBytes: number;
+  skippedItems: number;
+  failures: string[];
+  verifiedTargets: string[];
+  rollbackGuidance: string[];
+  receiptPath: string;
 };
 
 export type DuplicateGroup = {

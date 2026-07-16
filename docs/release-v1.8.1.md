@@ -1,17 +1,19 @@
 # DevEnv Manager v1.8.1
 
-v1.8.1 is a hotfix release for Dashboard resilience, app language selection, and release metadata consistency.
+v1.8.1 is a public hotfix release focused on making existing users able to update to a safer and more usable Workbench. It is not the final completion pass for every advanced feature; remaining completeness work continues in v1.8.2 / v1.9.0.
 
 ## Highlights
 
-- Fixed Dashboard fallback loading so port scan / netstat timeout cannot break the whole landing page.
-- Dashboard no longer runs a full `scan_ports` call during default load; Ports & Services remains the explicit scan entry.
-- Added app-level i18n with Auto / zh-CN / en-US language options.
-- Added Settings language selection and Command Palette language switching commands.
-- Added i18n coverage for Shell, Dashboard, main feature titles and actions, loading/error states, and Risk UX.
-- Restored first-launch safety notice before the workbench can be entered.
-- Restored per-page usage/risk guidance and visible risk level definitions.
-- Updated release metadata for GitHub + Gitee v1.8.1.
+- Stabilized Dashboard fallback loading so port scan / netstat timeouts no longer break the whole landing page.
+- Fixed Workbench async navigation bounce and reduced empty or result-less feedback states.
+- Restored visible result areas for plan/token actions across core pages instead of relying only on toast messages.
+- Improved Ports & Services search/filter behavior and made "not scanned yet" a normal state instead of an error.
+- Hardened Risk UX progress, timeout, debug visibility, and action result rendering.
+- Fixed install-only JDK flows so they do not show bogus backup receipts.
+- Kept external runtimes read-only while managed runtimes keep switch/uninstall behind token-gated actions.
+- Improved dark mode and high-contrast readability for Runtime and Risk panels.
+- Added Debug export support for troubleshooting user-reported regressions.
+- Updated Environment, Projects, Reports, Cleanup, Profiles, Settings, and feature guide data mapping to avoid large "unavailable" regressions.
 
 ## Installer
 
@@ -19,21 +21,29 @@ v1.8.1 is a hotfix release for Dashboard resilience, app language selection, and
 
 ## Size
 
-`2626160`
+`2657072`
 
 ## SHA256
 
-`366eea864333bc1927da182d8409462b53676da8b4a8432c24a5aa2d2def8de6`
+`0020a53785094797c77e15ff811c62802669db9b657dcd168437e050b9747df0`
+
+## Known Limitations
+
+- Some advanced runtime completeness checks and old-feature parity improvements remain scheduled for v1.8.2 / v1.9.0.
+- v1.8.1 prioritizes Workbench usability, data-contract correctness, safe feedback, and release-channel repair over expanding new features.
+- Users should still treat environment variable changes, PATH cleanup, service operations, cleanup actions, junction moves, and runtime switching as operations that require review and backups.
 
 ## 中文摘要
 
-v1.8.1 是热修复版本：
+v1.8.1 是公开热修复版本，目标是先让旧版本用户能够更新到更稳定、可用、可排查的 Workbench。它不是所有高级功能的最终完成版，剩余完整性工作继续进入 v1.8.2 / v1.9.0。
 
-- 修复端口扫描 / netstat 超时时 Dashboard 整页加载失败的问题。
-- Dashboard 默认不再执行完整端口扫描；需要扫描时进入“端口与服务”页面。
-- 新增应用级语言选项：跟随系统 / 简体中文 / English。
-- Settings 支持切换语言，Command Palette 支持语言切换命令。
-- Shell、Dashboard、主要功能标题和按钮、加载/错误状态、Risk UX 支持中英文。
-- 恢复进入工作台前的首次启动安全声明。
-- 恢复每页功能/风险说明和风险等级定义。
-- 补齐 GitHub + Gitee v1.8.1 发布元数据一致性。
+- 修复 Dashboard 因端口扫描 / netstat 超时导致整页异常的问题。
+- 修复 Workbench 异步导航回跳，并减少空 toast、无结果反馈等状态。
+- 核心页面的计划/令牌操作现在需要有可见结果区，不再只依赖 toast。
+- 修复端口搜索/筛选体验，未扫描端口显示为正常的“尚未扫描”状态。
+- 加强 Risk UX 的进度、超时、调试信息和操作结果展示。
+- 修复仅安装 JDK 时显示伪备份回执的问题。
+- 外部运行时保持只读，受管运行时的切换/卸载继续走令牌保护。
+- 改善 Runtime 和 Risk 面板在深色/高对比度主题下的可读性。
+- 增加 Debug 导出能力，方便排查用户现场回归。
+- 修正 Environment、Projects、Reports、Cleanup、Profiles、Settings 和功能指南的数据映射，避免大面积“不可用”。

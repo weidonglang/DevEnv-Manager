@@ -1,0 +1,3342 @@
+{
+  "schemaVersion": 2,
+  "version": "1.7.0",
+  "summary": {
+    "total": 237,
+    "mapped": 229,
+    "excluded": 8,
+    "unaccounted": 0,
+    "bySourceType": {
+      "data-action": 47,
+      "documentation-promise": 43,
+      "frontend-invoke": 136,
+      "page": 11
+    },
+    "byExclusionReason": {
+      "excluded-ui-mechanics": 4,
+      "excluded-internal": 4,
+      "excluded-duplicate-source": 0,
+      "excluded-obsolete-alias": 0
+    }
+  },
+  "records": [
+    {
+      "sourceId": "v17.page.doctor",
+      "sourceType": "page",
+      "sourceLocation": [
+        "installed/source page"
+      ],
+      "oldPage": "doctor",
+      "oldAction": null,
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Open Doctor page",
+      "normalizedCapabilityId": "navigation.workbench",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.page.environment",
+      "sourceType": "page",
+      "sourceLocation": [
+        "installed/source page"
+      ],
+      "oldPage": "environment",
+      "oldAction": null,
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Open Environment page",
+      "normalizedCapabilityId": "navigation.workbench",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.page.learning",
+      "sourceType": "page",
+      "sourceLocation": [
+        "installed/source page"
+      ],
+      "oldPage": "learning",
+      "oldAction": null,
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Open Learning page",
+      "normalizedCapabilityId": "navigation.workbench",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.page.maintenance",
+      "sourceType": "page",
+      "sourceLocation": [
+        "installed/source page"
+      ],
+      "oldPage": "maintenance",
+      "oldAction": null,
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Open Maintenance page",
+      "normalizedCapabilityId": "navigation.workbench",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.page.overview",
+      "sourceType": "page",
+      "sourceLocation": [
+        "installed/source page"
+      ],
+      "oldPage": "overview",
+      "oldAction": null,
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Open Overview page",
+      "normalizedCapabilityId": "navigation.workbench",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.page.platforms",
+      "sourceType": "page",
+      "sourceLocation": [
+        "installed/source page"
+      ],
+      "oldPage": "platforms",
+      "oldAction": null,
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Open Platforms page",
+      "normalizedCapabilityId": "navigation.workbench",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.page.ports",
+      "sourceType": "page",
+      "sourceLocation": [
+        "installed/source page"
+      ],
+      "oldPage": "ports",
+      "oldAction": null,
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Open Ports page",
+      "normalizedCapabilityId": "navigation.workbench",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.page.project",
+      "sourceType": "page",
+      "sourceLocation": [
+        "installed/source page"
+      ],
+      "oldPage": "project",
+      "oldAction": null,
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Open Project page",
+      "normalizedCapabilityId": "navigation.workbench",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.page.runtimes",
+      "sourceType": "page",
+      "sourceLocation": [
+        "installed/source page"
+      ],
+      "oldPage": "runtimes",
+      "oldAction": null,
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Open Runtimes page",
+      "normalizedCapabilityId": "navigation.workbench",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.page.toolbox",
+      "sourceType": "page",
+      "sourceLocation": [
+        "installed/source page"
+      ],
+      "oldPage": "toolbox",
+      "oldAction": null,
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Open Toolbox page",
+      "normalizedCapabilityId": "navigation.workbench",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.page.toolchains",
+      "sourceType": "page",
+      "sourceLocation": [
+        "installed/source page"
+      ],
+      "oldPage": "toolchains",
+      "oldAction": null,
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Open Toolchains page",
+      "normalizedCapabilityId": "navigation.workbench",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.action.apply-profile",
+      "sourceType": "data-action",
+      "sourceLocation": [
+        "v1.7.0 frontend action"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": "apply-profile",
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Apply Profile",
+      "normalizedCapabilityId": "profiles.apply",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.action.archive-add",
+      "sourceType": "data-action",
+      "sourceLocation": [
+        "v1.7.0 frontend action"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": "archive-add",
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Archive Add",
+      "normalizedCapabilityId": "cleanup.archive-plan",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.action.archive-remove",
+      "sourceType": "data-action",
+      "sourceLocation": [
+        "v1.7.0 frontend action"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": "archive-remove",
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Archive Remove",
+      "normalizedCapabilityId": "cleanup.archive-plan",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.action.check-updates",
+      "sourceType": "data-action",
+      "sourceLocation": [
+        "v1.7.0 frontend action"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": "check-updates",
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Check Updates",
+      "normalizedCapabilityId": "update.check",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.action.copy-diagnostics",
+      "sourceType": "data-action",
+      "sourceLocation": [
+        "v1.7.0 frontend action"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": "copy-diagnostics",
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Copy Diagnostics",
+      "normalizedCapabilityId": "doctor.report",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.action.copy-safety-disclaimer",
+      "sourceType": "data-action",
+      "sourceLocation": [
+        "v1.7.0 frontend action"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": "copy-safety-disclaimer",
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Copy Safety Disclaimer",
+      "normalizedCapabilityId": "safety.disclaimer",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.action.copy-text",
+      "sourceType": "data-action",
+      "sourceLocation": [
+        "v1.7.0 frontend action"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": "copy-text",
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Copy Text",
+      "normalizedCapabilityId": null,
+      "exclusionReason": "excluded-ui-mechanics"
+    },
+    {
+      "sourceId": "v17.action.delete-profile",
+      "sourceType": "data-action",
+      "sourceLocation": [
+        "v1.7.0 frontend action"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": "delete-profile",
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Delete Profile",
+      "normalizedCapabilityId": "profiles.delete",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.action.dismiss-safe-mode-banner",
+      "sourceType": "data-action",
+      "sourceLocation": [
+        "v1.7.0 frontend action"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": "dismiss-safe-mode-banner",
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Dismiss Safe Mode Banner",
+      "normalizedCapabilityId": null,
+      "exclusionReason": "excluded-ui-mechanics"
+    },
+    {
+      "sourceId": "v17.action.doctor-fix",
+      "sourceType": "data-action",
+      "sourceLocation": [
+        "v1.7.0 frontend action"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": "doctor-fix",
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Doctor Fix",
+      "normalizedCapabilityId": "doctor.repair",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.action.download-update",
+      "sourceType": "data-action",
+      "sourceLocation": [
+        "v1.7.0 frontend action"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": "download-update",
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Download Update",
+      "normalizedCapabilityId": "update.download-install",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.action.export-python-diagnostic",
+      "sourceType": "data-action",
+      "sourceLocation": [
+        "v1.7.0 frontend action"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": "export-python-diagnostic",
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Export Python Diagnostic",
+      "normalizedCapabilityId": "reports.export",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.action.hide-toast",
+      "sourceType": "data-action",
+      "sourceLocation": [
+        "v1.7.0 frontend action"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": "hide-toast",
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Hide Toast",
+      "normalizedCapabilityId": null,
+      "exclusionReason": "excluded-ui-mechanics"
+    },
+    {
+      "sourceId": "v17.action.install-apply-profile",
+      "sourceType": "data-action",
+      "sourceLocation": [
+        "v1.7.0 frontend action"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": "install-apply-profile",
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Install Apply Profile",
+      "normalizedCapabilityId": "profiles.apply",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.action.install-update",
+      "sourceType": "data-action",
+      "sourceLocation": [
+        "v1.7.0 frontend action"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": "install-update",
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Install Update",
+      "normalizedCapabilityId": "update.download-install",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.action.kill-port",
+      "sourceType": "data-action",
+      "sourceLocation": [
+        "v1.7.0 frontend action"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": "kill-port",
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Kill Port",
+      "normalizedCapabilityId": "ports.release",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.action.local-service-directory",
+      "sourceType": "data-action",
+      "sourceLocation": [
+        "v1.7.0 frontend action"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": "local-service-directory",
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Local Service Directory",
+      "normalizedCapabilityId": "services.directory",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.action.local-service-logs",
+      "sourceType": "data-action",
+      "sourceLocation": [
+        "v1.7.0 frontend action"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": "local-service-logs",
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Local Service Logs",
+      "normalizedCapabilityId": "services.logs",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.action.local-service-manage",
+      "sourceType": "data-action",
+      "sourceLocation": [
+        "v1.7.0 frontend action"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": "local-service-manage",
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Local Service Manage",
+      "normalizedCapabilityId": "services.manage",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.action.open-analysis-path",
+      "sourceType": "data-action",
+      "sourceLocation": [
+        "v1.7.0 frontend action"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": "open-analysis-path",
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Open Analysis Path",
+      "normalizedCapabilityId": "system.open-path",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.action.open-app-config-dir",
+      "sourceType": "data-action",
+      "sourceLocation": [
+        "v1.7.0 frontend action"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": "open-app-config-dir",
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Open App Config Dir",
+      "normalizedCapabilityId": "settings.config-directory",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.action.open-apps-features",
+      "sourceType": "data-action",
+      "sourceLocation": [
+        "v1.7.0 frontend action"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": "open-apps-features",
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Open Apps Features",
+      "normalizedCapabilityId": "system.apps-features",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.action.open-learning",
+      "sourceType": "data-action",
+      "sourceLocation": [
+        "v1.7.0 frontend action"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": "open-learning",
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Open Learning",
+      "normalizedCapabilityId": "learning.center",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.action.open-process-location",
+      "sourceType": "data-action",
+      "sourceLocation": [
+        "v1.7.0 frontend action"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": "open-process-location",
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Open Process Location",
+      "normalizedCapabilityId": "ports.process-location",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.action.open-python-alias-settings",
+      "sourceType": "data-action",
+      "sourceLocation": [
+        "v1.7.0 frontend action"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": "open-python-alias-settings",
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Open Python Alias Settings",
+      "normalizedCapabilityId": "environment.python-alias-settings",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.action.port-details",
+      "sourceType": "data-action",
+      "sourceLocation": [
+        "v1.7.0 frontend action"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": "port-details",
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Port Details",
+      "normalizedCapabilityId": "ports.scan-history",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.action.project-run",
+      "sourceType": "data-action",
+      "sourceLocation": [
+        "v1.7.0 frontend action"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": "project-run",
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Project Run",
+      "normalizedCapabilityId": "projects.actions",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.action.refresh-platforms",
+      "sourceType": "data-action",
+      "sourceLocation": [
+        "v1.7.0 frontend action"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": "refresh-platforms",
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Refresh Platforms",
+      "normalizedCapabilityId": "platforms.inspect",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.action.rescan-folder",
+      "sourceType": "data-action",
+      "sourceLocation": [
+        "v1.7.0 frontend action"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": "rescan-folder",
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Rescan Folder",
+      "normalizedCapabilityId": "cleanup.folder-analysis",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.action.reset-ui-config",
+      "sourceType": "data-action",
+      "sourceLocation": [
+        "v1.7.0 frontend action"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": "reset-ui-config",
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Reset Ui Config",
+      "normalizedCapabilityId": "settings.reset-ui",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.action.restore-env-record",
+      "sourceType": "data-action",
+      "sourceLocation": [
+        "v1.7.0 frontend action"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": "restore-env-record",
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Restore Env Record",
+      "normalizedCapabilityId": "environment.restore",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.action.retry-app-init",
+      "sourceType": "data-action",
+      "sourceLocation": [
+        "v1.7.0 frontend action"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": "retry-app-init",
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Retry App Init",
+      "normalizedCapabilityId": "bootstrap.retry",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.action.rollback-move",
+      "sourceType": "data-action",
+      "sourceLocation": [
+        "v1.7.0 frontend action"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": "rollback-move",
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Rollback Move",
+      "normalizedCapabilityId": "cleanup.move-rollback",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.action.set-java-home-candidate",
+      "sourceType": "data-action",
+      "sourceLocation": [
+        "v1.7.0 frontend action"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": "set-java-home-candidate",
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Set Java Home Candidate",
+      "normalizedCapabilityId": "environment.java-stabilize",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.action.switch-build-tool",
+      "sourceType": "data-action",
+      "sourceLocation": [
+        "v1.7.0 frontend action"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": "switch-build-tool",
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Switch Build Tool",
+      "normalizedCapabilityId": "runtime.switch",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.action.switch-go",
+      "sourceType": "data-action",
+      "sourceLocation": [
+        "v1.7.0 frontend action"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": "switch-go",
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Switch Go",
+      "normalizedCapabilityId": "runtime.switch",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.action.switch-jdk",
+      "sourceType": "data-action",
+      "sourceLocation": [
+        "v1.7.0 frontend action"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": "switch-jdk",
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Switch Jdk",
+      "normalizedCapabilityId": "runtime.switch",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.action.switch-node",
+      "sourceType": "data-action",
+      "sourceLocation": [
+        "v1.7.0 frontend action"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": "switch-node",
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Switch Node",
+      "normalizedCapabilityId": "runtime.switch",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.action.switch-python",
+      "sourceType": "data-action",
+      "sourceLocation": [
+        "v1.7.0 frontend action"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": "switch-python",
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Switch Python",
+      "normalizedCapabilityId": "runtime.switch",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.action.system-platform",
+      "sourceType": "data-action",
+      "sourceLocation": [
+        "v1.7.0 frontend action"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": "system-platform",
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "System Platform",
+      "normalizedCapabilityId": "platforms.manage",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.action.uninstall-build-tool",
+      "sourceType": "data-action",
+      "sourceLocation": [
+        "v1.7.0 frontend action"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": "uninstall-build-tool",
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Uninstall Build Tool",
+      "normalizedCapabilityId": "runtime.uninstall",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.action.uninstall-go",
+      "sourceType": "data-action",
+      "sourceLocation": [
+        "v1.7.0 frontend action"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": "uninstall-go",
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Uninstall Go",
+      "normalizedCapabilityId": "runtime.uninstall",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.action.uninstall-jdk",
+      "sourceType": "data-action",
+      "sourceLocation": [
+        "v1.7.0 frontend action"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": "uninstall-jdk",
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Uninstall Jdk",
+      "normalizedCapabilityId": "runtime.uninstall",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.action.uninstall-node",
+      "sourceType": "data-action",
+      "sourceLocation": [
+        "v1.7.0 frontend action"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": "uninstall-node",
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Uninstall Node",
+      "normalizedCapabilityId": "runtime.uninstall",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.action.uninstall-python",
+      "sourceType": "data-action",
+      "sourceLocation": [
+        "v1.7.0 frontend action"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": "uninstall-python",
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Uninstall Python",
+      "normalizedCapabilityId": "runtime.uninstall",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.action.update-project-port",
+      "sourceType": "data-action",
+      "sourceLocation": [
+        "v1.7.0 frontend action"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": "update-project-port",
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Update Project Port",
+      "normalizedCapabilityId": "projects.port-config",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.action.verify-external-jdk",
+      "sourceType": "data-action",
+      "sourceLocation": [
+        "v1.7.0 frontend action"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": "verify-external-jdk",
+      "oldCommand": null,
+      "readmeReference": null,
+      "rawDescription": "Verify External Jdk",
+      "normalizedCapabilityId": "runtime.external-jdk-verify",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.accept_safety_disclaimer",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "settings",
+      "oldAction": null,
+      "oldCommand": "accept_safety_disclaimer",
+      "readmeReference": null,
+      "rawDescription": "Accept Safety Disclaimer",
+      "normalizedCapabilityId": "safety.disclaimer",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.add_archive_plan_item",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "cleanup",
+      "oldAction": null,
+      "oldCommand": "add_archive_plan_item",
+      "readmeReference": null,
+      "rawDescription": "Add Archive Plan Item",
+      "normalizedCapabilityId": "cleanup.archive-plan",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.analyze_project",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "projects",
+      "oldAction": null,
+      "oldCommand": "analyze_project",
+      "readmeReference": null,
+      "rawDescription": "Analyze Project",
+      "normalizedCapabilityId": "projects.analysis",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.analyze_python_environment",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "environment",
+      "oldAction": null,
+      "oldCommand": "analyze_python_environment",
+      "readmeReference": null,
+      "rawDescription": "Analyze Python Environment",
+      "normalizedCapabilityId": "environment.python-health-repair",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.app_snapshot",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": "app_snapshot",
+      "readmeReference": null,
+      "rawDescription": "App Snapshot",
+      "normalizedCapabilityId": "dashboard.snapshot",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.apply_config_profile",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "profiles",
+      "oldAction": null,
+      "oldCommand": "apply_config_profile",
+      "readmeReference": null,
+      "rawDescription": "Apply Config Profile",
+      "normalizedCapabilityId": "profiles.apply",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.apply_env_repair_plan",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "environment",
+      "oldAction": null,
+      "oldCommand": "apply_env_repair_plan",
+      "readmeReference": null,
+      "rawDescription": "Apply Env Repair Plan",
+      "normalizedCapabilityId": "environment.java-stabilize",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.apply_file_association_plan",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "fileAssociations",
+      "oldAction": null,
+      "oldCommand": "apply_file_association_plan",
+      "readmeReference": null,
+      "rawDescription": "Apply File Association Plan",
+      "normalizedCapabilityId": "file-associations.apply",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.apply_project_configuration",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "projects",
+      "oldAction": null,
+      "oldCommand": "apply_project_configuration",
+      "readmeReference": null,
+      "rawDescription": "Apply Project Configuration",
+      "normalizedCapabilityId": "projects.configuration",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.apply_python_repair",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "environment",
+      "oldAction": null,
+      "oldCommand": "apply_python_repair",
+      "readmeReference": null,
+      "rawDescription": "Apply Python Repair",
+      "normalizedCapabilityId": "environment.python-health-repair",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.apply_user_environment_configuration",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "environment",
+      "oldAction": null,
+      "oldCommand": "apply_user_environment_configuration",
+      "readmeReference": null,
+      "rawDescription": "Apply User Environment Configuration",
+      "normalizedCapabilityId": "environment.configure",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.cache_entries",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "toolchains",
+      "oldAction": null,
+      "oldCommand": "cache_entries",
+      "readmeReference": null,
+      "rawDescription": "Cache Entries",
+      "normalizedCapabilityId": "toolchains.network-cache",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.cancel_maintenance_scan",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": "cancel_maintenance_scan",
+      "readmeReference": null,
+      "rawDescription": "Cancel Maintenance Scan",
+      "normalizedCapabilityId": "cleanup.scan-plan-execute",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.check_for_updates",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "settings",
+      "oldAction": null,
+      "oldCommand": "check_for_updates",
+      "readmeReference": null,
+      "rawDescription": "Check For Updates",
+      "normalizedCapabilityId": "update.check",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.clean_dev_cache",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "toolchains",
+      "oldAction": null,
+      "oldCommand": "clean_dev_cache",
+      "readmeReference": null,
+      "rawDescription": "Clean Dev Cache",
+      "normalizedCapabilityId": "cleanup.dev-cache",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.clean_selected_targets",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": "clean_selected_targets",
+      "readmeReference": null,
+      "rawDescription": "Clean Selected Targets",
+      "normalizedCapabilityId": "cleanup.scan-plan-execute",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.cleanup_path_entries",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "cleanup",
+      "oldAction": null,
+      "oldCommand": "cleanup_path_entries",
+      "readmeReference": null,
+      "rawDescription": "Cleanup Path Entries",
+      "normalizedCapabilityId": "environment.path-cleanup",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.clear_download_cache",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "toolchains",
+      "oldAction": null,
+      "oldCommand": "clear_download_cache",
+      "readmeReference": null,
+      "rawDescription": "Clear Download Cache",
+      "normalizedCapabilityId": "cleanup.download-cache",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.config_profile_requirements",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "profiles",
+      "oldAction": null,
+      "oldCommand": "config_profile_requirements",
+      "readmeReference": null,
+      "rawDescription": "Config Profile Requirements",
+      "normalizedCapabilityId": null,
+      "exclusionReason": "excluded-internal"
+    },
+    {
+      "sourceId": "v17.command.configure_user_environment",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "environment",
+      "oldAction": null,
+      "oldCommand": "configure_user_environment",
+      "readmeReference": null,
+      "rawDescription": "Configure User Environment",
+      "normalizedCapabilityId": "environment.configure",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.create_c_drive_expansion_plan",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "cleanup",
+      "oldAction": null,
+      "oldCommand": "create_c_drive_expansion_plan",
+      "readmeReference": null,
+      "rawDescription": "Create C Drive Expansion Plan",
+      "normalizedCapabilityId": "cleanup.partition-expansion",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.create_cleanup_plan",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "cleanup",
+      "oldAction": null,
+      "oldCommand": "create_cleanup_plan",
+      "readmeReference": null,
+      "rawDescription": "Create Cleanup Plan",
+      "normalizedCapabilityId": "cleanup.scan-plan-execute",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.create_confirmation_token",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "settings",
+      "oldAction": null,
+      "oldCommand": "create_confirmation_token",
+      "readmeReference": null,
+      "rawDescription": "Create Confirmation Token",
+      "normalizedCapabilityId": "safety.risk-confirmation",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.create_desktop_archive_plan",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "cleanup",
+      "oldAction": null,
+      "oldCommand": "create_desktop_archive_plan",
+      "readmeReference": null,
+      "rawDescription": "Create Desktop Archive Plan",
+      "normalizedCapabilityId": "cleanup.desktop-archive",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.create_downloads_archive_plan",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "cleanup",
+      "oldAction": null,
+      "oldCommand": "create_downloads_archive_plan",
+      "readmeReference": null,
+      "rawDescription": "Create Downloads Archive Plan",
+      "normalizedCapabilityId": "cleanup.downloads-archive",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.create_file_association_plan",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "fileAssociations",
+      "oldAction": null,
+      "oldCommand": "create_file_association_plan",
+      "readmeReference": null,
+      "rawDescription": "Create File Association Plan",
+      "normalizedCapabilityId": "file-associations.apply",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.create_java_stabilize_plan",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "environment",
+      "oldAction": null,
+      "oldCommand": "create_java_stabilize_plan",
+      "readmeReference": null,
+      "rawDescription": "Create Java Stabilize Plan",
+      "normalizedCapabilityId": "environment.java-stabilize",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.create_managed_python_pip_repair_plan",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": "create_managed_python_pip_repair_plan",
+      "readmeReference": null,
+      "rawDescription": "Create Managed Python Pip Repair Plan",
+      "normalizedCapabilityId": "environment.python-health-repair",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.create_move_plan",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "cleanup",
+      "oldAction": null,
+      "oldCommand": "create_move_plan",
+      "readmeReference": null,
+      "rawDescription": "Create Move Plan",
+      "normalizedCapabilityId": "cleanup.move-rollback",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.create_mysql_repair_plan",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "toolchains",
+      "oldAction": null,
+      "oldCommand": "create_mysql_repair_plan",
+      "readmeReference": null,
+      "rawDescription": "Create Mysql Repair Plan",
+      "normalizedCapabilityId": "mysql.repair",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.delete_config_profile",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "profiles",
+      "oldAction": null,
+      "oldCommand": "delete_config_profile",
+      "readmeReference": null,
+      "rawDescription": "Delete Config Profile",
+      "normalizedCapabilityId": "profiles.delete",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.discover_runtimes",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "runtimes",
+      "oldAction": null,
+      "oldCommand": "discover_runtimes",
+      "readmeReference": null,
+      "rawDescription": "Discover Runtimes",
+      "normalizedCapabilityId": "runtime.discover",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.doctor_report_text",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "ports",
+      "oldAction": null,
+      "oldCommand": "doctor_report_text",
+      "readmeReference": null,
+      "rawDescription": "Doctor Report Text",
+      "normalizedCapabilityId": "doctor.run",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.download_update",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "settings",
+      "oldAction": null,
+      "oldCommand": "download_update",
+      "readmeReference": null,
+      "rawDescription": "Download Update",
+      "normalizedCapabilityId": "update.download-install",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.env_snapshot",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "environment",
+      "oldAction": null,
+      "oldCommand": "env_snapshot",
+      "readmeReference": null,
+      "rawDescription": "Env Snapshot",
+      "normalizedCapabilityId": "environment.snapshot",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.environment_health",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "environment",
+      "oldAction": null,
+      "oldCommand": "environment_health",
+      "readmeReference": null,
+      "rawDescription": "Environment Health",
+      "normalizedCapabilityId": "environment.snapshot",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.execute_c_drive_expansion",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "cleanup",
+      "oldAction": null,
+      "oldCommand": "execute_c_drive_expansion",
+      "readmeReference": null,
+      "rawDescription": "Execute C Drive Expansion",
+      "normalizedCapabilityId": "cleanup.partition-expansion",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.execute_mysql_repair_plan",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "toolchains",
+      "oldAction": null,
+      "oldCommand": "execute_mysql_repair_plan",
+      "readmeReference": null,
+      "rawDescription": "Execute Mysql Repair Plan",
+      "normalizedCapabilityId": "mysql.repair",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.export_cleanup_report",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "ports",
+      "oldAction": null,
+      "oldCommand": "export_cleanup_report",
+      "readmeReference": null,
+      "rawDescription": "Export Cleanup Report",
+      "normalizedCapabilityId": "reports.export",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.export_config_profiles",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "ports",
+      "oldAction": null,
+      "oldCommand": "export_config_profiles",
+      "readmeReference": null,
+      "rawDescription": "Export Config Profiles",
+      "normalizedCapabilityId": "profiles.import-export",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.export_doctor_report",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "ports",
+      "oldAction": null,
+      "oldCommand": "export_doctor_report",
+      "readmeReference": null,
+      "rawDescription": "Export Doctor Report",
+      "normalizedCapabilityId": "doctor.report",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.export_doctor_report_json",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "ports",
+      "oldAction": null,
+      "oldCommand": "export_doctor_report_json",
+      "readmeReference": null,
+      "rawDescription": "Export Doctor Report Json",
+      "normalizedCapabilityId": "doctor.report",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.export_env_reliability_report",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "ports",
+      "oldAction": null,
+      "oldCommand": "export_env_reliability_report",
+      "readmeReference": null,
+      "rawDescription": "Export Env Reliability Report",
+      "normalizedCapabilityId": "reports.export",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.export_file_association_report",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "ports",
+      "oldAction": null,
+      "oldCommand": "export_file_association_report",
+      "readmeReference": null,
+      "rawDescription": "Export File Association Report",
+      "normalizedCapabilityId": "reports.export",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.export_python_diagnostic_report",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "ports",
+      "oldAction": null,
+      "oldCommand": "export_python_diagnostic_report",
+      "readmeReference": null,
+      "rawDescription": "Export Python Diagnostic Report",
+      "normalizedCapabilityId": "reports.export",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.feature_risk_registry",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "settings",
+      "oldAction": null,
+      "oldCommand": "feature_risk_registry",
+      "readmeReference": null,
+      "rawDescription": "Feature Risk Registry",
+      "normalizedCapabilityId": null,
+      "exclusionReason": "excluded-internal"
+    },
+    {
+      "sourceId": "v17.command.import_config_profiles",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "ports",
+      "oldAction": null,
+      "oldCommand": "import_config_profiles",
+      "readmeReference": null,
+      "rawDescription": "Import Config Profiles",
+      "normalizedCapabilityId": "profiles.import-export",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.inspect_agent_traces",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": "inspect_agent_traces",
+      "readmeReference": null,
+      "rawDescription": "Inspect Agent Traces",
+      "normalizedCapabilityId": "debug.agent-traces",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.inspect_app_usage",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "cleanup",
+      "oldAction": null,
+      "oldCommand": "inspect_app_usage",
+      "readmeReference": null,
+      "rawDescription": "Inspect App Usage",
+      "normalizedCapabilityId": "cleanup.application-usage",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.inspect_command_safety",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "settings",
+      "oldAction": null,
+      "oldCommand": "inspect_command_safety",
+      "readmeReference": null,
+      "rawDescription": "Inspect Command Safety",
+      "normalizedCapabilityId": "toolchains.command-safety",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.inspect_desktop",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "cleanup",
+      "oldAction": null,
+      "oldCommand": "inspect_desktop",
+      "readmeReference": null,
+      "rawDescription": "Inspect Desktop",
+      "normalizedCapabilityId": "cleanup.folder-analysis",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.inspect_downloads",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "cleanup",
+      "oldAction": null,
+      "oldCommand": "inspect_downloads",
+      "readmeReference": null,
+      "rawDescription": "Inspect Downloads",
+      "normalizedCapabilityId": "cleanup.folder-analysis",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.inspect_env_reliability",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "environment",
+      "oldAction": null,
+      "oldCommand": "inspect_env_reliability",
+      "readmeReference": null,
+      "rawDescription": "Inspect Env Reliability",
+      "normalizedCapabilityId": "environment.snapshot",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.inspect_idea_project",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "projects",
+      "oldAction": null,
+      "oldCommand": "inspect_idea_project",
+      "readmeReference": null,
+      "rawDescription": "Inspect Idea Project",
+      "normalizedCapabilityId": "projects.idea-analysis",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.inspect_java_environment",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "environment",
+      "oldAction": null,
+      "oldCommand": "inspect_java_environment",
+      "readmeReference": null,
+      "rawDescription": "Inspect Java Environment",
+      "normalizedCapabilityId": "environment.snapshot",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.inspect_local_services",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "toolchains",
+      "oldAction": null,
+      "oldCommand": "inspect_local_services",
+      "readmeReference": null,
+      "rawDescription": "Inspect Local Services",
+      "normalizedCapabilityId": "services.inspect",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.inspect_maintenance_overview",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": "inspect_maintenance_overview",
+      "readmeReference": null,
+      "rawDescription": "Inspect Maintenance Overview",
+      "normalizedCapabilityId": "cleanup.overview",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.inspect_mysql_repair",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "toolchains",
+      "oldAction": null,
+      "oldCommand": "inspect_mysql_repair",
+      "readmeReference": null,
+      "rawDescription": "Inspect Mysql Repair",
+      "normalizedCapabilityId": "mysql.repair",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.inspect_partition_layout",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "cleanup",
+      "oldAction": null,
+      "oldCommand": "inspect_partition_layout",
+      "readmeReference": null,
+      "rawDescription": "Inspect Partition Layout",
+      "normalizedCapabilityId": "cleanup.partition-expansion",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.inspect_platform_toolchains",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "toolchains",
+      "oldAction": null,
+      "oldCommand": "inspect_platform_toolchains",
+      "readmeReference": null,
+      "rawDescription": "Inspect Platform Toolchains",
+      "normalizedCapabilityId": "platforms.inspect",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.inspect_project_port_configs",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "ports",
+      "oldAction": null,
+      "oldCommand": "inspect_project_port_configs",
+      "readmeReference": null,
+      "rawDescription": "Inspect Project Port Configs",
+      "normalizedCapabilityId": "projects.port-config",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.inspect_python_integrity",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "environment",
+      "oldAction": null,
+      "oldCommand": "inspect_python_integrity",
+      "readmeReference": null,
+      "rawDescription": "Inspect Python Integrity",
+      "normalizedCapabilityId": "environment.python-health-repair",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.inspect_runtime_strong_verification",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "runtimes",
+      "oldAction": null,
+      "oldCommand": "inspect_runtime_strong_verification",
+      "readmeReference": null,
+      "rawDescription": "Inspect Runtime Strong Verification",
+      "normalizedCapabilityId": "runtime.verify",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.inspect_system_platforms",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "toolchains",
+      "oldAction": null,
+      "oldCommand": "inspect_system_platforms",
+      "readmeReference": null,
+      "rawDescription": "Inspect System Platforms",
+      "normalizedCapabilityId": "platforms.inspect",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.inspect_toolchains",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "toolchains",
+      "oldAction": null,
+      "oldCommand": "inspect_toolchains",
+      "readmeReference": null,
+      "rawDescription": "Inspect Toolchains",
+      "normalizedCapabilityId": "toolchains.inspect",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.install_go",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "runtimes",
+      "oldAction": null,
+      "oldCommand": "install_go",
+      "readmeReference": null,
+      "rawDescription": "Install Go",
+      "normalizedCapabilityId": "runtime.install",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.install_gradle_latest",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "runtimes",
+      "oldAction": null,
+      "oldCommand": "install_gradle_latest",
+      "readmeReference": null,
+      "rawDescription": "Install Gradle Latest",
+      "normalizedCapabilityId": "runtime.install",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.install_jdk",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "runtimes",
+      "oldAction": null,
+      "oldCommand": "install_jdk",
+      "readmeReference": null,
+      "rawDescription": "Install Jdk",
+      "normalizedCapabilityId": "runtime.install",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.install_maven_latest",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "runtimes",
+      "oldAction": null,
+      "oldCommand": "install_maven_latest",
+      "readmeReference": null,
+      "rawDescription": "Install Maven Latest",
+      "normalizedCapabilityId": "runtime.install",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.install_node",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "runtimes",
+      "oldAction": null,
+      "oldCommand": "install_node",
+      "readmeReference": null,
+      "rawDescription": "Install Node",
+      "normalizedCapabilityId": "runtime.install",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.install_profile_missing",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "profiles",
+      "oldAction": null,
+      "oldCommand": "install_profile_missing",
+      "readmeReference": null,
+      "rawDescription": "Install Profile Missing",
+      "normalizedCapabilityId": "profiles.apply",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.install_python",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "runtimes",
+      "oldAction": null,
+      "oldCommand": "install_python",
+      "readmeReference": null,
+      "rawDescription": "Install Python",
+      "normalizedCapabilityId": "runtime.install",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.jdk_distributions",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "runtimes",
+      "oldAction": null,
+      "oldCommand": "jdk_distributions",
+      "readmeReference": null,
+      "rawDescription": "Jdk Distributions",
+      "normalizedCapabilityId": "runtime.discover",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.kill_process",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "ports",
+      "oldAction": null,
+      "oldCommand": "kill_process",
+      "readmeReference": null,
+      "rawDescription": "Kill Process",
+      "normalizedCapabilityId": "ports.release",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.launch_update_installer",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "settings",
+      "oldAction": null,
+      "oldCommand": "launch_update_installer",
+      "readmeReference": null,
+      "rawDescription": "Launch Update Installer",
+      "normalizedCapabilityId": "update.download-install",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.list_archive_plan_items",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "cleanup",
+      "oldAction": null,
+      "oldCommand": "list_archive_plan_items",
+      "readmeReference": null,
+      "rawDescription": "List Archive Plan Items",
+      "normalizedCapabilityId": "cleanup.archive-plan",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.list_config_profiles",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "profiles",
+      "oldAction": null,
+      "oldCommand": "list_config_profiles",
+      "readmeReference": null,
+      "rawDescription": "List Config Profiles",
+      "normalizedCapabilityId": "profiles.list",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.list_env_backups",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "environment",
+      "oldAction": null,
+      "oldCommand": "list_env_backups",
+      "readmeReference": null,
+      "rawDescription": "List Env Backups",
+      "normalizedCapabilityId": "environment.backups",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.list_environment_backups",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "environment",
+      "oldAction": null,
+      "oldCommand": "list_environment_backups",
+      "readmeReference": null,
+      "rawDescription": "List Environment Backups",
+      "normalizedCapabilityId": "environment.backups",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.list_file_association_backups",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "fileAssociations",
+      "oldAction": null,
+      "oldCommand": "list_file_association_backups",
+      "readmeReference": null,
+      "rawDescription": "List File Association Backups",
+      "normalizedCapabilityId": "file-associations.backup-rollback",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.list_rollback_records",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": "list_rollback_records",
+      "readmeReference": null,
+      "rawDescription": "List Rollback Records",
+      "normalizedCapabilityId": "cleanup.move-rollback",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.load_config",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "settings",
+      "oldAction": null,
+      "oldCommand": "load_config",
+      "readmeReference": null,
+      "rawDescription": "Load Config",
+      "normalizedCapabilityId": "settings.load",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.local_service_logs",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "toolchains",
+      "oldAction": null,
+      "oldCommand": "local_service_logs",
+      "readmeReference": null,
+      "rawDescription": "Local Service Logs",
+      "normalizedCapabilityId": "services.logs",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.manage_local_service",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "toolchains",
+      "oldAction": null,
+      "oldCommand": "manage_local_service",
+      "readmeReference": null,
+      "rawDescription": "Manage Local Service",
+      "normalizedCapabilityId": "services.manage",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.manage_system_platform",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "toolchains",
+      "oldAction": null,
+      "oldCommand": "manage_system_platform",
+      "readmeReference": null,
+      "rawDescription": "Manage System Platform",
+      "normalizedCapabilityId": "platforms.manage",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.mysql_pending_execution_guard",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "toolchains",
+      "oldAction": null,
+      "oldCommand": "mysql_pending_execution_guard",
+      "readmeReference": null,
+      "rawDescription": "Mysql Pending Execution Guard",
+      "normalizedCapabilityId": null,
+      "exclusionReason": "excluded-internal"
+    },
+    {
+      "sourceId": "v17.command.network_diagnostics",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "toolchains",
+      "oldAction": null,
+      "oldCommand": "network_diagnostics",
+      "readmeReference": null,
+      "rawDescription": "Network Diagnostics",
+      "normalizedCapabilityId": "toolchains.network-cache",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.open_analysis_path",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": "open_analysis_path",
+      "readmeReference": null,
+      "rawDescription": "Open Analysis Path",
+      "normalizedCapabilityId": "system.open-path",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.open_app_config_dir",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "settings",
+      "oldAction": null,
+      "oldCommand": "open_app_config_dir",
+      "readmeReference": null,
+      "rawDescription": "Open App Config Dir",
+      "normalizedCapabilityId": "settings.config-directory",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.open_apps_features",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": "open_apps_features",
+      "readmeReference": null,
+      "rawDescription": "Open Apps Features",
+      "normalizedCapabilityId": "system.apps-features",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.open_default_apps_settings",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "fileAssociations",
+      "oldAction": null,
+      "oldCommand": "open_default_apps_settings",
+      "readmeReference": null,
+      "rawDescription": "Open Default Apps Settings",
+      "normalizedCapabilityId": "file-associations.settings",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.open_docker_desktop",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "cleanup",
+      "oldAction": null,
+      "oldCommand": "open_docker_desktop",
+      "readmeReference": null,
+      "rawDescription": "Open Docker Desktop",
+      "normalizedCapabilityId": "platforms.docker",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.open_file_association_backup_dir",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "fileAssociations",
+      "oldAction": null,
+      "oldCommand": "open_file_association_backup_dir",
+      "readmeReference": null,
+      "rawDescription": "Open File Association Backup Dir",
+      "normalizedCapabilityId": "file-associations.backup-rollback",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.open_file_type_settings",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "fileAssociations",
+      "oldAction": null,
+      "oldCommand": "open_file_type_settings",
+      "readmeReference": null,
+      "rawDescription": "Open File Type Settings",
+      "normalizedCapabilityId": "file-associations.settings",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.open_local_service_directory",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "toolchains",
+      "oldAction": null,
+      "oldCommand": "open_local_service_directory",
+      "readmeReference": null,
+      "rawDescription": "Open Local Service Directory",
+      "normalizedCapabilityId": "services.directory",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.open_process_location",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "ports",
+      "oldAction": null,
+      "oldCommand": "open_process_location",
+      "readmeReference": null,
+      "rawDescription": "Open Process Location",
+      "normalizedCapabilityId": "ports.process-location",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.open_python_alias_settings",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": "open_python_alias_settings",
+      "readmeReference": null,
+      "rawDescription": "Open Python Alias Settings",
+      "normalizedCapabilityId": "environment.python-alias-settings",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.port_history",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "ports",
+      "oldAction": null,
+      "oldCommand": "port_history",
+      "readmeReference": null,
+      "rawDescription": "Port History",
+      "normalizedCapabilityId": "ports.scan-history",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.preview_config_profiles",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "profiles",
+      "oldAction": null,
+      "oldCommand": "preview_config_profiles",
+      "readmeReference": null,
+      "rawDescription": "Preview Config Profiles",
+      "normalizedCapabilityId": "profiles.preview",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.preview_project_configuration",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "projects",
+      "oldAction": null,
+      "oldCommand": "preview_project_configuration",
+      "readmeReference": null,
+      "rawDescription": "Preview Project Configuration",
+      "normalizedCapabilityId": "projects.configuration",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.preview_python_repair",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "environment",
+      "oldAction": null,
+      "oldCommand": "preview_python_repair",
+      "readmeReference": null,
+      "rawDescription": "Preview Python Repair",
+      "normalizedCapabilityId": "environment.python-health-repair",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.preview_user_environment_configuration",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "environment",
+      "oldAction": null,
+      "oldCommand": "preview_user_environment_configuration",
+      "readmeReference": null,
+      "rawDescription": "Preview User Environment Configuration",
+      "normalizedCapabilityId": "environment.configure",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.remove_archive_plan_item",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "cleanup",
+      "oldAction": null,
+      "oldCommand": "remove_archive_plan_item",
+      "readmeReference": null,
+      "rawDescription": "Remove Archive Plan Item",
+      "normalizedCapabilityId": "cleanup.archive-plan",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.repair_doctor_safe",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "reports",
+      "oldAction": null,
+      "oldCommand": "repair_doctor_safe",
+      "readmeReference": null,
+      "rawDescription": "Repair Doctor Safe",
+      "normalizedCapabilityId": "doctor.repair",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.reset_ui_config",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "settings",
+      "oldAction": null,
+      "oldCommand": "reset_ui_config",
+      "readmeReference": null,
+      "rawDescription": "Reset Ui Config",
+      "normalizedCapabilityId": "settings.reset-ui",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.restore_env_backup",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "environment",
+      "oldAction": null,
+      "oldCommand": "restore_env_backup",
+      "readmeReference": null,
+      "rawDescription": "Restore Env Backup",
+      "normalizedCapabilityId": "environment.restore",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.restore_environment_backup",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "environment",
+      "oldAction": null,
+      "oldCommand": "restore_environment_backup",
+      "readmeReference": null,
+      "rawDescription": "Restore Environment Backup",
+      "normalizedCapabilityId": "environment.restore",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.restore_user_environment",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "environment",
+      "oldAction": null,
+      "oldCommand": "restore_user_environment",
+      "readmeReference": null,
+      "rawDescription": "Restore User Environment",
+      "normalizedCapabilityId": "environment.restore",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.rollback_file_association_backup",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "fileAssociations",
+      "oldAction": null,
+      "oldCommand": "rollback_file_association_backup",
+      "readmeReference": null,
+      "rawDescription": "Rollback File Association Backup",
+      "normalizedCapabilityId": "file-associations.backup-rollback",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.rollback_move",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "cleanup",
+      "oldAction": null,
+      "oldCommand": "rollback_move",
+      "readmeReference": null,
+      "rawDescription": "Rollback Move",
+      "normalizedCapabilityId": "cleanup.move-rollback",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.run_chsrc_action",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "toolchains",
+      "oldAction": null,
+      "oldCommand": "run_chsrc_action",
+      "readmeReference": null,
+      "rawDescription": "Run Chsrc Action",
+      "normalizedCapabilityId": "toolchains.mirrors",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.run_doctor",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "reports",
+      "oldAction": null,
+      "oldCommand": "run_doctor",
+      "readmeReference": null,
+      "rawDescription": "Run Doctor",
+      "normalizedCapabilityId": "doctor.run",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.run_learning_check",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": "run_learning_check",
+      "readmeReference": null,
+      "rawDescription": "Run Learning Check",
+      "normalizedCapabilityId": "learning.center",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.run_platform_action",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "toolchains",
+      "oldAction": null,
+      "oldCommand": "run_platform_action",
+      "readmeReference": null,
+      "rawDescription": "Run Platform Action",
+      "normalizedCapabilityId": "platforms.manage",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.run_project_action",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "projects",
+      "oldAction": null,
+      "oldCommand": "run_project_action",
+      "readmeReference": null,
+      "rawDescription": "Run Project Action",
+      "normalizedCapabilityId": "projects.actions",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.run_tool_command",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": "run_tool_command",
+      "readmeReference": null,
+      "rawDescription": "Run Tool Command",
+      "normalizedCapabilityId": "toolchains.command-safety",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.run_toolchain_action",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "toolchains",
+      "oldAction": null,
+      "oldCommand": "run_toolchain_action",
+      "readmeReference": null,
+      "rawDescription": "Run Toolchain Action",
+      "normalizedCapabilityId": "toolchains.actions",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.safety_disclaimer",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "settings",
+      "oldAction": null,
+      "oldCommand": "safety_disclaimer",
+      "readmeReference": null,
+      "rawDescription": "Safety Disclaimer",
+      "normalizedCapabilityId": "safety.disclaimer",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.save_config_profile",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "profiles",
+      "oldAction": null,
+      "oldCommand": "save_config_profile",
+      "readmeReference": null,
+      "rawDescription": "Save Config Profile",
+      "normalizedCapabilityId": "profiles.save",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.scan_cleanup_targets",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "cleanup",
+      "oldAction": null,
+      "oldCommand": "scan_cleanup_targets",
+      "readmeReference": null,
+      "rawDescription": "Scan Cleanup Targets",
+      "normalizedCapabilityId": "cleanup.scan-plan-execute",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.scan_duplicate_large_files",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "cleanup",
+      "oldAction": null,
+      "oldCommand": "scan_duplicate_large_files",
+      "readmeReference": null,
+      "rawDescription": "Scan Duplicate Large Files",
+      "normalizedCapabilityId": "cleanup.folder-analysis",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.scan_file_associations",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "fileAssociations",
+      "oldAction": null,
+      "oldCommand": "scan_file_associations",
+      "readmeReference": null,
+      "rawDescription": "Scan File Associations",
+      "normalizedCapabilityId": "file-associations.scan",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.scan_large_files",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "cleanup",
+      "oldAction": null,
+      "oldCommand": "scan_large_files",
+      "readmeReference": null,
+      "rawDescription": "Scan Large Files",
+      "normalizedCapabilityId": "cleanup.folder-analysis",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.scan_ports",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "ports",
+      "oldAction": null,
+      "oldCommand": "scan_ports",
+      "readmeReference": null,
+      "rawDescription": "Scan Ports",
+      "normalizedCapabilityId": "ports.scan-history",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.self_uninstall",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": "self_uninstall",
+      "readmeReference": null,
+      "rawDescription": "Self Uninstall",
+      "normalizedCapabilityId": "system.self-uninstall",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.set_auto_check_update",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "settings",
+      "oldAction": null,
+      "oldCommand": "set_auto_check_update",
+      "readmeReference": null,
+      "rawDescription": "Set Auto Check Update",
+      "normalizedCapabilityId": "settings.auto-update",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.set_root_dir",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "settings",
+      "oldAction": null,
+      "oldCommand": "set_root_dir",
+      "readmeReference": null,
+      "rawDescription": "Set Root Dir",
+      "normalizedCapabilityId": "settings.root",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.stop_local_service",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "toolchains",
+      "oldAction": null,
+      "oldCommand": "stop_local_service",
+      "readmeReference": null,
+      "rawDescription": "Stop Local Service",
+      "normalizedCapabilityId": "services.manage",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.storage_cleanup_architecture",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "cleanup",
+      "oldAction": null,
+      "oldCommand": "storage_cleanup_architecture",
+      "readmeReference": null,
+      "rawDescription": "Storage Cleanup Architecture",
+      "normalizedCapabilityId": "cleanup.overview",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.switch_runtime",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "runtimes",
+      "oldAction": null,
+      "oldCommand": "switch_runtime",
+      "readmeReference": null,
+      "rawDescription": "Switch Runtime",
+      "normalizedCapabilityId": "runtime.switch",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.uninstall_runtime",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "runtimes",
+      "oldAction": null,
+      "oldCommand": "uninstall_runtime",
+      "readmeReference": null,
+      "rawDescription": "Uninstall Runtime",
+      "normalizedCapabilityId": "runtime.uninstall",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.update_project_port",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "ports",
+      "oldAction": null,
+      "oldCommand": "update_project_port",
+      "readmeReference": null,
+      "rawDescription": "Update Project Port",
+      "normalizedCapabilityId": "projects.port-config",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.validate_directory_path",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": "validate_directory_path",
+      "readmeReference": null,
+      "rawDescription": "Validate Directory Path",
+      "normalizedCapabilityId": null,
+      "exclusionReason": "excluded-internal"
+    },
+    {
+      "sourceId": "v17.command.verify_external_jdk",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "environment",
+      "oldAction": null,
+      "oldCommand": "verify_external_jdk",
+      "readmeReference": null,
+      "rawDescription": "Verify External Jdk",
+      "normalizedCapabilityId": "runtime.external-jdk-verify",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.verify_java_consumer_environment",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "environment",
+      "oldAction": null,
+      "oldCommand": "verify_java_consumer_environment",
+      "readmeReference": null,
+      "rawDescription": "Verify Java Consumer Environment",
+      "normalizedCapabilityId": "projects.java-consumer-verify",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.command.verify_nexus_java_environment",
+      "sourceType": "frontend-invoke",
+      "sourceLocation": [
+        "v1.7.0 frontend invoke"
+      ],
+      "oldPage": "environment",
+      "oldAction": null,
+      "oldCommand": "verify_nexus_java_environment",
+      "readmeReference": null,
+      "rawDescription": "Verify Nexus Java Environment",
+      "normalizedCapabilityId": "projects.java-consumer-verify",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.promise.001",
+      "sourceType": "documentation-promise",
+      "sourceLocation": [
+        "README.md:Temurin、Zulu、Liberica、Microsoft OpenJDK，以及 Python、Node.js、Maven、Gradle 的下载、安装、切换、卸载和 `current` 指针管理。"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": null,
+      "readmeReference": "README.md:Temurin、Zulu、Liberica、Microsoft OpenJDK，以及 Python、Node.js、Maven、Gradle 的下载、安装、切换、卸载和 `current` 指针管理。",
+      "rawDescription": "Temurin、Zulu、Liberica、Microsoft OpenJDK，以及 Python、Node.js、Maven、Gradle 的下载、安装、切换、卸载和 `current` 指针管理。",
+      "normalizedCapabilityId": "runtime.lifecycle",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.promise.002",
+      "sourceType": "documentation-promise",
+      "sourceLocation": [
+        "README.md:安装根目录智能规范化：选择 `D:\\` 时自动使用 `D:\\DevEnvManager`，避免把文件散在盘符根目录。"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": null,
+      "readmeReference": "README.md:安装根目录智能规范化：选择 `D:\\` 时自动使用 `D:\\DevEnvManager`，避免把文件散在盘符根目录。",
+      "rawDescription": "安装根目录智能规范化：选择 `D:\\` 时自动使用 `D:\\DevEnvManager`，避免把文件散在盘符根目录。",
+      "normalizedCapabilityId": "settings.root",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.promise.003",
+      "sourceType": "documentation-promise",
+      "sourceLocation": [
+        "README.md:安装和切换后自动健康检查，验证命令和环境变量是否真的生效；JDK 会交叉核对 `JAVA_HOME`、PATH、`java`、`javac`、Maven 与 Gradle。"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": null,
+      "readmeReference": "README.md:安装和切换后自动健康检查，验证命令和环境变量是否真的生效；JDK 会交叉核对 `JAVA_HOME`、PATH、`java`、`javac`、Maven 与 Gradle。",
+      "rawDescription": "安装和切换后自动健康检查，验证命令和环境变量是否真的生效；JDK 会交叉核对 `JAVA_HOME`、PATH、`java`、`javac`、Maven 与 Gradle。",
+      "normalizedCapabilityId": "runtime.verify",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.promise.004",
+      "sourceType": "documentation-promise",
+      "sourceLocation": [
+        "README.md:运行时强验证：JDK/Python/Node/Maven/Gradle/Go 统一展示未安装、目录存在但未登记、已登记但不可用、组件缺失、环境未生效、可用和当前生效等状态。"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": null,
+      "readmeReference": "README.md:运行时强验证：JDK/Python/Node/Maven/Gradle/Go 统一展示未安装、目录存在但未登记、已登记但不可用、组件缺失、环境未生效、可用和当前生效等状态。",
+      "rawDescription": "运行时强验证：JDK/Python/Node/Maven/Gradle/Go 统一展示未安装、目录存在但未登记、已登记但不可用、组件缺失、环境未生效、可用和当前生效等状态。",
+      "normalizedCapabilityId": "runtime.verify",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.promise.005",
+      "sourceType": "documentation-promise",
+      "sourceLocation": [
+        "README.md:Python 完整性检查：安装后验证 `pip`、`venv`、`ssl`、`sqlite3`、`ctypes`，并将 `tkinter` 作为可选 GUI 组件提示；核心组件失败不会登记为已安装。"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": null,
+      "readmeReference": "README.md:Python 完整性检查：安装后验证 `pip`、`venv`、`ssl`、`sqlite3`、`ctypes`，并将 `tkinter` 作为可选 GUI 组件提示；核心组件失败不会登记为已安装。",
+      "rawDescription": "Python 完整性检查：安装后验证 `pip`、`venv`、`ssl`、`sqlite3`、`ctypes`，并将 `tkinter` 作为可选 GUI 组件提示；核心组件失败不会登记为已安装。",
+      "normalizedCapabilityId": "environment.python-health-repair",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.promise.006",
+      "sourceType": "documentation-promise",
+      "sourceLocation": [
+        "README.md:下载安装过程展示进度：查询、下载、解压、静默安装、验证。"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": null,
+      "readmeReference": "README.md:下载安装过程展示进度：查询、下载、解压、静默安装、验证。",
+      "rawDescription": "下载安装过程展示进度：查询、下载、解压、静默安装、验证。",
+      "normalizedCapabilityId": "runtime.install",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.promise.007",
+      "sourceType": "documentation-promise",
+      "sourceLocation": [
+        "README.md:用户级环境变量管理：写入前展示 `DEVENV_HOME`、`JAVA_HOME`、PATH 差异；二次确认、回读验证、最多 20 份历史备份和指定恢复。"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": null,
+      "readmeReference": "README.md:用户级环境变量管理：写入前展示 `DEVENV_HOME`、`JAVA_HOME`、PATH 差异；二次确认、回读验证、最多 20 份历史备份和指定恢复。",
+      "rawDescription": "用户级环境变量管理：写入前展示 `DEVENV_HOME`、`JAVA_HOME`、PATH 差异；二次确认、回读验证、最多 20 份历史备份和指定恢复。",
+      "normalizedCapabilityId": "environment.configure",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.promise.008",
+      "sourceType": "documentation-promise",
+      "sourceLocation": [
+        "README.md:`JAVA_HOME` 写入真实绝对 JDK 路径，PATH 仍保留可迁移的 `%DEVENV_HOME%` 受管条目，避免 Nacos、Maven、Gradle 等程序不做二次展开时误报。"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": null,
+      "readmeReference": "README.md:`JAVA_HOME` 写入真实绝对 JDK 路径，PATH 仍保留可迁移的 `%DEVENV_HOME%` 受管条目，避免 Nacos、Maven、Gradle 等程序不做二次展开时误报。",
+      "rawDescription": "`JAVA_HOME` 写入真实绝对 JDK 路径，PATH 仍保留可迁移的 `%DEVENV_HOME%` 受管条目，避免 Nacos、Maven、Gradle 等程序不做二次展开时误报。",
+      "normalizedCapabilityId": "environment.configure",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.promise.009",
+      "sourceType": "documentation-promise",
+      "sourceLocation": [
+        "README.md:环境可靠性中心：同时展示当前进程环境和 Windows 用户环境，显示 `JAVA_HOME` raw/expanded、PATH 命中顺序、重复/失效/受管条目、Java/Python/Node/Maven/Gradle 生效来源。"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": null,
+      "readmeReference": "README.md:环境可靠性中心：同时展示当前进程环境和 Windows 用户环境，显示 `JAVA_HOME` raw/expanded、PATH 命中顺序、重复/失效/受管条目、Java/Python/Node/Maven/Gradle 生效来源。",
+      "rawDescription": "环境可靠性中心：同时展示当前进程环境和 Windows 用户环境，显示 `JAVA_HOME` raw/expanded、PATH 命中顺序、重复/失效/受管条目、Java/Python/Node/Maven/Gradle 生效来源。",
+      "normalizedCapabilityId": "environment.snapshot",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.promise.010",
+      "sourceType": "documentation-promise",
+      "sourceLocation": [
+        "README.md:Java 稳定修复计划：后端生成一次性计划，写入真实绝对 `JAVA_HOME`，保留未知用户 PATH，去重并清理旧 DevEnv Manager 受管条目；执行前校验环境指纹，执行后重新验证。"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": null,
+      "readmeReference": "README.md:Java 稳定修复计划：后端生成一次性计划，写入真实绝对 `JAVA_HOME`，保留未知用户 PATH，去重并清理旧 DevEnv Manager 受管条目；执行前校验环境指纹，执行后重新验证。",
+      "rawDescription": "Java 稳定修复计划：后端生成一次性计划，写入真实绝对 `JAVA_HOME`，保留未知用户 PATH，去重并清理旧 DevEnv Manager 受管条目；执行前校验环境指纹，执行后重新验证。",
+      "normalizedCapabilityId": "environment.java-stabilize",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.promise.011",
+      "sourceType": "documentation-promise",
+      "sourceLocation": [
+        "README.md:环境备份恢复中心：列出环境备份、恢复前再次备份当前状态、恢复后广播环境变化并重新验证 Java/Python/Node。"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": null,
+      "readmeReference": "README.md:环境备份恢复中心：列出环境备份、恢复前再次备份当前状态、恢复后广播环境变化并重新验证 Java/Python/Node。",
+      "rawDescription": "环境备份恢复中心：列出环境备份、恢复前再次备份当前状态、恢复后广播环境变化并重新验证 Java/Python/Node。",
+      "normalizedCapabilityId": "environment.restore",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.promise.012",
+      "sourceType": "documentation-promise",
+      "sourceLocation": [
+        "README.md:Python 修复闭环：安装前检查当前 `python` / `pip` / `py`、用户 PATH、Store 别名与多版本冲突；修复前展示一次性计划并保存环境备份。"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": null,
+      "readmeReference": "README.md:Python 修复闭环：安装前检查当前 `python` / `pip` / `py`、用户 PATH、Store 别名与多版本冲突；修复前展示一次性计划并保存环境备份。",
+      "rawDescription": "Python 修复闭环：安装前检查当前 `python` / `pip` / `py`、用户 PATH、Store 别名与多版本冲突；修复前展示一次性计划并保存环境备份。",
+      "normalizedCapabilityId": "environment.python-health-repair",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.promise.013",
+      "sourceType": "documentation-promise",
+      "sourceLocation": [
+        "README.md:pip 缺失修复计划：仅对 DevEnv Manager 受管 Python 生成 `ensurepip` 与 pip 升级计划；非受管 Python 只提示，不替用户改系统安装。"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": null,
+      "readmeReference": "README.md:pip 缺失修复计划：仅对 DevEnv Manager 受管 Python 生成 `ensurepip` 与 pip 升级计划；非受管 Python 只提示，不替用户改系统安装。",
+      "rawDescription": "pip 缺失修复计划：仅对 DevEnv Manager 受管 Python 生成 `ensurepip` 与 pip 升级计划；非受管 Python 只提示，不替用户改系统安装。",
+      "normalizedCapabilityId": "environment.python-health-repair",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.promise.014",
+      "sourceType": "documentation-promise",
+      "sourceLocation": [
+        "README.md:环境医生：按类别对齐展示诊断项和修复建议，可导出 Markdown/JSON 或复制脱敏报告。"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": null,
+      "readmeReference": "README.md:环境医生：按类别对齐展示诊断项和修复建议，可导出 Markdown/JSON 或复制脱敏报告。",
+      "rawDescription": "环境医生：按类别对齐展示诊断项和修复建议，可导出 Markdown/JSON 或复制脱敏报告。",
+      "normalizedCapabilityId": "doctor.run",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.promise.015",
+      "sourceType": "documentation-promise",
+      "sourceLocation": [
+        "README.md:Python 冲突分析：检测默认 `python`、`pip`、`py -0p`、注册表、Microsoft Store 执行别名风险。"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": null,
+      "readmeReference": "README.md:Python 冲突分析：检测默认 `python`、`pip`、`py -0p`、注册表、Microsoft Store 执行别名风险。",
+      "rawDescription": "Python 冲突分析：检测默认 `python`、`pip`、`py -0p`、注册表、Microsoft Store 执行别名风险。",
+      "normalizedCapabilityId": "environment.python-health-repair",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.promise.016",
+      "sourceType": "documentation-promise",
+      "sourceLocation": [
+        "README.md:配置模板：保存当前 JDK/Python/Node/Maven/Gradle 组合和用户环境变量，导入前预览差异，并可自动补齐缺失版本后恢复。"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": null,
+      "readmeReference": "README.md:配置模板：保存当前 JDK/Python/Node/Maven/Gradle 组合和用户环境变量，导入前预览差异，并可自动补齐缺失版本后恢复。",
+      "rawDescription": "配置模板：保存当前 JDK/Python/Node/Maven/Gradle 组合和用户环境变量，导入前预览差异，并可自动补齐缺失版本后恢复。",
+      "normalizedCapabilityId": "profiles.apply",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.promise.017",
+      "sourceType": "documentation-promise",
+      "sourceLocation": [
+        "README.md:项目启动向导：支持选择项目文件夹，自动规范化路径、检查目录、识别 Node/Python/Maven/Gradle/Rust/Tauri/.NET/Go 项目；生成可编辑的 VS Code/IDEA 配置预览，应用前备份文件和环境模板。"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": null,
+      "readmeReference": "README.md:项目启动向导：支持选择项目文件夹，自动规范化路径、检查目录、识别 Node/Python/Maven/Gradle/Rust/Tauri/.NET/Go 项目；生成可编辑的 VS Code/IDEA 配置预览，应用前备份文件和环境模板。",
+      "rawDescription": "项目启动向导：支持选择项目文件夹，自动规范化路径、检查目录、识别 Node/Python/Maven/Gradle/Rust/Tauri/.NET/Go 项目；生成可编辑的 VS Code/IDEA 配置预览，应用前备份文件和环境模板。",
+      "normalizedCapabilityId": "projects.configuration",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.promise.018",
+      "sourceType": "documentation-promise",
+      "sourceLocation": [
+        "README.md:IDEA / IntelliJ 只读分析：读取 `.idea/misc.xml`、`.idea/modules.xml`、`.idea/compiler.xml` 和 `*.iml`，输出 Project SDK、language level、模块 SDK、编译目标与当前 `JAVA_HOME` 的匹配建议；不自动修改 IDEA 配置。"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": null,
+      "readmeReference": "README.md:IDEA / IntelliJ 只读分析：读取 `.idea/misc.xml`、`.idea/modules.xml`、`.idea/compiler.xml` 和 `*.iml`，输出 Project SDK、language level、模块 SDK、编译目标与当前 `JAVA_HOME` 的匹配建议；不自动修改 IDEA 配置。",
+      "rawDescription": "IDEA / IntelliJ 只读分析：读取 `.idea/misc.xml`、`.idea/modules.xml`、`.idea/compiler.xml` 和 `*.iml`，输出 Project SDK、language level、模块 SDK、编译目标与当前 `JAVA_HOME` 的匹配建议；不自动修改 IDEA 配置。",
+      "normalizedCapabilityId": "projects.idea-analysis",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.promise.019",
+      "sourceType": "documentation-promise",
+      "sourceLocation": [
+        "README.md:Java 消费者环境验证：Nacos、Nexus、Maven、Gradle、Spring Boot 或普通 bat/cmd 脚本可验证最新用户环境中的 `JAVA_HOME`、`java.exe`、`javac.exe`、PATH 首个 Java 和间接引用风险。"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": null,
+      "readmeReference": "README.md:Java 消费者环境验证：Nacos、Nexus、Maven、Gradle、Spring Boot 或普通 bat/cmd 脚本可验证最新用户环境中的 `JAVA_HOME`、`java.exe`、`javac.exe`、PATH 首个 Java 和间接引用风险。",
+      "rawDescription": "Java 消费者环境验证：Nacos、Nexus、Maven、Gradle、Spring Boot 或普通 bat/cmd 脚本可验证最新用户环境中的 `JAVA_HOME`、`java.exe`、`javac.exe`、PATH 首个 Java 和间接引用风险。",
+      "normalizedCapabilityId": "projects.java-consumer-verify",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.promise.020",
+      "sourceType": "documentation-promise",
+      "sourceLocation": [
+        "README.md:Git / GitHub 工具链：检测 Git、Git Bash、Git LFS、OpenSSH、用户身份、SSH 公钥和 GitHub HTTPS/SSH 连接，可安全配置身份或生成 ed25519 Key。"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": null,
+      "readmeReference": "README.md:Git / GitHub 工具链：检测 Git、Git Bash、Git LFS、OpenSSH、用户身份、SSH 公钥和 GitHub HTTPS/SSH 连接，可安全配置身份或生成 ed25519 Key。",
+      "rawDescription": "Git / GitHub 工具链：检测 Git、Git Bash、Git LFS、OpenSSH、用户身份、SSH 公钥和 GitHub HTTPS/SSH 连接，可安全配置身份或生成 ed25519 Key。",
+      "normalizedCapabilityId": "toolchains.git-ecosystem",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.promise.021",
+      "sourceType": "documentation-promise",
+      "sourceLocation": [
+        "README.md:Node.js 生态：检测 npm、npx、pnpm、Yarn、Corepack、registry、全局目录和 pnpm store，支持安装包管理器及切换官方源/npmmirror。"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": null,
+      "readmeReference": "README.md:Node.js 生态：检测 npm、npx、pnpm、Yarn、Corepack、registry、全局目录和 pnpm store，支持安装包管理器及切换官方源/npmmirror。",
+      "rawDescription": "Node.js 生态：检测 npm、npx、pnpm、Yarn、Corepack、registry、全局目录和 pnpm store，支持安装包管理器及切换官方源/npmmirror。",
+      "normalizedCapabilityId": "toolchains.node-ecosystem",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.promise.022",
+      "sourceType": "documentation-promise",
+      "sourceLocation": [
+        "README.md:Python 生态：检测 pip、uv、Poetry、virtualenv 和 pip 配置，支持安装工具及切换官方/国内 PyPI 镜像。"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": null,
+      "readmeReference": "README.md:Python 生态：检测 pip、uv、Poetry、virtualenv 和 pip 配置，支持安装工具及切换官方/国内 PyPI 镜像。",
+      "rawDescription": "Python 生态：检测 pip、uv、Poetry、virtualenv 和 pip 配置，支持安装工具及切换官方/国内 PyPI 镜像。",
+      "normalizedCapabilityId": "toolchains.python-ecosystem",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.promise.023",
+      "sourceType": "documentation-promise",
+      "sourceLocation": [
+        "README.md:统一工具注册表：为 JDK、Python、Node.js、Maven、Gradle、Git、Go、Rust、.NET 和生态工具提供统一能力元数据。"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": null,
+      "readmeReference": "README.md:统一工具注册表：为 JDK、Python、Node.js、Maven、Gradle、Git、Go、Rust、.NET 和生态工具提供统一能力元数据。",
+      "rawDescription": "统一工具注册表：为 JDK、Python、Node.js、Maven、Gradle、Git、Go、Rust、.NET 和生态工具提供统一能力元数据。",
+      "normalizedCapabilityId": "runtime.discover",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.promise.024",
+      "sourceType": "documentation-promise",
+      "sourceLocation": [
+        "README.md:Go 管理：从 `go.dev` 官方索引解析稳定版，校验 SHA256 后安装、切换和卸载 Windows x64 ZIP。"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": null,
+      "readmeReference": "README.md:Go 管理：从 `go.dev` 官方索引解析稳定版，校验 SHA256 后安装、切换和卸载 Windows x64 ZIP。",
+      "rawDescription": "Go 管理：从 `go.dev` 官方索引解析稳定版，校验 SHA256 后安装、切换和卸载 Windows x64 ZIP。",
+      "normalizedCapabilityId": "runtime.install",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.promise.025",
+      "sourceType": "documentation-promise",
+      "sourceLocation": [
+        "README.md:Rust / rustup 诊断：检测 rustup、rustc、Cargo、已安装工具链、默认工具链和 MSVC Build Tools，支持切换 stable 与更新。"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": null,
+      "readmeReference": "README.md:Rust / rustup 诊断：检测 rustup、rustc、Cargo、已安装工具链、默认工具链和 MSVC Build Tools，支持切换 stable 与更新。",
+      "rawDescription": "Rust / rustup 诊断：检测 rustup、rustc、Cargo、已安装工具链、默认工具链和 MSVC Build Tools，支持切换 stable 与更新。",
+      "normalizedCapabilityId": "toolchains.rust",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.promise.026",
+      "sourceType": "documentation-promise",
+      "sourceLocation": [
+        "README.md:.NET SDK 诊断：检测 SDK/Runtime 列表，识别项目 `global.json`，支持 restore、build 和 test 项目动作。"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": null,
+      "readmeReference": "README.md:.NET SDK 诊断：检测 SDK/Runtime 列表，识别项目 `global.json`，支持 restore、build 和 test 项目动作。",
+      "rawDescription": ".NET SDK 诊断：检测 SDK/Runtime 列表，识别项目 `global.json`，支持 restore、build 和 test 项目动作。",
+      "normalizedCapabilityId": "toolchains.dotnet",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.promise.027",
+      "sourceType": "documentation-promise",
+      "sourceLocation": [
+        "README.md:镜像加速中心：集中查看 npm、pip、GOPROXY、Maven、Gradle 和 Cargo 配置；可调用官方 RubyMetric/chsrc 进行固定目标的查看、测速、换源和恢复。"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": null,
+      "readmeReference": "README.md:镜像加速中心：集中查看 npm、pip、GOPROXY、Maven、Gradle 和 Cargo 配置；可调用官方 RubyMetric/chsrc 进行固定目标的查看、测速、换源和恢复。",
+      "rawDescription": "镜像加速中心：集中查看 npm、pip、GOPROXY、Maven、Gradle 和 Cargo 配置；可调用官方 RubyMetric/chsrc 进行固定目标的查看、测速、换源和恢复。",
+      "normalizedCapabilityId": "toolchains.mirrors",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.promise.028",
+      "sourceType": "documentation-promise",
+      "sourceLocation": [
+        "README.md:统一分页：独立列表超过 5 项时提供分页、总数与页码；端口表格每页 10 项。"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": null,
+      "readmeReference": "README.md:统一分页：独立列表超过 5 项时提供分页、总数与页码；端口表格每页 10 项。",
+      "rawDescription": "统一分页：独立列表超过 5 项时提供分页、总数与页码；端口表格每页 10 项。",
+      "normalizedCapabilityId": null,
+      "exclusionReason": "excluded-ui-mechanics"
+    },
+    {
+      "sourceId": "v17.promise.029",
+      "sourceType": "documentation-promise",
+      "sourceLocation": [
+        "README.md:端口管理：固定列宽排序、智能搜索、实时新增占用提醒、进程/父进程/Windows 服务解释、7 天历史、安全结束进程，以及 Spring Boot、Tomcat、Vite、`.env` 项目端口识别和备份修改。"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": null,
+      "readmeReference": "README.md:端口管理：固定列宽排序、智能搜索、实时新增占用提醒、进程/父进程/Windows 服务解释、7 天历史、安全结束进程，以及 Spring Boot、Tomcat、Vite、`.env` 项目端口识别和备份修改。",
+      "rawDescription": "端口管理：固定列宽排序、智能搜索、实时新增占用提醒、进程/父进程/Windows 服务解释、7 天历史、安全结束进程，以及 Spring Boot、Tomcat、Vite、`.env` 项目端口识别和备份修改。",
+      "normalizedCapabilityId": "ports.scan-history",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.promise.030",
+      "sourceType": "documentation-promise",
+      "sourceLocation": [
+        "README.md:Docker Desktop 安装、更新、启动和关闭；WSL 更新、发行版安装、启动、停止和默认发行版管理。"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": null,
+      "readmeReference": "README.md:Docker Desktop 安装、更新、启动和关闭；WSL 更新、发行版安装、启动、停止和默认发行版管理。",
+      "rawDescription": "Docker Desktop 安装、更新、启动和关闭；WSL 更新、发行版安装、启动、停止和默认发行版管理。",
+      "normalizedCapabilityId": "platforms.manage",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.promise.031",
+      "sourceType": "documentation-promise",
+      "sourceLocation": [
+        "README.md:MySQL、PostgreSQL、Redis、MongoDB、Elasticsearch、SQL Server 服务检测、启动、停止、重启、日志和安装目录访问。"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": null,
+      "readmeReference": "README.md:MySQL、PostgreSQL、Redis、MongoDB、Elasticsearch、SQL Server 服务检测、启动、停止、重启、日志和安装目录访问。",
+      "rawDescription": "MySQL、PostgreSQL、Redis、MongoDB、Elasticsearch、SQL Server 服务检测、启动、停止、重启、日志和安装目录访问。",
+      "normalizedCapabilityId": "services.manage",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.promise.032",
+      "sourceType": "documentation-promise",
+      "sourceLocation": [
+        "README.md:MySQL 修复中心：只读发现遗失服务、`my.ini`、端口、Data 系统库与候选业务库；支持一次性注册/启动/备份/系统库修复计划，并强制执行备份门禁。"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": null,
+      "readmeReference": "README.md:MySQL 修复中心：只读发现遗失服务、`my.ini`、端口、Data 系统库与候选业务库；支持一次性注册/启动/备份/系统库修复计划，并强制执行备份门禁。",
+      "rawDescription": "MySQL 修复中心：只读发现遗失服务、`my.ini`、端口、Data 系统库与候选业务库；支持一次性注册/启动/备份/系统库修复计划，并强制执行备份门禁。",
+      "normalizedCapabilityId": "mysql.repair",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.promise.033",
+      "sourceType": "documentation-promise",
+      "sourceLocation": [
+        "README.md:学习中心：介绍 Scoop、mise、vfox、uv、chsrc 的官方入口和适用边界，只允许运行固定版本、位置与环境检查命令。"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": null,
+      "readmeReference": "README.md:学习中心：介绍 Scoop、mise、vfox、uv、chsrc 的官方入口和适用边界，只允许运行固定版本、位置与环境检查命令。",
+      "rawDescription": "学习中心：介绍 Scoop、mise、vfox、uv、chsrc 的官方入口和适用边界，只允许运行固定版本、位置与环境检查命令。",
+      "normalizedCapabilityId": "learning.center",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.promise.034",
+      "sourceType": "documentation-promise",
+      "sourceLocation": [
+        "README.md:程序内更新：每天最多自动检查一次，只读取固定更新清单，不上传遥测；下载包强制 SHA256 校验。"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": null,
+      "readmeReference": "README.md:程序内更新：每天最多自动检查一次，只读取固定更新清单，不上传遥测；下载包强制 SHA256 校验。",
+      "rawDescription": "程序内更新：每天最多自动检查一次，只读取固定更新清单，不上传遥测；下载包强制 SHA256 校验。",
+      "normalizedCapabilityId": "update.download-install",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.promise.035",
+      "sourceType": "documentation-promise",
+      "sourceLocation": [
+        "README.md:C 盘急救大师 Phase 2：执行“扫描 → 选择 → 计划预览 → 二次确认 → 重新校验 → 回收站清理 → 验证 → 报告”；开发缓存优先调用官方命令。"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": null,
+      "readmeReference": "README.md:C 盘急救大师 Phase 2：执行“扫描 → 选择 → 计划预览 → 二次确认 → 重新校验 → 回收站清理 → 验证 → 报告”；开发缓存优先调用官方命令。",
+      "rawDescription": "C 盘急救大师 Phase 2：执行“扫描 → 选择 → 计划预览 → 二次确认 → 重新校验 → 回收站清理 → 验证 → 报告”；开发缓存优先调用官方命令。",
+      "normalizedCapabilityId": "cleanup.scan-plan-execute",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.promise.036",
+      "sourceType": "documentation-promise",
+      "sourceLocation": [
+        "README.md:C 盘急救大师 Phase 3：桌面/下载分类、大文件 Top 100、按大小与 SHA256 的重复文件扫描，以及微信/QQ、浏览器缓存、网盘、剪辑软件、游戏库和 Windows 已安装软件占用分析；支持把普通文件加入只记录路径的归档计划，全部默认只读且不移动文件。"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": null,
+      "readmeReference": "README.md:C 盘急救大师 Phase 3：桌面/下载分类、大文件 Top 100、按大小与 SHA256 的重复文件扫描，以及微信/QQ、浏览器缓存、网盘、剪辑软件、游戏库和 Windows 已安装软件占用分析；支持把普通文件加入只记录路径的归档计划，全部默认只读且不移动文件。",
+      "rawDescription": "C 盘急救大师 Phase 3：桌面/下载分类、大文件 Top 100、按大小与 SHA256 的重复文件扫描，以及微信/QQ、浏览器缓存、网盘、剪辑软件、游戏库和 Windows 已安装软件占用分析；支持把普通文件加入只记录路径的归档计划，全部默认只读且不移动文件。",
+      "normalizedCapabilityId": "cleanup.folder-analysis",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.promise.037",
+      "sourceType": "documentation-promise",
+      "sourceLocation": [
+        "README.md:C 盘急救大师 Phase 4：空间搬家、桌面/下载归档、Junction 桥接、回滚记录和 C 盘真扩容安全向导；分区检测只读，扩容仅安全 A/B 模式可执行并要求三次确认。"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": null,
+      "readmeReference": "README.md:C 盘急救大师 Phase 4：空间搬家、桌面/下载归档、Junction 桥接、回滚记录和 C 盘真扩容安全向导；分区检测只读，扩容仅安全 A/B 模式可执行并要求三次确认。",
+      "rawDescription": "C 盘急救大师 Phase 4：空间搬家、桌面/下载归档、Junction 桥接、回滚记录和 C 盘真扩容安全向导；分区检测只读，扩容仅安全 A/B 模式可执行并要求三次确认。",
+      "normalizedCapabilityId": "cleanup.move-rollback",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.promise.038",
+      "sourceType": "documentation-promise",
+      "sourceLocation": [
+        "README.md:命令面板安全模式：仅允许常见开发工具，拦截系统 Shell、磁盘、注册表、权限、服务和破坏性 Git 命令。"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": null,
+      "readmeReference": "README.md:命令面板安全模式：仅允许常见开发工具，拦截系统 Shell、磁盘、注册表、权限、服务和破坏性 Git 命令。",
+      "rawDescription": "命令面板安全模式：仅允许常见开发工具，拦截系统 Shell、磁盘、注册表、权限、服务和破坏性 Git 命令。",
+      "normalizedCapabilityId": "toolchains.command-safety",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.promise.039",
+      "sourceType": "documentation-promise",
+      "sourceLocation": [
+        "README.md:统一风险说明：主要页面都有功能说明、风险等级、影响范围、可恢复性、备份建议和确认要求；首次启动会显示使用前说明，用户可在设置/安全说明中重新查看。"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": null,
+      "readmeReference": "README.md:统一风险说明：主要页面都有功能说明、风险等级、影响范围、可恢复性、备份建议和确认要求；首次启动会显示使用前说明，用户可在设置/安全说明中重新查看。",
+      "rawDescription": "统一风险说明：主要页面都有功能说明、风险等级、影响范围、可恢复性、备份建议和确认要求；首次启动会显示使用前说明，用户可在设置/安全说明中重新查看。",
+      "normalizedCapabilityId": "safety.guide",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.promise.040",
+      "sourceType": "documentation-promise",
+      "sourceLocation": [
+        "README.md:AI Agent / CLI 痕迹分析：用户主动触发后只读检查可验证路径与项目配置文件名，不读取会话正文、history、token 或密钥。"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": null,
+      "readmeReference": "README.md:AI Agent / CLI 痕迹分析：用户主动触发后只读检查可验证路径与项目配置文件名，不读取会话正文、history、token 或密钥。",
+      "rawDescription": "AI Agent / CLI 痕迹分析：用户主动触发后只读检查可验证路径与项目配置文件名，不读取会话正文、history、token 或密钥。",
+      "normalizedCapabilityId": "debug.agent-traces",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.promise.041",
+      "sourceType": "documentation-promise",
+      "sourceLocation": [
+        "README.md:`devenv` CLI：环境诊断、可靠性快照、Java 修复计划、备份恢复、版本查看/切换、项目检查、清理扫描和配置模板应用；修改类 CLI 需要显式确认参数。"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": null,
+      "readmeReference": "README.md:`devenv` CLI：环境诊断、可靠性快照、Java 修复计划、备份恢复、版本查看/切换、项目检查、清理扫描和配置模板应用；修改类 CLI 需要显式确认参数。",
+      "rawDescription": "`devenv` CLI：环境诊断、可靠性快照、Java 修复计划、备份恢复、版本查看/切换、项目检查、清理扫描和配置模板应用；修改类 CLI 需要显式确认参数。",
+      "normalizedCapabilityId": "cli.workflows",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.promise.042",
+      "sourceType": "documentation-promise",
+      "sourceLocation": [
+        "README.md:网络诊断、下载缓存管理、命令面板、自身卸载入口。"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": null,
+      "readmeReference": "README.md:网络诊断、下载缓存管理、命令面板、自身卸载入口。",
+      "rawDescription": "网络诊断、下载缓存管理、命令面板、自身卸载入口。",
+      "normalizedCapabilityId": "toolchains.network-cache",
+      "exclusionReason": null
+    },
+    {
+      "sourceId": "v17.promise.043",
+      "sourceType": "documentation-promise",
+      "sourceLocation": [
+        "README.md:后台执行耗时任务，隐藏 Windows 命令窗口，减少闪屏和界面卡顿。"
+      ],
+      "oldPage": "dashboard",
+      "oldAction": null,
+      "oldCommand": null,
+      "readmeReference": "README.md:后台执行耗时任务，隐藏 Windows 命令窗口，减少闪屏和界面卡顿。",
+      "rawDescription": "后台执行耗时任务，隐藏 Windows 命令窗口，减少闪屏和界面卡顿。",
+      "normalizedCapabilityId": "runner.background-execution",
+      "exclusionReason": null
+    }
+  ]
+}

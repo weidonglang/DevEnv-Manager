@@ -78,6 +78,17 @@ pub fn clean_dev_cache(tool: &str, managed_root: &Path) -> Result<String, String
     run_command(executable, args, managed_root)
 }
 
+#[cfg(feature = "acceptance-fixtures")]
+pub(crate) fn clean_dev_cache_isolated<F>(tool: &str, runner: F) -> Result<String, String>
+where
+    F: FnOnce(&str, &[&str]) -> Result<String, String>,
+{
+    let normalized = tool.trim().to_ascii_lowercase();
+    let (executable, args) = command_spec(&normalized)
+        .ok_or_else(|| "Unsupported development cache fixture".to_string())?;
+    runner(executable, args)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

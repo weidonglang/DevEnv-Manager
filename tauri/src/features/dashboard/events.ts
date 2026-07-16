@@ -18,6 +18,7 @@ export function bindDashboardEvents(context: FeatureContext, state: DashboardSta
       state.portStatus = "unavailable";
       state.errors.ports = result.error;
     }
+    if (!context.isCurrent()) return;
     context.root.innerHTML = renderDashboard(state);
     bindDashboardEvents(context, state);
   });
@@ -25,6 +26,7 @@ export function bindDashboardEvents(context: FeatureContext, state: DashboardSta
   bindAction(context.root, "create-java-stabilize-plan", () => context.navigate("environment"));
   bindAction(context.root, "check-updates", async () => {
     state.update = await getUpdateStatus();
+    if (!context.isCurrent()) return;
     context.root.innerHTML = renderDashboard(state);
     bindDashboardEvents(context, state);
   });
@@ -43,6 +45,7 @@ export async function refreshDashboard(context: FeatureContext, state: Dashboard
     loadSafe(getPowerShellStatus),
     loadSafe(getUpdateStatus),
   ]);
+  if (!context.isCurrent()) return;
   if (snapshot.ok) {
     state.snapshot = snapshot.value;
   } else {

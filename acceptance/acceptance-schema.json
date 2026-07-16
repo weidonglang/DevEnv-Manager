@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DevEnv Manager Feature Acceptance Manifest",
+  "type": "object",
+  "required": ["version", "pages"],
+  "properties": {
+    "version": { "type": "string" },
+    "commandAllowlist": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["command", "reason"],
+        "properties": {
+          "command": { "type": "string" },
+          "reason": { "type": "string", "minLength": 1 },
+          "priority": { "type": "string" }
+        }
+      }
+    },
+    "pages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["pageId", "displayName", "priority", "features"],
+        "properties": {
+          "pageId": { "type": "string" },
+          "displayName": { "type": "string" },
+          "priority": { "enum": ["P0", "P1", "P2"] },
+          "features": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "featureId",
+                "id",
+                "domain",
+                "userVisibleName",
+                "name",
+                "priority",
+                "targetVersion",
+                "status",
+                "oldFeature",
+                "frontendComponent",
+                "frontendEntry",
+                "selectors",
+                "backendCommands",
+                "backendExists",
+                "frontendWired",
+                "riskLevel",
+                "requiresTauri",
+                "requiresLoading",
+                "requiresResultArea",
+                "requiresErrorArea",
+                "requiresDebug",
+                "requiresReport",
+                "requiresRiskPlan",
+                "requiresToken",
+                "requiresVerify",
+                "requiresRollback",
+                "requiresPagination",
+                "requiresI18n",
+                "requiresDarkReadable",
+                "safeSmokeMode",
+                "manualAllowed",
+                "acceptanceChecks",
+                "testModes"
+              ],
+              "properties": {
+                "featureId": { "type": "string" },
+                "userVisibleName": { "type": "string" },
+                "priority": { "enum": ["P0", "P1", "P2"] },
+                "status": { "enum": ["implemented", "partial", "backendOnly", "uiOnly", "missing", "deferred", "manualOnly"] },
+                "frontendEntry": {
+                  "type": "object",
+                  "required": ["route", "testIds"],
+                  "properties": {
+                    "route": { "type": "string" },
+                    "testIds": { "type": "array", "items": { "type": "string" } }
+                  }
+                },
+                "selectors": {
+                  "type": "object",
+                  "additionalProperties": { "type": ["string", "null"] }
+                },
+                "backendCommands": { "type": "array", "items": { "type": "string" } },
+                "targetVersion": { "type": "string" },
+                "domain": { "type": "string" },
+                "oldFeature": { "type": "boolean" },
+                "oldEntry": { "type": ["string", "null"] },
+                "currentEntry": { "type": ["string", "null"] },
+                "frontendComponent": { "type": "string" },
+                "backendExists": { "type": "boolean" },
+                "frontendWired": { "type": "boolean" },
+                "riskLevel": { "type": "string" },
+                "requiresTauri": { "type": "boolean" },
+                "requiresWindows": { "type": "boolean" },
+                "requiresLoading": { "type": "boolean" },
+                "requiresResultArea": { "type": "boolean" },
+                "requiresErrorArea": { "type": "boolean" },
+                "requiresDebug": { "type": "boolean" },
+                "requiresReport": { "type": "boolean" },
+                "requiresRiskPlan": { "type": "boolean" },
+                "requiresToken": { "type": "boolean" },
+                "requiresVerify": { "type": "boolean" },
+                "requiresRollback": { "type": "boolean" },
+                "requiresPagination": { "type": "boolean" },
+                "requiresI18n": { "type": "boolean" },
+                "requiresDarkReadable": { "type": "boolean" },
+                "safeSmokeMode": { "type": "string" },
+                "manualOnlyReason": { "type": ["string", "null"] },
+                "deferredReason": { "type": ["string", "null"] },
+                "manualAllowed": { "type": "boolean" },
+                "expectedFailureReason": { "type": ["string", "null"] },
+                "testModes": { "type": "array", "items": { "type": "string" } },
+                "acceptanceChecks": { "type": "array", "items": { "type": "string" } }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

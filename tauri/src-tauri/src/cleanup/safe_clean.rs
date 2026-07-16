@@ -151,6 +151,17 @@ pub fn clean_managed_download_cache(managed_root: &Path) -> CleanupResult {
     store_result(result)
 }
 
+#[cfg(feature = "acceptance-fixtures")]
+pub(crate) fn clean_managed_download_cache_isolated(managed_root: &Path) -> CleanupResult {
+    clean_managed_download_cache_with(managed_root, |path| {
+        if path.is_dir() {
+            fs::remove_dir_all(path).map_err(|error| error.to_string())
+        } else {
+            fs::remove_file(path).map_err(|error| error.to_string())
+        }
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
