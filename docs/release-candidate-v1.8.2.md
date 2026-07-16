@@ -1,4 +1,6 @@
-# v1.8.2 Updated Release Candidate
+# v1.8.2 Historical Release Candidate (Superseded)
+
+This document records the historical `71cdcd9` candidate only. It is superseded by the final assets in `docs/release-v1.8.2.md` and must not be used for publication.
 
 ## Build Identity
 

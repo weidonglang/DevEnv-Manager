@@ -2,9 +2,9 @@
 
 [GitHub 主仓库](https://github.com/weidonglang/DevEnv-Manager) · [Gitee 国内镜像](https://gitee.com/weidonglang/DevEnv-Manager) · [GitHub Release](https://github.com/weidonglang/DevEnv-Manager/releases) · [Gitee Release](https://gitee.com/weidonglang/DevEnv-Manager/releases) · [完整操作手册](docs/user-guide.md) · [安全说明](docs/safety-and-disclaimer.md) · [问题反馈](https://github.com/weidonglang/DevEnv-Manager/issues)
 
-面向 Windows 的开发环境诊断器与安全操作面板。当前版本：**1.8.2 Release Candidate**。
+面向 Windows 的开发环境诊断器与安全操作面板。当前版本：**1.8.2 Stable**。
 
-1.8.2 是前端重构后的首个稳定性恢复候选版本：恢复并加固 Cleanup、Ports、Environment、Reports、File Associations 等核心工作流，加入自动验收与真实 Tauri 验证。Runtime 最终重构继续由 #130 / v1.9.0 跟踪。
+1.8.2 是前端重构后的稳定性恢复版本：恢复并加固 Cleanup、Ports、Environment、Projects、Reports、File Associations 等核心工作流，加入自动验收与真实 Tauri/Hyper-V 验证。Runtime 最终重构继续由 #130 / v1.9.0 跟踪。
 
 ## 下载与镜像
 
@@ -12,7 +12,9 @@
 - Gitee 国内镜像：https://gitee.com/weidonglang/DevEnv-Manager
 - GitHub Release：https://github.com/weidonglang/DevEnv-Manager/releases
 - Gitee Release：https://gitee.com/weidonglang/DevEnv-Manager/releases
-- v1.8.2 新 RC 正在从最终修复 commit 重新构建；旧 RC 资产已作废，不得发布或上传。
+- v1.8.2 NSIS：https://github.com/weidonglang/DevEnv-Manager/releases/download/v1.8.2/DevEnv.Manager_1.8.2_x64-setup.exe
+- 国内下载：https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.8.2/DevEnv.Manager_1.8.2_x64-setup.exe
+- NSIS SHA256：`b910f56674abca837baaff662e159d6025d66dce933c2f758af34211a27e49a6`
 
 适合：
 
@@ -45,7 +47,7 @@ DevEnv Manager 解决的是 Windows 上多个开发生态互相影响的问题�
 - 不适合希望软件自动接管整台机器、清理任意个人文件或替代专业包管理器的场景。
 - 熟练使用 mise/asdf/Scoop/Chocolatey 且环境已经稳定的用户，可以只使用诊断能力。
 
-## 1.8.2 Release Candidate
+## 1.8.2 Stable
 
 我们需要向受 v1.8.0 和 v1.8.1 回归问题影响的用户郑重道歉。Workbench 重构后曾出现页面大面积“不可用”、按钮只有短暂提示却没有结果、旧功能入口丢失、深色和高对比度模式难以阅读、端口扫描超时拖累其他页面，以及计划创建后找不到执行入口等问题。这些问题不应由用户反复手测才能发现。
 
@@ -62,13 +64,16 @@ v1.8.2 因此不是继续堆叠新功能，而是一次完整的稳定性恢复�
 - 明确 Runtime 的受管/外部边界：外部运行时只读，不允许由 DevEnv Manager 直接切换或删除；受管操作继续走计划、确认令牌和验证。
 - 完成 Toolchains、Windows 服务、WSL 平台和 MySQL 修复的隔离 VM/UAC 验收；MySQL fixture 的系统表恢复后，`ibdata1` 与业务数据哈希保持不变。
 - 完成中英文公共结果字段、Cleanup/Runtime/Settings 进度文案和扩容动态状态适配；新增 648 个双语 key 的一致性门禁，覆盖 29 个 UI 与事件源文件。
+- 修复英文界面仍混入后端中文诊断、计划影响、清理原因和运行时验证说明的问题；所有后端可见文本统一经过语言适配边界。
+- 修复 Cleanup 摘要与数据库服务表格在 Dark/High Contrast 下的浅色背景和低对比度文字，主题样式统一使用设计令牌。
+- 抑制外部 JDK/工具探测失败时弹出的系统级 VCRUNTIME 错误窗口；探测失败现在只进入结构化结果，不阻断工作台。
 - 建立 static、safe、frontend、sandbox、manual 五层自动验收，检查 backend-only、ui-only、toast-only、字段漂移、selector、风险契约和空白提示。
 
-最终聚合验收为 283 项：240 通过、0 失败、36 项按安全策略跳过、7 项保留为有明确理由的人工或延期项。Rust 154 项测试、Clippy、前端生产构建、195 个稳定 selector、170 个后端命令裁决和 GitHub/Gitee 更新元数据一致性均已通过。
+最终聚合验收为 283 项：240 通过、0 失败、36 项按安全策略跳过、7 项保留为有明确理由的人工或延期项。Rust 154 项测试、Clippy、110 模块前端生产构建、195 个稳定 selector、170 个后端命令裁决和 GitHub/Gitee 更新元数据一致性均已通过。
 
 v1.9.0 的 Runtime 数据模型重构继续由 #130 跟踪；Profile 历史版本恢复需要新的持久化模型，Advanced 模式仍属于后续策略和视觉工作。这些后续增强不属于 v1.7.0 旧功能缺失。
 
-Verified RC installer metadata and upgrade/rollback evidence are recorded in [docs/release-v1.8.2.md](docs/release-v1.8.2.md). No v1.8.2 tag or release is created by this PR.
+正式安装包元数据、升级/回滚证据和验收边界记录在 [docs/release-v1.8.2.md](docs/release-v1.8.2.md)。历史 RC 安装包全部作废，不得用于分发。
 
 ## 1.8.1 Stable
 

@@ -2,16 +2,16 @@
   "schemaVersion": 2,
   "channel": "stable",
   "version": "1.8.2",
-  "date": "2026-07-11",
+  "date": "2026-07-16",
   "notes": [
-    "Verified v1.8.2 RC candidate: restores and hardens Cleanup, Ports, Environment, Reports, and File Associations after the frontend refactor; adds automated acceptance and installed NSIS/MSI verification. Runtime final redesign remains deferred to v1.9.0 / #130."
+    "v1.8.2 stable restores and hardens Cleanup, Ports, Environment, Projects, Reports, File Associations, Runtime boundaries, bilingual rendering, and dark/high-contrast readability after the frontend refactor. It adds automated acceptance plus installed NSIS/MSI, upgrade, rollback, UAC, and safety verification. Runtime final redesign remains tracked by v1.9.0 / #130."
   ],
   "assets": [
     {
       "platform": "windows-x64",
       "fileName": "DevEnv.Manager_1.8.2_x64-setup.exe",
-      "size": 2675263,
-      "sha256": "858e128f42b774e41772da9c065596c116812355d90c7943636bfaedded321e7",
+      "size": 2775318,
+      "sha256": "b910f56674abca837baaff662e159d6025d66dce933c2f758af34211a27e49a6",
       "primaryUrl": "https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.8.2/DevEnv.Manager_1.8.2_x64-setup.exe",
       "mirrors": [
         {
