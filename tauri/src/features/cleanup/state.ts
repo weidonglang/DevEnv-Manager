@@ -31,6 +31,11 @@ export type CleanupWorkbenchState = {
   duplicateScanCompletedAt: string;
   desktopArchivePlan: MovePlan | null;
   desktopArchiveResult: MoveResult | null;
+  desktopCleanupPlan: MovePlan | null;
+  desktopCleanupResult: MoveResult | null;
+  desktopSelectedPaths: string[];
+  desktopTargetDrive: string;
+  desktopRecoveryResult: string;
   downloadsArchivePlan: MovePlan | null;
   downloadsArchiveResult: MoveResult | null;
   appUsage: AppUsageReport | null;
@@ -74,6 +79,11 @@ export const cleanupWorkbenchInitialState: CleanupWorkbenchState = {
   duplicateScanCompletedAt: "",
   desktopArchivePlan: null,
   desktopArchiveResult: null,
+  desktopCleanupPlan: null,
+  desktopCleanupResult: null,
+  desktopSelectedPaths: [],
+  desktopTargetDrive: "D",
+  desktopRecoveryResult: "",
   downloadsArchivePlan: null,
   downloadsArchiveResult: null,
   appUsage: null,

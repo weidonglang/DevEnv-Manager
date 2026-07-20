@@ -37,17 +37,18 @@ pub use downloads::inspect_downloads;
 pub use duplicates::scan_duplicate_large_files_with_progress;
 pub use expansion::{create_c_drive_expansion_plan, execute_c_drive_expansion};
 pub use large_files::scan_large_files_with_progress;
-pub use migration::execute_move_plan;
 #[cfg(feature = "acceptance-fixtures")]
 pub(crate) use migration::execute_isolated_move_plan;
+pub use migration::execute_move_plan;
 pub use model::{
     AppUsageReport, CleanupPlan, CleanupResult, CleanupScanReport, DiskVolumeInfo, DuplicateGroup,
     ExpansionPlan, ExpansionResult, FolderUsageReport, InstalledSoftwareUsage, LargeFileItem,
     MaintenanceOverview, MovePlan, MoveResult, PartitionLayoutReport, RollbackRecord,
 };
 pub use move_plan::{
-    create_desktop_archive_plan, create_downloads_archive_plan, create_junction_bridge_plan,
-    create_move_plan, execute_desktop_archive_plan, execute_downloads_archive_plan,
+    create_desktop_archive_plan, create_desktop_cleanup_plan, create_downloads_archive_plan,
+    create_junction_bridge_plan, create_move_plan, execute_desktop_archive_plan,
+    execute_desktop_cleanup_plan, execute_downloads_archive_plan,
 };
 pub use partition::inspect_partition_layout;
 #[allow(unused_imports)]
@@ -57,9 +58,9 @@ pub use protect::{
 };
 pub use report::inspect_maintenance_overview;
 pub use rollback::{list_rollback_records, rollback_move};
-pub use safe_clean::{clean_managed_download_cache, clean_selected_targets};
 #[cfg(feature = "acceptance-fixtures")]
 pub(crate) use safe_clean::clean_managed_download_cache_isolated;
+pub use safe_clean::{clean_managed_download_cache, clean_selected_targets};
 pub use scan::scan_cleanup_targets;
 pub use software::inspect_installed_software_usage;
 

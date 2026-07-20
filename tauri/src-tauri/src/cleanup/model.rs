@@ -140,6 +140,8 @@ pub struct LargeFileItem {
     pub open_status: String,
     pub suggestion: String,
     pub risk: String,
+    pub actionable: bool,
+    pub blocked_reason: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Default)]
@@ -176,6 +178,9 @@ pub struct FolderUsageReport {
     pub name: String,
     pub path: String,
     pub total_bytes: u64,
+    pub file_count: usize,
+    pub folder_count: usize,
+    pub protected_count: usize,
     pub categories: Vec<FolderUsageItem>,
     pub top_files: Vec<LargeFileItem>,
     pub suggestions: Vec<String>,
@@ -230,7 +235,28 @@ pub struct MovePlan {
     pub risk: String,
     pub requires_admin: bool,
     pub reversible: bool,
+    #[serde(default)]
+    pub selected_items: Vec<MovePlanItem>,
     pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct MovePlanItem {
+    pub source: String,
+    pub target: String,
+    pub size: u64,
+    pub sha256: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct MoveReceipt {
+    pub source: String,
+    pub target: String,
+    pub size: u64,
+    pub source_sha256: String,
+    pub target_sha256: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -245,6 +271,8 @@ pub struct MoveResult {
     pub junction_created: bool,
     pub failures: Vec<String>,
     pub rollback_id: Option<String>,
+    #[serde(default)]
+    pub receipts: Vec<MoveReceipt>,
     pub report_markdown: String,
 }
 
@@ -259,6 +287,8 @@ pub struct RollbackRecord {
     pub backup_path: Option<String>,
     pub junction_path: Option<String>,
     pub reversible: bool,
+    #[serde(default)]
+    pub moved_files: Vec<MoveReceipt>,
     pub notes: Vec<String>,
 }
 

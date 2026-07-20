@@ -53,7 +53,9 @@
             "app_snapshot",
             "environment_health",
             "powershell_runner_status",
-            "scan_ports"
+            "scan_ports",
+            "port_scan_status",
+            "enrich_port_scan"
           ],
           "backendExists": true,
           "frontendWired": true,
@@ -1117,8 +1119,8 @@
           "userVisibleName": "Multi-disk overview",
           "name": "Multi-disk overview",
           "priority": "P0",
-          "targetVersion": "v1.8.2",
-          "status": "partial",
+          "targetVersion": "v1.8.3",
+          "status": "implemented",
           "oldFeature": true,
           "oldEntry": "Cleanup > Disk overview",
           "currentEntry": "Cleanup > Multi-disk overview",
@@ -1246,8 +1248,8 @@
           "userVisibleName": "Desktop archive",
           "name": "Desktop archive",
           "priority": "P0",
-          "targetVersion": "v1.8.2",
-          "status": "partial",
+          "targetVersion": "v1.8.3",
+          "status": "implemented",
           "oldFeature": true,
           "oldEntry": "Cleanup > Desktop rescue",
           "currentEntry": "Cleanup > Desktop rescue archive",
@@ -1270,6 +1272,7 @@
             "error": "cleanup-desktop-archive-error"
           },
           "backendCommands": [
+            "inspect_desktop",
             "create_desktop_archive_plan",
             "execute_desktop_archive_plan"
           ],
@@ -1304,6 +1307,77 @@
             "backendCommandRegistered",
             "riskContract",
             "resultPanelVisible",
+            "debugContract",
+            "reportContract"
+          ]
+        },
+        {
+          "featureId": "cleanup.desktopRecycle.ui",
+          "id": "cleanup.desktopRecycle.ui",
+          "domain": "Cleanup",
+          "userVisibleName": "Selected Desktop files to Recycle Bin",
+          "name": "Selected Desktop files to Recycle Bin",
+          "priority": "P0",
+          "targetVersion": "v1.8.3",
+          "status": "implemented",
+          "oldFeature": true,
+          "oldEntry": "Cleanup > Desktop cleanup",
+          "currentEntry": "Cleanup > Desktop analysis, archive, and cleanup",
+          "frontendComponent": "CleanupPage",
+          "frontendEntry": {
+            "route": "cleanup",
+            "testIds": [
+              "cleanup-desktop-candidate-table",
+              "cleanup-desktop-recycle-section",
+              "create-desktop-cleanup-plan",
+              "execute-desktop-cleanup-plan",
+              "cleanup-desktop-recycle-plan-result",
+              "cleanup-desktop-recycle-execute-result"
+            ]
+          },
+          "selectors": {
+            "entry": "cleanup-desktop-recycle-section",
+            "primaryAction": "create-desktop-cleanup-plan",
+            "result": "cleanup-desktop-recycle-execute-result",
+            "error": "cleanup-desktop-recycle-error"
+          },
+          "backendCommands": [
+            "create_desktop_cleanup_plan",
+            "execute_desktop_cleanup_plan",
+            "open_recycle_bin"
+          ],
+          "backendExists": true,
+          "frontendWired": true,
+          "riskLevel": "medium",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "requiresLoading": true,
+          "requiresResultArea": true,
+          "requiresErrorArea": true,
+          "requiresDebug": true,
+          "requiresReport": true,
+          "requiresRiskPlan": true,
+          "requiresToken": true,
+          "requiresVerify": true,
+          "requiresRollback": true,
+          "requiresPagination": false,
+          "requiresI18n": true,
+          "requiresDarkReadable": true,
+          "safeSmokeMode": "dryRun",
+          "manualOnlyReason": null,
+          "deferredReason": null,
+          "expectedFailureReason": null,
+          "testModes": [
+            "static",
+            "frontend",
+            "safe"
+          ],
+          "manualAllowed": false,
+          "acceptanceChecks": [
+            "backendCommandRegistered",
+            "riskContract",
+            "resultPanelVisible",
+            "noToastOnly",
             "debugContract",
             "reportContract"
           ]
@@ -1529,8 +1603,8 @@
           "userVisibleName": "Port scan table and closeability reasons",
           "name": "Port scan table and closeability reasons",
           "priority": "P0",
-          "targetVersion": "v1.8.2",
-          "status": "partial",
+          "targetVersion": "v1.8.3",
+          "status": "implemented",
           "oldFeature": true,
           "oldEntry": "Ports > Scan",
           "currentEntry": "Ports > Scan",
@@ -1551,6 +1625,9 @@
           },
           "backendCommands": [
             "scan_ports",
+            "enrich_port_scan",
+            "port_scan_status",
+            "cancel_port_scan",
             "port_history"
           ],
           "backendExists": true,
@@ -2529,6 +2606,7 @@
             "load_config",
             "set_root_dir",
             "set_auto_check_update",
+            "set_port_scan_preferences",
             "reset_ui_config",
             "open_app_config_dir"
           ],

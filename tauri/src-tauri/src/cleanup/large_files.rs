@@ -21,7 +21,12 @@ fn normalized(path: &Path) -> String {
         .to_ascii_lowercase()
 }
 
-fn large_file_item(path: &Path, size: u64, modified_at: Option<String>, file_type: String) -> LargeFileItem {
+fn large_file_item(
+    path: &Path,
+    size: u64,
+    modified_at: Option<String>,
+    file_type: String,
+) -> LargeFileItem {
     let directory = path
         .parent()
         .map(|value| value.to_string_lossy().to_string())
@@ -66,6 +71,8 @@ fn large_file_item(path: &Path, size: u64, modified_at: Option<String>, file_typ
             "medium"
         }
         .to_string(),
+        actionable: false,
+        blocked_reason: Some("大文件扫描仅提供只读分析".to_string()),
         file_type,
     }
 }

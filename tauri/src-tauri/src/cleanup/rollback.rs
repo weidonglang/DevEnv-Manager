@@ -1,7 +1,47 @@
-use super::model::RollbackRecord;
+use super::migration::sha256_file;
+use super::model::{MoveReceipt, RollbackRecord};
 use super::utils::generated_at;
 use std::fs;
 use std::path::Path;
+
+fn restore_archived_file(receipt: &MoveReceipt) -> Result<(), String> {
+    let source = Path::new(&receipt.source);
+    let target = Path::new(&receipt.target);
+    if source.exists() && !target.exists() {
+        return match sha256_file(source) {
+            Ok(hash) if hash.eq_ignore_ascii_case(&receipt.source_sha256) => Ok(()),
+            _ => Err(format!(
+                "原位置文件已存在但哈希不一致：{}",
+                source.display()
+            )),
+        };
+    }
+    if source.exists() {
+        return Err(format!(
+            "原位置和归档位置同时存在，拒绝覆盖：{}",
+            source.display()
+        ));
+    }
+    if !target.exists()
+        || !sha256_file(target).is_ok_and(|hash| hash.eq_ignore_ascii_case(&receipt.target_sha256))
+    {
+        return Err(format!("归档文件缺失或哈希已变化：{}", target.display()));
+    }
+    if let Some(parent) = source.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|error| format!("创建原目录失败 {}：{error}", parent.display()))?;
+    }
+    let copied = fs::copy(target, source)
+        .map_err(|error| format!("复制回原位置失败 {}：{error}", source.display()))?;
+    let restored = copied == receipt.size
+        && sha256_file(source).is_ok_and(|hash| hash.eq_ignore_ascii_case(&receipt.source_sha256));
+    if !restored {
+        let _ = fs::remove_file(source);
+        return Err(format!("恢复后的文件校验失败：{}", source.display()));
+    }
+    fs::remove_file(target)
+        .map_err(|error| format!("恢复后无法移除归档副本 {}：{error}", target.display()))
+}
 
 fn rollback_file(managed_root: &Path) -> std::path::PathBuf {
     managed_root.join("config").join("rollback-records.json")
@@ -43,6 +83,18 @@ pub fn rollback_move(managed_root: &Path, rollback_id: String) -> Result<String,
     };
     if !record.reversible {
         return Err("该操作被标记为不可自动回滚，请根据报告手动处理".to_string());
+    }
+
+    if record.operation_type == "desktop_archive" && !record.moved_files.is_empty() {
+        let mut failures = Vec::new();
+        for receipt in record.moved_files.iter().rev() {
+            if let Err(error) = restore_archived_file(receipt) {
+                failures.push(error);
+            }
+        }
+        if !failures.is_empty() {
+            return Err(format!("桌面归档回滚未完全成功：{}", failures.join("；")));
+        }
     }
 
     if let Some(junction) = record.junction_path.as_deref() {
@@ -90,6 +142,7 @@ mod tests {
             backup_path: None,
             junction_path: None,
             reversible: true,
+            moved_files: Vec::new(),
             notes: vec!["ok".to_string()],
         };
         save_rollback_record(root.path(), record).unwrap();

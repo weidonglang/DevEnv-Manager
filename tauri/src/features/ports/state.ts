@@ -1,7 +1,9 @@
-import type { LocalServiceStatus, PortHistorySummary, PortRecord, PortResolutionPlan, PortResolutionResult } from "../../types";
+import type { LocalServiceStatus, PortHistorySummary, PortRecord, PortResolutionPlan, PortResolutionResult, PortScanSnapshot } from "../../types";
 
 export type PortsWorkbenchState = {
   records: PortRecord[];
+  snapshot: PortScanSnapshot | null;
+  scanScope: "recommended" | "full";
   history: PortHistorySummary[];
   services: LocalServiceStatus[];
   plan: PortResolutionPlan | null;
@@ -20,6 +22,8 @@ export type PortsWorkbenchState = {
 
 export const portsWorkbenchInitialState: PortsWorkbenchState = {
   records: [],
+  snapshot: null,
+  scanScope: "recommended",
   history: [],
   services: [],
   plan: null,

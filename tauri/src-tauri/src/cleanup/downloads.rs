@@ -9,6 +9,46 @@ use std::time::{Duration, SystemTime};
 const MAX_FOLDER_ENTRIES: usize = 100_000;
 type FileRecord = (PathBuf, u64, Option<SystemTime>);
 
+fn file_action_block_reason(path: &Path, modified: Option<SystemTime>) -> Option<String> {
+    let metadata = fs::symlink_metadata(path).ok()?;
+    if metadata.permissions().readonly() {
+        return Some("只读文件默认不处理".to_string());
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        const HIDDEN: u32 = 0x0002;
+        const SYSTEM: u32 = 0x0004;
+        const REPARSE_POINT: u32 = 0x0400;
+        const OFFLINE: u32 = 0x1000;
+        const RECALL_ON_OPEN: u32 = 0x0004_0000;
+        const RECALL_ON_DATA_ACCESS: u32 = 0x0040_0000;
+        if metadata.file_attributes()
+            & (HIDDEN | SYSTEM | REPARSE_POINT | OFFLINE | RECALL_ON_OPEN | RECALL_ON_DATA_ACCESS)
+            != 0
+        {
+            return Some("隐藏、系统、重解析或云端占位文件默认不处理".to_string());
+        }
+    }
+    let name = path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or_default();
+    if name.eq_ignore_ascii_case("desktop.ini") || name.eq_ignore_ascii_case("thumbs.db") {
+        return Some("桌面系统文件默认不处理".to_string());
+    }
+    if classify_file_type(path) == "快捷方式" {
+        return Some("快捷方式默认不处理".to_string());
+    }
+    if modified.is_some_and(|time| {
+        SystemTime::now().duration_since(time).unwrap_or_default()
+            < Duration::from_secs(7 * 24 * 60 * 60)
+    }) {
+        return Some("最近 7 天内修改的文件默认不处理".to_string());
+    }
+    None
+}
+
 pub(crate) fn classify_file_type(path: &Path) -> &'static str {
     let extension = path
         .extension()
@@ -27,11 +67,13 @@ pub(crate) fn classify_file_type(path: &Path) -> &'static str {
     }
 }
 
-fn collect_files(root: &Path) -> (Vec<FileRecord>, bool) {
+fn collect_files(root: &Path) -> (Vec<FileRecord>, bool, usize, usize) {
     let mut files = Vec::new();
     let mut stack = vec![root.to_path_buf()];
     let mut visited = 0_usize;
     let mut truncated = false;
+    let mut folder_count = 0_usize;
+    let mut protected_count = 0_usize;
     while let Some(path) = stack.pop() {
         if visited >= MAX_FOLDER_ENTRIES {
             truncated = true;
@@ -39,21 +81,26 @@ fn collect_files(root: &Path) -> (Vec<FileRecord>, bool) {
         }
         visited += 1;
         if path != root && is_sensitive_account_data(&path) {
+            protected_count += 1;
             continue;
         }
         let Ok(metadata) = fs::symlink_metadata(&path) else {
             continue;
         };
         if metadata.file_type().is_symlink() {
+            protected_count += 1;
             continue;
         }
         if metadata.is_file() {
             files.push((path, metadata.len(), metadata.modified().ok()));
         } else if let Ok(entries) = fs::read_dir(&path) {
+            if path != root {
+                folder_count += 1;
+            }
             stack.extend(entries.flatten().map(|entry| entry.path()));
         }
     }
-    (files, truncated)
+    (files, truncated, folder_count, protected_count)
 }
 
 fn source_label(desktop: bool, category: &str) -> String {
@@ -68,7 +115,12 @@ fn source_label(desktop: bool, category: &str) -> String {
     }
 }
 
-fn file_item(path: &Path, size: u64, modified: Option<SystemTime>, source_category: &str) -> LargeFileItem {
+fn file_item(
+    path: &Path,
+    size: u64,
+    modified: Option<SystemTime>,
+    source_category: &str,
+) -> LargeFileItem {
     let exists = path.exists();
     let directory = path
         .parent()
@@ -76,6 +128,7 @@ fn file_item(path: &Path, size: u64, modified: Option<SystemTime>, source_catego
         .unwrap_or_default();
     let can_locate = !directory.is_empty() && Path::new(&directory).exists();
     let file_type = classify_file_type(path).to_string();
+    let blocked_reason = file_action_block_reason(path, modified);
     LargeFileItem {
         file_name: path
             .file_name()
@@ -103,7 +156,8 @@ fn file_item(path: &Path, size: u64, modified: Option<SystemTime>, source_catego
         } else {
             "所在目录不可访问，请检查权限、云盘同步或重新扫描".to_string()
         },
-        suggestion: if file_type == "安装包" || file_type == "压缩包" || file_type == "ISO/磁盘镜像" {
+        suggestion: if file_type == "安装包" || file_type == "压缩包" || file_type == "ISO/磁盘镜像"
+        {
             "确认不再需要后可加入归档计划；本页面不会自动删除或移动".to_string()
         } else {
             "先定位文件并确认用途；本页面只提供只读分析".to_string()
@@ -113,6 +167,8 @@ fn file_item(path: &Path, size: u64, modified: Option<SystemTime>, source_catego
         } else {
             "low".to_string()
         },
+        actionable: blocked_reason.is_none(),
+        blocked_reason,
     }
 }
 
@@ -144,7 +200,9 @@ fn file_matches_category(
                 >= Duration::from_secs(30 * 24 * 60 * 60)
         }),
         "截图" => desktop && is_screenshot(path),
-        "重复文件候选" => desktop && size > 0 && same_size.get(&size).copied().unwrap_or(0) > 1,
+        "重复文件候选" => {
+            desktop && size > 0 && same_size.get(&size).copied().unwrap_or(0) > 1
+        }
         _ => classify_file_type(path) == name,
     }
 }
@@ -161,14 +219,22 @@ fn category_details(
         .filter(|(path, size, modified)| {
             file_matches_category(name, path, *size, *modified, desktop, now, same_size)
         })
-        .map(|(path, size, modified)| file_item(path, *size, *modified, &source_label(desktop, name)))
+        .map(|(path, size, modified)| {
+            file_item(path, *size, *modified, &source_label(desktop, name))
+        })
         .collect();
     details.sort_by_key(|item| std::cmp::Reverse(item.size));
     details.truncate(10);
     details
 }
 
-fn category_item(root: &Path, name: &str, size: u64, suggestion: &str, details: Vec<LargeFileItem>) -> FolderUsageItem {
+fn category_item(
+    root: &Path,
+    name: &str,
+    size: u64,
+    suggestion: &str,
+    details: Vec<LargeFileItem>,
+) -> FolderUsageItem {
     FolderUsageItem {
         name: name.to_string(),
         path: root.to_string_lossy().to_string(),
@@ -180,7 +246,12 @@ fn category_item(root: &Path, name: &str, size: u64, suggestion: &str, details: 
 }
 
 pub(crate) fn inspect_folder(root: &Path, desktop: bool) -> FolderUsageReport {
-    let (files, truncated) = collect_files(root);
+    let (files, truncated, folder_count, protected_count) = collect_files(root);
+    let protected_count = protected_count
+        + files
+            .iter()
+            .filter(|(path, _, modified)| file_action_block_reason(path, *modified).is_some())
+            .count();
     let total_bytes = files.iter().map(|(_, size, _)| *size).sum();
     let now = SystemTime::now();
     let mut sizes: HashMap<&'static str, u64> = HashMap::new();
@@ -243,7 +314,11 @@ pub(crate) fn inspect_folder(root: &Path, desktop: bool) -> FolderUsageReport {
                 path,
                 *size,
                 *modified,
-                if desktop { "桌面 / Top 文件" } else { "下载 / Top 文件" },
+                if desktop {
+                    "桌面 / Top 文件"
+                } else {
+                    "下载 / Top 文件"
+                },
             )
         })
         .collect();
@@ -280,6 +355,9 @@ pub(crate) fn inspect_folder(root: &Path, desktop: bool) -> FolderUsageReport {
         .to_string(),
         path: root.to_string_lossy().to_string(),
         total_bytes,
+        file_count: files.len(),
+        folder_count,
+        protected_count,
         categories,
         top_files,
         suggestions: vec![

@@ -1875,9 +1875,53 @@ tr.is-selected td {
 
 .cleanup-volume-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(min(230px, 100%), 1fr));
+  gap: 12px;
   margin: 12px 0;
+  width: 100%;
+  min-width: 0;
+}
+
+.desktop-operation-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(360px, 100%), 1fr));
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+}
+
+.desktop-operation-section {
+  min-width: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface-raised);
+}
+
+.desktop-operation-section > h3 {
+  margin-top: 0;
+}
+
+.desktop-operation-section label {
+  display: grid;
+  gap: var(--space-2);
+  max-width: 16rem;
+}
+
+.desktop-candidate-table {
+  max-height: 24rem;
+}
+
+.desktop-candidate-table td,
+.desktop-candidate-table th {
+  max-width: 22rem;
+  overflow-wrap: anywhere;
+}
+
+.hash-cell {
+  max-width: 20rem;
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 12px;
 }
 
 .folder-overview-grid {
@@ -2280,9 +2324,11 @@ tr.is-selected td {
   display: grid;
   gap: 5px;
   padding: 16px;
-  border: 1px solid #dde6e8;
-  border-radius: 10px;
-  background: #ffffff;
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
 }
 
 .maintenance-metric > span,
@@ -2290,18 +2336,99 @@ tr.is-selected td {
 .volume-row small,
 .maintenance-item small,
 .maintenance-category summary small {
-  color: #66757e;
+  color: var(--color-text-muted);
 }
 
 .maintenance-metric strong {
-  color: #1c4436;
+  color: var(--color-text);
   font-size: 23px;
 }
 
+.maintenance-metric.risk-low,
+.maintenance-metric.risk-medium,
 .maintenance-metric.risk-high,
 .maintenance-metric.risk-critical {
-  border-color: #e8bbae;
-  background: #fff8f5;
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+}
+
+.maintenance-metric.risk-medium,
+.maintenance-metric.risk-high {
+  border-color: var(--color-warning);
+}
+
+.maintenance-metric.risk-critical {
+  border-color: var(--color-danger);
+}
+
+.disk-volume-card {
+  align-content: start;
+  min-height: 164px;
+}
+
+.disk-volume-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.disk-volume-card > span,
+.disk-volume-card > small {
+  overflow-wrap: anywhere;
+}
+
+.disk-volume-card .row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  margin-top: auto;
+}
+
+.disk-volume-card .row-actions button {
+  flex: 1 1 110px;
+  min-width: 0;
+  white-space: normal;
+}
+
+.scan-status-strip,
+.settings-port-scan {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+}
+
+.scan-status-strip span,
+.settings-port-scan p {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.settings-port-scan > div {
+  flex: 1 1 320px;
+}
+
+.settings-port-scan label,
+.inline-field {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--color-text-muted);
+}
+
+.settings-port-scan select,
+.inline-field select {
+  max-width: 100%;
+  min-width: 180px;
 }
 
 .maintenance-grid {

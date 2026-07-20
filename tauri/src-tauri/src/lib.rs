@@ -5,6 +5,7 @@ mod file_assoc;
 #[cfg(feature = "acceptance-fixtures")]
 mod isolated_acceptance;
 mod mysql_repair;
+mod port_scan;
 mod powershell_runner;
 mod safety;
 
@@ -19,12 +20,12 @@ use std::env;
 use std::ffi::OsStr;
 use std::fs;
 use std::io::{self, Read, Write};
-use std::net::{IpAddr, Ipv4Addr};
+use std::net::IpAddr;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::{
     atomic::{AtomicBool, AtomicU64, Ordering},
-    Mutex, OnceLock,
+    Condvar, Mutex, OnceLock,
 };
 use std::thread;
 use std::time::{Duration, Instant};
@@ -67,6 +68,8 @@ const PROTECTED_FORCE_KILL_PROCESS_NAMES: [&str; 11] = [
 ];
 const PORT_PID_VERIFY_ATTEMPTS: usize = 20;
 const PORT_RELEASE_VERIFY_ATTEMPTS: usize = 4;
+const PORT_SCAN_CACHE_TTL: Duration = Duration::from_secs(20);
+static PORT_SCAN_GENERATION: AtomicU64 = AtomicU64::new(0);
 const BLOCKED_NAMES: [&str; 9] = [
     "system",
     "idle",
@@ -117,6 +120,10 @@ struct AppPaths {
 struct Settings {
     root_dir: String,
     auto_check_update: bool,
+    #[serde(default = "default_true")]
+    auto_scan_ports_on_startup: bool,
+    #[serde(default = "default_port_scan_scope")]
+    port_scan_scope: String,
     download_timeout_seconds: u64,
     theme: String,
     last_page: String,
@@ -388,7 +395,7 @@ struct JavaEnvironmentReport {
     candidates: Vec<RuntimeInfo>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 struct PortRecord {
     protocol: String,
@@ -415,6 +422,40 @@ struct PortRecord {
     evidence: Vec<String>,
     conflict_evidence: Vec<String>,
 }
+
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct PortScanSnapshot {
+    scan_id: String,
+    scope: String,
+    status: String,
+    source: String,
+    scanned_at: u64,
+    elapsed_ms: u128,
+    raw_count: usize,
+    filtered_count: usize,
+    truncated: bool,
+    cached: bool,
+    complete: bool,
+    user_message: String,
+    debug_summary: String,
+    records: Vec<PortRecord>,
+}
+
+#[derive(Clone)]
+struct CachedPortScan {
+    snapshot: PortScanSnapshot,
+    cached_at: Instant,
+}
+
+#[derive(Default)]
+struct PortScanCoordinator {
+    cached: Option<CachedPortScan>,
+    in_flight: bool,
+    last_error: Option<String>,
+}
+
+static PORT_SCAN_COORDINATOR: OnceLock<(Mutex<PortScanCoordinator>, Condvar)> = OnceLock::new();
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -1449,6 +1490,30 @@ const RISK_OPERATION_REGISTRY: &[RiskOperationSpec] = &[
         description: "执行空间搬家或归档计划",
     },
     RiskOperationSpec {
+        command: "execute_desktop_archive_plan",
+        action_id: "execute_desktop_archive_plan",
+        risk_level: "high",
+        requires_backup: true,
+        requires_token: true,
+        description: "执行用户所选桌面文件归档计划",
+    },
+    RiskOperationSpec {
+        command: "execute_downloads_archive_plan",
+        action_id: "execute_downloads_archive_plan",
+        risk_level: "high",
+        requires_backup: true,
+        requires_token: true,
+        description: "执行下载目录归档计划",
+    },
+    RiskOperationSpec {
+        command: "execute_desktop_cleanup_plan",
+        action_id: "execute_desktop_cleanup_plan",
+        risk_level: "medium",
+        requires_backup: false,
+        requires_token: true,
+        description: "将用户所选桌面文件移动到 Windows 回收站",
+    },
+    RiskOperationSpec {
         command: "execute_generic_archive_plan",
         action_id: "execute_generic_archive_plan",
         risk_level: "high",
@@ -1768,6 +1833,17 @@ fn set_root_dir(root: String) -> Result<ConfigView, String> {
 fn set_auto_check_update(enabled: bool) -> Result<ConfigView, String> {
     let mut settings = load_settings()?;
     settings.auto_check_update = enabled;
+    save_json(&settings_file(), &settings)?;
+    load_config()
+}
+
+#[tauri::command]
+fn set_port_scan_preferences(enabled: bool, scope: String) -> Result<ConfigView, String> {
+    let mut settings = load_settings()?;
+    settings.auto_scan_ports_on_startup = enabled;
+    settings.port_scan_scope = port_scan::ScanScope::parse(Some(scope.trim()))
+        .as_str()
+        .to_string();
     save_json(&settings_file(), &settings)?;
     load_config()
 }
@@ -2486,8 +2562,11 @@ async fn create_junction_bridge_plan(
 }
 
 #[tauri::command]
-async fn create_desktop_archive_plan(target_drive: String) -> Result<cleanup::MovePlan, String> {
-    run_blocking(move || cleanup::create_desktop_archive_plan(target_drive)).await?
+async fn create_desktop_archive_plan(
+    target_drive: String,
+    selected_paths: Vec<String>,
+) -> Result<cleanup::MovePlan, String> {
+    run_blocking(move || cleanup::create_desktop_archive_plan(target_drive, selected_paths)).await?
 }
 
 #[tauri::command]
@@ -2496,11 +2575,50 @@ async fn execute_desktop_archive_plan(
     confirmation_token: Option<String>,
 ) -> Result<cleanup::MoveResult, String> {
     run_blocking(move || {
-        require_risk_operation_token("execute_move_plan", &plan.plan_id, confirmation_token)?;
+        require_risk_operation_token(
+            "execute_desktop_archive_plan",
+            &plan.plan_id,
+            confirmation_token,
+        )?;
         let paths = load_paths()?;
         Ok(cleanup::execute_desktop_archive_plan(&paths.root, plan))
     })
     .await?
+}
+
+#[tauri::command]
+async fn create_desktop_cleanup_plan(
+    selected_paths: Vec<String>,
+) -> Result<cleanup::MovePlan, String> {
+    run_blocking(move || cleanup::create_desktop_cleanup_plan(selected_paths)).await?
+}
+
+#[tauri::command]
+async fn execute_desktop_cleanup_plan(
+    plan: cleanup::MovePlan,
+    confirmation_token: Option<String>,
+) -> Result<cleanup::MoveResult, String> {
+    run_blocking(move || {
+        require_risk_operation_token(
+            "execute_desktop_cleanup_plan",
+            &plan.plan_id,
+            confirmation_token,
+        )?;
+        Ok(cleanup::execute_desktop_cleanup_plan(plan))
+    })
+    .await?
+}
+
+#[tauri::command]
+fn open_recycle_bin() -> Result<OperationResult, String> {
+    Command::new("explorer.exe")
+        .arg("shell:RecycleBinFolder")
+        .spawn()
+        .map_err(|error| format!("无法打开 Windows 回收站：{error}"))?;
+    Ok(OperationResult {
+        success: true,
+        message: "已打开 Windows 回收站，可使用系统还原操作恢复文件。".to_string(),
+    })
 }
 
 #[tauri::command]
@@ -2514,7 +2632,11 @@ async fn execute_downloads_archive_plan(
     confirmation_token: Option<String>,
 ) -> Result<cleanup::MoveResult, String> {
     run_blocking(move || {
-        require_risk_operation_token("execute_move_plan", &plan.plan_id, confirmation_token)?;
+        require_risk_operation_token(
+            "execute_downloads_archive_plan",
+            &plan.plan_id,
+            confirmation_token,
+        )?;
         let paths = load_paths()?;
         Ok(cleanup::execute_downloads_archive_plan(&paths.root, plan))
     })
@@ -4513,148 +4635,496 @@ fn process_action_fingerprint(action_id: &str, plan_id: &str, risk_level: &str) 
 }
 
 #[tauri::command]
-async fn scan_ports() -> Result<Vec<PortRecord>, String> {
-    run_blocking(scan_ports_blocking).await?
+async fn scan_ports(
+    force: Option<bool>,
+    scope: Option<String>,
+) -> Result<PortScanSnapshot, String> {
+    run_blocking(move || {
+        scan_port_snapshot_blocking(
+            force.unwrap_or(false),
+            port_scan::ScanScope::parse(scope.as_deref()),
+        )
+    })
+    .await?
+}
+
+#[tauri::command]
+async fn enrich_port_scan(scan_id: String) -> Result<PortScanSnapshot, String> {
+    run_blocking(move || enrich_port_snapshot_blocking(&scan_id)).await?
+}
+
+#[tauri::command]
+fn port_scan_status() -> PortScanSnapshot {
+    let (coordinator, _) = port_scan_coordinator();
+    match coordinator.lock() {
+        Ok(state) => {
+            if let Some(cached) = state.cached.as_ref() {
+                let mut snapshot = cached.snapshot.clone();
+                snapshot.cached = true;
+                if state.in_flight {
+                    snapshot.status = "scanning".to_string();
+                    snapshot.user_message =
+                        "Refreshing ports in the background; the last result remains visible."
+                            .to_string();
+                }
+                snapshot
+            } else if state.in_flight {
+                pending_port_snapshot("scanning")
+            } else {
+                pending_port_snapshot("idle")
+            }
+        }
+        Err(_) => failed_port_snapshot(
+            port_scan::ScanScope::Recommended,
+            "Port scan status is unavailable.",
+            "port scan coordinator lock poisoned",
+            0,
+        ),
+    }
+}
+
+#[tauri::command]
+fn cancel_port_scan() -> OperationResult {
+    PORT_SCAN_GENERATION.fetch_add(1, Ordering::SeqCst);
+    OperationResult {
+        success: true,
+        message: "The previous port scan result will be ignored.".to_string(),
+    }
+}
+
+fn port_scan_coordinator() -> &'static (Mutex<PortScanCoordinator>, Condvar) {
+    PORT_SCAN_COORDINATOR
+        .get_or_init(|| (Mutex::new(PortScanCoordinator::default()), Condvar::new()))
 }
 
 fn scan_ports_blocking() -> Result<Vec<PortRecord>, String> {
-    match powershell_runner::run_probe_command("netstat", &["-ano"], 5) {
-        Ok(output) if output.success => parse_netstat_ports(&output.stdout),
-        Ok(output) => parse_powershell_ports().map_err(|fallback| {
-            format!(
-                "netstat failed: {}; fallback failed: {fallback}",
-                powershell_runner::native_command_message(&output)
+    scan_ports_blocking_with(false)
+}
+
+fn scan_ports_blocking_with(force: bool) -> Result<Vec<PortRecord>, String> {
+    let snapshot = scan_port_snapshot_blocking(force, port_scan::ScanScope::Recommended)?;
+    if snapshot.status == "failed" {
+        return Err(snapshot.user_message);
+    }
+    let snapshot = if snapshot.complete {
+        snapshot
+    } else {
+        enrich_port_snapshot_blocking(&snapshot.scan_id)?
+    };
+    if snapshot.status == "failed" {
+        Err(snapshot.user_message)
+    } else {
+        Ok(snapshot.records)
+    }
+}
+
+fn scan_port_snapshot_blocking(
+    force: bool,
+    scope: port_scan::ScanScope,
+) -> Result<PortScanSnapshot, String> {
+    scan_port_snapshot_with(
+        port_scan_coordinator(),
+        &PORT_SCAN_GENERATION,
+        force,
+        scope,
+        collect_port_seeds,
+    )
+}
+
+fn scan_port_snapshot_with<F>(
+    coordinator_pair: &(Mutex<PortScanCoordinator>, Condvar),
+    generation_counter: &AtomicU64,
+    force: bool,
+    scope: port_scan::ScanScope,
+    collect: F,
+) -> Result<PortScanSnapshot, String>
+where
+    F: FnOnce(port_scan::ScanScope) -> Result<port_scan::ParsedPortSeeds, String>,
+{
+    let (coordinator, wake) = coordinator_pair;
+    let mut state = coordinator
+        .lock()
+        .map_err(|_| "Port scan cache is unavailable".to_string())?;
+    if !force {
+        if let Some(cached) = state.cached.as_ref() {
+            if cached.cached_at.elapsed() <= PORT_SCAN_CACHE_TTL
+                && cached.snapshot.scope == scope.as_str()
+            {
+                let mut snapshot = cached.snapshot.clone();
+                snapshot.cached = true;
+                return Ok(snapshot);
+            }
+        }
+    }
+    if state.in_flight {
+        let (joined, timeout) = wake
+            .wait_timeout(state, Duration::from_secs(12))
+            .map_err(|_| "Port scan coordinator wait failed".to_string())?;
+        state = joined;
+        if let Some(cached) = state.cached.as_ref() {
+            let mut snapshot = cached.snapshot.clone();
+            snapshot.cached = true;
+            return Ok(snapshot);
+        }
+        if timeout.timed_out() {
+            return Ok(failed_port_snapshot(
+                scope,
+                "Port scanning is still running. You can retry without blocking the page.",
+                "single-flight wait timed out",
+                0,
+            ));
+        }
+        return Ok(failed_port_snapshot(
+            scope,
+            "Port scanning failed. You can retry or export diagnostics.",
+            state.last_error.as_deref().unwrap_or("port scan failed"),
+            0,
+        ));
+    }
+    state.in_flight = true;
+    state.last_error = None;
+    let previous = state.cached.clone();
+    drop(state);
+
+    let generation = generation_counter.fetch_add(1, Ordering::SeqCst) + 1;
+    let started = Instant::now();
+    let result = collect(scope);
+    let elapsed_ms = started.elapsed().as_millis();
+    let cancelled = generation_counter.load(Ordering::SeqCst) != generation;
+    let mut state = coordinator
+        .lock()
+        .map_err(|_| "Port scan cache is unavailable".to_string())?;
+    state.in_flight = false;
+
+    let snapshot = if cancelled {
+        if let Some(previous) = previous {
+            let mut snapshot = previous.snapshot;
+            snapshot.cached = true;
+            snapshot.status = "stale".to_string();
+            snapshot.user_message =
+                "The previous scan was cancelled; the last successful result is retained."
+                    .to_string();
+            snapshot
+        } else {
+            failed_port_snapshot(
+                scope,
+                "Port scanning was cancelled.",
+                "scan generation was superseded",
+                elapsed_ms,
             )
-        }),
-        Err(err) => parse_powershell_ports()
-            .map_err(|fallback| format!("无法执行 netstat: {err}; fallback failed: {fallback}")),
+        }
+    } else {
+        match result {
+            Ok(parsed) => {
+                let records = parsed
+                    .seeds
+                    .into_iter()
+                    .map(build_quick_port_record)
+                    .collect::<Vec<_>>();
+                let snapshot = PortScanSnapshot {
+                    scan_id: format!("ports-{}-{generation}", unix_timestamp()),
+                    scope: scope.as_str().to_string(),
+                    status: "success".to_string(),
+                    source: parsed.source,
+                    scanned_at: unix_timestamp(),
+                    elapsed_ms,
+                    raw_count: parsed.raw_count,
+                    filtered_count: parsed.filtered_count,
+                    truncated: parsed.truncated,
+                    cached: false,
+                    complete: false,
+                    user_message: String::new(),
+                    debug_summary: format!(
+                        "source scan completed: raw={}, filtered={}, truncated={}, elapsed={}ms",
+                        parsed.raw_count, parsed.filtered_count, parsed.truncated, elapsed_ms
+                    ),
+                    records,
+                };
+                state.cached = Some(CachedPortScan {
+                    snapshot: snapshot.clone(),
+                    cached_at: Instant::now(),
+                });
+                snapshot
+            }
+            Err(debug_summary) => {
+                state.last_error = Some(debug_summary.clone());
+                if let Some(previous) = previous {
+                    let mut snapshot = previous.snapshot;
+                    snapshot.cached = true;
+                    snapshot.status = "stale".to_string();
+                    snapshot.user_message = "Port scanning timed out or failed; the last successful result is retained. Retry or export diagnostics.".to_string();
+                    snapshot.debug_summary = debug_summary;
+                    state.cached = Some(CachedPortScan {
+                        snapshot: snapshot.clone(),
+                        cached_at: previous.cached_at,
+                    });
+                    snapshot
+                } else {
+                    failed_port_snapshot(
+                        scope,
+                        "Port scanning timed out or failed. Retry or export diagnostics.",
+                        &debug_summary,
+                        elapsed_ms,
+                    )
+                }
+            }
+        }
+    };
+    wake.notify_all();
+    Ok(snapshot)
+}
+
+fn collect_port_seeds(scope: port_scan::ScanScope) -> Result<port_scan::ParsedPortSeeds, String> {
+    let netstat = powershell_runner::run_probe_command("netstat", &["-ano"], 5);
+    let netstat_summary = match netstat {
+        Ok(output) if output.success => {
+            match port_scan::select_snapshot_output(
+                Ok(&output.stdout),
+                Err("fallback was not required".to_string()),
+                scope,
+                port_scan::DEFAULT_RECORD_LIMIT,
+            ) {
+                Ok(parsed) => return Ok(parsed),
+                Err(error) => error,
+            }
+        }
+        Ok(output) => powershell_runner::native_command_message(&output),
+        Err(error) => error,
+    };
+
+    let script = port_scan::powershell_snapshot_script(scope, port_scan::DEFAULT_RECORD_LIMIT);
+    let fallback = powershell_runner::run_powershell_script(script, Vec::new(), 9);
+    let fallback_output = match fallback {
+        Ok(output) if output.success => Ok(output.stdout),
+        Ok(output) => Err(format!(
+            "fallback timedOut={} exit={:?} elapsed={}ms stderr={}",
+            output.timed_out,
+            output.exit_code,
+            output.elapsed_ms,
+            if output.stderr.trim().is_empty() {
+                output.stdout
+            } else {
+                output.stderr
+            }
+        )),
+        Err(error) => Err(format!("fallback could not start: {error}")),
+    };
+    port_scan::select_snapshot_output(
+        Err(netstat_summary),
+        fallback_output.as_deref().map_err(String::clone),
+        scope,
+        port_scan::DEFAULT_RECORD_LIMIT,
+    )
+    .map_err(|error| {
+        port_scan::bounded_diagnostic(&format!(
+            "source=netstat phase=snapshot; source=powershell-json phase=fallback; {error}"
+        ))
+    })
+}
+
+fn failed_port_snapshot(
+    scope: port_scan::ScanScope,
+    user_message: &str,
+    debug_summary: &str,
+    elapsed_ms: u128,
+) -> PortScanSnapshot {
+    PortScanSnapshot {
+        scan_id: format!("ports-failed-{}", unix_timestamp()),
+        scope: scope.as_str().to_string(),
+        status: "failed".to_string(),
+        source: "none".to_string(),
+        scanned_at: unix_timestamp(),
+        elapsed_ms,
+        raw_count: 0,
+        filtered_count: 0,
+        truncated: false,
+        cached: false,
+        complete: false,
+        user_message: user_message.to_string(),
+        debug_summary: port_scan::bounded_diagnostic(debug_summary),
+        records: Vec::new(),
     }
 }
 
-fn parse_netstat_ports(text: &str) -> Result<Vec<PortRecord>, String> {
+fn pending_port_snapshot(status: &str) -> PortScanSnapshot {
+    PortScanSnapshot {
+        scan_id: String::new(),
+        scope: port_scan::ScanScope::Recommended.as_str().to_string(),
+        status: status.to_string(),
+        source: "none".to_string(),
+        scanned_at: 0,
+        elapsed_ms: 0,
+        raw_count: 0,
+        filtered_count: 0,
+        truncated: false,
+        cached: false,
+        complete: false,
+        user_message: String::new(),
+        debug_summary: String::new(),
+        records: Vec::new(),
+    }
+}
+
+fn enrich_port_snapshot_blocking(scan_id: &str) -> Result<PortScanSnapshot, String> {
+    let (coordinator, wake) = port_scan_coordinator();
+    let mut state = coordinator
+        .lock()
+        .map_err(|_| "Port scan cache is unavailable".to_string())?;
+    let Some(cached) = state.cached.as_ref() else {
+        return Err("No successful port snapshot is available to enrich".to_string());
+    };
+    if cached.snapshot.scan_id != scan_id {
+        return Err("The port snapshot is stale; use the newest scan result".to_string());
+    }
+    if cached.snapshot.complete {
+        let mut snapshot = cached.snapshot.clone();
+        snapshot.cached = true;
+        return Ok(snapshot);
+    }
+    if state.in_flight {
+        let (joined, _) = wake
+            .wait_timeout(state, Duration::from_secs(8))
+            .map_err(|_| "Port enrichment wait failed".to_string())?;
+        state = joined;
+        return state
+            .cached
+            .as_ref()
+            .map(|cached| cached.snapshot.clone())
+            .ok_or_else(|| "Port enrichment did not produce a snapshot".to_string());
+    }
+    let records = cached.snapshot.records.clone();
+    let generation = PORT_SCAN_GENERATION.load(Ordering::SeqCst);
+    state.in_flight = true;
+    drop(state);
+
+    let started = Instant::now();
     let system = sysinfo::System::new_all();
     let services = windows_service_map();
-    let mut records = Vec::new();
-
-    for line in text.lines() {
-        let columns: Vec<&str> = line.split_whitespace().collect();
-        if columns.len() < 4 {
-            continue;
-        }
-        let protocol = columns[0].to_ascii_uppercase();
-        if protocol != "TCP" && protocol != "UDP" {
-            continue;
-        }
-
-        let (local, remote, state, pid_text) = if protocol == "TCP" && columns.len() >= 5 {
-            (columns[1], columns[2], columns[3].to_string(), columns[4])
-        } else if protocol == "UDP" && columns.len() >= 4 {
-            (columns[1], columns[2], "LISTENING".to_string(), columns[3])
-        } else {
-            continue;
-        };
-
-        let Some((local_address, local_port)) = parse_socket(local) else {
-            continue;
-        };
-        let pid = pid_text.parse::<u32>().unwrap_or(0);
-        records.push(build_port_record(
-            &system,
-            &services,
-            PortRecordSeed {
-                local_port,
-                protocol,
-                local_address,
-                remote_address: remote.to_string(),
-                state,
-                pid,
-            },
-        ));
+    let records = records
+        .into_iter()
+        .map(|record| {
+            build_port_record(
+                &system,
+                &services,
+                port_scan::PortSeed {
+                    local_port: record.local_port,
+                    protocol: record.protocol,
+                    local_address: record.local_address,
+                    remote_address: record.remote_address,
+                    state: record.state,
+                    pid: record.pid,
+                },
+            )
+        })
+        .collect::<Vec<_>>();
+    let mut state = coordinator
+        .lock()
+        .map_err(|_| "Port scan cache is unavailable".to_string())?;
+    state.in_flight = false;
+    if PORT_SCAN_GENERATION.load(Ordering::SeqCst) != generation {
+        wake.notify_all();
+        return Err("The port enrichment was cancelled or superseded".to_string());
     }
-    finish_port_records(records)
+    let Some(cached) = state.cached.as_mut() else {
+        wake.notify_all();
+        return Err("Port snapshot disappeared during enrichment".to_string());
+    };
+    if cached.snapshot.scan_id != scan_id {
+        wake.notify_all();
+        return Err("The enriched result belongs to an expired port snapshot".to_string());
+    }
+    cached.snapshot.records = records;
+    cached.snapshot.complete = true;
+    cached.snapshot.filtered_count = cached.snapshot.records.len();
+    cached.snapshot.debug_summary = format!(
+        "{}; enrichment uniquePids={} elapsed={}ms",
+        cached.snapshot.debug_summary,
+        cached
+            .snapshot
+            .records
+            .iter()
+            .map(|record| record.pid)
+            .collect::<BTreeSet<_>>()
+            .len(),
+        started.elapsed().as_millis()
+    );
+    let snapshot = cached.snapshot.clone();
+    let _ = update_port_history(&snapshot.records);
+    wake.notify_all();
+    Ok(snapshot)
 }
 
-fn parse_powershell_ports() -> Result<Vec<PortRecord>, String> {
-    let script = r#"
-$ErrorActionPreference = 'Stop'
-$tcp = Get-NetTCPConnection -ErrorAction Stop | Select-Object `
-  @{Name='Protocol';Expression={'TCP'}}, LocalAddress, LocalPort, RemoteAddress, RemotePort, State, OwningProcess
-$udp = @()
-try {
-  $udp = Get-NetUDPEndpoint -ErrorAction Stop | Select-Object `
-    @{Name='Protocol';Expression={'UDP'}}, LocalAddress, LocalPort, @{Name='RemoteAddress';Expression={'*'}}, @{Name='RemotePort';Expression={'*'}}, @{Name='State';Expression={'LISTENING'}}, OwningProcess
-} catch {}
-@($tcp) + @($udp) | ConvertTo-Csv -NoTypeInformation
-"#;
-    let output = powershell_runner::run_powershell_script(script, Vec::new(), 8)?;
-    if !output.success {
-        let message = if output.stderr.trim().is_empty() {
-            output.stdout.trim().to_string()
-        } else {
-            output.stderr.trim().to_string()
-        };
-        return Err(if message.is_empty() {
-            "PowerShell port fallback failed".to_string()
-        } else {
-            message
-        });
+fn build_quick_port_record(seed: port_scan::PortSeed) -> PortRecord {
+    let process_name = if seed.pid == 4 {
+        "System".to_string()
+    } else {
+        String::new()
+    };
+    let service_names = Vec::new();
+    let signature = analyze_port_signature(
+        seed.local_port,
+        &seed.state,
+        &process_name,
+        "",
+        "",
+        &service_names,
+    );
+    PortRecord {
+        protocol: seed.protocol,
+        local_address: seed.local_address,
+        local_port: seed.local_port,
+        remote_address: redact_remote_endpoint(&seed.remote_address),
+        state: seed.state,
+        pid: seed.pid,
+        process_name,
+        process_path: String::new(),
+        command_line: String::new(),
+        parent_pid: 0,
+        parent_process_name: String::new(),
+        service_names,
+        common_usage: signature.identity.clone(),
+        explanation: signature.explanation.clone(),
+        risk: signature.risk.clone(),
+        identity: signature.identity,
+        confidence: signature.confidence,
+        evidence_count: signature.evidence.len(),
+        conflict_count: signature.conflict_evidence.len(),
+        risk_level: signature.risk_level,
+        recommendation: signature.recommendation,
+        evidence: signature.evidence,
+        conflict_evidence: signature.conflict_evidence,
     }
-    let system = sysinfo::System::new_all();
-    let services = windows_service_map();
-    let mut records = Vec::new();
-    for line in output.stdout.lines().skip(1) {
-        let columns = parse_csv_line(line);
-        if columns.len() < 7 {
-            continue;
-        }
-        let protocol = columns[0].trim().to_ascii_uppercase();
-        if protocol != "TCP" && protocol != "UDP" {
-            continue;
-        }
-        let local_address = columns[1].trim().to_string();
-        let Ok(local_port) = columns[2].trim().parse::<u16>() else {
-            continue;
-        };
-        let remote_address = match (columns[3].trim(), columns[4].trim()) {
-            ("", _) => "*".to_string(),
-            (address, "") | (address, "0") | (address, "*") => address.to_string(),
-            (address, port) => format!("{address}:{port}"),
-        };
-        let state = if protocol == "UDP" {
-            "LISTENING".to_string()
-        } else {
-            columns[5].trim().to_string()
-        };
-        let pid = columns[6].trim().parse::<u32>().unwrap_or(0);
-        records.push(build_port_record(
-            &system,
-            &services,
-            PortRecordSeed {
-                local_port,
-                protocol,
-                local_address,
-                remote_address,
-                state,
-                pid,
-            },
-        ));
-    }
-    finish_port_records(records)
 }
 
-struct PortRecordSeed {
-    local_port: u16,
-    protocol: String,
-    local_address: String,
-    remote_address: String,
-    state: String,
-    pid: u32,
+fn redact_remote_endpoint(value: &str) -> String {
+    let address = value
+        .trim()
+        .trim_start_matches('[')
+        .split(']')
+        .next()
+        .unwrap_or(value)
+        .rsplit_once(':')
+        .map(|(address, _)| address)
+        .unwrap_or(value)
+        .trim_matches(['[', ']']);
+    if address.parse::<IpAddr>().is_ok_and(|parsed| {
+        !parsed.is_loopback()
+            && !parsed.is_unspecified()
+            && !match parsed {
+                IpAddr::V4(ip) => ip.is_private() || ip.is_link_local(),
+                IpAddr::V6(ip) => ip.is_unique_local() || ip.is_unicast_link_local(),
+            }
+    }) {
+        "<public-address>".to_string()
+    } else {
+        value.to_string()
+    }
 }
 
 fn build_port_record(
     system: &sysinfo::System,
     services: &std::collections::HashMap<u32, Vec<String>>,
-    seed: PortRecordSeed,
+    seed: port_scan::PortSeed,
 ) -> PortRecord {
     let process_name = process_name(system, seed.pid);
     let (process_path, command_line, parent_pid, parent_process_name) =
@@ -4677,7 +5147,7 @@ fn build_port_record(
         protocol: seed.protocol,
         local_address: seed.local_address,
         local_port: seed.local_port,
-        remote_address: seed.remote_address,
+        remote_address: redact_remote_endpoint(&seed.remote_address),
         state: seed.state,
         pid: seed.pid,
         process_name,
@@ -4698,17 +5168,6 @@ fn build_port_record(
         evidence: signature.evidence,
         conflict_evidence: signature.conflict_evidence,
     }
-}
-
-fn finish_port_records(mut records: Vec<PortRecord>) -> Result<Vec<PortRecord>, String> {
-    records.sort_by(|a, b| {
-        a.local_port
-            .cmp(&b.local_port)
-            .then(a.protocol.cmp(&b.protocol))
-            .then(a.pid.cmp(&b.pid))
-    });
-    let _ = update_port_history(&records);
-    Ok(records)
 }
 
 #[tauri::command]
@@ -4811,7 +5270,7 @@ fn execute_port_resolution_plan_blocking(
         .map_err(|_| "Port resolution plan store is unavailable".to_string())?
         .remove(&plan_id)
         .ok_or_else(|| "Port resolution plan does not exist or was already used".to_string())?;
-    let before = scan_ports_blocking()?;
+    let before = scan_ports_blocking_with(true)?;
     if !before
         .iter()
         .any(|item| port_owner_matches_plan(item, &plan))
@@ -4910,7 +5369,12 @@ where
 fn wait_for_port_release(port: u16) -> Result<Vec<PortRecord>, String> {
     let mut remaining_owners = Vec::new();
     for attempt in 0..PORT_RELEASE_VERIFY_ATTEMPTS {
-        remaining_owners = scan_ports_blocking()?
+        let snapshot = scan_port_snapshot_blocking(true, port_scan::ScanScope::Recommended)?;
+        if snapshot.status == "failed" {
+            return Err(snapshot.user_message);
+        }
+        remaining_owners = snapshot
+            .records
             .into_iter()
             .filter(|item| item.local_port == port && item.state.eq_ignore_ascii_case("LISTENING"))
             .collect();
@@ -11028,6 +11492,9 @@ pub fn run() {
             create_junction_bridge_plan,
             create_desktop_archive_plan,
             execute_desktop_archive_plan,
+            create_desktop_cleanup_plan,
+            execute_desktop_cleanup_plan,
+            open_recycle_bin,
             create_downloads_archive_plan,
             execute_downloads_archive_plan,
             inspect_partition_layout,
@@ -11043,6 +11510,7 @@ pub fn run() {
             load_config,
             set_root_dir,
             set_auto_check_update,
+            set_port_scan_preferences,
             env_snapshot,
             inspect_java_environment,
             inspect_agent_traces,
@@ -11063,6 +11531,9 @@ pub fn run() {
             uninstall_runtime,
             kill_process,
             scan_ports,
+            enrich_port_scan,
+            port_scan_status,
+            cancel_port_scan,
             create_port_resolution_plan,
             execute_port_resolution_plan,
             port_history,
@@ -11693,6 +12164,8 @@ fn default_settings() -> Settings {
     Settings {
         root_dir: display_path(default_root_dir()),
         auto_check_update: false,
+        auto_scan_ports_on_startup: true,
+        port_scan_scope: default_port_scan_scope(),
         download_timeout_seconds: 60,
         theme: "system".to_string(),
         last_page: "home".to_string(),
@@ -11706,6 +12179,14 @@ fn default_settings() -> Settings {
         safety_disclaimer_version: 0,
         safety_disclaimer_accepted_at: None,
     }
+}
+
+fn default_true() -> bool {
+    true
+}
+
+fn default_port_scan_scope() -> String {
+    "recommended".to_string()
 }
 
 fn default_stable_channel() -> String {
@@ -13349,6 +13830,7 @@ fn extract_windows_path(line: &str) -> Option<String> {
     Some(line[start..].trim().trim_matches('"').to_string())
 }
 
+#[cfg(test)]
 fn parse_socket(value: &str) -> Option<(String, u16)> {
     let trimmed = value.trim();
     if trimmed.starts_with('[') {
@@ -13360,7 +13842,7 @@ fn parse_socket(value: &str) -> Option<(String, u16)> {
 
     let (addr, port_text) = trimmed.rsplit_once(':')?;
     let normalized_addr = if addr == "*" {
-        IpAddr::V4(Ipv4Addr::UNSPECIFIED).to_string()
+        IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED).to_string()
     } else {
         addr.to_string()
     };
@@ -15564,6 +16046,140 @@ fn display_path(path: impl AsRef<Path>) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn parsed_port_fixture() -> Result<port_scan::ParsedPortSeeds, String> {
+        Ok(port_scan::parse_netstat(
+            "TCP 127.0.0.1:18765 0.0.0.0:0 LISTENING 4242\n",
+            port_scan::ScanScope::Recommended,
+            port_scan::DEFAULT_RECORD_LIMIT,
+        ))
+    }
+
+    #[test]
+    fn port_scan_cache_reuses_recent_snapshot() {
+        let coordinator = (Mutex::new(PortScanCoordinator::default()), Condvar::new());
+        let generation = AtomicU64::new(0);
+        let calls = std::sync::atomic::AtomicUsize::new(0);
+        let first = scan_port_snapshot_with(
+            &coordinator,
+            &generation,
+            false,
+            port_scan::ScanScope::Recommended,
+            |_| {
+                calls.fetch_add(1, Ordering::SeqCst);
+                parsed_port_fixture()
+            },
+        )
+        .unwrap();
+        let second = scan_port_snapshot_with(
+            &coordinator,
+            &generation,
+            false,
+            port_scan::ScanScope::Recommended,
+            |_| {
+                calls.fetch_add(1, Ordering::SeqCst);
+                parsed_port_fixture()
+            },
+        )
+        .unwrap();
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        assert_eq!(first.scan_id, second.scan_id);
+        assert!(second.cached);
+    }
+
+    #[test]
+    fn forced_port_scan_bypasses_recent_cache() {
+        let coordinator = (Mutex::new(PortScanCoordinator::default()), Condvar::new());
+        let generation = AtomicU64::new(0);
+        let calls = std::sync::atomic::AtomicUsize::new(0);
+        scan_port_snapshot_with(
+            &coordinator,
+            &generation,
+            false,
+            port_scan::ScanScope::Recommended,
+            |_| {
+                calls.fetch_add(1, Ordering::SeqCst);
+                parsed_port_fixture()
+            },
+        )
+        .unwrap();
+        let refreshed = scan_port_snapshot_with(
+            &coordinator,
+            &generation,
+            true,
+            port_scan::ScanScope::Recommended,
+            |_| {
+                calls.fetch_add(1, Ordering::SeqCst);
+                parsed_port_fixture()
+            },
+        )
+        .unwrap();
+        assert_eq!(calls.load(Ordering::SeqCst), 2);
+        assert!(!refreshed.cached);
+    }
+
+    #[test]
+    fn port_scan_single_flight_runs_collector_once() {
+        let coordinator =
+            std::sync::Arc::new((Mutex::new(PortScanCoordinator::default()), Condvar::new()));
+        let generation = std::sync::Arc::new(AtomicU64::new(0));
+        let calls = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let first_coordinator = coordinator.clone();
+        let first_generation = generation.clone();
+        let first_calls = calls.clone();
+        let first = std::thread::spawn(move || {
+            scan_port_snapshot_with(
+                &first_coordinator,
+                &first_generation,
+                true,
+                port_scan::ScanScope::Recommended,
+                |_| {
+                    first_calls.fetch_add(1, Ordering::SeqCst);
+                    std::thread::sleep(Duration::from_millis(80));
+                    parsed_port_fixture()
+                },
+            )
+            .unwrap()
+        });
+        std::thread::sleep(Duration::from_millis(10));
+        let second = scan_port_snapshot_with(
+            &coordinator,
+            &generation,
+            true,
+            port_scan::ScanScope::Recommended,
+            |_| {
+                calls.fetch_add(1, Ordering::SeqCst);
+                parsed_port_fixture()
+            },
+        )
+        .unwrap();
+        let first = first.join().unwrap();
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        assert_eq!(first.scan_id, second.scan_id);
+    }
+
+    #[test]
+    fn cancelled_port_scan_does_not_publish_result() {
+        let coordinator = (Mutex::new(PortScanCoordinator::default()), Condvar::new());
+        let generation = AtomicU64::new(0);
+        let snapshot = scan_port_snapshot_with(
+            &coordinator,
+            &generation,
+            true,
+            port_scan::ScanScope::Recommended,
+            |_| {
+                generation.fetch_add(1, Ordering::SeqCst);
+                parsed_port_fixture()
+            },
+        )
+        .unwrap();
+        assert_eq!(snapshot.status, "failed");
+        assert!(snapshot
+            .user_message
+            .to_ascii_lowercase()
+            .contains("cancelled"));
+        assert!(coordinator.0.lock().unwrap().cached.is_none());
+    }
 
     #[test]
     fn writable_managed_root_accepts_writable_directory() {

@@ -17,6 +17,8 @@ export type ConfigView = {
   settings: {
     rootDir: string;
     autoCheckUpdate: boolean;
+    autoScanPortsOnStartup: boolean;
+    portScanScope: "recommended" | "full";
     downloadTimeoutSeconds: number;
     theme: string;
     updateSourceMode?: string;
@@ -265,6 +267,23 @@ export type PortRecord = {
   recommendation: string;
   evidence: string[];
   conflictEvidence: string[];
+};
+
+export type PortScanSnapshot = {
+  scanId: string;
+  scope: "recommended" | "full";
+  status: "idle" | "scanning" | "success" | "stale" | "failed";
+  source: string;
+  scannedAt: number;
+  elapsedMs: number;
+  rawCount: number;
+  filteredCount: number;
+  truncated: boolean;
+  cached: boolean;
+  complete: boolean;
+  userMessage: string;
+  debugSummary: string;
+  records: PortRecord[];
 };
 
 export type PortResolutionPlan = {
@@ -1045,7 +1064,23 @@ export type MovePlan = {
   risk: string;
   requiresAdmin: boolean;
   reversible: boolean;
+  selectedItems: MovePlanItem[];
   warnings: string[];
+};
+
+export type MovePlanItem = {
+  source: string;
+  target: string;
+  size: number;
+  sha256: string;
+};
+
+export type MoveReceipt = {
+  source: string;
+  target: string;
+  size: number;
+  sourceSha256: string;
+  targetSha256: string;
 };
 
 export type MoveResult = {
@@ -1058,6 +1093,7 @@ export type MoveResult = {
   junctionCreated: boolean;
   failures: string[];
   rollbackId?: string;
+  receipts: MoveReceipt[];
   reportMarkdown: string;
 };
 
@@ -1070,6 +1106,7 @@ export type RollbackRecord = {
   backupPath?: string;
   junctionPath?: string;
   reversible: boolean;
+  movedFiles: MoveReceipt[];
   notes: string[];
 };
 
@@ -1169,6 +1206,8 @@ export type LargeFileItem = {
   openStatus: string;
   suggestion: string;
   risk: string;
+  actionable: boolean;
+  blockedReason?: string | null;
 };
 
 export type ArchivePlanItem = {
@@ -1221,6 +1260,9 @@ export type FolderUsageReport = {
   name: string;
   path: string;
   totalBytes: number;
+  fileCount: number;
+  folderCount: number;
+  protectedCount: number;
   categories: Array<{
     name: string;
     path: string;

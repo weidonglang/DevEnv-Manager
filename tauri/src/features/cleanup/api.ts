@@ -45,8 +45,8 @@ export function executeMovePlan(plan: MovePlan, confirmationToken: string): Prom
   return invoke<MoveResult>("execute_move_plan", { plan, confirmationToken });
 }
 
-export function rollbackMove(rollbackId: string, confirmationToken: string): Promise<MoveResult> {
-  return invoke<MoveResult>("rollback_move", { rollbackId, confirmationToken });
+export function rollbackMove(rollbackId: string, confirmationToken: string): Promise<OperationResult> {
+  return invoke<OperationResult>("rollback_move", { rollbackId, confirmationToken });
 }
 
 export function inspectPartitionLayout(): Promise<PartitionLayoutReport> {
@@ -81,12 +81,24 @@ export function scanDuplicateLargeFiles(root: string, minSizeMb: number): Promis
   return invoke<DuplicateGroup[]>("scan_duplicate_large_files", { root, minSizeMb });
 }
 
-export function createDesktopArchivePlan(targetDrive: string): Promise<MovePlan> {
-  return invoke<MovePlan>("create_desktop_archive_plan", { targetDrive });
+export function createDesktopArchivePlan(targetDrive: string, selectedPaths: string[]): Promise<MovePlan> {
+  return invoke<MovePlan>("create_desktop_archive_plan", { targetDrive, selectedPaths });
 }
 
 export function executeDesktopArchivePlan(plan: MovePlan, confirmationToken: string): Promise<MoveResult> {
   return invoke<MoveResult>("execute_desktop_archive_plan", { plan, confirmationToken });
+}
+
+export function createDesktopCleanupPlan(selectedPaths: string[]): Promise<MovePlan> {
+  return invoke<MovePlan>("create_desktop_cleanup_plan", { selectedPaths });
+}
+
+export function executeDesktopCleanupPlan(plan: MovePlan, confirmationToken: string): Promise<MoveResult> {
+  return invoke<MoveResult>("execute_desktop_cleanup_plan", { plan, confirmationToken });
+}
+
+export function openRecycleBin(): Promise<OperationResult> {
+  return invoke<OperationResult>("open_recycle_bin");
 }
 
 export function createDownloadsArchivePlan(targetDrive: string): Promise<MovePlan> {

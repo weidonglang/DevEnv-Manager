@@ -28,6 +28,11 @@ export function renderSettingsWorkbench(state: SettingsWorkbenchState): string {
           ${renderActionButton("toggle-advanced-mode", isAdvancedMode() ? t("settings.advancedOff") : t("settings.advancedOn"))}
           ${renderActionButton("reset-ui-config", t("settings.resetUiConfig"), "danger")}
         </div>
+        <div class="settings-port-scan" data-testid="settings-port-scan-section">
+          <div><strong>${localize("Startup developer-port scan", "启动后自动扫描开发端口")}</strong><p>${localize("Runs once after the safety gate and first render. It never blocks the Dashboard.", "安全声明和首屏渲染完成后后台运行一次，不会阻塞仪表盘。")}</p></div>
+          ${renderActionButton("toggle-auto-port-scan", state.config?.settings.autoScanPortsOnStartup ? localize("Disable", "关闭") : localize("Enable", "开启"))}
+          <label>${localize("Default scope", "默认范围")}<select id="settings-port-scan-scope" data-testid="settings-port-scan-scope"><option value="recommended" ${state.config?.settings.portScanScope !== "full" ? "selected" : ""}>${localize("Recommended: listening, bound and active", "推荐：监听、绑定和活动端口")}</option><option value="full" ${state.config?.settings.portScanScope === "full" ? "selected" : ""}>${localize("Full: all connection states", "完整：全部连接状态")}</option></select></label>
+        </div>
       </section>
       ${renderRiskLevelGuide()}
       ${renderUpdatePanel(state, vm.updateRows, vm.updateDownloadRows)}

@@ -1,6 +1,6 @@
 use super::*;
 use serde_json::{json, Map};
-use std::net::TcpListener;
+use std::net::{Ipv4Addr, TcpListener};
 
 fn hash(path: &Path) -> Result<String, String> {
     file_sha256(path)
@@ -134,6 +134,7 @@ fn move_fixture(output: &Path, workspace: &Path) -> Result<Value, String> {
         risk: "high".to_string(),
         requires_admin: false,
         reversible: true,
+        selected_items: Vec::new(),
         warnings: Vec::new(),
     };
     let token = issue_token("execute_move_plan", &plan.plan_id, true)?;

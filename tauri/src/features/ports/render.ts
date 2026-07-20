@@ -1,6 +1,6 @@
 import type { PortRecord } from "../../types";
 import { escapeHtml, pageItems, renderActionButton, renderBadge, renderMetric, renderObjectTable, renderPagination, valueOf } from "../sharedView";
-import { t } from "../../core/i18n";
+import { localize, t } from "../../core/i18n";
 import { renderFeatureGuide } from "../../components/featureGuide";
 import { assessPortTreatability, portRecordKey, selectedPortRecord } from "./portSafety";
 import type { PortsWorkbenchState } from "./state";
@@ -51,16 +51,40 @@ function renderPortsShell(state: PortsWorkbenchState): string {
       ${renderMetric(t("feature.ports.history"), state.history.length)}
       ${renderMetric(t("feature.ports.selected"), selected ? `${selected.localPort} / PID ${selected.pid}` : t("feature.ports.none"))}
     </div>
+    ${renderScanStatus(state)}
     ${renderPortErrors(state)}
     <input id="port-filter" value="${escapeHtml(state.filter)}" placeholder="${t("feature.ports.filter")}" autocomplete="off" />
     <div class="toolbar">
       ${renderActionButton("scan-ports", t("dashboard.scanPorts"), "primary")}
+      <label class="inline-field">${localize("Scan scope", "扫描范围")}<select id="port-scan-scope" data-testid="ports-scan-scope"><option value="recommended" ${state.scanScope === "recommended" ? "selected" : ""}>${localize("Recommended", "推荐")}</option><option value="full" ${state.scanScope === "full" ? "selected" : ""}>${localize("All connections", "全部连接")}</option></select></label>
       ${renderActionButton("create-port-plan", t("feature.ports.createPlanForSelected"))}
       ${renderActionButton("execute-port-plan", t("feature.ports.executePlan"), "danger")}
       ${renderActionButton("inspect-local-services", t("feature.ports.inspectServices"))}
       ${state.retryPlanRequest ? renderActionButton("retry-port-plan-after-scan", t("feature.ports.rescanAndRetry")) : ""}
     </div>
   </section>`;
+}
+
+function renderScanStatus(state: PortsWorkbenchState): string {
+  const snapshot = state.snapshot;
+  if (!snapshot) return `<div class="small-note" data-testid="ports-scan-status">${localize("No port snapshot yet.", "尚无端口快照。")} </div>`;
+  const status = snapshot.status === "scanning"
+    ? localize("Scanning", "正在扫描")
+    : snapshot.status === "stale"
+      ? localize("Last successful result retained", "已保留上次成功结果")
+      : snapshot.status === "failed"
+        ? localize("Scan failed", "扫描失败")
+        : snapshot.complete
+          ? localize("Snapshot and process details complete", "快照和进程详情已完成")
+          : localize("Snapshot ready; enriching process details", "快照已就绪，正在补充进程详情");
+  const scannedAt = snapshot.scannedAt ? new Date(snapshot.scannedAt * 1000).toLocaleString() : localize("Not completed", "尚未完成");
+  return `<div class="scan-status-strip" data-testid="ports-scan-status">
+    <strong>${escapeHtml(status)}</strong>
+    <span>${localize("Source", "来源")}: ${escapeHtml(snapshot.source || "-")}</span>
+    <span>${localize("Last scan", "最近扫描")}: ${escapeHtml(scannedAt)}</span>
+    <span>${localize("Raw / kept", "原始 / 保留")}: ${snapshot.rawCount} / ${snapshot.filteredCount}${snapshot.truncated ? ` (${localize("truncated", "已截断")})` : ""}</span>
+    <span>${snapshot.elapsedMs} ms</span>
+  </div>`;
 }
 
 export function renderPortsTable(state: PortsWorkbenchState): string {
