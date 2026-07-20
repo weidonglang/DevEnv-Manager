@@ -21,8 +21,8 @@ export function portHistory(): Promise<PortHistorySummary[]> {
   return invoke<PortHistorySummary[]>("port_history");
 }
 
-export function createPortResolutionPlan(pid: number, port: number): Promise<PortResolutionPlan> {
-  return invoke<PortResolutionPlan>("create_port_resolution_plan", { pid, port });
+export function createPortResolutionPlan(groupId: string): Promise<PortResolutionPlan> {
+  return invoke<PortResolutionPlan>("create_port_resolution_plan", { groupId });
 }
 
 export function executePortResolutionPlan(planId: string, confirmationToken: string): Promise<PortResolutionResult> {

@@ -1,4 +1,5 @@
 import type { FeatureContext } from "../../app/featureContext";
+import type { PortRecord } from "../../types";
 import { localize, t } from "../../core/i18n";
 import { bindAction } from "../sharedView";
 import { createPortResolutionPlan, enrichPortScan, executePortResolutionPlan, inspectLocalServices, portHistory, scanPorts } from "./api";
@@ -42,7 +43,7 @@ export function bindPortEvents(context: FeatureContext, state: PortsWorkbenchSta
     state.plan = null;
     state.executionResult = null;
     state.planError = "";
-    await createPlanForPort(context, state, selected.pid, selected.localPort);
+    await createPlanForPort(context, state, selected);
   });
   bindAction(context.root, "execute-port-plan", async () => {
     if (!state.plan) {
@@ -129,7 +130,7 @@ export function bindPortEvents(context: FeatureContext, state: PortsWorkbenchSta
     const retry = state.retryPlanRequest;
     if (!retry) return;
     await refreshPorts(context, state, true);
-    const refreshed = state.records.find((record) => record.localPort === retry.port) ?? state.records.find((record) => record.pid === retry.pid);
+    const refreshed = state.records.find((record) => record.groupId === retry.groupId);
     if (!refreshed) {
       state.planError = t("feature.ports.ownerChangedAfterRescan");
       renderAndBind(context, state);
@@ -137,7 +138,7 @@ export function bindPortEvents(context: FeatureContext, state: PortsWorkbenchSta
     }
     state.selectedKey = portRecordKey(refreshed);
     state.selectedPort = refreshed.localPort;
-    await createPlanForPort(context, state, refreshed.pid, refreshed.localPort);
+    await createPlanForPort(context, state, refreshed);
   });
 }
 
@@ -238,8 +239,7 @@ function bindPortsTableEvents(context: FeatureContext, state: PortsWorkbenchStat
   });
 }
 
-async function createPlanForPort(context: FeatureContext, state: PortsWorkbenchState, pid: number, port: number): Promise<void> {
-  const selected = state.records.find((record) => record.pid === pid && record.localPort === port) ?? selectedPortRecord(state.records, state.selectedKey);
+async function createPlanForPort(context: FeatureContext, state: PortsWorkbenchState, selected: PortRecord): Promise<void> {
   const treatability = assessPortTreatability(selected);
   if (!selected || !treatability.treatable) {
     state.plan = null;
@@ -251,7 +251,7 @@ async function createPlanForPort(context: FeatureContext, state: PortsWorkbenchS
   }
   context.progress.start(t("feature.ports.createPlan"));
   try {
-    state.plan = await createPortResolutionPlan(pid, port);
+    state.plan = await createPortResolutionPlan(selected.groupId);
     state.executionResult = null;
     state.planError = "";
     state.retryPlanRequest = null;
@@ -262,7 +262,7 @@ async function createPlanForPort(context: FeatureContext, state: PortsWorkbenchS
   } catch (error) {
     const message = normalizePlanError(error);
     state.planError = message;
-    state.retryPlanRequest = { pid, port };
+    state.retryPlanRequest = { groupId: selected.groupId, pid: selected.pid, port: selected.localPort };
     context.progress.fail(message);
     renderAndBind(context, state);
   }

@@ -16,7 +16,7 @@ export type PortsWorkbenchState = {
   servicesError: string;
   planError: string;
   diagnosticsResult: string;
-  retryPlanRequest: { pid: number; port: number } | null;
+  retryPlanRequest: { groupId: string; pid: number; port: number } | null;
   page: number;
 };
 

@@ -33,7 +33,7 @@ function renderPortExecutionResult(state: PortsWorkbenchState): string {
       ${renderMetric(t("feature.ports.serviceOwned"), result.serviceOwned ? t("state.yes") : t("state.no"))}
       ${renderMetric(t("feature.ports.requiresAdmin"), result.requiresAdmin ? t("state.yes") : t("state.no"))}
     </div>
-    ${renderObjectTable(result, ["message", "pidExited", "portReleased", "releaseCheckedAt"])}
+    ${renderObjectTable(result, ["message", "pidExited", "portReleased", "relatedPortsReleased", "remainingRelatedPorts", "releaseCheckedAt"])}
     ${result.failureReason ? `<div class="small-note"><strong>${t("feature.ports.failureReason")}</strong><p>${escapeHtml(result.failureReason)}</p></div>` : ""}
     ${result.nextSteps.length ? renderList(t("feature.ports.nextSteps"), result.nextSteps) : ""}
     ${renderRemainingOwners(result.remainingOwners)}
@@ -89,13 +89,13 @@ function renderScanStatus(state: PortsWorkbenchState): string {
 
 export function renderPortsTable(state: PortsWorkbenchState): string {
   const rows = state.records.filter((record) =>
-    `${valueOf(record, "localPort")} ${valueOf(record, "processName")} ${valueOf(record, "identity")}`.toLowerCase().includes(state.filter.toLowerCase()),
+    `${valueOf(record, "localPort")} ${valueOf(record, "processName")} ${valueOf(record, "friendlyNameEn")} ${valueOf(record, "friendlyNameZh")} ${valueOf(record, "identity")} ${record.serviceNames.join(" ")}`.toLowerCase().includes(state.filter.toLowerCase()),
   );
   const page = pageItems(rows, state.page, 10);
   return `
         <h2>${t("feature.ports.table")}</h2>
         <div class="data-table port-table">
-          <div class="data-row head"><span>${t("feature.ports.select")}</span><span>${t("feature.ports.port")}</span><span>${t("feature.ports.protocol")}</span><span>${t("feature.ports.state")}</span><span>PID</span><span>${t("feature.ports.process")}</span><span>${t("feature.ports.risk")}</span><span>${t("feature.ports.identity")}</span><span>${t("feature.ports.confidence")}</span><span>${t("feature.ports.recommendation")}</span></div>
+          <div class="data-row head"><span>${t("feature.ports.select")}</span><span>${t("feature.ports.port")}</span><span>${t("feature.ports.protocol")}</span><span>${t("feature.ports.state")}</span><span>PID</span><span>${localize("Friendly name", "友好程序名")}</span><span>${localize("Process", "真实进程")}</span><span>${localize("Bindings / connections", "绑定/连接")}</span><span>${t("feature.ports.services")}</span><span>${localize("Operation risk", "操作风险")}</span><span>${t("feature.ports.confidence")}</span><span>${t("feature.ports.recommendation")}</span></div>
           ${page.items.map((record) => renderPortRow(record, state.selectedKey)).join("") || `<div class="empty">${t("feature.ports.noRecords")}</div>`}
         </div>
         ${renderPagination("ports", page.page, page.totalPages, page.total)}
@@ -112,11 +112,13 @@ function renderPortRow(record: PortRecord, selectedKey: string | null): string {
   const key = portRecordKey(record);
   const selected = key === selectedKey;
   const treatability = assessPortTreatability(record);
+  const friendlyName = localize(record.friendlyNameEn, record.friendlyNameZh);
   return `<div class="data-row ${selected ? "is-selected" : ""}" data-testid="ports-row">
     <span><button data-port-select="${escapeHtml(key)}" type="button" aria-pressed="${selected ? "true" : "false"}">${selected ? t("feature.ports.selectedRow") : t("feature.ports.select")}</button></span>
     <span>${escapeHtml(String(record.localPort))}</span><span>${escapeHtml(record.protocol)}</span><span>${escapeHtml(record.state)}</span>
-    <span>${escapeHtml(String(record.pid))}</span><span>${escapeHtml(record.processName)}</span><span>${renderBadge(treatability.treatable ? t("feature.ports.operationRiskHigh") : t("feature.ports.protectedOwner"), treatability.treatable ? "warning" : "danger")}</span>
-    <span>${escapeHtml(record.identity)}</span><span>${escapeHtml(String(record.confidence))}</span><span data-testid="ports-row-closeability-reason">${escapeHtml(t(treatability.reasonKey))}</span>
+    <span>${escapeHtml(String(record.pid))}</span><span>${escapeHtml(friendlyName)}</span><span>${escapeHtml(record.processName || t("state.notAvailable"))}</span>
+    <span data-testid="ports-row-binding-summary">${escapeHtml(bindingSummary(record))}</span><span>${escapeHtml(record.serviceDisplayNames.join(", ") || record.serviceNames.join(", ") || t("feature.ports.none"))}</span>
+    <span>${renderBadge(operationRiskLabel(record.riskLevel), treatability.treatable ? "warning" : "danger")}</span><span>${escapeHtml(confidenceLabel(record))}</span><span data-testid="ports-row-closeability-reason">${escapeHtml(t(treatability.reasonKey))}</span>
   </div>`;
 }
 
@@ -128,16 +130,33 @@ function renderSelectedPortDetail(state: PortsWorkbenchState): string {
     <dl class="kv-list">
       ${detailRow(t("feature.ports.port"), `${selected.localPort} / ${selected.protocol}`)}
       ${detailRow("PID", String(selected.pid))}
+      ${detailRow(localize("Friendly name", "友好程序名"), localize(selected.friendlyNameEn, selected.friendlyNameZh))}
       ${detailRow(t("feature.ports.process"), selected.processName)}
+      ${detailRow(localize("Process started", "进程启动时间"), selected.processStartTime ? new Date(selected.processStartTime * 1000).toLocaleString() : t("state.notAvailable"))}
       ${detailRow(t("feature.ports.processPath"), selected.processPath || t("state.notAvailable"))}
+      ${detailRow("ProductName", selected.productName || t("state.notAvailable"))}
+      ${detailRow("FileDescription", selected.fileDescription || t("state.notAvailable"))}
+      ${detailRow("CompanyName", selected.companyName || t("state.notAvailable"))}
+      ${detailRow(localize("Publisher", "文件发布者"), selected.publisher || t("state.notAvailable"))}
+      ${detailRow(localize("Parent process", "父进程"), selected.parentProcessName ? `${selected.parentProcessName} / PID ${selected.parentPid}` : t("state.notAvailable"))}
       ${detailRow(t("feature.ports.services"), selected.serviceNames.join(", ") || t("feature.ports.none"))}
-      ${detailRow(t("feature.ports.ownerType"), selected.identity)}
+      ${detailRow(localize("Service display names", "服务显示名"), selected.serviceDisplayNames.join(", ") || t("feature.ports.none"))}
+      ${detailRow(localize("Service state / start mode", "服务状态/启动类型"), [selected.serviceStates.join(", "), selected.serviceStartModes.join(", ")].filter(Boolean).join(" / ") || t("feature.ports.none"))}
+      ${detailRow(t("feature.ports.ownerType"), selected.identityCategory)}
       ${detailRow(t("feature.ports.ownerRisk"), selected.riskLevel)}
       ${detailRow(t("feature.ports.operationRisk"), treatability.treatable ? t("feature.ports.operationRiskHigh") : t("feature.ports.notExecutable"))}
-      ${detailRow(t("feature.ports.confidence"), String(selected.confidence))}
+      ${detailRow(t("feature.ports.confidence"), confidenceLabel(selected))}
+      ${detailRow(localize("Identity catalog", "识别目录"), selected.identityCatalogVersion)}
       ${detailRow(t("feature.ports.treatable"), treatability.treatable ? t("state.yes") : t("state.no"))}
-      ${detailRow(t("feature.ports.recommendation"), selected.recommendation || selected.explanation || t("state.notAvailable"))}
+      ${detailRow(t("feature.ports.recommendation"), localize(selected.recommendationEn, selected.recommendationZh) || selected.explanation || t("state.notAvailable"))}
     </dl>
+    ${renderBindings(selected)}
+    <div data-testid="ports-source-evidence">
+      ${renderList(localize("Scan sources", "扫描来源"), selected.scanSources.map((source) => `${source.source} / ${new Date(source.scannedAt * 1000).toLocaleString()} / ${source.recordCount}${source.fallback ? ` / ${localize("fallback", "回退来源")}` : ""}`))}
+      ${selected.scanSources.some((source) => source.conflicts.length) ? renderList(localize("Source conflicts", "来源冲突"), selected.scanSources.flatMap((source) => source.conflicts.map((conflict) => `${source.source}: ${conflict}`))) : ""}
+    </div>
+    ${selected.evidence.length ? renderList(localize("Recognition evidence", "识别证据"), selected.evidence) : ""}
+    ${selected.conflictEvidence.length ? renderList(localize("Recognition conflicts", "冲突证据"), selected.conflictEvidence) : ""}
     <div class="toolbar">
       ${treatability.treatable ? renderActionButton("create-port-plan", t("feature.ports.createPlanForSelected")) : ""}
       ${renderActionButton("copy-selected-port-diagnostics", t("feature.ports.copyDiagnostics"))}
@@ -151,7 +170,8 @@ function renderPortPlan(state: PortsWorkbenchState): string {
   const plan = state.plan;
   if (!plan) return `<div class="empty">${t("feature.ports.noPlan")}</div>`;
   return `<div class="port-plan" data-testid="ports-plan-preview">
-    ${renderObjectTable(plan, ["planId", "riskLevel", "pid", "port", "protocol", "processName", "processPath", "commandLine", "parentPid", "parentProcessName"])}
+    ${renderObjectTable(plan, ["planId", "groupId", "groupFingerprint", "scanId", "riskLevel", "pid", "port", "protocol", "processStartTime", "processName", "processPath", "commandLineFingerprint", "expectedOwnerIdentity", "createdAt", "expiresAt", "parentPid", "parentProcessName"])}
+    ${plan.bindings.length ? renderList(localize("Planned bindings", "计划绑定"), plan.bindings.map((binding) => `${binding.localEndpoint} / ${binding.state}`)) : ""}
     ${plan.serviceNames.length ? renderList(t("feature.ports.services"), plan.serviceNames) : ""}
     ${plan.relatedPorts.length ? renderList(t("feature.ports.relatedPorts"), plan.relatedPorts.map(String)) : ""}
     ${plan.recommendedActions.length ? renderList(t("feature.ports.recommendedActions"), plan.recommendedActions) : ""}
@@ -175,4 +195,38 @@ function detailRow(label: string, value: string): string {
 
 function renderList(title: string, items: string[]): string {
   return `<div class="small-note"><strong>${escapeHtml(title)}</strong><ul>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul></div>`;
+}
+
+function bindingSummary(record: PortRecord): string {
+  if (record.state === "ESTABLISHED") {
+    return localize(`${record.remoteConnectionCount} active connections`, `${record.remoteConnectionCount} 个活动连接`);
+  }
+  if (record.hasIpv4 && record.hasIpv6) {
+    return localize(`IPv4 + IPv6, ${record.bindingCount} bindings`, `IPv4 + IPv6，${record.bindingCount} 个绑定`);
+  }
+  return localize(`${record.bindingCount} bindings`, `${record.bindingCount} 个绑定`);
+}
+
+function renderBindings(record: PortRecord): string {
+  if (!record.bindings.length) return "";
+  return `<div class="small-note" data-testid="ports-binding-details"><strong>${localize("Local bindings and redacted remote summary", "本地绑定和脱敏远端摘要")}</strong><ul>${record.bindings.map((binding) => `<li><code>${escapeHtml(binding.localEndpoint)}</code> · ${escapeHtml(binding.state)}${binding.remoteEndpoint && binding.remoteEndpoint !== "*" ? ` → <code>${escapeHtml(binding.remoteEndpoint)}</code>` : ""}</li>`).join("")}</ul></div>`;
+}
+
+function confidenceLabel(record: PortRecord): string {
+  const labels: Record<PortRecord["confidenceLevel"], string> = {
+    verified: localize("Verified", "已验证"),
+    high: localize("High confidence", "高置信度"),
+    medium: localize("Possible", "可能是"),
+    low: localize("Weak match", "弱识别"),
+    unknown: localize("Unknown", "未知"),
+    conflict: localize("Identity conflict", "身份冲突"),
+  };
+  return `${labels[record.confidenceLevel]} · ${record.confidence}%`;
+}
+
+function operationRiskLabel(level: string): string {
+  if (level === "critical") return localize("Protected", "受保护");
+  if (level === "high") return localize("High", "高风险");
+  if (level === "medium") return localize("Medium", "中风险");
+  return localize("Low", "低风险");
 }

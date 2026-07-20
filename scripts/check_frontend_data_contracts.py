@@ -127,6 +127,14 @@ def main() -> int:
         return fail("Ports table must be paginated")
     if "state.page = 1" not in ports_events or "ports:next" not in ports_events:
         return fail("Ports pagination must reset on filter and bind next/previous controls")
+    ports_safety = read("tauri/src/features/ports/portSafety.ts")
+    if "return record.groupId" not in ports_safety:
+        return fail("Ports selection must use the backend stable groupId")
+    if "`${record.protocol}:${record.localPort}:${record.pid}`" in ports_safety:
+        return fail("Ports must not reuse protocol:port:pid as a row selection key")
+    ports_api = read("tauri/src/features/ports/api.ts")
+    if 'create_port_resolution_plan", { groupId }' not in ports_api:
+        return fail("Port plan creation must target a stable groupId")
 
     file_association_render = read("tauri/src/features/fileAssociations/render.ts")
     file_association_events = read("tauri/src/features/fileAssociations/events.ts")

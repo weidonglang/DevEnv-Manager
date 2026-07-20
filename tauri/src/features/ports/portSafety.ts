@@ -17,7 +17,7 @@ export type PortTreatability = {
 const SYSTEM_PROCESS_NAMES = new Set(["system", "idle", "registry", "svchost.exe", "services.exe", "lsass.exe", "wininit.exe", "csrss.exe", "smss.exe"]);
 
 export function portRecordKey(record: PortRecord): string {
-  return `${record.protocol}:${record.localPort}:${record.pid}`;
+  return record.groupId;
 }
 
 export function assessPortTreatability(record: PortRecord | null | undefined): PortTreatability {

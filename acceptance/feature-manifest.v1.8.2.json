@@ -1614,7 +1614,10 @@
             "testIds": [
               "ports-table-section",
               "ports-row",
-              "ports-row-closeability-reason"
+              "ports-row-closeability-reason",
+              "ports-row-binding-summary",
+              "ports-binding-details",
+              "ports-source-evidence"
             ]
           },
           "selectors": {
@@ -1659,6 +1662,8 @@
           "acceptanceChecks": [
             "tableVisible",
             "rowReasonVisible",
+            "bindingGroupsVisible",
+            "identityEvidenceVisible",
             "reportContract",
             "debugContract"
           ]
@@ -1670,8 +1675,8 @@
           "userVisibleName": "Port plan, token, execute and release verification",
           "name": "Port plan, token, execute and release verification",
           "priority": "P0",
-          "targetVersion": "v1.8.2",
-          "status": "partial",
+          "targetVersion": "v1.8.3",
+          "status": "implemented",
           "oldFeature": true,
           "oldEntry": "Ports > Resolve",
           "currentEntry": "Ports > Resolve",

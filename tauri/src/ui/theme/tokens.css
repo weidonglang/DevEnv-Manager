@@ -357,6 +357,15 @@ button:disabled {
   background: var(--color-surface-raised);
 }
 
+.port-table {
+  overflow-x: auto;
+}
+
+.port-table .data-row {
+  grid-template-columns: 72px 72px 64px 92px 72px minmax(150px, 1.2fr) minmax(120px, 1fr) minmax(150px, 1.2fr) minmax(140px, 1fr) 96px 124px minmax(190px, 1.5fr);
+  min-width: 1480px;
+}
+
 .status-badge {
   display: inline-flex;
   align-items: center;
