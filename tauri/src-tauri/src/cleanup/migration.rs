@@ -18,6 +18,32 @@ fn normalized(path: &Path) -> String {
         .to_ascii_lowercase()
 }
 
+fn is_expected_archive_root_with(
+    source: &Path,
+    mode: &str,
+    desktop: Option<&Path>,
+    downloads: Option<&Path>,
+) -> bool {
+    let source = normalized(source);
+    match mode {
+        "desktop_archive" | "desktop_recycle" => {
+            desktop.map(normalized).is_some_and(|root| source == root)
+        }
+        "archive_only" => [desktop, downloads]
+            .into_iter()
+            .flatten()
+            .map(normalized)
+            .any(|root| source == root),
+        _ => false,
+    }
+}
+
+fn is_expected_archive_root(source: &Path, mode: &str) -> bool {
+    let desktop = dirs::desktop_dir();
+    let downloads = dirs::download_dir();
+    is_expected_archive_root_with(source, mode, desktop.as_deref(), downloads.as_deref())
+}
+
 fn path_is_reparse_point(path: &Path) -> bool {
     let Ok(metadata) = fs::symlink_metadata(path) else {
         return false;
@@ -92,10 +118,7 @@ pub(crate) fn ensure_movable_source(source: &Path, mode: &str) -> Result<Vec<Str
         return Err("源路径是符号链接或 Junction，已拒绝嵌套搬家".to_string());
     }
     if let Some(reason) = should_skip_path(source) {
-        let lowered = normalized(source);
-        let desktop_or_downloads =
-            lowered.ends_with("\\desktop") || lowered.ends_with("\\downloads");
-        if !(mode == "archive_only" && desktop_or_downloads) {
+        if !is_expected_archive_root(source, mode) {
             return Err(reason);
         }
     }
@@ -132,9 +155,7 @@ pub(crate) fn ensure_movable_source(source: &Path, mode: &str) -> Result<Vec<Str
             .join("Cache"),
     ];
     let mut warnings = Vec::new();
-    if matches!(mode, "archive_only" | "desktop_archive" | "desktop_recycle")
-        && is_inside_root(source, &home.join("Desktop"))
-    {
+    if is_expected_archive_root(source, mode) {
         warnings.push("桌面归档不会移动快捷方式、隐藏文件和系统文件".to_string());
         return Ok(warnings);
     }
@@ -760,6 +781,43 @@ mod tests {
     fn target_drive_rejects_c_drive() {
         assert!(target_root_for_drive("C:", "Downloads").is_err());
         assert!(target_root_for_drive("D:", "Downloads").is_ok());
+    }
+
+    #[test]
+    fn archive_root_exception_is_exact_and_mode_bound() {
+        let desktop = Path::new(r"C:\Users\ReleaseLabAdmin\Desktop");
+        let downloads = Path::new(r"C:\Users\ReleaseLabAdmin\Downloads");
+
+        assert!(is_expected_archive_root_with(
+            desktop,
+            "desktop_archive",
+            Some(desktop),
+            Some(downloads)
+        ));
+        assert!(is_expected_archive_root_with(
+            downloads,
+            "archive_only",
+            Some(desktop),
+            Some(downloads)
+        ));
+        assert!(!is_expected_archive_root_with(
+            &desktop.join("nested"),
+            "desktop_archive",
+            Some(desktop),
+            Some(downloads)
+        ));
+        assert!(!is_expected_archive_root_with(
+            desktop,
+            "move_user_folder",
+            Some(desktop),
+            Some(downloads)
+        ));
+        assert!(!is_expected_archive_root_with(
+            downloads,
+            "desktop_archive",
+            Some(desktop),
+            Some(downloads)
+        ));
     }
 
     #[test]
