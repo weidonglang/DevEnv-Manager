@@ -20,6 +20,7 @@ import { mountToolchainsFeature } from "../features/toolchains";
 import { mountProfilesFeature } from "../features/profiles";
 import { mountReportsFeature } from "../features/reports";
 import { mountSettingsFeature } from "../features/settings";
+import packageMetadata from "../../package.json";
 
 const app = document.querySelector<HTMLDivElement>("#app");
 let workbenchStarted = false;
@@ -92,7 +93,7 @@ function renderShell() {
         <section id="feature-root" class="view active" aria-live="polite" data-testid="global-persistent-result"></section>
         <footer class="workbench-statusbar">
           <span id="workbench-status-view">${t("route.dashboard.label")}</span>
-          <span>${t("app.statusRelease")}</span>
+          <span>${t("app.statusRelease", { version: packageMetadata.version })}</span>
           <span>${t("app.riskStatus")}</span>
         </footer>
       </section>

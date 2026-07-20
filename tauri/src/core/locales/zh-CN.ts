@@ -3,7 +3,7 @@ export const zhCN = {
   "app.localWorkbench": "本地开发环境工作台",
   "app.commandPalette": "命令面板",
   "app.refresh": "刷新",
-  "app.statusRelease": "v1.8.2 发布候选",
+  "app.statusRelease": "v{version} 发布候选",
   "app.riskStatus": "风险操作需要计划和确认令牌",
   "app.theme": "主题",
   "app.theme.light": "亮色",

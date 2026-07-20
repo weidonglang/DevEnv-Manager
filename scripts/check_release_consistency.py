@@ -28,6 +28,20 @@ def main() -> int:
         readme,
     )
     readme_version = readme_match.group(1) if readme_match else ""
+    locale_paths = [
+        "tauri/src/core/locales/en-US.ts",
+        "tauri/src/core/locales/zh-CN.ts",
+    ]
+    hardcoded_status_versions = []
+    for path in locale_paths:
+        locale = (ROOT / path).read_text(encoding="utf-8")
+        if re.search(r'"app\.statusRelease"\s*:\s*"v\d+\.\d+\.\d+', locale):
+            hardcoded_status_versions.append(path)
+    if hardcoded_status_versions:
+        print("Release consistency check failed: app.statusRelease must use the build version placeholder.")
+        for path in hardcoded_status_versions:
+            print(f"- {path}")
+        return 1
     versions = {
         "tauri/package.json": package_version,
         "tauri/package-lock.json": package_lock_version,
