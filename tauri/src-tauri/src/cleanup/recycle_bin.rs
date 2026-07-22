@@ -161,17 +161,12 @@ pub fn execute_recycle_bin_cleanup_plan(
         .filter(|id| !remaining_ids.contains(id.as_str()))
         .count();
     let after_bytes = selected_after.iter().map(|item| item.size).sum::<u64>();
-    let mut failures = outcomes
-        .iter()
-        .filter(|item| !item.success)
-        .map(|item| format!("{}: {}", item.drive, item.error))
-        .collect::<Vec<_>>();
-    if !selected_after.is_empty() {
-        failures.push(format!(
-            "{} previewed item(s) remain on the selected volume(s) after cleanup.",
-            selected_after.len()
-        ));
-    }
+    let failures = verified_cleanup_failures(
+        &outcomes,
+        selected_after.len(),
+        cleaned_items,
+        plan.item_count,
+    );
     let success = failures.is_empty() && cleaned_items == plan.item_count;
     Ok(RecycleBinCleanupResult {
         plan_id: plan.plan_id,
@@ -190,6 +185,36 @@ pub fn execute_recycle_bin_cleanup_plan(
             "recycle-bin-cleanup-incomplete".to_string()
         },
     })
+}
+
+fn verified_cleanup_failures(
+    outcomes: &[ClearOutcome],
+    remaining_items: usize,
+    cleaned_items: usize,
+    expected_items: usize,
+) -> Vec<String> {
+    // Clear-RecycleBin can report ERROR_FILE_NOT_FOUND after Windows has already
+    // removed the final item. The fresh shell snapshot is the authoritative result.
+    if remaining_items == 0 && cleaned_items == expected_items {
+        return Vec::new();
+    }
+
+    let mut failures = outcomes
+        .iter()
+        .filter(|item| !item.success)
+        .map(|item| format!("{}: {}", item.drive, item.error))
+        .collect::<Vec<_>>();
+    if remaining_items > 0 {
+        failures.push(format!(
+            "{remaining_items} previewed item(s) remain on the selected volume(s) after cleanup."
+        ));
+    }
+    if cleaned_items != expected_items {
+        failures.push(format!(
+            "Cleanup verification removed {cleaned_items} of {expected_items} previewed item(s)."
+        ));
+    }
+    failures
 }
 
 fn parse_report(json: &str) -> Result<RecycleBinReport, String> {
@@ -481,5 +506,30 @@ mod tests {
             .warnings
             .iter()
             .any(|item| item == "unresolved-source-drive"));
+    }
+
+    #[test]
+    fn recycle_cleanup_accepts_verified_empty_snapshot_after_cmdlet_file_not_found() {
+        let outcomes = vec![ClearOutcome {
+            drive: "E:".to_string(),
+            success: false,
+            error: "The system cannot find the file specified.".to_string(),
+        }];
+        assert!(verified_cleanup_failures(&outcomes, 0, 1, 1).is_empty());
+    }
+
+    #[test]
+    fn recycle_cleanup_keeps_cmdlet_error_when_items_remain() {
+        let outcomes = vec![ClearOutcome {
+            drive: "E:".to_string(),
+            success: false,
+            error: "Access is denied.".to_string(),
+        }];
+        let failures = verified_cleanup_failures(&outcomes, 1, 0, 1);
+        assert!(failures
+            .iter()
+            .any(|item| item.contains("Access is denied")));
+        assert!(failures.iter().any(|item| item.contains("remain")));
+        assert!(failures.iter().any(|item| item.contains("removed 0 of 1")));
     }
 }
