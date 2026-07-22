@@ -1,8 +1,8 @@
 # DevEnv Manager v1.8.3 Stable Release Review
 
-Status: **GO for final PR review; not published yet**
+Status: **Published and verified on GitHub and Gitee**
 
-The public stable channel remains on v1.8.2 until PR #135 is merged, `main` CI passes, and both GitHub and Gitee releases are verified. The exact source candidate and local assets in this review are pinned to commit `ef89b71b91dd550d40c21e4f05cf3f32a52c9252`.
+The public stable channel is v1.8.3. PR #135 was merged as `921b9daf05d0781ed1028d6dfc6d99b4d320932c`; the exact application source and locally validated assets are pinned to source commit `ef89b71b91dd550d40c21e4f05cf3f32a52c9252`.
 
 ## User Notice
 
@@ -62,22 +62,22 @@ No installer or configuration-path source changed after the earlier v1.8.3 dual-
 
 Raw evidence is retained under the Git-ignored `artifacts/release-lab/v1.8.3/ef89b71/` directory. `preflight.json`, `functional-prepare.json`, `functional-validation.json`, and `final-cleanup.json` identify the exact source commit and preserve the machine results.
 
+## Publication Verification
+
+- PR #135 and `main` CI run `29928050840` passed before publication.
+- Annotated tag `v1.8.3` was pushed to GitHub and Gitee from merge commit `921b9da`.
+- [GitHub Release](https://github.com/weidonglang/DevEnv-Manager/releases/tag/v1.8.3) and [Gitee Release](https://gitee.com/weidonglang/DevEnv-Manager/releases/tag/v1.8.3) are public and contain the reviewed NSIS and MSI assets.
+- The NSIS and MSI were independently downloaded from both platforms. All four online files matched the reviewed sizes and SHA256 values in this document.
+- GitHub and Gitee public manifests both returned version 1.8.3, the expected x64 NSIS file name, 2,841,914-byte size, and SHA256 `a6663ab2e409f936b11105f4d827b4d41cbfbe9e225ce55aa7a92e4eb601d20c`.
+- A real v1.8.2 application checked both online channels. GitHub completed in 277 ms and Gitee in 460 ms; both returned `currentVersion=1.8.2`, `latestVersion=1.8.3`, `updateAvailable=true`, and the expected URL, mirrors, platform, size, and SHA256.
+- The update-smoke v1.8.2 install and uninstall both returned exit code 0.
+- Issue #134 was closed only after these online checks passed. Issue #130 remains open for v1.9.0 Runtime work.
+
 ## Non-Blocking Disclosures
 
 - The bundles are not Authenticode-signed, matching the current project distribution model. Windows may show its normal trust warning.
 - `runtime.v19.fullRedesign`, `profiles.historyRestore`, and `advanced.mode` remain explicitly deferred. Their issues must stay open.
-- GitHub/Gitee online asset hashes and update-channel discovery cannot be proven until the tag and releases exist; these are publication gates, not local product blockers.
 
-## Review Decision
+## Release Decision
 
-No source, automated-test, CI, asset, installed-app, or ReleaseLab blocker remains. PR #135 can move from Draft to final review. Publication must use this order:
-
-1. Commit the final evidence and update metadata; require latest-head PR CI to pass.
-2. Perform a final diff and release review, then mark PR #135 ready and merge it.
-3. Require target `main` CI to pass.
-4. Create and push tag `v1.8.3` to GitHub and Gitee.
-5. Create the GitHub Release and upload only the reviewed NSIS and MSI assets.
-6. Create or synchronize the Gitee Release with the same assets.
-7. Download both online assets from both platforms and verify size and SHA256.
-8. Run the v1.8.2 to v1.8.3 update-channel smoke against GitHub and Gitee manifests.
-9. Close #134 only after both platforms and update channels pass. Keep #130 and other deferred tracking issues open.
+v1.8.3 is released. No source, automated-test, CI, asset, installed-app, ReleaseLab, publication, or update-channel blocker remains. All earlier v1.8.3 candidate assets remain superseded and must not be distributed.
