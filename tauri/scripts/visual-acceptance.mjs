@@ -1,4 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
@@ -74,7 +75,9 @@ async function main() {
 
     const results = [];
     for (const testCase of cases) {
-      results.push(await runCase(client, vitePort, testCase));
+      const result = await runCase(client, vitePort, testCase);
+      results.push(result);
+      printCaseResult(result);
     }
 
     if (updateBaseline) {
@@ -85,7 +88,6 @@ async function main() {
       await compareVisualBaseline(results);
     }
 
-    results.forEach(printCaseResult);
     const report = buildReport(results);
     await writeFile(join(artifactDirectory, "visual-acceptance-report.json"), `${JSON.stringify(report, null, 2)}\n`, "utf8");
     await writeFile(join(artifactDirectory, "visual-acceptance-report.md"), markdownReport(report), "utf8");
@@ -640,10 +642,9 @@ function findEdge() {
     process.env.LOCALAPPDATA && join(process.env.LOCALAPPDATA, "Microsoft", "Edge", "Application", "msedge.exe"),
   ].filter(Boolean);
   for (const candidate of candidates) {
-    const probe = spawnSync(candidate, ["--version"], { windowsHide: true, encoding: "utf8" });
-    if (!probe.error) return candidate;
+    if (existsSync(candidate)) return candidate;
   }
-  const where = spawnSync("where.exe", ["msedge.exe"], { windowsHide: true, encoding: "utf8" });
+  const where = spawnSync("where.exe", ["msedge.exe"], { windowsHide: true, encoding: "utf8", timeout: 5000 });
   const found = where.status === 0 ? where.stdout.split(/\r?\n/).find(Boolean) : "";
   if (found) return found.trim();
   throw new Error("Microsoft Edge was not found; visual acceptance cannot run");
@@ -655,7 +656,7 @@ async function waitForEdgePage(port, child) {
   while (Date.now() < deadline) {
     if (child.exitCode !== null) throw new Error(`Microsoft Edge exited early with code ${child.exitCode}`);
     try {
-      const response = await fetch(endpoint);
+      const response = await fetch(endpoint, { signal: AbortSignal.timeout(3000) });
       if (response.ok) {
         const targets = await response.json();
         const page = targets.find((target) => target.type === "page" && target.webSocketDebuggerUrl);
@@ -687,7 +688,7 @@ async function waitForHttp(url, child, logs) {
   while (Date.now() < deadline) {
     if (child.exitCode !== null) throw new Error(`Vite exited early with code ${child.exitCode}\n${logs.join("")}`);
     try {
-      const response = await fetch(url);
+      const response = await fetch(url, { signal: AbortSignal.timeout(3000) });
       if (response.ok) return;
     } catch {
       // Vite is still starting.
@@ -746,11 +747,21 @@ class CdpClient {
     });
   }
 
-  static async connect(url) {
+  static async connect(url, timeoutMs = 15000) {
     const socket = new WebSocket(url);
     await new Promise((resolveOpen, reject) => {
-      socket.addEventListener("open", resolveOpen, { once: true });
-      socket.addEventListener("error", () => reject(new Error("Unable to connect to Edge DevTools")), { once: true });
+      const timeout = setTimeout(() => {
+        socket.close();
+        reject(new Error(`Timed out connecting to Edge DevTools after ${timeoutMs} ms`));
+      }, timeoutMs);
+      socket.addEventListener("open", () => {
+        clearTimeout(timeout);
+        resolveOpen();
+      }, { once: true });
+      socket.addEventListener("error", () => {
+        clearTimeout(timeout);
+        reject(new Error("Unable to connect to Edge DevTools"));
+      }, { once: true });
     });
     return new CdpClient(socket);
   }
