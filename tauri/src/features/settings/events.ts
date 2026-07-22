@@ -5,7 +5,7 @@ import { clearDebugEntries, debugEntriesAsMarkdown, getDebugEntries, isAdvancedM
 import { localeModeLabel, localize, setLocale, t, type LocaleMode } from "../../core/i18n";
 import { applyTheme, readTheme, type ThemeMode } from "../../ui/theme/controller";
 import { bindAction } from "../sharedView";
-import { checkForUpdates, downloadUpdate, launchUpdateInstaller, loadSettingsWorkbench, openAppConfigDir, powershellRunnerStatus, resetUiConfig, selfUninstall, setAutoCheckUpdate, setRootDir } from "./api";
+import { checkForUpdates, downloadUpdate, launchUpdateInstaller, loadSettingsWorkbench, openAppConfigDir, powershellRunnerStatus, resetUiConfig, selfUninstall, setAutoCheckUpdate, setPortScanPreferences, setRootDir } from "./api";
 import { filterDebugEntries, renderDebugEntriesPreview, renderSettingsWorkbench, type DebugFilter } from "./render";
 import type { SettingsWorkbenchState } from "./state";
 
@@ -58,6 +58,33 @@ export function bindSettingsEvents(context: FeatureContext, state: SettingsWorkb
   });
   bindAction(context.root, "toggle-auto-update", async () => {
     state.config = await setAutoCheckUpdate(!state.config?.settings.autoCheckUpdate);
+    if (!context.isCurrent()) return;
+    context.root.innerHTML = renderSettingsWorkbench(state);
+    bindSettingsEvents(context, state);
+  });
+  bindAction(context.root, "toggle-auto-port-scan", async () => {
+    if (!state.config) return;
+    state.operationError = "";
+    try {
+      state.config = await setPortScanPreferences(!state.config.settings.autoScanPortsOnStartup, state.config.settings.portScanScope);
+      state.operationResult = localize("Startup port scan preference saved.", "启动端口扫描设置已保存。");
+    } catch (error) {
+      state.operationError = errorMessage(error);
+    }
+    if (!context.isCurrent()) return;
+    context.root.innerHTML = renderSettingsWorkbench(state);
+    bindSettingsEvents(context, state);
+  });
+  context.root.querySelector<HTMLSelectElement>("#settings-port-scan-scope")?.addEventListener("change", async (event) => {
+    if (!state.config) return;
+    const scope = (event.target as HTMLSelectElement).value === "full" ? "full" : "recommended";
+    state.operationError = "";
+    try {
+      state.config = await setPortScanPreferences(state.config.settings.autoScanPortsOnStartup, scope);
+      state.operationResult = localize("Port scan scope saved.", "端口扫描范围已保存。");
+    } catch (error) {
+      state.operationError = errorMessage(error);
+    }
     if (!context.isCurrent()) return;
     context.root.innerHTML = renderSettingsWorkbench(state);
     bindSettingsEvents(context, state);

@@ -18,7 +18,77 @@ pub struct DiskVolumeInfo {
     pub used_bytes: u64,
     pub used_percent: f64,
     pub file_system: Option<String>,
+    pub disk_kind: String,
+    pub removable: bool,
+    pub read_only: bool,
+    pub system_volume: bool,
+    pub archive_target_eligible: bool,
+    pub archive_target_reason: String,
     pub risk: String,
+}
+
+#[derive(Debug, Clone, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct RecycleBinReport {
+    pub generated_at: String,
+    pub item_count: usize,
+    pub total_bytes: u64,
+    pub recoverable_count: usize,
+    pub items: Vec<RecycleBinItem>,
+    pub volumes: Vec<RecycleBinVolumeSummary>,
+    pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct RecycleBinItem {
+    pub id: String,
+    pub name: String,
+    pub original_path: String,
+    pub recycle_path: String,
+    pub source_drive: String,
+    pub size: u64,
+    pub deleted_at: String,
+    pub recoverable: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct RecycleBinVolumeSummary {
+    pub drive: String,
+    pub item_count: usize,
+    pub total_bytes: u64,
+    pub recoverable_count: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct RecycleBinCleanupPlan {
+    pub plan_id: String,
+    pub created_at: String,
+    pub selected_drives: Vec<String>,
+    pub item_ids: Vec<String>,
+    pub item_count: usize,
+    pub estimated_bytes: u64,
+    pub snapshot_fingerprint: String,
+    pub risk_level: String,
+    pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct RecycleBinCleanupResult {
+    pub plan_id: String,
+    pub success: bool,
+    pub before_item_count: usize,
+    pub before_bytes: u64,
+    pub after_item_count: usize,
+    pub after_bytes: u64,
+    pub cleaned_items: usize,
+    pub cleaned_bytes: u64,
+    pub selected_drives: Vec<String>,
+    pub failures: Vec<String>,
+    pub message: String,
 }
 
 #[derive(Debug, Clone, Serialize, Default)]
@@ -140,6 +210,8 @@ pub struct LargeFileItem {
     pub open_status: String,
     pub suggestion: String,
     pub risk: String,
+    pub actionable: bool,
+    pub blocked_reason: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Default)]
@@ -176,6 +248,9 @@ pub struct FolderUsageReport {
     pub name: String,
     pub path: String,
     pub total_bytes: u64,
+    pub file_count: usize,
+    pub folder_count: usize,
+    pub protected_count: usize,
     pub categories: Vec<FolderUsageItem>,
     pub top_files: Vec<LargeFileItem>,
     pub suggestions: Vec<String>,
@@ -230,7 +305,28 @@ pub struct MovePlan {
     pub risk: String,
     pub requires_admin: bool,
     pub reversible: bool,
+    #[serde(default)]
+    pub selected_items: Vec<MovePlanItem>,
     pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct MovePlanItem {
+    pub source: String,
+    pub target: String,
+    pub size: u64,
+    pub sha256: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct MoveReceipt {
+    pub source: String,
+    pub target: String,
+    pub size: u64,
+    pub source_sha256: String,
+    pub target_sha256: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -245,6 +341,8 @@ pub struct MoveResult {
     pub junction_created: bool,
     pub failures: Vec<String>,
     pub rollback_id: Option<String>,
+    #[serde(default)]
+    pub receipts: Vec<MoveReceipt>,
     pub report_markdown: String,
 }
 
@@ -259,6 +357,8 @@ pub struct RollbackRecord {
     pub backup_path: Option<String>,
     pub junction_path: Option<String>,
     pub reversible: bool,
+    #[serde(default)]
+    pub moved_files: Vec<MoveReceipt>,
     pub notes: Vec<String>,
 }
 

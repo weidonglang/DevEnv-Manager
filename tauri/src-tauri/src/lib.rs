@@ -5,7 +5,9 @@ mod file_assoc;
 #[cfg(feature = "acceptance-fixtures")]
 mod isolated_acceptance;
 mod mysql_repair;
+mod port_scan;
 mod powershell_runner;
+mod process_identity;
 mod safety;
 
 #[cfg(feature = "acceptance-fixtures")]
@@ -19,12 +21,12 @@ use std::env;
 use std::ffi::OsStr;
 use std::fs;
 use std::io::{self, Read, Write};
-use std::net::{IpAddr, Ipv4Addr};
+use std::net::IpAddr;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::{
     atomic::{AtomicBool, AtomicU64, Ordering},
-    Mutex, OnceLock,
+    Condvar, Mutex, OnceLock,
 };
 use std::thread;
 use std::time::{Duration, Instant};
@@ -67,6 +69,8 @@ const PROTECTED_FORCE_KILL_PROCESS_NAMES: [&str; 11] = [
 ];
 const PORT_PID_VERIFY_ATTEMPTS: usize = 20;
 const PORT_RELEASE_VERIFY_ATTEMPTS: usize = 4;
+const PORT_SCAN_CACHE_TTL: Duration = Duration::from_secs(20);
+static PORT_SCAN_GENERATION: AtomicU64 = AtomicU64::new(0);
 const BLOCKED_NAMES: [&str; 9] = [
     "system",
     "idle",
@@ -117,6 +121,10 @@ struct AppPaths {
 struct Settings {
     root_dir: String,
     auto_check_update: bool,
+    #[serde(default = "default_true")]
+    auto_scan_ports_on_startup: bool,
+    #[serde(default = "default_port_scan_scope")]
+    port_scan_scope: String,
     download_timeout_seconds: u64,
     theme: String,
     last_page: String,
@@ -388,49 +396,146 @@ struct JavaEnvironmentReport {
     candidates: Vec<RuntimeInfo>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 struct PortRecord {
+    group_id: String,
+    group_fingerprint: String,
     protocol: String,
     local_address: String,
     local_port: u16,
     remote_address: String,
     state: String,
     pid: u32,
+    process_start_time: u64,
     process_name: String,
+    friendly_name_zh: String,
+    friendly_name_en: String,
     process_path: String,
+    product_name: String,
+    file_description: String,
+    company_name: String,
+    publisher: String,
     command_line: String,
+    command_line_fingerprint: String,
     parent_pid: u32,
     parent_process_name: String,
     service_names: Vec<String>,
+    service_display_names: Vec<String>,
+    service_states: Vec<String>,
+    service_start_modes: Vec<String>,
+    service_details: Vec<PortServiceDetail>,
+    bindings: Vec<port_scan::PortBinding>,
+    binding_count: usize,
+    remote_connection_count: usize,
+    related_ports: Vec<u16>,
+    source_record_count: usize,
+    has_ipv4: bool,
+    has_ipv6: bool,
+    scan_sources: Vec<PortScanSourceEvidence>,
     common_usage: String,
     explanation: String,
     risk: String,
     identity: String,
+    identity_id: String,
+    identity_category: String,
+    identity_ecosystem: String,
     confidence: u8,
+    confidence_level: String,
+    identity_catalog_version: String,
     evidence_count: usize,
     conflict_count: usize,
     risk_level: String,
     recommendation: String,
+    recommendation_zh: String,
+    recommendation_en: String,
     evidence: Vec<String>,
     conflict_evidence: Vec<String>,
 }
+
+#[derive(Debug, Serialize, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+struct PortServiceDetail {
+    name: String,
+    display_name: String,
+    state: String,
+    start_mode: String,
+    process_id: u32,
+    service_type: String,
+    description: String,
+    path_name: String,
+    service_host_group: String,
+    service_dll: String,
+    core_windows_service: bool,
+}
+
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct PortScanSourceEvidence {
+    source: String,
+    scanned_at: u64,
+    record_count: usize,
+    fallback: bool,
+    conflicts: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct PortScanSnapshot {
+    scan_id: String,
+    scope: String,
+    status: String,
+    source: String,
+    scanned_at: u64,
+    elapsed_ms: u128,
+    raw_count: usize,
+    filtered_count: usize,
+    truncated: bool,
+    cached: bool,
+    complete: bool,
+    user_message: String,
+    debug_summary: String,
+    records: Vec<PortRecord>,
+}
+
+#[derive(Clone)]
+struct CachedPortScan {
+    snapshot: PortScanSnapshot,
+    cached_at: Instant,
+}
+
+#[derive(Default)]
+struct PortScanCoordinator {
+    cached: Option<CachedPortScan>,
+    in_flight: bool,
+    last_error: Option<String>,
+}
+
+static PORT_SCAN_COORDINATOR: OnceLock<(Mutex<PortScanCoordinator>, Condvar)> = OnceLock::new();
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 struct PortResolutionPlan {
     plan_id: String,
+    group_id: String,
+    group_fingerprint: String,
+    scan_id: String,
     pid: u32,
     port: u16,
     protocol: String,
+    process_start_time: u64,
     process_name: String,
     process_path: String,
-    command_line: String,
+    command_line_fingerprint: String,
     parent_pid: Option<u32>,
     parent_process_name: Option<String>,
     child_processes: Vec<ChildProcessSummary>,
     service_names: Vec<String>,
+    bindings: Vec<port_scan::PortBinding>,
     related_ports: Vec<u16>,
+    expected_owner_identity: String,
+    created_at: u64,
+    expires_at: u64,
     project_root: Option<String>,
     risk_level: String,
     warnings: Vec<String>,
@@ -458,6 +563,8 @@ struct PortResolutionResult {
     next_steps: Vec<String>,
     pid_exited: bool,
     port_released: bool,
+    related_ports_released: bool,
+    remaining_related_ports: Vec<u16>,
     release_checked_at: String,
     remaining_owners: Vec<PortRecord>,
 }
@@ -1198,6 +1305,21 @@ static DOCTOR_REPAIR_PLANS: OnceLock<Mutex<HashMap<String, PendingDoctorRepairPl
     OnceLock::new();
 static GENERIC_ARCHIVE_PLANS: OnceLock<Mutex<HashMap<String, GenericArchivePlan>>> =
     OnceLock::new();
+static MOVE_PLANS: OnceLock<Mutex<HashMap<String, cleanup::MovePlan>>> = OnceLock::new();
+static EXPANSION_PLANS: OnceLock<Mutex<HashMap<String, PendingExpansionPlan>>> = OnceLock::new();
+static RECYCLE_BIN_CLEANUP_PLANS: OnceLock<Mutex<HashMap<String, cleanup::RecycleBinCleanupPlan>>> =
+    OnceLock::new();
+
+#[derive(Debug, Clone)]
+struct PendingExpansionPlan {
+    created_at: u64,
+    plan: cleanup::ExpansionPlan,
+}
+
+const MOVE_PLAN_TTL_SECONDS: u64 = 30 * 60;
+const MAX_PENDING_MOVE_PLANS: usize = 128;
+const EXPANSION_PLAN_TTL_SECONDS: u64 = 15 * 60;
+const MAX_PENDING_EXPANSION_PLANS: usize = 32;
 
 fn confirmation_tokens() -> &'static Mutex<HashMap<String, ConfirmationToken>> {
     CONFIRMATION_TOKENS.get_or_init(|| Mutex::new(HashMap::new()))
@@ -1213,6 +1335,18 @@ fn profile_apply_plans() -> &'static Mutex<HashMap<String, PendingProfileApplyPl
 
 fn doctor_repair_plans() -> &'static Mutex<HashMap<String, PendingDoctorRepairPlan>> {
     DOCTOR_REPAIR_PLANS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn move_plans() -> &'static Mutex<HashMap<String, cleanup::MovePlan>> {
+    MOVE_PLANS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn expansion_plans() -> &'static Mutex<HashMap<String, PendingExpansionPlan>> {
+    EXPANSION_PLANS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn recycle_bin_cleanup_plans() -> &'static Mutex<HashMap<String, cleanup::RecycleBinCleanupPlan>> {
+    RECYCLE_BIN_CLEANUP_PLANS.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
 const RISK_OPERATION_REGISTRY: &[RiskOperationSpec] = &[
@@ -1449,6 +1583,39 @@ const RISK_OPERATION_REGISTRY: &[RiskOperationSpec] = &[
         description: "执行空间搬家或归档计划",
     },
     RiskOperationSpec {
+        command: "execute_desktop_archive_plan",
+        action_id: "execute_desktop_archive_plan",
+        risk_level: "high",
+        requires_backup: true,
+        requires_token: true,
+        description: "执行用户所选桌面文件归档计划",
+    },
+    RiskOperationSpec {
+        command: "execute_downloads_archive_plan",
+        action_id: "execute_downloads_archive_plan",
+        risk_level: "high",
+        requires_backup: true,
+        requires_token: true,
+        description: "执行下载目录归档计划",
+    },
+    RiskOperationSpec {
+        command: "execute_desktop_cleanup_plan",
+        action_id: "execute_desktop_cleanup_plan",
+        risk_level: "medium",
+        requires_backup: false,
+        requires_token: true,
+        description: "将用户所选桌面文件移动到 Windows 回收站",
+    },
+    RiskOperationSpec {
+        command: "execute_recycle_bin_cleanup_plan",
+        action_id: "execute_recycle_bin_cleanup_plan",
+        risk_level: "critical",
+        requires_backup: false,
+        requires_token: true,
+        description:
+            "Permanently empty selected Windows Recycle Bin source volumes after a snapshot recheck",
+    },
+    RiskOperationSpec {
         command: "execute_generic_archive_plan",
         action_id: "execute_generic_archive_plan",
         risk_level: "high",
@@ -1470,7 +1637,7 @@ const RISK_OPERATION_REGISTRY: &[RiskOperationSpec] = &[
         risk_level: "medium",
         requires_backup: false,
         requires_token: true,
-        description: "鎵ц宸查瑙堢殑瀹夊叏娓呯悊璁″垝",
+        description: "执行已预览的安全清理计划",
     },
     RiskOperationSpec {
         command: "clear_download_cache",
@@ -1768,6 +1935,17 @@ fn set_root_dir(root: String) -> Result<ConfigView, String> {
 fn set_auto_check_update(enabled: bool) -> Result<ConfigView, String> {
     let mut settings = load_settings()?;
     settings.auto_check_update = enabled;
+    save_json(&settings_file(), &settings)?;
+    load_config()
+}
+
+#[tauri::command]
+fn set_port_scan_preferences(enabled: bool, scope: String) -> Result<ConfigView, String> {
+    let mut settings = load_settings()?;
+    settings.auto_scan_ports_on_startup = enabled;
+    settings.port_scan_scope = port_scan::ScanScope::parse(Some(scope.trim()))
+        .as_str()
+        .to_string();
     save_json(&settings_file(), &settings)?;
     load_config()
 }
@@ -2429,13 +2607,135 @@ fn open_app_config_dir() -> Result<OperationResult, String> {
     })
 }
 
+fn store_move_plan(plan: cleanup::MovePlan) -> Result<cleanup::MovePlan, String> {
+    let now = unix_timestamp();
+    let mut store = move_plans()
+        .lock()
+        .map_err(|_| "Move plan storage is unavailable".to_string())?;
+    store.retain(|_, pending| !move_plan_expired(pending, now));
+    if store.len() >= MAX_PENDING_MOVE_PLANS {
+        return Err(
+            "Too many pending move plans; complete an existing plan or wait for it to expire"
+                .to_string(),
+        );
+    }
+    store.insert(plan.plan_id.clone(), plan.clone());
+    Ok(plan)
+}
+
+fn move_plan_expired(plan: &cleanup::MovePlan, now: u64) -> bool {
+    plan.created_at
+        .parse::<u64>()
+        .ok()
+        .is_none_or(|created| created.saturating_add(MOVE_PLAN_TTL_SECONDS) < now)
+}
+
+fn verify_move_plan(plan: &cleanup::MovePlan) -> Result<(), String> {
+    let store = move_plans()
+        .lock()
+        .map_err(|_| "Move plan storage is unavailable".to_string())?;
+    let stored = store
+        .get(&plan.plan_id)
+        .ok_or_else(|| "Move plan does not exist, was replaced, or was already used".to_string())?;
+    if stored != plan {
+        return Err("Move plan content changed after preview; execution refused".to_string());
+    }
+    if move_plan_expired(stored, unix_timestamp()) {
+        return Err("Move plan expired; create a new preview before execution".to_string());
+    }
+    Ok(())
+}
+
+fn consume_move_plan(plan: cleanup::MovePlan) -> Result<cleanup::MovePlan, String> {
+    let mut store = move_plans()
+        .lock()
+        .map_err(|_| "Move plan storage is unavailable".to_string())?;
+    let stored = store
+        .remove(&plan.plan_id)
+        .ok_or_else(|| "Move plan does not exist, was replaced, or was already used".to_string())?;
+    if stored != plan {
+        store.insert(stored.plan_id.clone(), stored);
+        return Err("Move plan content changed after preview; execution refused".to_string());
+    }
+    if move_plan_expired(&stored, unix_timestamp()) {
+        return Err("Move plan expired; create a new preview before execution".to_string());
+    }
+    Ok(plan)
+}
+
+fn store_expansion_plan(plan: cleanup::ExpansionPlan) -> Result<cleanup::ExpansionPlan, String> {
+    let now = unix_timestamp();
+    let mut store = expansion_plans()
+        .lock()
+        .map_err(|_| "Expansion plan storage is unavailable".to_string())?;
+    store.retain(|_, pending| {
+        pending
+            .created_at
+            .saturating_add(EXPANSION_PLAN_TTL_SECONDS)
+            >= now
+    });
+    if store.len() >= MAX_PENDING_EXPANSION_PLANS {
+        return Err("Too many pending expansion plans; wait for an old plan to expire".to_string());
+    }
+    store.insert(
+        plan.plan_id.clone(),
+        PendingExpansionPlan {
+            created_at: now,
+            plan: plan.clone(),
+        },
+    );
+    Ok(plan)
+}
+
+fn verify_expansion_plan(plan: &cleanup::ExpansionPlan) -> Result<(), String> {
+    let store = expansion_plans()
+        .lock()
+        .map_err(|_| "Expansion plan storage is unavailable".to_string())?;
+    let pending = store
+        .get(&plan.plan_id)
+        .ok_or_else(|| "Expansion plan does not exist, expired, or was already used".to_string())?;
+    if &pending.plan != plan {
+        return Err("Expansion plan content changed after preview; execution refused".to_string());
+    }
+    if pending
+        .created_at
+        .saturating_add(EXPANSION_PLAN_TTL_SECONDS)
+        < unix_timestamp()
+    {
+        return Err("Expansion plan expired; inspect the partition layout again".to_string());
+    }
+    Ok(())
+}
+
+fn consume_expansion_plan(plan: cleanup::ExpansionPlan) -> Result<cleanup::ExpansionPlan, String> {
+    let mut store = expansion_plans()
+        .lock()
+        .map_err(|_| "Expansion plan storage is unavailable".to_string())?;
+    let pending = store
+        .remove(&plan.plan_id)
+        .ok_or_else(|| "Expansion plan does not exist, expired, or was already used".to_string())?;
+    if pending.plan != plan {
+        store.insert(pending.plan.plan_id.clone(), pending);
+        return Err("Expansion plan content changed after preview; execution refused".to_string());
+    }
+    if pending
+        .created_at
+        .saturating_add(EXPANSION_PLAN_TTL_SECONDS)
+        < unix_timestamp()
+    {
+        return Err("Expansion plan expired; inspect the partition layout again".to_string());
+    }
+    Ok(plan)
+}
+
 #[tauri::command]
 async fn create_move_plan(
     source: String,
     target_drive: String,
     mode: String,
 ) -> Result<cleanup::MovePlan, String> {
-    run_blocking(move || cleanup::create_move_plan(source, target_drive, mode)).await?
+    run_blocking(move || store_move_plan(cleanup::create_move_plan(source, target_drive, mode)?))
+        .await?
 }
 
 #[tauri::command]
@@ -2444,7 +2744,9 @@ async fn execute_move_plan(
     confirmation_token: Option<String>,
 ) -> Result<cleanup::MoveResult, String> {
     run_blocking(move || {
+        verify_move_plan(&plan)?;
         require_risk_operation_token("execute_move_plan", &plan.plan_id, confirmation_token)?;
+        let plan = consume_move_plan(plan)?;
         let paths = load_paths()?;
         Ok(cleanup::execute_move_plan(&paths.root, plan))
     })
@@ -2482,12 +2784,22 @@ async fn create_junction_bridge_plan(
     source: String,
     target: String,
 ) -> Result<cleanup::MovePlan, String> {
-    run_blocking(move || cleanup::create_junction_bridge_plan(source, target)).await?
+    run_blocking(move || store_move_plan(cleanup::create_junction_bridge_plan(source, target)?))
+        .await?
 }
 
 #[tauri::command]
-async fn create_desktop_archive_plan(target_drive: String) -> Result<cleanup::MovePlan, String> {
-    run_blocking(move || cleanup::create_desktop_archive_plan(target_drive)).await?
+async fn create_desktop_archive_plan(
+    target_drive: String,
+    selected_paths: Vec<String>,
+) -> Result<cleanup::MovePlan, String> {
+    run_blocking(move || {
+        store_move_plan(cleanup::create_desktop_archive_plan(
+            target_drive,
+            selected_paths,
+        )?)
+    })
+    .await?
 }
 
 #[tauri::command]
@@ -2496,7 +2808,13 @@ async fn execute_desktop_archive_plan(
     confirmation_token: Option<String>,
 ) -> Result<cleanup::MoveResult, String> {
     run_blocking(move || {
-        require_risk_operation_token("execute_move_plan", &plan.plan_id, confirmation_token)?;
+        verify_move_plan(&plan)?;
+        require_risk_operation_token(
+            "execute_desktop_archive_plan",
+            &plan.plan_id,
+            confirmation_token,
+        )?;
+        let plan = consume_move_plan(plan)?;
         let paths = load_paths()?;
         Ok(cleanup::execute_desktop_archive_plan(&paths.root, plan))
     })
@@ -2504,8 +2822,103 @@ async fn execute_desktop_archive_plan(
 }
 
 #[tauri::command]
+async fn create_desktop_cleanup_plan(
+    selected_paths: Vec<String>,
+) -> Result<cleanup::MovePlan, String> {
+    run_blocking(move || store_move_plan(cleanup::create_desktop_cleanup_plan(selected_paths)?))
+        .await?
+}
+
+#[tauri::command]
+async fn execute_desktop_cleanup_plan(
+    plan: cleanup::MovePlan,
+    confirmation_token: Option<String>,
+) -> Result<cleanup::MoveResult, String> {
+    run_blocking(move || {
+        verify_move_plan(&plan)?;
+        require_risk_operation_token(
+            "execute_desktop_cleanup_plan",
+            &plan.plan_id,
+            confirmation_token,
+        )?;
+        let plan = consume_move_plan(plan)?;
+        Ok(cleanup::execute_desktop_cleanup_plan(plan))
+    })
+    .await?
+}
+
+#[tauri::command]
+async fn inspect_recycle_bin() -> Result<cleanup::RecycleBinReport, String> {
+    run_blocking(cleanup::inspect_recycle_bin).await?
+}
+
+#[tauri::command]
+async fn create_recycle_bin_cleanup_plan(
+    selected_drives: Vec<String>,
+) -> Result<cleanup::RecycleBinCleanupPlan, String> {
+    run_blocking(move || {
+        let plan = cleanup::create_recycle_bin_cleanup_plan(selected_drives)?;
+        let mut store = recycle_bin_cleanup_plans()
+            .lock()
+            .map_err(|_| "Recycle Bin cleanup plan storage is unavailable".to_string())?;
+        store.clear();
+        store.insert(plan.plan_id.clone(), plan.clone());
+        Ok(plan)
+    })
+    .await?
+}
+
+#[tauri::command]
+async fn execute_recycle_bin_cleanup_plan(
+    plan_id: String,
+    confirmation_token: Option<String>,
+) -> Result<cleanup::RecycleBinCleanupResult, String> {
+    run_blocking(move || {
+        {
+            let store = recycle_bin_cleanup_plans()
+                .lock()
+                .map_err(|_| "Recycle Bin cleanup plan storage is unavailable".to_string())?;
+            if !store.contains_key(&plan_id) {
+                return Err(
+                    "Recycle Bin cleanup plan does not exist, was replaced, or was already used"
+                        .to_string(),
+                );
+            }
+        }
+        require_risk_operation_token(
+            "execute_recycle_bin_cleanup_plan",
+            &plan_id,
+            confirmation_token,
+        )?;
+        let plan = recycle_bin_cleanup_plans()
+            .lock()
+            .map_err(|_| "Recycle Bin cleanup plan storage is unavailable".to_string())?
+            .remove(&plan_id)
+            .ok_or_else(|| {
+                "Recycle Bin cleanup plan does not exist, was replaced, or was already used"
+                    .to_string()
+            })?;
+        cleanup::execute_recycle_bin_cleanup_plan(plan)
+    })
+    .await?
+}
+
+#[tauri::command]
+fn open_recycle_bin() -> Result<OperationResult, String> {
+    Command::new("explorer.exe")
+        .arg("shell:RecycleBinFolder")
+        .spawn()
+        .map_err(|error| format!("无法打开 Windows 回收站：{error}"))?;
+    Ok(OperationResult {
+        success: true,
+        message: "已打开 Windows 回收站，可使用系统还原操作恢复文件。".to_string(),
+    })
+}
+
+#[tauri::command]
 async fn create_downloads_archive_plan(target_drive: String) -> Result<cleanup::MovePlan, String> {
-    run_blocking(move || cleanup::create_downloads_archive_plan(target_drive)).await?
+    run_blocking(move || store_move_plan(cleanup::create_downloads_archive_plan(target_drive)?))
+        .await?
 }
 
 #[tauri::command]
@@ -2514,7 +2927,13 @@ async fn execute_downloads_archive_plan(
     confirmation_token: Option<String>,
 ) -> Result<cleanup::MoveResult, String> {
     run_blocking(move || {
-        require_risk_operation_token("execute_move_plan", &plan.plan_id, confirmation_token)?;
+        verify_move_plan(&plan)?;
+        require_risk_operation_token(
+            "execute_downloads_archive_plan",
+            &plan.plan_id,
+            confirmation_token,
+        )?;
+        let plan = consume_move_plan(plan)?;
         let paths = load_paths()?;
         Ok(cleanup::execute_downloads_archive_plan(&paths.root, plan))
     })
@@ -2528,7 +2947,7 @@ async fn inspect_partition_layout() -> Result<cleanup::PartitionLayoutReport, St
 
 #[tauri::command]
 async fn create_c_drive_expansion_plan() -> Result<cleanup::ExpansionPlan, String> {
-    run_blocking(cleanup::create_c_drive_expansion_plan).await?
+    run_blocking(|| store_expansion_plan(cleanup::create_c_drive_expansion_plan()?)).await?
 }
 
 #[tauri::command]
@@ -2537,7 +2956,10 @@ async fn execute_c_drive_expansion(
     confirmation_token: Option<String>,
 ) -> Result<cleanup::ExpansionResult, String> {
     run_blocking(move || {
+        verify_expansion_plan(&plan)?;
         require_risk_operation_token("execute_expansion_plan", &plan.plan_id, confirmation_token)?;
+        let plan = consume_expansion_plan(plan)?;
+        cleanup::revalidate_c_drive_expansion_plan(&plan)?;
         Ok(cleanup::execute_c_drive_expansion(plan))
     })
     .await?
@@ -4513,222 +4935,742 @@ fn process_action_fingerprint(action_id: &str, plan_id: &str, risk_level: &str) 
 }
 
 #[tauri::command]
-async fn scan_ports() -> Result<Vec<PortRecord>, String> {
-    run_blocking(scan_ports_blocking).await?
-}
-
-fn scan_ports_blocking() -> Result<Vec<PortRecord>, String> {
-    match powershell_runner::run_probe_command("netstat", &["-ano"], 5) {
-        Ok(output) if output.success => parse_netstat_ports(&output.stdout),
-        Ok(output) => parse_powershell_ports().map_err(|fallback| {
-            format!(
-                "netstat failed: {}; fallback failed: {fallback}",
-                powershell_runner::native_command_message(&output)
-            )
-        }),
-        Err(err) => parse_powershell_ports()
-            .map_err(|fallback| format!("无法执行 netstat: {err}; fallback failed: {fallback}")),
-    }
-}
-
-fn parse_netstat_ports(text: &str) -> Result<Vec<PortRecord>, String> {
-    let system = sysinfo::System::new_all();
-    let services = windows_service_map();
-    let mut records = Vec::new();
-
-    for line in text.lines() {
-        let columns: Vec<&str> = line.split_whitespace().collect();
-        if columns.len() < 4 {
-            continue;
-        }
-        let protocol = columns[0].to_ascii_uppercase();
-        if protocol != "TCP" && protocol != "UDP" {
-            continue;
-        }
-
-        let (local, remote, state, pid_text) = if protocol == "TCP" && columns.len() >= 5 {
-            (columns[1], columns[2], columns[3].to_string(), columns[4])
-        } else if protocol == "UDP" && columns.len() >= 4 {
-            (columns[1], columns[2], "LISTENING".to_string(), columns[3])
-        } else {
-            continue;
-        };
-
-        let Some((local_address, local_port)) = parse_socket(local) else {
-            continue;
-        };
-        let pid = pid_text.parse::<u32>().unwrap_or(0);
-        records.push(build_port_record(
-            &system,
-            &services,
-            PortRecordSeed {
-                local_port,
-                protocol,
-                local_address,
-                remote_address: remote.to_string(),
-                state,
-                pid,
-            },
-        ));
-    }
-    finish_port_records(records)
-}
-
-fn parse_powershell_ports() -> Result<Vec<PortRecord>, String> {
-    let script = r#"
-$ErrorActionPreference = 'Stop'
-$tcp = Get-NetTCPConnection -ErrorAction Stop | Select-Object `
-  @{Name='Protocol';Expression={'TCP'}}, LocalAddress, LocalPort, RemoteAddress, RemotePort, State, OwningProcess
-$udp = @()
-try {
-  $udp = Get-NetUDPEndpoint -ErrorAction Stop | Select-Object `
-    @{Name='Protocol';Expression={'UDP'}}, LocalAddress, LocalPort, @{Name='RemoteAddress';Expression={'*'}}, @{Name='RemotePort';Expression={'*'}}, @{Name='State';Expression={'LISTENING'}}, OwningProcess
-} catch {}
-@($tcp) + @($udp) | ConvertTo-Csv -NoTypeInformation
-"#;
-    let output = powershell_runner::run_powershell_script(script, Vec::new(), 8)?;
-    if !output.success {
-        let message = if output.stderr.trim().is_empty() {
-            output.stdout.trim().to_string()
-        } else {
-            output.stderr.trim().to_string()
-        };
-        return Err(if message.is_empty() {
-            "PowerShell port fallback failed".to_string()
-        } else {
-            message
-        });
-    }
-    let system = sysinfo::System::new_all();
-    let services = windows_service_map();
-    let mut records = Vec::new();
-    for line in output.stdout.lines().skip(1) {
-        let columns = parse_csv_line(line);
-        if columns.len() < 7 {
-            continue;
-        }
-        let protocol = columns[0].trim().to_ascii_uppercase();
-        if protocol != "TCP" && protocol != "UDP" {
-            continue;
-        }
-        let local_address = columns[1].trim().to_string();
-        let Ok(local_port) = columns[2].trim().parse::<u16>() else {
-            continue;
-        };
-        let remote_address = match (columns[3].trim(), columns[4].trim()) {
-            ("", _) => "*".to_string(),
-            (address, "") | (address, "0") | (address, "*") => address.to_string(),
-            (address, port) => format!("{address}:{port}"),
-        };
-        let state = if protocol == "UDP" {
-            "LISTENING".to_string()
-        } else {
-            columns[5].trim().to_string()
-        };
-        let pid = columns[6].trim().parse::<u32>().unwrap_or(0);
-        records.push(build_port_record(
-            &system,
-            &services,
-            PortRecordSeed {
-                local_port,
-                protocol,
-                local_address,
-                remote_address,
-                state,
-                pid,
-            },
-        ));
-    }
-    finish_port_records(records)
-}
-
-struct PortRecordSeed {
-    local_port: u16,
-    protocol: String,
-    local_address: String,
-    remote_address: String,
-    state: String,
-    pid: u32,
-}
-
-fn build_port_record(
-    system: &sysinfo::System,
-    services: &std::collections::HashMap<u32, Vec<String>>,
-    seed: PortRecordSeed,
-) -> PortRecord {
-    let process_name = process_name(system, seed.pid);
-    let (process_path, command_line, parent_pid, parent_process_name) =
-        process_details(system, seed.pid);
-    let service_names = services.get(&seed.pid).cloned().unwrap_or_default();
-    let signature = analyze_port_signature(
-        seed.local_port,
-        &seed.state,
-        &process_name,
-        &process_path,
-        &command_line,
-        &service_names,
-    );
-    let command_line = redact_command_line(&command_line);
-    let common_usage = signature.identity.clone();
-    let explanation = signature.explanation.clone();
-    let risk = signature.risk.clone();
-
-    PortRecord {
-        protocol: seed.protocol,
-        local_address: seed.local_address,
-        local_port: seed.local_port,
-        remote_address: seed.remote_address,
-        state: seed.state,
-        pid: seed.pid,
-        process_name,
-        process_path,
-        command_line,
-        parent_pid,
-        parent_process_name,
-        service_names,
-        common_usage,
-        explanation,
-        risk,
-        identity: signature.identity,
-        confidence: signature.confidence,
-        evidence_count: signature.evidence.len(),
-        conflict_count: signature.conflict_evidence.len(),
-        risk_level: signature.risk_level,
-        recommendation: signature.recommendation,
-        evidence: signature.evidence,
-        conflict_evidence: signature.conflict_evidence,
-    }
-}
-
-fn finish_port_records(mut records: Vec<PortRecord>) -> Result<Vec<PortRecord>, String> {
-    records.sort_by(|a, b| {
-        a.local_port
-            .cmp(&b.local_port)
-            .then(a.protocol.cmp(&b.protocol))
-            .then(a.pid.cmp(&b.pid))
-    });
-    let _ = update_port_history(&records);
-    Ok(records)
+async fn scan_ports(
+    force: Option<bool>,
+    scope: Option<String>,
+) -> Result<PortScanSnapshot, String> {
+    run_blocking(move || {
+        scan_port_snapshot_blocking(
+            force.unwrap_or(false),
+            port_scan::ScanScope::parse(scope.as_deref()),
+        )
+    })
+    .await?
 }
 
 #[tauri::command]
-async fn create_port_resolution_plan(pid: u32, port: u16) -> Result<PortResolutionPlan, String> {
-    run_blocking(move || create_port_resolution_plan_blocking(pid, port)).await?
+async fn enrich_port_scan(scan_id: String) -> Result<PortScanSnapshot, String> {
+    run_blocking(move || enrich_port_snapshot_blocking(&scan_id)).await?
 }
 
-fn create_port_resolution_plan_blocking(pid: u32, port: u16) -> Result<PortResolutionPlan, String> {
+#[tauri::command]
+fn port_scan_status() -> PortScanSnapshot {
+    let (coordinator, _) = port_scan_coordinator();
+    match coordinator.lock() {
+        Ok(state) => {
+            if let Some(cached) = state.cached.as_ref() {
+                let mut snapshot = cached.snapshot.clone();
+                snapshot.cached = true;
+                if state.in_flight {
+                    snapshot.status = "scanning".to_string();
+                    snapshot.user_message =
+                        "Refreshing ports in the background; the last result remains visible."
+                            .to_string();
+                }
+                snapshot
+            } else if state.in_flight {
+                pending_port_snapshot("scanning")
+            } else {
+                pending_port_snapshot("idle")
+            }
+        }
+        Err(_) => failed_port_snapshot(
+            port_scan::ScanScope::Recommended,
+            "Port scan status is unavailable.",
+            "port scan coordinator lock poisoned",
+            0,
+        ),
+    }
+}
+
+#[tauri::command]
+fn cancel_port_scan() -> OperationResult {
+    PORT_SCAN_GENERATION.fetch_add(1, Ordering::SeqCst);
+    OperationResult {
+        success: true,
+        message: "The previous port scan result will be ignored.".to_string(),
+    }
+}
+
+fn port_scan_coordinator() -> &'static (Mutex<PortScanCoordinator>, Condvar) {
+    PORT_SCAN_COORDINATOR
+        .get_or_init(|| (Mutex::new(PortScanCoordinator::default()), Condvar::new()))
+}
+
+fn scan_ports_blocking() -> Result<Vec<PortRecord>, String> {
+    scan_ports_blocking_with(false)
+}
+
+fn scan_ports_blocking_with(force: bool) -> Result<Vec<PortRecord>, String> {
+    let snapshot = scan_port_snapshot_blocking(force, port_scan::ScanScope::Recommended)?;
+    if snapshot.status == "failed" {
+        return Err(snapshot.user_message);
+    }
+    let snapshot = if snapshot.complete {
+        snapshot
+    } else {
+        enrich_port_snapshot_blocking(&snapshot.scan_id)?
+    };
+    if snapshot.status == "failed" {
+        Err(snapshot.user_message)
+    } else {
+        Ok(snapshot.records)
+    }
+}
+
+fn scan_port_snapshot_blocking(
+    force: bool,
+    scope: port_scan::ScanScope,
+) -> Result<PortScanSnapshot, String> {
+    scan_port_snapshot_with(
+        port_scan_coordinator(),
+        &PORT_SCAN_GENERATION,
+        force,
+        scope,
+        collect_port_seeds,
+    )
+}
+
+fn scan_port_snapshot_with<F>(
+    coordinator_pair: &(Mutex<PortScanCoordinator>, Condvar),
+    generation_counter: &AtomicU64,
+    force: bool,
+    scope: port_scan::ScanScope,
+    collect: F,
+) -> Result<PortScanSnapshot, String>
+where
+    F: FnOnce(port_scan::ScanScope) -> Result<port_scan::ParsedPortSeeds, String>,
+{
+    let (coordinator, wake) = coordinator_pair;
+    let mut state = coordinator
+        .lock()
+        .map_err(|_| "Port scan cache is unavailable".to_string())?;
+    if !force {
+        if let Some(cached) = state.cached.as_ref() {
+            if cached.cached_at.elapsed() <= PORT_SCAN_CACHE_TTL
+                && cached.snapshot.scope == scope.as_str()
+            {
+                let mut snapshot = cached.snapshot.clone();
+                snapshot.cached = true;
+                return Ok(snapshot);
+            }
+        }
+    }
+    if state.in_flight {
+        let (joined, timeout) = wake
+            .wait_timeout(state, Duration::from_secs(12))
+            .map_err(|_| "Port scan coordinator wait failed".to_string())?;
+        state = joined;
+        if let Some(cached) = state.cached.as_ref() {
+            let mut snapshot = cached.snapshot.clone();
+            snapshot.cached = true;
+            return Ok(snapshot);
+        }
+        if timeout.timed_out() {
+            return Ok(failed_port_snapshot(
+                scope,
+                "Port scanning is still running. You can retry without blocking the page.",
+                "single-flight wait timed out",
+                0,
+            ));
+        }
+        return Ok(failed_port_snapshot(
+            scope,
+            "Port scanning failed. You can retry or export diagnostics.",
+            state.last_error.as_deref().unwrap_or("port scan failed"),
+            0,
+        ));
+    }
+    state.in_flight = true;
+    state.last_error = None;
+    let previous = state.cached.clone();
+    drop(state);
+
+    let generation = generation_counter.fetch_add(1, Ordering::SeqCst) + 1;
+    let started = Instant::now();
+    let result = collect(scope);
+    let elapsed_ms = started.elapsed().as_millis();
+    let cancelled = generation_counter.load(Ordering::SeqCst) != generation;
+    let mut state = coordinator
+        .lock()
+        .map_err(|_| "Port scan cache is unavailable".to_string())?;
+    state.in_flight = false;
+
+    let snapshot = if cancelled {
+        if let Some(previous) = previous {
+            let mut snapshot = previous.snapshot;
+            snapshot.cached = true;
+            snapshot.status = "stale".to_string();
+            snapshot.user_message =
+                "The previous scan was cancelled; the last successful result is retained."
+                    .to_string();
+            snapshot
+        } else {
+            failed_port_snapshot(
+                scope,
+                "Port scanning was cancelled.",
+                "scan generation was superseded",
+                elapsed_ms,
+            )
+        }
+    } else {
+        match result {
+            Ok(parsed) => {
+                let scanned_at = unix_timestamp();
+                let process_system = sysinfo::System::new_all();
+                let source_evidence = parsed.source_evidence.clone();
+                let records = port_scan::group_seeds(parsed.seeds)
+                    .into_iter()
+                    .map(|group| {
+                        build_quick_port_record(
+                            &process_system,
+                            group,
+                            &source_evidence,
+                            scanned_at,
+                        )
+                    })
+                    .collect::<Vec<_>>();
+                let snapshot = PortScanSnapshot {
+                    scan_id: format!("ports-{}-{generation}", unix_timestamp()),
+                    scope: scope.as_str().to_string(),
+                    status: "success".to_string(),
+                    source: parsed.source,
+                    scanned_at,
+                    elapsed_ms,
+                    raw_count: parsed.raw_count,
+                    filtered_count: parsed.filtered_count,
+                    truncated: parsed.truncated,
+                    cached: false,
+                    complete: false,
+                    user_message: String::new(),
+                    debug_summary: format!(
+                        "source scan completed: raw={}, filtered={}, truncated={}, elapsed={}ms",
+                        parsed.raw_count, parsed.filtered_count, parsed.truncated, elapsed_ms
+                    ),
+                    records,
+                };
+                state.cached = Some(CachedPortScan {
+                    snapshot: snapshot.clone(),
+                    cached_at: Instant::now(),
+                });
+                snapshot
+            }
+            Err(debug_summary) => {
+                state.last_error = Some(debug_summary.clone());
+                if let Some(previous) = previous {
+                    let mut snapshot = previous.snapshot;
+                    snapshot.cached = true;
+                    snapshot.status = "stale".to_string();
+                    snapshot.user_message = "Port scanning timed out or failed; the last successful result is retained. Retry or export diagnostics.".to_string();
+                    snapshot.debug_summary = debug_summary;
+                    state.cached = Some(CachedPortScan {
+                        snapshot: snapshot.clone(),
+                        cached_at: previous.cached_at,
+                    });
+                    snapshot
+                } else {
+                    failed_port_snapshot(
+                        scope,
+                        "Port scanning timed out or failed. Retry or export diagnostics.",
+                        &debug_summary,
+                        elapsed_ms,
+                    )
+                }
+            }
+        }
+    };
+    wake.notify_all();
+    Ok(snapshot)
+}
+
+fn collect_port_seeds(scope: port_scan::ScanScope) -> Result<port_scan::ParsedPortSeeds, String> {
+    let netstat = powershell_runner::run_probe_command("netstat", &["-ano"], 5);
+    let netstat_summary = match netstat {
+        Ok(output) if output.success => {
+            match port_scan::select_snapshot_output(
+                Ok(&output.stdout),
+                Err("fallback was not required".to_string()),
+                scope,
+                port_scan::DEFAULT_RECORD_LIMIT,
+            ) {
+                Ok(parsed) => return Ok(parsed),
+                Err(error) => error,
+            }
+        }
+        Ok(output) => powershell_runner::native_command_message(&output),
+        Err(error) => error,
+    };
+
+    let script = port_scan::powershell_snapshot_script(scope, port_scan::DEFAULT_RECORD_LIMIT);
+    let fallback = powershell_runner::run_powershell_script(script, Vec::new(), 9);
+    let fallback_output = match fallback {
+        Ok(output) if output.success => Ok(output.stdout),
+        Ok(output) => Err(format!(
+            "fallback timedOut={} exit={:?} elapsed={}ms stderr={}",
+            output.timed_out,
+            output.exit_code,
+            output.elapsed_ms,
+            if output.stderr.trim().is_empty() {
+                output.stdout
+            } else {
+                output.stderr
+            }
+        )),
+        Err(error) => Err(format!("fallback could not start: {error}")),
+    };
+    port_scan::select_snapshot_output(
+        Err(netstat_summary),
+        fallback_output.as_deref().map_err(String::clone),
+        scope,
+        port_scan::DEFAULT_RECORD_LIMIT,
+    )
+    .map_err(|error| {
+        port_scan::bounded_diagnostic(&format!(
+            "source=netstat phase=snapshot; source=powershell-json phase=fallback; {error}"
+        ))
+    })
+}
+
+fn failed_port_snapshot(
+    scope: port_scan::ScanScope,
+    user_message: &str,
+    debug_summary: &str,
+    elapsed_ms: u128,
+) -> PortScanSnapshot {
+    PortScanSnapshot {
+        scan_id: format!("ports-failed-{}", unix_timestamp()),
+        scope: scope.as_str().to_string(),
+        status: "failed".to_string(),
+        source: "none".to_string(),
+        scanned_at: unix_timestamp(),
+        elapsed_ms,
+        raw_count: 0,
+        filtered_count: 0,
+        truncated: false,
+        cached: false,
+        complete: false,
+        user_message: user_message.to_string(),
+        debug_summary: port_scan::bounded_diagnostic(debug_summary),
+        records: Vec::new(),
+    }
+}
+
+fn pending_port_snapshot(status: &str) -> PortScanSnapshot {
+    PortScanSnapshot {
+        scan_id: String::new(),
+        scope: port_scan::ScanScope::Recommended.as_str().to_string(),
+        status: status.to_string(),
+        source: "none".to_string(),
+        scanned_at: 0,
+        elapsed_ms: 0,
+        raw_count: 0,
+        filtered_count: 0,
+        truncated: false,
+        cached: false,
+        complete: false,
+        user_message: String::new(),
+        debug_summary: String::new(),
+        records: Vec::new(),
+    }
+}
+
+fn enrich_port_snapshot_blocking(scan_id: &str) -> Result<PortScanSnapshot, String> {
+    let (coordinator, wake) = port_scan_coordinator();
+    let mut state = coordinator
+        .lock()
+        .map_err(|_| "Port scan cache is unavailable".to_string())?;
+    let Some(cached) = state.cached.as_ref() else {
+        return Err("No successful port snapshot is available to enrich".to_string());
+    };
+    if cached.snapshot.scan_id != scan_id {
+        return Err("The port snapshot is stale; use the newest scan result".to_string());
+    }
+    if cached.snapshot.complete {
+        let mut snapshot = cached.snapshot.clone();
+        snapshot.cached = true;
+        return Ok(snapshot);
+    }
+    if state.in_flight {
+        let (joined, _) = wake
+            .wait_timeout(state, Duration::from_secs(8))
+            .map_err(|_| "Port enrichment wait failed".to_string())?;
+        state = joined;
+        return state
+            .cached
+            .as_ref()
+            .map(|cached| cached.snapshot.clone())
+            .ok_or_else(|| "Port enrichment did not produce a snapshot".to_string());
+    }
+    let records = cached.snapshot.records.clone();
+    let generation = PORT_SCAN_GENERATION.load(Ordering::SeqCst);
+    state.in_flight = true;
+    drop(state);
+
+    let started = Instant::now();
+    let system = sysinfo::System::new_all();
+    let services = windows_service_map();
+    let details = records
+        .iter()
+        .map(|record| (record.pid, process_details(&system, record.pid)))
+        .collect::<HashMap<_, _>>();
+    let paths = details
+        .values()
+        .map(|details| details.process_path.clone())
+        .filter(|path| !path.trim().is_empty())
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect::<Vec<_>>();
+    let metadata = process_file_metadata(&paths);
+    let mut records = records
+        .into_iter()
+        .map(|record| {
+            enrich_port_record(
+                &system,
+                &services,
+                details.get(&record.pid).cloned().unwrap_or_default(),
+                &metadata,
+                record,
+            )
+        })
+        .collect::<Vec<_>>();
+    let related_ports_by_pid = records.iter().fold(
+        HashMap::<u32, BTreeSet<u16>>::new(),
+        |mut grouped, record| {
+            grouped
+                .entry(record.pid)
+                .or_default()
+                .insert(record.local_port);
+            grouped
+        },
+    );
+    for record in &mut records {
+        record.related_ports = related_ports_by_pid
+            .get(&record.pid)
+            .map(|ports| ports.iter().copied().collect())
+            .unwrap_or_default();
+    }
+    let mut state = coordinator
+        .lock()
+        .map_err(|_| "Port scan cache is unavailable".to_string())?;
+    state.in_flight = false;
+    if PORT_SCAN_GENERATION.load(Ordering::SeqCst) != generation {
+        wake.notify_all();
+        return Err("The port enrichment was cancelled or superseded".to_string());
+    }
+    let Some(cached) = state.cached.as_mut() else {
+        wake.notify_all();
+        return Err("Port snapshot disappeared during enrichment".to_string());
+    };
+    if cached.snapshot.scan_id != scan_id {
+        wake.notify_all();
+        return Err("The enriched result belongs to an expired port snapshot".to_string());
+    }
+    cached.snapshot.records = records;
+    cached.snapshot.complete = true;
+    cached.snapshot.filtered_count = cached.snapshot.records.len();
+    cached.snapshot.debug_summary = format!(
+        "{}; enrichment uniquePids={} elapsed={}ms",
+        cached.snapshot.debug_summary,
+        cached
+            .snapshot
+            .records
+            .iter()
+            .map(|record| record.pid)
+            .collect::<BTreeSet<_>>()
+            .len(),
+        started.elapsed().as_millis()
+    );
+    let snapshot = cached.snapshot.clone();
+    let _ = update_port_history(&snapshot.records);
+    wake.notify_all();
+    Ok(snapshot)
+}
+
+fn build_quick_port_record(
+    system: &sysinfo::System,
+    group: port_scan::PortEndpointGroup,
+    sources: &[port_scan::PortSourceEvidence],
+    scanned_at: u64,
+) -> PortRecord {
+    let process_name = process_name(system, group.pid);
+    let process_start_time = system
+        .process(sysinfo::Pid::from_u32(group.pid))
+        .map(|process| process.start_time())
+        .unwrap_or(0);
+    let service_names = Vec::new();
+    let identity = process_identity::identify(&process_identity::IdentityObservation {
+        process_name: &process_name,
+        port: group.local_port,
+        ..process_identity::IdentityObservation::default()
+    });
+    let operation = assess_port_operation_risk(
+        group.local_port,
+        &group.state_category,
+        group.pid,
+        &process_name,
+        &service_names,
+    );
+    let local_address = group
+        .bindings
+        .first()
+        .map(|binding| binding.local_address.clone())
+        .unwrap_or_default();
+    let remote_address = group
+        .bindings
+        .first()
+        .map(|binding| redact_remote_endpoint(&binding.remote_endpoint))
+        .unwrap_or_default();
+    let group_id = port_scan::stable_group_id(&group, process_start_time);
+    let bindings = group
+        .bindings
+        .iter()
+        .cloned()
+        .map(|mut binding| {
+            binding.remote_endpoint = redact_remote_endpoint(&binding.remote_endpoint);
+            binding
+        })
+        .collect();
+    let explanation = identity_explanation(&identity);
+    PortRecord {
+        group_id,
+        group_fingerprint: group.group_fingerprint,
+        protocol: group.protocol,
+        local_address,
+        local_port: group.local_port,
+        remote_address,
+        state: group.state_category,
+        pid: group.pid,
+        process_start_time,
+        process_name,
+        friendly_name_zh: identity.display_name_zh.clone(),
+        friendly_name_en: identity.display_name_en.clone(),
+        process_path: String::new(),
+        product_name: String::new(),
+        file_description: String::new(),
+        company_name: String::new(),
+        publisher: String::new(),
+        command_line: String::new(),
+        command_line_fingerprint: sha256_text(""),
+        parent_pid: 0,
+        parent_process_name: String::new(),
+        service_names,
+        service_display_names: Vec::new(),
+        service_states: Vec::new(),
+        service_start_modes: Vec::new(),
+        service_details: Vec::new(),
+        bindings,
+        binding_count: group.binding_count,
+        remote_connection_count: group.remote_connection_count,
+        related_ports: Vec::new(),
+        source_record_count: group.source_record_count,
+        has_ipv4: group.has_ipv4,
+        has_ipv6: group.has_ipv6,
+        scan_sources: sources
+            .iter()
+            .map(|item| PortScanSourceEvidence {
+                source: item.source.clone(),
+                scanned_at,
+                record_count: item.record_count,
+                fallback: item.fallback,
+                conflicts: item.conflicts.clone(),
+            })
+            .collect(),
+        common_usage: identity.display_name_zh.clone(),
+        explanation,
+        risk: operation.risk,
+        identity: identity.display_name_zh,
+        identity_id: identity.identity_id,
+        identity_category: identity.category,
+        identity_ecosystem: identity.ecosystem,
+        confidence: identity.confidence,
+        confidence_level: identity.confidence_level,
+        identity_catalog_version: identity.catalog_version,
+        evidence_count: identity.evidence.len(),
+        conflict_count: identity.conflicts.len(),
+        risk_level: operation.risk_level,
+        recommendation: operation.recommendation_zh.clone(),
+        recommendation_zh: operation.recommendation_zh,
+        recommendation_en: operation.recommendation_en,
+        evidence: identity.evidence,
+        conflict_evidence: identity.conflicts,
+    }
+}
+
+fn redact_remote_endpoint(value: &str) -> String {
+    let address = value
+        .trim()
+        .trim_start_matches('[')
+        .split(']')
+        .next()
+        .unwrap_or(value)
+        .rsplit_once(':')
+        .map(|(address, _)| address)
+        .unwrap_or(value)
+        .trim_matches(['[', ']']);
+    if address.parse::<IpAddr>().is_ok_and(|parsed| {
+        !parsed.is_loopback()
+            && !parsed.is_unspecified()
+            && !match parsed {
+                IpAddr::V4(ip) => ip.is_private() || ip.is_link_local(),
+                IpAddr::V6(ip) => ip.is_unique_local() || ip.is_unicast_link_local(),
+            }
+    }) {
+        "<public-address>".to_string()
+    } else {
+        value.to_string()
+    }
+}
+
+fn enrich_port_record(
+    system: &sysinfo::System,
+    services: &HashMap<u32, Vec<WindowsServiceIdentity>>,
+    details: ProcessDetails,
+    metadata: &HashMap<String, ProcessFileMetadata>,
+    mut record: PortRecord,
+) -> PortRecord {
+    let process_name = process_name(system, record.pid);
+    let service_items = services.get(&record.pid).cloned().unwrap_or_default();
+    let service_names = service_items
+        .iter()
+        .map(|service| service.name.clone())
+        .collect::<Vec<_>>();
+    let service_display_names = service_items
+        .iter()
+        .map(|service| service.display_name.clone())
+        .filter(|value| !value.trim().is_empty())
+        .collect::<Vec<_>>();
+    let metadata = metadata
+        .get(&path_key(&details.process_path))
+        .cloned()
+        .unwrap_or_default();
+    let identity = process_identity::identify(&process_identity::IdentityObservation {
+        process_name: &process_name,
+        process_path: &details.process_path,
+        command_line: &details.command_line,
+        parent_process_name: &details.parent_process_name,
+        service_names: &service_names,
+        service_display_names: &service_display_names,
+        product_name: &metadata.product_name,
+        file_description: &metadata.file_description,
+        company_name: &metadata.company_name,
+        publisher: &metadata.publisher,
+        port: record.local_port,
+    });
+    let operation = assess_port_operation_risk(
+        record.local_port,
+        &record.state,
+        record.pid,
+        &process_name,
+        &service_names,
+    );
+    let friendly_name_zh = service_host_friendly_name(
+        &identity.identity_id,
+        &identity.display_name_zh,
+        &service_display_names,
+        &service_names,
+        "Windows 服务宿主，具体服务未解析",
+    );
+    let friendly_name_en = service_host_friendly_name(
+        &identity.identity_id,
+        &identity.display_name_en,
+        &service_display_names,
+        &service_names,
+        "Windows Service Host (specific service unresolved)",
+    );
+    record.process_start_time = details.process_start_time;
+    record.process_name = process_name;
+    record.friendly_name_zh = friendly_name_zh;
+    record.friendly_name_en = friendly_name_en;
+    record.process_path = details.process_path;
+    record.product_name = metadata.product_name;
+    record.file_description = metadata.file_description;
+    record.company_name = metadata.company_name;
+    record.publisher = metadata.publisher;
+    if !metadata.original_filename.trim().is_empty() {
+        record
+            .evidence
+            .push(format!("OriginalFilename={}", metadata.original_filename));
+    }
+    record.command_line_fingerprint = sha256_text(&details.command_line);
+    record.command_line = redact_command_line(&details.command_line);
+    record.parent_pid = details.parent_pid;
+    record.parent_process_name = details.parent_process_name;
+    record.service_names = service_names;
+    record.service_display_names = service_display_names;
+    record.service_states = service_items
+        .iter()
+        .map(|service| service.state.clone())
+        .filter(|value| !value.trim().is_empty())
+        .collect();
+    record.service_start_modes = service_items
+        .iter()
+        .map(|service| service.start_mode.clone())
+        .filter(|value| !value.trim().is_empty())
+        .collect();
+    record.service_details = service_items
+        .iter()
+        .map(|service| PortServiceDetail {
+            name: service.name.clone(),
+            display_name: service.display_name.clone(),
+            state: service.state.clone(),
+            start_mode: service.start_mode.clone(),
+            process_id: service.process_id,
+            service_type: service.service_type.clone(),
+            description: service.description.clone(),
+            path_name: service.path_name.clone(),
+            service_host_group: service.service_host_group.clone(),
+            service_dll: service.service_dll.clone(),
+            core_windows_service: service.core_windows_service,
+        })
+        .collect();
+    record.common_usage = identity.display_name_zh.clone();
+    record.explanation = identity_explanation(&identity);
+    record.risk = operation.risk;
+    record.identity = identity.display_name_zh;
+    record.identity_id = identity.identity_id;
+    record.identity_category = identity.category;
+    record.identity_ecosystem = identity.ecosystem;
+    record.confidence = identity.confidence;
+    record.confidence_level = identity.confidence_level;
+    record.identity_catalog_version = identity.catalog_version;
+    record.evidence_count = identity.evidence.len();
+    record.conflict_count = identity.conflicts.len();
+    record.risk_level = operation.risk_level;
+    record.recommendation = operation.recommendation_zh.clone();
+    record.recommendation_zh = operation.recommendation_zh;
+    record.recommendation_en = operation.recommendation_en;
+    record.evidence.extend(identity.evidence);
+    record.conflict_evidence = identity.conflicts;
+    record
+}
+
+#[tauri::command]
+async fn create_port_resolution_plan(group_id: String) -> Result<PortResolutionPlan, String> {
+    run_blocking(move || create_port_resolution_plan_blocking(group_id)).await?
+}
+
+fn create_port_resolution_plan_blocking(group_id: String) -> Result<PortResolutionPlan, String> {
+    let snapshot = scan_port_snapshot_blocking(false, port_scan::ScanScope::Recommended)?;
+    let snapshot = if snapshot.complete {
+        snapshot
+    } else {
+        enrich_port_snapshot_blocking(&snapshot.scan_id)?
+    };
+    let record = snapshot
+        .records
+        .iter()
+        .find(|item| item.group_id == group_id)
+        .ok_or_else(|| "Port owner changed; rescan before creating a plan".to_string())?;
+    let pid = record.pid;
+    let port = record.local_port;
     if BLOCKED_PIDS.contains(&pid) {
         return Err(format!("PID {pid} is protected"));
     }
-    let records = scan_ports_blocking()?;
-    let record = records
-        .iter()
-        .find(|item| {
-            item.pid == pid
-                && item.local_port == port
-                && item.state.eq_ignore_ascii_case("LISTENING")
-        })
-        .ok_or_else(|| "Port owner changed; rescan before creating a plan".to_string())?;
+    if !record.state.eq_ignore_ascii_case("LISTENING")
+        && !record.state.eq_ignore_ascii_case("BOUND")
+    {
+        return Err("Only listening or bound port groups can create a resolution plan".to_string());
+    }
     let system = sysinfo::System::new_all();
     let child_processes = system
         .processes()
@@ -4739,13 +5681,7 @@ fn create_port_resolution_plan_blocking(pid: u32, port: u16) -> Result<PortResol
             name: process.name().to_string_lossy().to_string(),
         })
         .collect::<Vec<_>>();
-    let related_ports = records
-        .iter()
-        .filter(|item| item.pid == pid)
-        .map(|item| item.local_port)
-        .collect::<BTreeSet<_>>()
-        .into_iter()
-        .collect::<Vec<_>>();
+    let related_ports = record.related_ports.clone();
     let mut warnings = Vec::new();
     if !record.service_names.is_empty() {
         return Err(
@@ -4763,20 +5699,29 @@ fn create_port_resolution_plan_blocking(pid: u32, port: u16) -> Result<PortResol
         warnings.push("sensitive_service_port".to_string());
     }
     let plan_id = port_resolution_plan_id(record);
+    let created_at = unix_timestamp();
     let plan = PortResolutionPlan {
         plan_id: plan_id.clone(),
+        group_id: record.group_id.clone(),
+        group_fingerprint: record.group_fingerprint.clone(),
+        scan_id: snapshot.scan_id,
         pid,
         port,
         protocol: record.protocol.clone(),
+        process_start_time: record.process_start_time,
         process_name: record.process_name.clone(),
         process_path: record.process_path.clone(),
-        command_line: record.command_line.clone(),
+        command_line_fingerprint: record.command_line_fingerprint.clone(),
         parent_pid: (record.parent_pid != 0).then_some(record.parent_pid),
         parent_process_name: (!record.parent_process_name.is_empty())
             .then(|| record.parent_process_name.clone()),
         child_processes,
         service_names: record.service_names.clone(),
+        bindings: record.bindings.clone(),
         related_ports,
+        expected_owner_identity: port_owner_identity(record),
+        created_at,
+        expires_at: created_at + 300,
         project_root: project_root_from_command_line(&record.command_line),
         risk_level: "high".to_string(),
         warnings,
@@ -4811,12 +5756,18 @@ fn execute_port_resolution_plan_blocking(
         .map_err(|_| "Port resolution plan store is unavailable".to_string())?
         .remove(&plan_id)
         .ok_or_else(|| "Port resolution plan does not exist or was already used".to_string())?;
-    let before = scan_ports_blocking()?;
-    if !before
+    if unix_timestamp() > plan.expires_at {
+        return Err("Port resolution plan expired; rescan and create a new plan".to_string());
+    }
+    let before = scan_ports_blocking_with(true)?;
+    let Some(current) = before
         .iter()
-        .any(|item| port_owner_matches_plan(item, &plan))
-    {
+        .find(|item| port_owner_matches_plan(item, &plan))
+    else {
         return Err("Port owner changed; execution refused".to_string());
+    };
+    if risk_rank(&current.risk_level) > risk_rank(&plan.risk_level) {
+        return Err("Port operation risk increased; execution refused".to_string());
     }
     validate_force_kill_target(
         plan.pid,
@@ -4830,24 +5781,26 @@ fn execute_port_resolution_plan_blocking(
     let pid_exited = retry_until(PORT_PID_VERIFY_ATTEMPTS, Duration::from_millis(100), || {
         !process_is_running(plan.pid)
     });
-    let remaining_owners = wait_for_port_release(plan.port)?;
-    let port_released = remaining_owners.is_empty();
+    let release = wait_for_port_release(&plan)?;
+    let port_released = release.remaining_owners.is_empty();
+    let related_ports_released = release.remaining_related_ports.is_empty();
     let requires_admin = port_failure_requires_admin(&kill);
-    let failure_reason = if kill.success && pid_exited && port_released {
+    let failure_reason = if kill.success && pid_exited && port_released && related_ports_released {
         String::new()
     } else {
-        port_failure_reason(&kill, pid_exited, port_released)
+        port_failure_reason(&kill, pid_exited, port_released, related_ports_released)
     };
     let next_steps = port_resolution_next_steps(
         &plan,
         kill.success,
         pid_exited,
         port_released,
+        related_ports_released,
         requires_admin,
     );
     Ok(PortResolutionResult {
-        success: kill.success && pid_exited && port_released,
-        message: if kill.success && pid_exited && port_released {
+        success: kill.success && pid_exited && port_released && related_ports_released,
+        message: if kill.success && pid_exited && port_released && related_ports_released {
             format!("端口 {} 已释放", plan.port)
         } else {
             "端口释放未完成，请查看失败原因和下一步建议".to_string()
@@ -4861,8 +5814,10 @@ fn execute_port_resolution_plan_blocking(
         next_steps,
         pid_exited,
         port_released,
+        related_ports_released,
+        remaining_related_ports: release.remaining_related_ports,
         release_checked_at: unix_timestamp().to_string(),
-        remaining_owners,
+        remaining_owners: release.remaining_owners,
     })
 }
 
@@ -4907,21 +5862,50 @@ where
     false
 }
 
-fn wait_for_port_release(port: u16) -> Result<Vec<PortRecord>, String> {
-    let mut remaining_owners = Vec::new();
+#[derive(Debug)]
+struct PortReleaseVerification {
+    remaining_owners: Vec<PortRecord>,
+    remaining_related_ports: Vec<u16>,
+}
+
+fn wait_for_port_release(plan: &PortResolutionPlan) -> Result<PortReleaseVerification, String> {
+    let mut verification = PortReleaseVerification {
+        remaining_owners: Vec::new(),
+        remaining_related_ports: Vec::new(),
+    };
     for attempt in 0..PORT_RELEASE_VERIFY_ATTEMPTS {
-        remaining_owners = scan_ports_blocking()?
+        let snapshot = scan_port_snapshot_blocking(true, port_scan::ScanScope::Recommended)?;
+        if snapshot.status == "failed" {
+            return Err(snapshot.user_message);
+        }
+        verification.remaining_owners = remaining_port_owners(snapshot.records.clone(), plan);
+        verification.remaining_related_ports = snapshot
+            .records
+            .iter()
+            .filter(|record| plan.related_ports.contains(&record.local_port))
+            .map(|record| record.local_port)
+            .collect::<BTreeSet<_>>()
             .into_iter()
-            .filter(|item| item.local_port == port && item.state.eq_ignore_ascii_case("LISTENING"))
             .collect();
-        if remaining_owners.is_empty() {
-            return Ok(remaining_owners);
+        if verification.remaining_owners.is_empty()
+            && verification.remaining_related_ports.is_empty()
+        {
+            return Ok(verification);
         }
         if attempt + 1 < PORT_RELEASE_VERIFY_ATTEMPTS {
             thread::sleep(Duration::from_millis(200));
         }
     }
-    Ok(remaining_owners)
+    Ok(verification)
+}
+
+fn remaining_port_owners(records: Vec<PortRecord>, plan: &PortResolutionPlan) -> Vec<PortRecord> {
+    records
+        .into_iter()
+        .filter(|item| {
+            item.local_port == plan.port && item.protocol.eq_ignore_ascii_case(&plan.protocol)
+        })
+        .collect()
 }
 
 fn port_failure_requires_admin(result: &powershell_runner::NativeCommandResult) -> bool {
@@ -4937,6 +5921,7 @@ fn port_failure_reason(
     result: &powershell_runner::NativeCommandResult,
     pid_exited: bool,
     port_released: bool,
+    related_ports_released: bool,
 ) -> String {
     if result.timed_out {
         return format!("停止进程超时，{} ms 后仍未完成。", result.elapsed_ms);
@@ -4946,6 +5931,9 @@ fn port_failure_reason(
     }
     if result.success && !port_released {
         return "系统已接受停止请求，但端口复查仍显示被占用。".to_string();
+    }
+    if result.success && port_released && !related_ports_released {
+        return "目标端口已释放，但计划中的相关端口仍被占用或已被其他进程重新占用。".to_string();
     }
     if port_failure_requires_admin(result) {
         return "Windows 拒绝停止该进程，通常需要管理员权限或该进程受服务/系统策略保护。"
@@ -4965,6 +5953,7 @@ fn port_resolution_next_steps(
     kill_success: bool,
     pid_exited: bool,
     port_released: bool,
+    related_ports_released: bool,
     requires_admin: bool,
 ) -> Vec<String> {
     let mut steps = Vec::new();
@@ -4989,6 +5978,9 @@ fn port_resolution_next_steps(
     if !port_released {
         steps.push("重新扫描端口，确认是否出现新的占用方或原服务自动拉起。".to_string());
     }
+    if !related_ports_released {
+        steps.push("检查计划中的相关端口；它们可能仍存在或已被其他 PID 重新占用。".to_string());
+    }
     if steps.is_empty() {
         steps.push("重新扫描端口确认没有新的占用方。".to_string());
     }
@@ -4997,22 +5989,53 @@ fn port_resolution_next_steps(
 
 fn port_resolution_plan_id(record: &PortRecord) -> String {
     let mut hasher = Sha256::new();
-    hasher.update(record.pid.to_le_bytes());
-    hasher.update(record.local_port.to_le_bytes());
-    hasher.update(record.process_name.as_bytes());
-    hasher.update(record.process_path.as_bytes());
+    hasher.update(record.group_id.as_bytes());
+    hasher.update(record.group_fingerprint.as_bytes());
+    hasher.update(port_owner_identity(record).as_bytes());
     hasher.update(unix_timestamp().to_le_bytes());
     format!("port-{:x}", hasher.finalize())
 }
 
 fn port_owner_matches_plan(record: &PortRecord, plan: &PortResolutionPlan) -> bool {
-    record.pid == plan.pid
+    record.group_id == plan.group_id
+        && record.group_fingerprint == plan.group_fingerprint
+        && record.pid == plan.pid
         && record.local_port == plan.port
-        && record.state.eq_ignore_ascii_case("LISTENING")
+        && record.protocol.eq_ignore_ascii_case(&plan.protocol)
+        && record.process_start_time == plan.process_start_time
         && record.process_name == plan.process_name
         && record.process_path == plan.process_path
-        && sha256_text(&record.command_line) == sha256_text(&plan.command_line)
+        && record.command_line_fingerprint == plan.command_line_fingerprint
         && sorted_strings(&record.service_names) == sorted_strings(&plan.service_names)
+        && port_owner_identity(record) == plan.expected_owner_identity
+        && record.bindings.iter().any(|binding| {
+            plan.bindings.iter().any(|expected| {
+                binding.local_endpoint == expected.local_endpoint
+                    && binding.state.eq_ignore_ascii_case(&expected.state)
+            })
+        })
+}
+
+fn port_owner_identity(record: &PortRecord) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(record.pid.to_le_bytes());
+    hasher.update(record.process_start_time.to_le_bytes());
+    hasher.update(record.process_path.to_ascii_lowercase().as_bytes());
+    hasher.update(record.command_line_fingerprint.as_bytes());
+    for service in sorted_strings(&record.service_names) {
+        hasher.update(b"\0");
+        hasher.update(service.as_bytes());
+    }
+    format!("{:x}", hasher.finalize())
+}
+
+fn risk_rank(value: &str) -> u8 {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "critical" => 4,
+        "high" => 3,
+        "medium" => 2,
+        _ => 1,
+    }
 }
 
 fn sha256_text(value: &str) -> String {
@@ -5687,19 +6710,33 @@ fn validate_generic_archive_source(path: &str) -> Result<(PathBuf, u64), String>
     Ok((candidate, metadata.len()))
 }
 
-fn generic_archive_target_root(target_drive: &str) -> Result<PathBuf, String> {
-    let drive = target_drive.trim().trim_end_matches([':', '\\', '/']);
-    if drive.len() != 1 || !drive.as_bytes()[0].is_ascii_alphabetic() {
-        return Err("Archive target must be a drive letter such as D".to_string());
+fn generic_archive_target_root(target_selection: &str) -> Result<PathBuf, String> {
+    let selection = target_selection.trim().trim_end_matches(['\\', '/']);
+    if selection.is_empty() || selection.contains('\0') || selection.chars().any(char::is_control) {
+        return Err("Choose a valid archive target drive or directory".to_string());
     }
-    let drive = drive.to_ascii_uppercase();
-    if drive == "C" {
-        return Err("Generic archive target must not be the system C drive".to_string());
+    let drive = selection.trim_end_matches(':');
+    let base = if drive.len() == 1 && drive.as_bytes()[0].is_ascii_alphabetic() {
+        PathBuf::from(format!("{}:\\DevEnvArchive", drive.to_ascii_uppercase()))
+    } else {
+        let bytes = selection.as_bytes();
+        let drive_absolute = bytes.len() >= 3
+            && bytes[0].is_ascii_alphabetic()
+            && bytes[1] == b':'
+            && matches!(bytes[2], b'\\' | b'/');
+        let unc = selection.starts_with("\\\\")
+            && !selection.starts_with("\\\\?\\")
+            && !selection.starts_with("\\\\.\\");
+        if !drive_absolute && !unc {
+            return Err("Archive target directory must be an absolute Windows path".to_string());
+        }
+        PathBuf::from(selection).join("DevEnvArchive")
+    };
+    let target = base.join(format!("Selected-{}", filename_timestamp()));
+    if path_key(&display_path(&target)).starts_with("c:\\") {
+        return Err("Generic archive target must not be on the system C drive".to_string());
     }
-    Ok(PathBuf::from(format!(
-        "{drive}:\\DevEnvArchive\\Selected-{}",
-        filename_timestamp()
-    )))
+    Ok(target)
 }
 
 fn path_is_reparse_point(path: &Path) -> bool {
@@ -5719,7 +6756,7 @@ fn path_is_reparse_point(path: &Path) -> bool {
     false
 }
 
-fn validate_archive_target_boundary(target_root: &Path) -> Result<PathBuf, String> {
+fn validate_archive_target_ancestor(target_root: &Path) -> Result<(), String> {
     let mut cursor = Some(target_root);
     while let Some(path) = cursor {
         if path.exists() && path_is_reparse_point(path) {
@@ -5730,6 +6767,21 @@ fn validate_archive_target_boundary(target_root: &Path) -> Result<PathBuf, Strin
         }
         cursor = path.parent();
     }
+    let existing_ancestor = target_root
+        .ancestors()
+        .find(|path| path.exists())
+        .ok_or_else(|| "Archive target volume or parent directory is unavailable".to_string())?;
+    let canonical_ancestor = existing_ancestor
+        .canonicalize()
+        .map_err(|error| format!("Cannot resolve archive target parent: {error}"))?;
+    if path_key(&display_path(&canonical_ancestor)).starts_with("c:\\") {
+        return Err("Archive target resolved onto the system C drive".to_string());
+    }
+    Ok(())
+}
+
+fn validate_archive_target_boundary(target_root: &Path) -> Result<PathBuf, String> {
+    validate_archive_target_ancestor(target_root)?;
     fs::create_dir_all(target_root)
         .map_err(|error| format!("Cannot create archive target: {error}"))?;
     let canonical = target_root
@@ -5809,10 +6861,9 @@ fn build_generic_archive_plan(
 #[tauri::command]
 fn create_generic_archive_plan(target_drive: String) -> Result<GenericArchivePlan, String> {
     let paths = load_paths()?;
-    let plan = build_generic_archive_plan(
-        load_archive_plan(&paths)?,
-        generic_archive_target_root(&target_drive)?,
-    )?;
+    let target_root = generic_archive_target_root(&target_drive)?;
+    validate_archive_target_ancestor(&target_root)?;
+    let plan = build_generic_archive_plan(load_archive_plan(&paths)?, target_root)?;
     let mut store = generic_archive_plan_store()
         .lock()
         .map_err(|_| "Generic archive plan storage is unavailable".to_string())?;
@@ -9488,7 +10539,9 @@ fn verify_java_consumer_environment_blocking(
     if !root.is_dir() {
         return Err("请选择项目根目录，而不是单个文件。".to_string());
     }
-    let paths = load_paths()?;
+    // This command is read-only. An unavailable settings directory must not block
+    // consumer diagnostics, so use the default expansion root as a safe fallback.
+    let paths = load_paths().unwrap_or_else(|_| AppPaths::new(default_root_dir()));
     let user = user_environment().unwrap_or_default();
     let process = env::vars().collect::<HashMap<_, _>>();
     let raw = user.get("JAVA_HOME").cloned();
@@ -11028,6 +12081,12 @@ pub fn run() {
             create_junction_bridge_plan,
             create_desktop_archive_plan,
             execute_desktop_archive_plan,
+            create_desktop_cleanup_plan,
+            execute_desktop_cleanup_plan,
+            inspect_recycle_bin,
+            create_recycle_bin_cleanup_plan,
+            execute_recycle_bin_cleanup_plan,
+            open_recycle_bin,
             create_downloads_archive_plan,
             execute_downloads_archive_plan,
             inspect_partition_layout,
@@ -11043,6 +12102,7 @@ pub fn run() {
             load_config,
             set_root_dir,
             set_auto_check_update,
+            set_port_scan_preferences,
             env_snapshot,
             inspect_java_environment,
             inspect_agent_traces,
@@ -11063,6 +12123,9 @@ pub fn run() {
             uninstall_runtime,
             kill_process,
             scan_ports,
+            enrich_port_scan,
+            port_scan_status,
+            cancel_port_scan,
             create_port_resolution_plan,
             execute_port_resolution_plan,
             port_history,
@@ -11693,6 +12756,8 @@ fn default_settings() -> Settings {
     Settings {
         root_dir: display_path(default_root_dir()),
         auto_check_update: false,
+        auto_scan_ports_on_startup: true,
+        port_scan_scope: default_port_scan_scope(),
         download_timeout_seconds: 60,
         theme: "system".to_string(),
         last_page: "home".to_string(),
@@ -11706,6 +12771,14 @@ fn default_settings() -> Settings {
         safety_disclaimer_version: 0,
         safety_disclaimer_accepted_at: None,
     }
+}
+
+fn default_true() -> bool {
+    true
+}
+
+fn default_port_scan_scope() -> String {
+    "recommended".to_string()
 }
 
 fn default_stable_channel() -> String {
@@ -13349,6 +14422,7 @@ fn extract_windows_path(line: &str) -> Option<String> {
     Some(line[start..].trim().trim_matches('"').to_string())
 }
 
+#[cfg(test)]
 fn parse_socket(value: &str) -> Option<(String, u16)> {
     let trimmed = value.trim();
     if trimmed.starts_with('[') {
@@ -13360,7 +14434,7 @@ fn parse_socket(value: &str) -> Option<(String, u16)> {
 
     let (addr, port_text) = trimmed.rsplit_once(':')?;
     let normalized_addr = if addr == "*" {
-        IpAddr::V4(Ipv4Addr::UNSPECIFIED).to_string()
+        IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED).to_string()
     } else {
         addr.to_string()
     };
@@ -13537,9 +14611,61 @@ fn run_command_output(
     ))
 }
 
-fn process_details(system: &sysinfo::System, pid: u32) -> (String, String, u32, String) {
+#[derive(Debug, Clone, Default)]
+struct ProcessDetails {
+    process_path: String,
+    command_line: String,
+    parent_pid: u32,
+    parent_process_name: String,
+    process_start_time: u64,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct ProcessFileMetadata {
+    path: String,
+    #[serde(default)]
+    product_name: String,
+    #[serde(default)]
+    file_description: String,
+    #[serde(default)]
+    company_name: String,
+    #[serde(default)]
+    original_filename: String,
+    #[serde(default)]
+    publisher: String,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct WindowsServiceIdentity {
+    #[serde(default)]
+    name: String,
+    #[serde(default)]
+    display_name: String,
+    #[serde(default)]
+    state: String,
+    #[serde(default)]
+    start_mode: String,
+    #[serde(default)]
+    process_id: u32,
+    #[serde(default)]
+    service_type: String,
+    #[serde(default)]
+    description: String,
+    #[serde(default)]
+    path_name: String,
+    #[serde(default)]
+    service_host_group: String,
+    #[serde(default)]
+    service_dll: String,
+    #[serde(default)]
+    core_windows_service: bool,
+}
+
+fn process_details(system: &sysinfo::System, pid: u32) -> ProcessDetails {
     let Some(process) = system.process(sysinfo::Pid::from_u32(pid)) else {
-        return (String::new(), String::new(), 0, String::new());
+        return ProcessDetails::default();
     };
     let process_path = process.exe().map(display_path).unwrap_or_default();
     let command_line = process
@@ -13553,13 +14679,71 @@ fn process_details(system: &sysinfo::System, pid: u32) -> (String, String, u32, 
         .process(sysinfo::Pid::from_u32(parent_pid))
         .map(|parent| parent.name().to_string_lossy().to_string())
         .unwrap_or_default();
-    (process_path, command_line, parent_pid, parent_process_name)
+    ProcessDetails {
+        process_path,
+        command_line,
+        parent_pid,
+        parent_process_name,
+        process_start_time: process.start_time(),
+    }
 }
 
-fn windows_service_map() -> std::collections::HashMap<u32, Vec<String>> {
+fn windows_service_map() -> std::collections::HashMap<u32, Vec<WindowsServiceIdentity>> {
     let mut result = std::collections::HashMap::new();
     #[cfg(windows)]
     {
+        let script = r#"$items = @(Get-CimInstance Win32_Service -ErrorAction Stop | Where-Object { $_.ProcessId -gt 0 } | ForEach-Object {
+  $pathName = [Environment]::ExpandEnvironmentVariables([string]$_.PathName)
+  $serviceDll = ''
+  try {
+    $parameters = Get-ItemProperty -LiteralPath (\"Registry::HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Services\\$($_.Name)\\Parameters\") -ErrorAction Stop
+    $serviceDll = [Environment]::ExpandEnvironmentVariables([string]$parameters.ServiceDll)
+  } catch {}
+  $hostGroup = ''
+  $match = [regex]::Match($pathName, '(?i)(?:^|\\s)-k\\s+([^\\s]+)')
+  if ($match.Success) { $hostGroup = [string]$match.Groups[1].Value }
+  $windowsRoot = [IO.Path]::GetFullPath($env:SystemRoot).TrimEnd('\\')
+  $corePath = @($pathName, $serviceDll) | Where-Object { $_ -and $_.StartsWith($windowsRoot, [StringComparison]::OrdinalIgnoreCase) }
+  [pscustomobject]@{
+    Name=[string]$_.Name
+    DisplayName=[string]$_.DisplayName
+    State=[string]$_.State
+    StartMode=[string]$_.StartMode
+    ProcessId=[int]$_.ProcessId
+    ServiceType=[string]$_.ServiceType
+    Description=[string]$_.Description
+    PathName=$pathName
+    ServiceHostGroup=$hostGroup
+    ServiceDll=$serviceDll
+    CoreWindowsService=[bool]$corePath
+  }
+})
+@($items) | ConvertTo-Json -Compress -Depth 3"#;
+        if let Ok(output) = powershell_runner::run_powershell_script(script, Vec::new(), 6) {
+            if output.success {
+                let text = output.stdout.trim();
+                let services = if text.starts_with('[') {
+                    serde_json::from_str::<Vec<WindowsServiceIdentity>>(text).ok()
+                } else {
+                    serde_json::from_str::<WindowsServiceIdentity>(text)
+                        .ok()
+                        .map(|item| vec![item])
+                };
+                if let Some(services) = services {
+                    for service in services {
+                        if service.process_id > 0 && !service.name.trim().is_empty() {
+                            result
+                                .entry(service.process_id)
+                                .or_insert_with(Vec::new)
+                                .push(service);
+                        }
+                    }
+                    if !result.is_empty() {
+                        return result;
+                    }
+                }
+            }
+        }
         let Ok(output) = hidden_command("tasklist")
             .args(["/svc", "/fo", "csv", "/nh"])
             .output()
@@ -13576,7 +14760,71 @@ fn windows_service_map() -> std::collections::HashMap<u32, Vec<String>> {
                 .map(|value| tasklist_service_names(value))
                 .unwrap_or_default();
             if !services.is_empty() {
-                result.insert(pid, services);
+                result.insert(
+                    pid,
+                    services
+                        .into_iter()
+                        .map(|name| WindowsServiceIdentity {
+                            name,
+                            process_id: pid,
+                            ..WindowsServiceIdentity::default()
+                        })
+                        .collect(),
+                );
+            }
+        }
+    }
+    result
+}
+
+fn process_file_metadata(paths: &[String]) -> HashMap<String, ProcessFileMetadata> {
+    let mut result = HashMap::new();
+    #[cfg(windows)]
+    {
+        let args = paths
+            .iter()
+            .filter(|path| !path.trim().is_empty())
+            .take(48)
+            .cloned()
+            .collect::<Vec<_>>();
+        if args.is_empty() {
+            return result;
+        }
+        let script = r#"$items = foreach ($path in $args) {
+  try {
+    $item = Get-Item -LiteralPath $path -ErrorAction Stop
+    $version = $item.VersionInfo
+    $publisher = ''
+    try {
+      $signature = Get-AuthenticodeSignature -LiteralPath $path -ErrorAction Stop
+      if ($signature.SignerCertificate) { $publisher = [string]$signature.SignerCertificate.Subject }
+    } catch {}
+    [pscustomobject]@{
+      Path = [string]$path
+      ProductName = [string]$version.ProductName
+      FileDescription = [string]$version.FileDescription
+      CompanyName = [string]$version.CompanyName
+      OriginalFilename = [string]$version.OriginalFilename
+      Publisher = $publisher
+    }
+  } catch {}
+}
+@($items) | ConvertTo-Json -Compress -Depth 3"#;
+        if let Ok(output) = powershell_runner::run_powershell_script(script, args, 10) {
+            if output.success {
+                let text = output.stdout.trim();
+                let items = if text.starts_with('[') {
+                    serde_json::from_str::<Vec<ProcessFileMetadata>>(text).ok()
+                } else {
+                    serde_json::from_str::<ProcessFileMetadata>(text)
+                        .ok()
+                        .map(|item| vec![item])
+                };
+                for item in items.unwrap_or_default() {
+                    if !item.path.trim().is_empty() {
+                        result.insert(path_key(&item.path), item);
+                    }
+                }
             }
         }
     }
@@ -13619,375 +14867,121 @@ fn parse_csv_line(line: &str) -> Vec<String> {
 }
 
 #[derive(Debug, Clone)]
-struct PortSignature {
-    identity: String,
-    confidence: u8,
-    evidence: Vec<String>,
-    conflict_evidence: Vec<String>,
+struct PortOperationAssessment {
     risk: String,
     risk_level: String,
-    recommendation: String,
-    explanation: String,
+    recommendation_zh: String,
+    recommendation_en: String,
 }
 
-fn analyze_port_signature(
+fn assess_port_operation_risk(
     port: u16,
     state: &str,
+    pid: u32,
     process_name: &str,
-    process_path: &str,
-    command_line: &str,
     service_names: &[String],
-) -> PortSignature {
-    let lower_name = process_name.to_ascii_lowercase();
-    let haystack = format!(
-        "{} {} {} {}",
-        lower_name,
-        process_path.to_ascii_lowercase(),
-        command_line.to_ascii_lowercase(),
-        service_names.join(" ").to_ascii_lowercase()
-    );
-    let mut evidence = Vec::new();
-    let mut conflict = Vec::new();
-    let mut identity = "未识别的本地服务".to_string();
-    let mut score = 0_i32;
-
-    let signatures: &[(&str, &[&str], &str)] = &[
+) -> PortOperationAssessment {
+    let normalized_name = process_name.trim().to_ascii_lowercase();
+    let (risk_level, risk, recommendation_en, recommendation_zh) = if BLOCKED_PIDS.contains(&pid)
+        || PROTECTED_FORCE_KILL_PROCESS_NAMES.contains(&normalized_name.as_str())
+    {
         (
-            "Spring Boot",
-            &[
-                "spring-boot",
-                "org.springframework.boot",
-                "bootrun",
-                "springapplication",
-            ],
-            "Java / JVM",
-        ),
+            "critical",
+            "protected-system",
+            "This protected Windows owner cannot use ordinary process termination.",
+            "这是受保护的 Windows 占用方，不能使用普通进程结束操作。",
+        )
+    } else if !service_names.is_empty() {
         (
-            "Tomcat",
-            &["tomcat", "catalina", "org.apache.catalina"],
-            "Java / JVM",
-        ),
-        ("Jetty", &["jetty", "org.eclipse.jetty"], "Java / JVM"),
-        ("Undertow", &["undertow", "io.undertow"], "Java / JVM"),
-        ("Nacos", &["nacos", "com.alibaba.nacos"], "Java / JVM"),
-        ("Sentinel", &["sentinel", "csp.sentinel"], "Java / JVM"),
-        ("Seata", &["seata"], "Java / JVM"),
-        ("Eureka", &["eureka"], "Java / JVM"),
-        ("Jenkins", &["jenkins"], "Java / JVM"),
-        ("Nexus", &["nexus", "sonatype"], "Java / JVM"),
-        ("SonarQube", &["sonarqube", "sonar"], "Java / JVM"),
+            "high",
+            "service-owned",
+            "Use service management and a new strict plan; ordinary process termination is hidden.",
+            "请通过服务管理和新的严格计划处理；普通进程结束入口已隐藏。",
+        )
+    } else if !state.eq_ignore_ascii_case("LISTENING") && !state.eq_ignore_ascii_case("BOUND") {
         (
-            "Java / JVM",
-            &["java.exe", "\\jdk", "\\jre", "java -jar"],
-            "Java / JVM",
-        ),
-        ("Maven", &["mvn.cmd", "maven"], "Java / JVM"),
-        ("Gradle", &["gradle", "gradlew"], "Java / JVM"),
+            "medium",
+            "active-connection",
+            "This is an active connection group. Inspect its bindings before acting on the owner.",
+            "这是活动连接组，请先检查绑定详情，再决定是否处理占用进程。",
+        )
+    } else if matches!(
+        port,
+        1433 | 1521
+            | 2181
+            | 2379
+            | 2380
+            | 3306
+            | 4222
+            | 5432
+            | 5672
+            | 6379
+            | 7474
+            | 7687
+            | 8123
+            | 9000
+            | 9042
+            | 9092
+            | 9200
+            | 9300
+            | 27017
+    ) {
         (
-            "Node.js",
-            &["node.exe", "\\nodejs\\", "npm", "pnpm", "yarn", "bun"],
-            "Node / 前端",
-        ),
-        ("Vite", &["vite", "vite.config"], "Node / 前端"),
+            "high",
+            "sensitive-service",
+            "This port commonly belongs to a database or infrastructure service. Verify data, clients, and backups before handling it.",
+            "该端口常用于数据库或基础服务，处理前请确认数据、连接方和备份。",
+        )
+    } else {
         (
-            "Webpack Dev Server",
-            &["webpack-dev-server", "webpack serve"],
-            "Node / 前端",
-        ),
-        ("Next.js", &["next dev", "next-server"], "Node / 前端"),
-        ("Nuxt", &["nuxt", "nuxi"], "Node / 前端"),
-        ("React Scripts", &["react-scripts"], "Node / 前端"),
-        ("Vue CLI", &["vue-cli-service"], "Node / 前端"),
-        ("Angular", &["ng serve", "@angular/cli"], "Node / 前端"),
-        ("Storybook", &["storybook"], "Node / 前端"),
-        ("NestJS", &["nestjs", "@nestjs"], "Node / 前端"),
-        ("Electron Dev", &["electron", "electron.exe"], "Node / 前端"),
-        ("Tauri Dev", &["tauri dev", "tauri-cli"], "Node / 前端"),
-        (
-            "Python",
-            &[
-                "python.exe",
-                "\\python",
-                "uvicorn",
-                "gunicorn",
-                "flask",
-                "django",
-            ],
-            "Python / AI",
-        ),
-        ("FastAPI / Uvicorn", &["fastapi", "uvicorn"], "Python / AI"),
-        (
-            "Jupyter",
-            &["jupyter", "ipykernel", "notebook"],
-            "Python / AI",
-        ),
-        ("Streamlit", &["streamlit"], "Python / AI"),
-        ("Gradio", &["gradio"], "Python / AI"),
-        ("ComfyUI", &["comfyui"], "Python / AI"),
-        (
-            "Stable Diffusion WebUI",
-            &["stable-diffusion-webui", "webui-user"],
-            "Python / AI",
-        ),
-        ("Ollama", &["ollama"], "Python / AI"),
-        ("LM Studio", &["lm studio", "lmstudio"], "Python / AI"),
-        ("vLLM", &["vllm"], "Python / AI"),
-        ("Go", &["go.exe", "\\go\\bin", ".go"], "Go / Rust / .NET"),
-        (
-            "Rust",
-            &["cargo.exe", "target\\debug", "target\\release"],
-            "Go / Rust / .NET",
-        ),
-        (
-            ".NET",
-            &["dotnet.exe", "iisexpress", "kestrel"],
-            "Go / Rust / .NET",
-        ),
-        ("PHP", &["php.exe", "php-cgi", "phpstudy"], "PHP / Ruby"),
-        ("Ruby", &["ruby.exe", "rails", "puma"], "PHP / Ruby"),
-        ("MySQL / MariaDB", &["mysqld", "mysql", "mariadb"], "数据库"),
-        ("PostgreSQL", &["postgres", "postmaster"], "数据库"),
-        ("Redis", &["redis-server"], "数据库"),
-        ("MongoDB", &["mongod"], "数据库"),
-        ("Elasticsearch", &["elasticsearch"], "数据库"),
-        ("OpenSearch", &["opensearch"], "数据库"),
-        ("SQL Server", &["sqlservr", "mssql"], "数据库"),
-        ("Oracle", &["oracle", "tnslsnr"], "数据库"),
-        ("Nginx", &["nginx.exe", "\\nginx\\"], "Web 服务器"),
-        ("Apache HTTPD", &["httpd.exe", "apache"], "Web 服务器"),
-        ("RabbitMQ", &["rabbitmq", "beam.smp"], "中间件"),
-        ("Kafka", &["kafka"], "中间件"),
-        ("ZooKeeper", &["zookeeper"], "中间件"),
-        ("MinIO", &["minio"], "中间件"),
-        ("Prometheus", &["prometheus"], "中间件"),
-        ("Grafana", &["grafana"], "中间件"),
-        (
-            "Docker / Container",
-            &["docker", "com.docker", "com.docker.backend", "containerd"],
-            "Docker / WSL",
-        ),
-        (
-            "WSL",
-            &["wsl", "wslhost", "vmmem", "\\wsl$"],
-            "Docker / WSL",
-        ),
-        (
-            "本地代理",
-            &[
-                "clash", "mihomo", "v2ray", "xray", "sing-box", "privoxy", "fiddler", "charles",
-            ],
-            "本地代理",
-        ),
-        (
-            "Node Inspector",
-            &["--inspect", "inspector"],
-            "IDE / 调试器",
-        ),
-        ("Java JDWP", &["jdwp", "address=*:"], "IDE / 调试器"),
-        ("Python debugpy", &["debugpy"], "IDE / 调试器"),
-        (
-            "IDE / 调试器",
-            &[
-                "idea64",
-                "pycharm",
-                "webstorm",
-                "code.exe",
-                "cursor.exe",
-                "trae.exe",
-                "debug",
-            ],
-            "IDE / 调试器",
-        ),
-        (
-            "桌面应用",
-            &[
-                "steam.exe",
-                "steamwebhelper.exe",
-                "qq.exe",
-                "wechat",
-                "weixin",
-                "wxwork",
-                "bilibili",
-                "哔哩哔哩",
-                "uu",
-                "chrome.exe",
-                "msedge.exe",
-                "firefox.exe",
-                "discord.exe",
-                "telegram.exe",
-                "onedrive.exe",
-                "baidunetdisk",
-                "baiduyunguanjia",
-                "cursor.exe",
-                "trae.exe",
-                "code.exe",
-                "wechat.exe",
-                "webview",
-                "mumu",
-                "nemu",
-                "armourycrate",
-                "autodesk",
-            ],
-            "桌面应用",
-        ),
-        (
-            "系统/驱动服务",
-            &[
-                "system",
-                "svchost.exe",
-                "vmware-authd.exe",
-                "nvcontainer.exe",
-                "nvidia overlay.exe",
-                "avp.exe",
-                "kaspersky",
-            ],
-            "系统/驱动服务",
-        ),
-    ];
-    let is_generic_signature = |label: &str| {
-        matches!(
-            label,
-            "Java / JVM" | "Node.js" | "Python" | "Go" | "Rust" | ".NET"
+            "low",
+            "developer-candidate",
+            "If the process instance and project are confirmed, create a plan and verify every binding after execution.",
+            "确认进程实例和项目后再创建计划，并在执行后验证每个绑定。",
         )
     };
-    for (label, markers, group) in signatures {
-        let hits = markers
-            .iter()
-            .filter(|marker| haystack.contains(&marker.to_ascii_lowercase()))
-            .count();
-        if hits > 0 {
-            score += (hits as i32) * 25;
-            if identity == "未识别的本地服务"
-                || (!is_generic_signature(label) && is_generic_signature(&identity))
-                || matches!(*label, "桌面应用" | "IDE / 调试器")
-            {
-                identity = (*label).to_string();
-            }
-            evidence.push(format!(
-                "{group} 强证据：{label} 命中 {hits} 个进程/路径/命令行标记"
-            ));
-        }
-    }
-
-    if !state.eq_ignore_ascii_case("LISTENING") {
-        conflict.push(format!("{state} 不是本地监听状态，不能当作正在提供服务"));
-        score -= 25;
-    }
-    if matches!(
-        lower_name.as_str(),
-        "chrome.exe" | "msedge.exe" | "firefox.exe"
-    ) && (port == 9222 || haystack.contains("remote-debugging-port"))
-    {
-        let browser = match lower_name.as_str() {
-            "msedge.exe" => "Edge 调试端口",
-            "firefox.exe" => "Firefox 调试端口",
-            _ => "Chrome 调试端口",
-        };
-        identity = browser.to_string();
-        score += 60;
-        evidence.push(format!("{browser} 强证据：浏览器进程使用远程调试端口"));
-    }
-
-    if [
-        "steam.exe",
-        "steamwebhelper.exe",
-        "qq.exe",
-        "wechat.exe",
-        "weixin.exe",
-        "wxwork.exe",
-        "chrome.exe",
-        "msedge.exe",
-        "firefox.exe",
-        "code.exe",
-        "cursor.exe",
-        "trae.exe",
-    ]
-    .iter()
-    .any(|name| lower_name == *name)
-    {
-        conflict
-            .push("桌面/浏览器/IDE 进程只按实际进程识别，不按端口号猜测为 Web 框架".to_string());
-        score -= 20;
-    }
-    let port_hint = match port {
-        80 => Some("HTTP Web 服务"),
-        443 => Some("HTTPS Web 服务"),
-        1433 => Some("SQL Server"),
-        3000 | 4173 | 5173 | 5174 => Some("前端开发服务"),
-        3306 => Some("MySQL"),
-        5432 => Some("PostgreSQL"),
-        6379 => Some("Redis"),
-        8005 | 8009 | 8443 => Some("Tomcat"),
-        8000 => Some("常见 Web 开发服务"),
-        8080..=8082 => Some("Spring Boot / Tomcat / Web 服务"),
-        8761 => Some("Spring Cloud Eureka"),
-        8888 => Some("Jupyter / Spring Config"),
-        9200 => Some("Elasticsearch"),
-        27017 => Some("MongoDB"),
-        _ => None,
-    };
-    if let Some(hint) = port_hint {
-        evidence.push(format!("弱证据：端口 {port} 常见于 {hint}"));
-        let ambiguous_web_port = matches!(port, 80 | 443 | 8000 | 8080..=8082 | 8888);
-        if identity == "未识别的本地服务"
-            && state.eq_ignore_ascii_case("LISTENING")
-            && !ambiguous_web_port
-        {
-            identity = format!("{hint}（仅端口弱证据）");
-        }
-        score += 8;
-    }
-
-    let confidence = score.clamp(0, 100) as u8;
-    let unknown_or_weak = identity == "未识别的本地服务" || identity.contains("仅端口弱证据");
-    let risk_level = if !state.eq_ignore_ascii_case("LISTENING") {
-        "low"
-    } else if !service_names.is_empty() || matches!(port, 3306 | 5432 | 6379 | 27017 | 9200 | 1433)
-    {
-        "high"
-    } else if unknown_or_weak && matches!(port, 80 | 443 | 8000 | 8080..=8082 | 8888) {
-        "low"
-    } else if matches!(port, 80 | 443 | 8080..=8082 | 8000 | 8888) {
-        "medium"
-    } else {
-        "low"
-    }
-    .to_string();
-    let risk = match risk_level.as_str() {
-        "high" => "敏感服务",
-        "medium" => "需确认",
-        _ => "普通",
-    }
-    .to_string();
-    let recommendation = if !state.eq_ignore_ascii_case("LISTENING") {
-        "这是已有连接记录，优先确认远端地址，不建议结束进程。"
-    } else if !service_names.is_empty() {
-        "这是 Windows 服务托管的端口，建议先通过服务管理器或服务详情处理，不走普通进程释放流程。"
-    } else if confidence < 40 {
-        "识别证据不足，先打开进程位置或查看详情再操作。"
-    } else if risk_level == "high" {
-        "疑似数据库/中间件等敏感服务，结束前先确认项目、备份和连接用户。"
-    } else {
-        "如确认对应项目已停止使用，可从详情中执行安全结束。"
-    }
-    .to_string();
-    let explanation = format!(
-        "{identity}；置信度 {confidence}%；强/弱证据 {} 条，冲突证据 {} 条。",
-        evidence.len(),
-        conflict.len()
-    );
-    PortSignature {
-        identity,
-        confidence,
-        evidence,
-        conflict_evidence: conflict,
-        risk,
-        risk_level,
-        recommendation,
-        explanation,
+    PortOperationAssessment {
+        risk: risk.to_string(),
+        risk_level: risk_level.to_string(),
+        recommendation_zh: recommendation_zh.to_string(),
+        recommendation_en: recommendation_en.to_string(),
     }
 }
 
+fn identity_explanation(identity: &process_identity::IdentityMatch) -> String {
+    format!(
+        "{} / {} confidence={} evidence={} conflicts={} catalog={} handling={}",
+        identity.display_name_en,
+        identity.display_name_zh,
+        identity.confidence_level,
+        identity.evidence.len(),
+        identity.conflicts.len(),
+        identity.catalog_version,
+        identity.default_handling
+    )
+}
+
+fn service_host_friendly_name(
+    identity_id: &str,
+    fallback: &str,
+    display_names: &[String],
+    service_names: &[String],
+    unresolved: &str,
+) -> String {
+    if identity_id != "windows-service-host" {
+        return fallback.to_string();
+    }
+    let labels = if display_names.is_empty() {
+        service_names
+    } else {
+        display_names
+    };
+    if labels.is_empty() {
+        unresolved.to_string()
+    } else {
+        format!("{}: {}", fallback, labels.join(" / "))
+    }
+}
 fn update_port_history(records: &[PortRecord]) -> Result<(), String> {
     let paths = load_paths()?;
     let mut history: Vec<PortHistoryEntry> =
@@ -15565,6 +16559,258 @@ fn display_path(path: impl AsRef<Path>) -> String {
 mod tests {
     use super::*;
 
+    fn parsed_port_fixture() -> Result<port_scan::ParsedPortSeeds, String> {
+        Ok(port_scan::parse_netstat(
+            "TCP 127.0.0.1:18765 0.0.0.0:0 LISTENING 4242\n",
+            port_scan::ScanScope::Recommended,
+            port_scan::DEFAULT_RECORD_LIMIT,
+        ))
+    }
+
+    fn grouped_port_record_fixture() -> PortRecord {
+        let group = port_scan::group_seeds(vec![port_scan::PortSeed {
+            protocol: "TCP".to_string(),
+            local_address: "0.0.0.0".to_string(),
+            local_port: 5043,
+            remote_address: "*".to_string(),
+            state: "LISTENING".to_string(),
+            pid: 4242,
+        }])
+        .remove(0);
+        let system = sysinfo::System::new_all();
+        let sources = vec![port_scan::PortSourceEvidence {
+            source: "fixture".to_string(),
+            record_count: 1,
+            fallback: false,
+            conflicts: Vec::new(),
+        }];
+        let mut record = build_quick_port_record(&system, group, &sources, 1000);
+        record.process_start_time = 900;
+        record.process_name = "devserver.exe".to_string();
+        record.process_path = r"C:\Tools\devserver.exe".to_string();
+        record.command_line_fingerprint = sha256_text("devserver --port 5043");
+        record.group_id = format!(
+            "test-group-{}",
+            sha256_text(&format!(
+                "{}:{}:{}:{}",
+                record.protocol, record.local_port, record.pid, record.process_start_time
+            ))
+        );
+        record
+    }
+
+    fn port_plan_fixture(record: &PortRecord) -> PortResolutionPlan {
+        PortResolutionPlan {
+            plan_id: "test-port-plan".to_string(),
+            group_id: record.group_id.clone(),
+            group_fingerprint: record.group_fingerprint.clone(),
+            scan_id: "test-scan".to_string(),
+            pid: record.pid,
+            port: record.local_port,
+            protocol: record.protocol.clone(),
+            process_start_time: record.process_start_time,
+            process_name: record.process_name.clone(),
+            process_path: record.process_path.clone(),
+            command_line_fingerprint: record.command_line_fingerprint.clone(),
+            parent_pid: None,
+            parent_process_name: None,
+            child_processes: Vec::new(),
+            service_names: record.service_names.clone(),
+            bindings: record.bindings.clone(),
+            related_ports: record.related_ports.clone(),
+            expected_owner_identity: port_owner_identity(record),
+            created_at: unix_timestamp(),
+            expires_at: unix_timestamp() + 120,
+            project_root: None,
+            risk_level: "high".to_string(),
+            warnings: Vec::new(),
+            recommended_actions: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn port_plan_owner_verification_rejects_pid_reuse_path_and_service_changes() {
+        let record = grouped_port_record_fixture();
+        let plan = port_plan_fixture(&record);
+        assert!(port_owner_matches_plan(&record, &plan));
+
+        let mut pid_reused = record.clone();
+        pid_reused.process_start_time += 1;
+        assert!(!port_owner_matches_plan(&pid_reused, &plan));
+
+        let mut path_changed = record.clone();
+        path_changed.process_path = r"C:\Other\devserver.exe".to_string();
+        assert!(!port_owner_matches_plan(&path_changed, &plan));
+
+        let mut command_changed = record.clone();
+        command_changed.command_line_fingerprint = sha256_text("different command");
+        assert!(!port_owner_matches_plan(&command_changed, &plan));
+
+        let mut service_changed = record.clone();
+        service_changed.service_names = vec!["UnexpectedService".to_string()];
+        assert!(!port_owner_matches_plan(&service_changed, &plan));
+    }
+
+    #[test]
+    fn port_plan_owner_verification_rejects_binding_or_group_changes() {
+        let record = grouped_port_record_fixture();
+        let plan = port_plan_fixture(&record);
+        let mut changed = record.clone();
+        changed.group_fingerprint = "changed".to_string();
+        assert!(!port_owner_matches_plan(&changed, &plan));
+
+        let mut no_binding = record.clone();
+        no_binding.bindings.clear();
+        assert!(!port_owner_matches_plan(&no_binding, &plan));
+    }
+
+    #[test]
+    fn another_pid_reoccupying_the_port_prevents_false_release_success() {
+        let record = grouped_port_record_fixture();
+        let plan = port_plan_fixture(&record);
+        let mut replacement = record.clone();
+        replacement.pid = 9999;
+        replacement.process_start_time += 10;
+        replacement.group_id = "replacement-owner".to_string();
+        assert_eq!(remaining_port_owners(vec![replacement], &plan).len(), 1);
+    }
+
+    #[test]
+    fn software_identity_does_not_lower_operation_risk() {
+        let known = assess_port_operation_risk(5432, "LISTENING", 42, "postgres.exe", &[]);
+        let renamed = assess_port_operation_risk(5432, "LISTENING", 42, "renamed.exe", &[]);
+        assert_eq!(known.risk_level, "high");
+        assert_eq!(known.risk_level, renamed.risk_level);
+        let protected = assess_port_operation_risk(8080, "LISTENING", 42, "svchost.exe", &[]);
+        assert_eq!(protected.risk_level, "critical");
+    }
+
+    #[test]
+    fn port_scan_cache_reuses_recent_snapshot() {
+        let coordinator = (Mutex::new(PortScanCoordinator::default()), Condvar::new());
+        let generation = AtomicU64::new(0);
+        let calls = std::sync::atomic::AtomicUsize::new(0);
+        let first = scan_port_snapshot_with(
+            &coordinator,
+            &generation,
+            false,
+            port_scan::ScanScope::Recommended,
+            |_| {
+                calls.fetch_add(1, Ordering::SeqCst);
+                parsed_port_fixture()
+            },
+        )
+        .unwrap();
+        let second = scan_port_snapshot_with(
+            &coordinator,
+            &generation,
+            false,
+            port_scan::ScanScope::Recommended,
+            |_| {
+                calls.fetch_add(1, Ordering::SeqCst);
+                parsed_port_fixture()
+            },
+        )
+        .unwrap();
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        assert_eq!(first.scan_id, second.scan_id);
+        assert!(second.cached);
+    }
+
+    #[test]
+    fn forced_port_scan_bypasses_recent_cache() {
+        let coordinator = (Mutex::new(PortScanCoordinator::default()), Condvar::new());
+        let generation = AtomicU64::new(0);
+        let calls = std::sync::atomic::AtomicUsize::new(0);
+        scan_port_snapshot_with(
+            &coordinator,
+            &generation,
+            false,
+            port_scan::ScanScope::Recommended,
+            |_| {
+                calls.fetch_add(1, Ordering::SeqCst);
+                parsed_port_fixture()
+            },
+        )
+        .unwrap();
+        let refreshed = scan_port_snapshot_with(
+            &coordinator,
+            &generation,
+            true,
+            port_scan::ScanScope::Recommended,
+            |_| {
+                calls.fetch_add(1, Ordering::SeqCst);
+                parsed_port_fixture()
+            },
+        )
+        .unwrap();
+        assert_eq!(calls.load(Ordering::SeqCst), 2);
+        assert!(!refreshed.cached);
+    }
+
+    #[test]
+    fn port_scan_single_flight_runs_collector_once() {
+        let coordinator =
+            std::sync::Arc::new((Mutex::new(PortScanCoordinator::default()), Condvar::new()));
+        let generation = std::sync::Arc::new(AtomicU64::new(0));
+        let calls = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let first_coordinator = coordinator.clone();
+        let first_generation = generation.clone();
+        let first_calls = calls.clone();
+        let first = std::thread::spawn(move || {
+            scan_port_snapshot_with(
+                &first_coordinator,
+                &first_generation,
+                true,
+                port_scan::ScanScope::Recommended,
+                |_| {
+                    first_calls.fetch_add(1, Ordering::SeqCst);
+                    std::thread::sleep(Duration::from_millis(80));
+                    parsed_port_fixture()
+                },
+            )
+            .unwrap()
+        });
+        std::thread::sleep(Duration::from_millis(10));
+        let second = scan_port_snapshot_with(
+            &coordinator,
+            &generation,
+            true,
+            port_scan::ScanScope::Recommended,
+            |_| {
+                calls.fetch_add(1, Ordering::SeqCst);
+                parsed_port_fixture()
+            },
+        )
+        .unwrap();
+        let first = first.join().unwrap();
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        assert_eq!(first.scan_id, second.scan_id);
+    }
+
+    #[test]
+    fn cancelled_port_scan_does_not_publish_result() {
+        let coordinator = (Mutex::new(PortScanCoordinator::default()), Condvar::new());
+        let generation = AtomicU64::new(0);
+        let snapshot = scan_port_snapshot_with(
+            &coordinator,
+            &generation,
+            true,
+            port_scan::ScanScope::Recommended,
+            |_| {
+                generation.fetch_add(1, Ordering::SeqCst);
+                parsed_port_fixture()
+            },
+        )
+        .unwrap();
+        assert_eq!(snapshot.status, "failed");
+        assert!(snapshot
+            .user_message
+            .to_ascii_lowercase()
+            .contains("cancelled"));
+        assert!(coordinator.0.lock().unwrap().cached.is_none());
+    }
+
     #[test]
     fn writable_managed_root_accepts_writable_directory() {
         let base = tempfile::tempdir().unwrap();
@@ -16060,6 +17306,67 @@ mod tests {
     }
 
     #[test]
+    fn move_plan_is_backend_bound_and_single_use() {
+        let plan = cleanup::MovePlan {
+            plan_id: format!("test-move-plan-{}-{}", std::process::id(), unix_timestamp()),
+            created_at: unix_timestamp().to_string(),
+            source: r"C:\ReleaseLab\source".to_string(),
+            target: r"D:\DevEnvArchive\source".to_string(),
+            mode: "archive".to_string(),
+            estimated_bytes: 128,
+            item_count: 1,
+            risk: "high".to_string(),
+            requires_admin: false,
+            reversible: true,
+            selected_items: Vec::new(),
+            warnings: vec!["fixture".to_string()],
+        };
+
+        store_move_plan(plan.clone()).unwrap();
+
+        let mut tampered = plan.clone();
+        tampered.target = r"C:\Windows\System32".to_string();
+        assert!(verify_move_plan(&tampered).is_err());
+        assert!(consume_move_plan(tampered).is_err());
+
+        assert!(verify_move_plan(&plan).is_ok());
+        assert_eq!(consume_move_plan(plan.clone()).unwrap(), plan);
+        assert!(consume_move_plan(plan).is_err());
+    }
+
+    #[test]
+    fn move_plan_expiration_is_enforced() {
+        let plan = cleanup::MovePlan {
+            plan_id: format!("expired-move-plan-{}", unix_timestamp()),
+            created_at: "1".to_string(),
+            ..cleanup::MovePlan::default()
+        };
+        store_move_plan(plan.clone()).unwrap();
+        assert!(verify_move_plan(&plan).is_err());
+        let _ = move_plans().lock().unwrap().remove(&plan.plan_id);
+    }
+
+    #[test]
+    fn expansion_plan_is_backend_bound_and_single_use() {
+        let plan = cleanup::ExpansionPlan {
+            plan_id: format!("test-expansion-plan-{}", unix_timestamp()),
+            mode: "safe_extend_unallocated".to_string(),
+            can_execute: true,
+            commands_preview: vec!["select volume C".to_string(), "extend".to_string()],
+            ..cleanup::ExpansionPlan::default()
+        };
+        store_expansion_plan(plan.clone()).unwrap();
+
+        let mut tampered = plan.clone();
+        tampered.mode = "delete_empty_adjacent_partition_then_extend".to_string();
+        assert!(verify_expansion_plan(&tampered).is_err());
+        assert!(consume_expansion_plan(tampered).is_err());
+        assert!(verify_expansion_plan(&plan).is_ok());
+        assert_eq!(consume_expansion_plan(plan.clone()).unwrap(), plan);
+        assert!(consume_expansion_plan(plan).is_err());
+    }
+
+    #[test]
     fn risk_gate_rejects_missing_mismatch_expired_and_reused_tokens() {
         let command = "manage_system_platform";
         let plan_id = "docker_update:";
@@ -16175,96 +17482,87 @@ mod tests {
 
     #[test]
     fn desktop_process_not_classified_as_spring_by_port_only() {
-        let signature = analyze_port_signature(
-            8080,
-            "LISTENING",
-            "steamwebhelper.exe",
-            r"C:\Program Files (x86)\Steam\bin\cef\steamwebhelper.exe",
-            r#""C:\Program Files (x86)\Steam\bin\cef\steamwebhelper.exe""#,
-            &[],
-        );
-        assert_eq!(signature.identity, "桌面应用");
-        assert!(signature
-            .conflict_evidence
-            .iter()
-            .any(|item| item.contains("桌面/浏览器/IDE")));
-        assert!(!signature.identity.contains("Spring"));
+        let signature = process_identity::identify(&process_identity::IdentityObservation {
+            process_name: "steamwebhelper.exe",
+            process_path: r"C:\Program Files (x86)\Steam\bin\cef\steamwebhelper.exe",
+            command_line: r#""C:\Program Files (x86)\Steam\bin\cef\steamwebhelper.exe""#,
+            port: 8080,
+            ..process_identity::IdentityObservation::default()
+        });
+        assert_eq!(signature.identity_id, "desktop-sync-communication");
+        assert_ne!(signature.identity_id, "spring-boot");
     }
 
     #[test]
     fn qq_on_8082_is_not_spring() {
-        let signature = analyze_port_signature(
-            8082,
-            "LISTENING",
-            "QQ.exe",
-            r"C:\Program Files\Tencent\QQNT\QQ.exe",
-            r#""C:\Program Files\Tencent\QQNT\QQ.exe""#,
-            &[],
-        );
-        assert_eq!(signature.identity, "桌面应用");
-        assert!(!signature.identity.contains("Spring"));
-        assert!(!signature.identity.contains("Tomcat"));
+        let signature = process_identity::identify(&process_identity::IdentityObservation {
+            process_name: "QQ.exe",
+            process_path: r"C:\Program Files\Tencent\QQNT\QQ.exe",
+            command_line: r#""C:\Program Files\Tencent\QQNT\QQ.exe""#,
+            port: 8082,
+            ..process_identity::IdentityObservation::default()
+        });
+        assert_eq!(signature.identity_id, "desktop-sync-communication");
+        assert_ne!(signature.identity_id, "spring-boot");
+        assert_ne!(signature.identity_id, "tomcat");
     }
 
     #[test]
     fn chrome_debug_port_is_specific_not_generic_web() {
-        let signature = analyze_port_signature(
-            9222,
-            "LISTENING",
-            "chrome.exe",
-            r"C:\Program Files\Google\Chrome\Application\chrome.exe",
-            r#""C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222"#,
-            &[],
-        );
-        assert_eq!(signature.identity, "Chrome 调试端口");
-        assert!(!signature.identity.contains("Web 服务"));
+        let signature = process_identity::identify(&process_identity::IdentityObservation {
+            process_name: "chrome.exe",
+            process_path: r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+            command_line: r#""C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222"#,
+            port: 9222,
+            ..process_identity::IdentityObservation::default()
+        });
+        assert_eq!(signature.identity_id, "browser-debug");
     }
 
     #[test]
     fn code_process_is_not_user_project_service_by_port_only() {
-        let signature = analyze_port_signature(
-            5173,
-            "LISTENING",
-            "Code.exe",
-            r"C:\Users\Alice\AppData\Local\Programs\Microsoft VS Code\Code.exe",
-            r#""C:\Users\Alice\AppData\Local\Programs\Microsoft VS Code\Code.exe""#,
-            &[],
-        );
-        assert!(matches!(
-            signature.identity.as_str(),
-            "IDE / 调试器" | "桌面应用"
-        ));
-        assert!(!signature.identity.contains("Vite"));
+        let signature = process_identity::identify(&process_identity::IdentityObservation {
+            process_name: "Code.exe",
+            process_path: r"C:\Users\Alice\AppData\Local\Programs\Microsoft VS Code\Code.exe",
+            port: 5173,
+            ..process_identity::IdentityObservation::default()
+        });
+        assert_eq!(signature.identity_id, "ide-development-tool");
+        assert_ne!(signature.identity_id, "vite");
     }
 
     #[test]
     fn unknown_8080_stays_low_confidence_unknown() {
-        let signature = analyze_port_signature(
-            8080,
-            "LISTENING",
-            "unknown.exe",
-            r"C:\Tools\unknown.exe",
-            r#""C:\Tools\unknown.exe""#,
-            &[],
-        );
-        assert_eq!(signature.identity, "未识别的本地服务");
+        let signature = process_identity::identify(&process_identity::IdentityObservation {
+            process_name: "unknown.exe",
+            process_path: r"C:\Tools\unknown.exe",
+            port: 8080,
+            ..process_identity::IdentityObservation::default()
+        });
+        assert_eq!(signature.identity_id, "unknown");
         assert!(signature.confidence < 40);
-        assert_eq!(signature.risk_level, "low");
+        assert_eq!(
+            assess_port_operation_risk(8080, "LISTENING", 42, "unknown.exe", &[]).risk_level,
+            "low"
+        );
     }
 
     #[test]
     fn service_owned_port_is_high_risk_and_not_low() {
-        let signature = analyze_port_signature(
-            43595,
-            "LISTENING",
-            "tomcat10.exe",
-            r"C:\Program Files\Apache Software Foundation\Tomcat 10.1\bin\tomcat10.exe",
-            r#""C:\Program Files\Apache Software Foundation\Tomcat 10.1\bin\tomcat10.exe" //RS//Tomcat10"#,
-            &["Tomcat10".to_string()],
-        );
-        assert_eq!(signature.identity, "Tomcat");
-        assert_eq!(signature.risk_level, "high");
-        assert!(signature.recommendation.contains("Windows 服务托管"));
+        let services = vec!["Tomcat10".to_string()];
+        let signature = process_identity::identify(&process_identity::IdentityObservation {
+            process_name: "tomcat10.exe",
+            process_path: r"C:\Program Files\Apache Software Foundation\Tomcat 10.1\bin\tomcat10.exe",
+            command_line: r#""C:\Program Files\Apache Software Foundation\Tomcat 10.1\bin\tomcat10.exe" //RS//Tomcat10"#,
+            service_names: &services,
+            port: 43595,
+            ..process_identity::IdentityObservation::default()
+        });
+        let operation =
+            assess_port_operation_risk(43595, "LISTENING", 42, "tomcat10.exe", &services);
+        assert_eq!(signature.identity_id, "tomcat");
+        assert_eq!(operation.risk_level, "high");
+        assert!(operation.recommendation_en.contains("service management"));
     }
 
     #[test]
@@ -16368,43 +17666,31 @@ mod tests {
 
     #[test]
     fn established_connection_is_not_local_listening_service() {
-        let signature = analyze_port_signature(
-            8080,
-            "ESTABLISHED",
-            "java.exe",
-            r"C:\Program Files\Java\jdk-21\bin\java.exe",
-            r#""C:\Program Files\Java\jdk-21\bin\java.exe" -jar app.jar"#,
-            &[],
-        );
-        assert_eq!(signature.risk_level, "low");
-        assert!(signature
-            .conflict_evidence
-            .iter()
-            .any(|item| item.contains("不是本地监听状态")));
+        let operation = assess_port_operation_risk(8080, "ESTABLISHED", 42, "java.exe", &[]);
+        assert_eq!(operation.risk_level, "medium");
+        assert_eq!(operation.risk, "active-connection");
     }
 
     #[test]
     fn vite_and_spring_have_strong_identity() {
-        let vite = analyze_port_signature(
-            5173,
-            "LISTENING",
-            "node.exe",
-            r"C:\Program Files\nodejs\node.exe",
-            r#""node.exe" "C:\app\node_modules\.bin\vite" --host 127.0.0.1"#,
-            &[],
-        );
-        assert_eq!(vite.identity, "Vite");
+        let vite = process_identity::identify(&process_identity::IdentityObservation {
+            process_name: "node.exe",
+            process_path: r"C:\Program Files\nodejs\node.exe",
+            command_line: r#""node.exe" "C:\app\node_modules\.bin\vite" --host 127.0.0.1"#,
+            port: 5173,
+            ..process_identity::IdentityObservation::default()
+        });
+        assert_eq!(vite.identity_id, "vite");
         assert!(vite.confidence >= 40);
 
-        let spring = analyze_port_signature(
-            8080,
-            "LISTENING",
-            "java.exe",
-            r"C:\Program Files\Java\jdk-21\bin\java.exe",
-            r#""java.exe" -jar demo-spring-boot.jar"#,
-            &[],
-        );
-        assert_eq!(spring.identity, "Spring Boot");
+        let spring = process_identity::identify(&process_identity::IdentityObservation {
+            process_name: "java.exe",
+            process_path: r"C:\Program Files\Java\jdk-21\bin\java.exe",
+            command_line: r#""java.exe" -jar demo-spring-boot.jar"#,
+            port: 8080,
+            ..process_identity::IdentityObservation::default()
+        });
+        assert_eq!(spring.identity_id, "spring-boot");
         assert!(spring.confidence >= 40);
     }
 
@@ -16705,6 +17991,28 @@ mod tests {
     }
 
     #[test]
+    fn generic_archive_target_accepts_drive_or_absolute_folder_and_rejects_unsafe_inputs() {
+        let drive_target = generic_archive_target_root("d:\\").unwrap();
+        assert!(display_path(&drive_target)
+            .to_ascii_lowercase()
+            .contains("d:\\devenvarchive"));
+        assert!(drive_target
+            .file_name()
+            .and_then(|value| value.to_str())
+            .is_some_and(|value| value.starts_with("Selected-")));
+
+        let folder_target = generic_archive_target_root(r"D:\ReleaseLab\ArchiveTarget").unwrap();
+        let folder_display = display_path(folder_target).to_ascii_lowercase();
+        assert!(folder_display.contains(r"d:\releaselab\archivetarget"));
+        assert!(folder_display.contains("devenvarchive"));
+
+        assert!(generic_archive_target_root("C:").is_err());
+        assert!(generic_archive_target_root(r"C:\ReleaseLab\ArchiveTarget").is_err());
+        assert!(generic_archive_target_root("relative-folder").is_err());
+        assert!(generic_archive_target_root(r"\\?\D:\ArchiveTarget").is_err());
+    }
+
+    #[test]
     fn generic_archive_moves_and_verifies_only_fixture_file() {
         let source_root = tempfile::tempdir().unwrap();
         let target_root = tempfile::tempdir_in(env::current_dir().unwrap()).unwrap();
@@ -16828,5 +18136,29 @@ mod tests {
         fs::write(&executable, b"test").unwrap();
         let command = format!("\"{}\" --service", executable.display());
         assert_eq!(service_executable_path(&command).unwrap(), executable);
+    }
+
+    #[test]
+    fn service_host_name_distinguishes_resolved_and_unresolved_owners() {
+        assert_eq!(
+            service_host_friendly_name(
+                "windows-service-host",
+                "Windows Service Host",
+                &["IKE and AuthIP IPsec Keying Modules".to_string()],
+                &["IKEEXT".to_string()],
+                "Windows Service Host (specific service unresolved)",
+            ),
+            "Windows Service Host: IKE and AuthIP IPsec Keying Modules"
+        );
+        assert_eq!(
+            service_host_friendly_name(
+                "windows-service-host",
+                "Windows Service Host",
+                &[],
+                &[],
+                "Windows Service Host (specific service unresolved)",
+            ),
+            "Windows Service Host (specific service unresolved)"
+        );
     }
 }

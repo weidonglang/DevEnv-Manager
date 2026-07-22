@@ -4,6 +4,9 @@ import { debugEntriesAsMarkdown, getDebugEntries, isAdvancedMode, type DebugEven
 import { renderFeatureGuide, renderRiskLevelGuide } from "../../components/featureGuide";
 import type { SettingsWorkbenchState } from "./state";
 import { toSettingsViewModel } from "./viewModel";
+import packageMetadata from "../../../package.json";
+
+const REPOSITORY_SLUG = "weidonglang/DevEnv-Manager";
 
 export function renderSettingsWorkbench(state: SettingsWorkbenchState): string {
   const vm = toSettingsViewModel(state);
@@ -28,9 +31,15 @@ export function renderSettingsWorkbench(state: SettingsWorkbenchState): string {
           ${renderActionButton("toggle-advanced-mode", isAdvancedMode() ? t("settings.advancedOff") : t("settings.advancedOn"))}
           ${renderActionButton("reset-ui-config", t("settings.resetUiConfig"), "danger")}
         </div>
+        <div class="settings-port-scan" data-testid="settings-port-scan-section">
+          <div><strong>${localize("Startup developer-port scan", "启动后自动扫描开发端口")}</strong><p>${localize("Runs once after the safety gate and first render. It never blocks the Dashboard.", "安全声明和首屏渲染完成后后台运行一次，不会阻塞仪表盘。")}</p></div>
+          ${renderActionButton("toggle-auto-port-scan", state.config?.settings.autoScanPortsOnStartup ? localize("Disable", "关闭") : localize("Enable", "开启"))}
+          <label>${localize("Default scope", "默认范围")}<select id="settings-port-scan-scope" data-testid="settings-port-scan-scope"><option value="recommended" ${state.config?.settings.portScanScope !== "full" ? "selected" : ""}>${localize("Recommended: listening, bound and active", "推荐：监听、绑定和活动端口")}</option><option value="full" ${state.config?.settings.portScanScope === "full" ? "selected" : ""}>${localize("Full: all connection states", "完整：全部连接状态")}</option></select></label>
+        </div>
       </section>
       ${renderRiskLevelGuide()}
       ${renderUpdatePanel(state, vm.updateRows, vm.updateDownloadRows)}
+      ${renderAboutPanel(state)}
       <section class="panel" data-testid="settings-uninstall-section">
         <div class="panel-head"><div><h2>${localize("Uninstall DevEnv Manager", "卸载 DevEnv Manager")}</h2><p>${localize("Starts the registered Windows uninstaller. User configuration is retained unless you explicitly remove it in the uninstaller.", "启动 Windows 已注册的卸载程序。除非在卸载程序中明确选择删除，否则会保留用户配置。")}</p></div></div>
         <div class="small-note">${localize("The application closes after the official uninstaller starts. This action does not silently delete user configuration or managed runtimes.", "正式卸载程序启动后应用会关闭；此操作不会静默删除用户配置或受管运行时。")}</div>
@@ -42,6 +51,21 @@ export function renderSettingsWorkbench(state: SettingsWorkbenchState): string {
       ${isAdvancedMode() ? renderDebugPanel(state.debugPage) : ""}
     </div>
   `;
+}
+
+function renderAboutPanel(state: SettingsWorkbenchState): string {
+  const sources = state.config?.settings.updateSources?.filter((source) => source.enabled).map((source) => source.name).join(", ") || localize("Not loaded", "尚未加载");
+  return `<section class="panel" data-testid="settings-about-section">
+    <div class="panel-head"><div><h2>${localize("About DevEnv Manager", "关于 DevEnv Manager")}</h2><p>${localize("Version and release-channel information used for installation and upgrade verification.", "用于安装与升级验证的版本和发布通道信息。")}</p></div></div>
+    <dl class="kv-list">
+      <div><dt>${localize("Application", "应用")}</dt><dd>DevEnv Manager</dd></div>
+      <div><dt>${localize("Version", "版本")}</dt><dd data-testid="settings-about-version">${escapeHtml(packageMetadata.version)}</dd></div>
+      <div><dt>${localize("Target", "目标平台")}</dt><dd>Windows x64</dd></div>
+      <div><dt>${localize("Update sources", "更新源")}</dt><dd>${escapeHtml(sources)}</dd></div>
+      <div><dt>GitHub</dt><dd>${escapeHtml(REPOSITORY_SLUG)}</dd></div>
+      <div><dt>Gitee</dt><dd>${escapeHtml(REPOSITORY_SLUG)}</dd></div>
+    </dl>
+  </section>`;
 }
 
 function renderUpdatePanel(

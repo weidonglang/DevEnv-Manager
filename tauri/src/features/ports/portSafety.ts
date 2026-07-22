@@ -7,6 +7,7 @@ export type PortTreatabilityReasonKey =
   | "feature.ports.serviceOwnedReason"
   | "feature.ports.systemProcessReason"
   | "feature.ports.criticalOwnerReason"
+  | "feature.ports.nonListeningReason"
   | "feature.ports.treatableReason";
 
 export type PortTreatability = {
@@ -17,14 +18,16 @@ export type PortTreatability = {
 const SYSTEM_PROCESS_NAMES = new Set(["system", "idle", "registry", "svchost.exe", "services.exe", "lsass.exe", "wininit.exe", "csrss.exe", "smss.exe"]);
 
 export function portRecordKey(record: PortRecord): string {
-  return `${record.protocol}:${record.localPort}:${record.pid}`;
+  return record.groupId;
 }
 
 export function assessPortTreatability(record: PortRecord | null | undefined): PortTreatability {
   if (!record) return { treatable: false, reasonKey: "feature.ports.noSelectedDetail" };
   const processName = (record.processName || "").trim().toLowerCase();
+  const state = (record.state || "").trim().toUpperCase();
   const identity = `${record.identity || ""} ${record.riskLevel || ""} ${record.risk || ""}`.toLowerCase();
   if (!record.pid) return { treatable: false, reasonKey: "feature.ports.noPidReason" };
+  if (state !== "LISTENING" && state !== "BOUND") return { treatable: false, reasonKey: "feature.ports.nonListeningReason" };
   if (record.pid <= 4 || processName === "system") return { treatable: false, reasonKey: "feature.ports.protectedOwnerReason" };
   if (record.serviceNames.length) return { treatable: false, reasonKey: "feature.ports.serviceOwnedReason" };
   if (SYSTEM_PROCESS_NAMES.has(processName)) return { treatable: false, reasonKey: "feature.ports.systemProcessReason" };

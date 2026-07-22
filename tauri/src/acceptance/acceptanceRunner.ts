@@ -30,6 +30,8 @@ export function runFrontendAcceptanceSnapshot(): FrontendAcceptanceResult[] {
   checks.push(hasSelector("ports.row.closeabilityReason", portsHtml, acceptanceSelectors.ports.rowCloseabilityReason));
   checks.push(hasSelector("ports.plan.visible", portsHtml, acceptanceSelectors.ports.planPreview));
   checks.push(hasSelector("ports.execute.result", portsHtml, acceptanceSelectors.ports.executeResult));
+  checks.push(hasSelector("ports.scan.status", portsHtml, acceptanceSelectors.ports.scanStatus));
+  checks.push(hasSelector("ports.scan.scope", portsHtml, acceptanceSelectors.ports.scanScope));
 
   const runtimeHtml = renderAcceptancePage("runtimes");
   checks.push(hasSelector("runtime.install.jdk", runtimeHtml, acceptanceSelectors.runtime.installJdkGroup));
@@ -42,6 +44,24 @@ export function runFrontendAcceptanceSnapshot(): FrontendAcceptanceResult[] {
   const cleanupHtml = renderAcceptancePage("cleanup");
   checks.push(hasSelector("cleanup.diskOverview", cleanupHtml, acceptanceSelectors.cleanup.diskOverviewSection));
   checks.push(hasSelector("cleanup.operationResult", cleanupHtml, acceptanceSelectors.cleanup.operationResult));
+  checks.push(hasSelector("cleanup.diskCardGrid", cleanupHtml, acceptanceSelectors.cleanup.diskCardGrid));
+  checks.push(hasSelector("cleanup.desktopCandidates", cleanupHtml, acceptanceSelectors.cleanup.desktopCandidateTable));
+  checks.push(hasSelector("cleanup.desktopRecyclePlan", cleanupHtml, acceptanceSelectors.cleanup.desktopRecyclePlan));
+  checks.push(hasSelector("cleanup.desktopRecycleResult", cleanupHtml, acceptanceSelectors.cleanup.desktopRecycleResult));
+  checks.push(hasSelector("cleanup.desktopArchive.targetPicker", cleanupHtml, acceptanceSelectors.cleanup.desktopArchiveTargetPicker));
+  checks.push(hasSelector("cleanup.desktopArchive.targetSelect", cleanupHtml, acceptanceSelectors.cleanup.desktopArchiveTargetSelect));
+  checks.push(hasSelector("cleanup.downloadsArchive.targetPicker", cleanupHtml, acceptanceSelectors.cleanup.downloadsArchiveTargetPicker));
+  checks.push(hasSelector("cleanup.genericArchive.targetPicker", cleanupHtml, acceptanceSelectors.cleanup.genericArchiveTargetPicker));
+  checks.push(hasSelector("cleanup.recycleBin.section", cleanupHtml, acceptanceSelectors.cleanup.recycleBinSection));
+  checks.push(hasSelector("cleanup.recycleBin.refresh", cleanupHtml, acceptanceSelectors.cleanup.recycleBinRefresh));
+  checks.push(hasSelector("cleanup.recycleBin.createPlan", cleanupHtml, acceptanceSelectors.cleanup.recycleBinCreatePlan));
+  checks.push(hasSelector("cleanup.recycleBin.executePlan", cleanupHtml, acceptanceSelectors.cleanup.recycleBinExecutePlan));
+  checks.push(hasSelector("cleanup.recycleBin.summary", cleanupHtml, acceptanceSelectors.cleanup.recycleBinSummary));
+  checks.push(hasSelector("cleanup.recycleBin.volumeScope", cleanupHtml, acceptanceSelectors.cleanup.recycleBinVolumeScope));
+  checks.push(hasSelector("cleanup.recycleBin.preview", cleanupHtml, acceptanceSelectors.cleanup.recycleBinPreview));
+  checks.push(hasSelector("cleanup.recycleBin.planPreview", cleanupHtml, acceptanceSelectors.cleanup.recycleBinPlanPreview));
+  checks.push(hasSelector("cleanup.recycleBin.result", cleanupHtml, acceptanceSelectors.cleanup.recycleBinResult));
+  checks.push(hasSelector("cleanup.recycleBin.table", cleanupHtml, acceptanceSelectors.cleanup.recycleBinTable));
 
   const toolchainsHtml = renderAcceptancePage("toolchains");
   for (const [name, selector] of Object.entries(acceptanceSelectors.toolchains)) {

@@ -1,22 +1,50 @@
 import type { FeatureContext } from "../../app/featureContext";
 import { bindAction, loadSafe } from "../sharedView";
-import { getAppSnapshot, getEnvironmentHealth, getPortSummary, getPowerShellStatus, getUpdateStatus } from "./api";
+import { enrichPortScan, forcePortScan, getAppSnapshot, getEnvironmentHealth, getPortScanStatus, getPowerShellStatus, getUpdateStatus } from "./api";
 import { renderDashboard } from "./render";
 import type { DashboardState } from "./state";
+import type { PortScanSnapshot } from "../../types";
+import { localize } from "../../core/i18n";
+
+let activePortUpdate: ((snapshot: PortScanSnapshot) => void) | null = null;
+let portUpdateListenerBound = false;
 
 export function bindDashboardEvents(context: FeatureContext, state: DashboardState): void {
+  activePortUpdate = (snapshot) => {
+    if (!context.isCurrent()) return;
+    applyPortSnapshot(state, snapshot);
+    context.root.innerHTML = renderDashboard(state);
+    bindDashboardEvents(context, state);
+  };
+  if (!portUpdateListenerBound) {
+    portUpdateListenerBound = true;
+    window.addEventListener("devenv:port-scan-updated", (event) => {
+      activePortUpdate?.((event as CustomEvent<PortScanSnapshot>).detail);
+    });
+  }
   bindAction(context.root, "run-doctor", () => context.navigate("reports"));
   bindAction(context.root, "inspect-environment", () => context.navigate("environment"));
   bindAction(context.root, "scan-ports", () => context.navigate("ports"));
   bindAction(context.root, "retry-ports-only", async () => {
-    const result = await loadSafe(() => getPortSummary());
+    state.portStatus = "scanning";
+    context.root.innerHTML = renderDashboard(state);
+    bindDashboardEvents(context, state);
+    const result = await loadSafe(() => forcePortScan());
     if (result.ok) {
-      state.ports = result.value;
-      state.portStatus = "cached";
-      delete state.errors.ports;
+      applyPortSnapshot(state, result.value);
+      if (result.value.scanId && !result.value.complete && result.value.status !== "failed") {
+        void enrichPortScan(result.value.scanId)
+          .then((snapshot) => {
+            if (!context.isCurrent()) return;
+            applyPortSnapshot(state, snapshot);
+            context.root.innerHTML = renderDashboard(state);
+            bindDashboardEvents(context, state);
+          })
+          .catch(() => undefined);
+      }
     } else {
       state.portStatus = "unavailable";
-      state.errors.ports = result.error;
+      state.errors.ports = "Port scanning failed; retry or export diagnostics.";
     }
     if (!context.isCurrent()) return;
     context.root.innerHTML = renderDashboard(state);
@@ -39,9 +67,10 @@ export function bindDashboardEvents(context: FeatureContext, state: DashboardSta
 export async function refreshDashboard(context: FeatureContext, state: DashboardState): Promise<void> {
   state.loading = true;
   state.errors = {};
-  const [snapshot, health, powershell, update] = await Promise.all([
+  const [snapshot, health, ports, powershell, update] = await Promise.all([
     loadSafe(getAppSnapshot),
     loadSafe(getEnvironmentHealth),
+    loadSafe(getPortScanStatus),
     loadSafe(getPowerShellStatus),
     loadSafe(getUpdateStatus),
   ]);
@@ -56,6 +85,12 @@ export async function refreshDashboard(context: FeatureContext, state: Dashboard
   } else {
     state.errors.health = health.error;
   }
+  if (ports.ok) {
+    applyPortSnapshot(state, ports.value);
+  } else {
+    state.portStatus = state.ports.length ? "stale" : "unavailable";
+    state.errors.ports = "Port scan status is temporarily unavailable.";
+  }
   if (powershell.ok) {
     state.powershell = powershell.value;
   } else {
@@ -66,8 +101,33 @@ export async function refreshDashboard(context: FeatureContext, state: Dashboard
   } else {
     state.errors.update = update.error;
   }
-  state.portStatus = state.ports.length ? "cached" : "idle";
   state.loading = false;
   context.root.innerHTML = renderDashboard(state);
   bindDashboardEvents(context, state);
+}
+
+function applyPortSnapshot(state: DashboardState, snapshot: NonNullable<DashboardState["portSnapshot"]>): void {
+  state.portSnapshot = snapshot;
+  if (snapshot.records.length || snapshot.status !== "failed") state.ports = snapshot.records;
+  state.portStatus = snapshot.status === "scanning"
+    ? "scanning"
+    : snapshot.status === "stale"
+      ? "stale"
+      : snapshot.status === "failed"
+        ? (state.ports.length ? "stale" : "unavailable")
+        : snapshot.status === "idle"
+          ? "idle"
+          : "cached";
+  if (snapshot.status === "failed") {
+    state.errors.ports = localize(
+      "Port scanning timed out or failed. Retry or export diagnostics.",
+      "端口扫描超时或失败，可以重试或导出诊断。",
+    );
+  } else if (snapshot.status === "stale") {
+    state.errors.ports = localize(
+      "Port scanning failed; the last successful result is retained.",
+      "端口扫描失败，已保留上次成功结果。",
+    );
+  }
+  else delete state.errors.ports;
 }

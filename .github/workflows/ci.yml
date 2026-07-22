@@ -42,6 +42,10 @@ jobs:
         working-directory: tauri/src-tauri
         run: cargo test --all-targets
 
+      - name: Rust formatting
+        working-directory: tauri/src-tauri
+        run: cargo fmt --all -- --check
+
       - name: Rust clippy
         working-directory: tauri/src-tauri
         run: cargo clippy --all-targets -- -D warnings
@@ -52,5 +56,37 @@ jobs:
       - name: Frontend i18n contracts
         run: python scripts/check_frontend_i18n_contracts.py
 
+      - name: Process identity catalog
+        run: python scripts/check_process_identity_catalog.py
+
+      - name: Feature acceptance (static)
+        run: python scripts/run_feature_acceptance.py --mode static
+
+      - name: Feature acceptance (safe)
+        run: python scripts/run_feature_acceptance.py --mode safe
+
+      - name: Feature acceptance (frontend)
+        run: python scripts/run_feature_acceptance.py --mode frontend
+
+      - name: Visual acceptance (Edge)
+        working-directory: tauri
+        timeout-minutes: 10
+        run: npm run acceptance:visual
+
+      - name: Feature acceptance (report)
+        run: python scripts/run_feature_acceptance.py --mode report
+
       - name: Repository hygiene
         run: python scripts/check_repo_hygiene.py
+
+      - name: Upload acceptance reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: feature-acceptance-${{ github.sha }}
+          path: |
+            artifacts/feature-acceptance-*.json
+            artifacts/feature-acceptance-report.md
+            artifacts/manual-smoke-checklist.md
+            artifacts/isolated-evidence/**
+            artifacts/visual-acceptance/**

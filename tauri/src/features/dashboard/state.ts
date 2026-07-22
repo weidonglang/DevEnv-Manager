@@ -1,4 +1,4 @@
-import type { AppSnapshot, EnvHealthCheck, PortRecord, PowerShellResult, UpdateCheckResult } from "../../types";
+import type { AppSnapshot, EnvHealthCheck, PortRecord, PortScanSnapshot, PowerShellResult, UpdateCheckResult } from "../../types";
 
 export type DashboardDataError = {
   snapshot?: string;
@@ -12,9 +12,10 @@ export type DashboardState = {
   snapshot: AppSnapshot | null;
   health: EnvHealthCheck[];
   ports: PortRecord[];
+  portSnapshot: PortScanSnapshot | null;
   powershell: PowerShellResult | null;
   update: UpdateCheckResult | null;
-  portStatus: "idle" | "cached" | "unavailable";
+  portStatus: "idle" | "scanning" | "cached" | "stale" | "unavailable";
   errors: DashboardDataError;
   loading: boolean;
 };
@@ -23,6 +24,7 @@ export const dashboardInitialState: DashboardState = {
   snapshot: null,
   health: [],
   ports: [],
+  portSnapshot: null,
   powershell: null,
   update: null,
   portStatus: "idle",

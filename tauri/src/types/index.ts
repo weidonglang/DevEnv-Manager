@@ -17,6 +17,8 @@ export type ConfigView = {
   settings: {
     rootDir: string;
     autoCheckUpdate: boolean;
+    autoScanPortsOnStartup: boolean;
+    portScanScope: "recommended" | "full";
     downloadTimeoutSeconds: number;
     theme: string;
     updateSourceMode?: string;
@@ -242,44 +244,110 @@ export type JavaEnvironmentReport = {
 };
 
 export type PortRecord = {
+  groupId: string;
+  groupFingerprint: string;
   protocol: string;
   localAddress: string;
   localPort: number;
   remoteAddress: string;
   state: string;
   pid: number;
+  processStartTime: number;
   processName: string;
+  friendlyNameZh: string;
+  friendlyNameEn: string;
   processPath: string;
+  productName: string;
+  fileDescription: string;
+  companyName: string;
+  publisher: string;
   commandLine: string;
+  commandLineFingerprint: string;
   parentPid: number;
   parentProcessName: string;
   serviceNames: string[];
+  serviceDisplayNames: string[];
+  serviceStates: string[];
+  serviceStartModes: string[];
+  serviceDetails: Array<{
+    name: string;
+    displayName: string;
+    state: string;
+    startMode: string;
+    processId: number;
+    serviceType: string;
+    description: string;
+    pathName: string;
+    serviceHostGroup: string;
+    serviceDll: string;
+    coreWindowsService: boolean;
+  }>;
+  bindings: Array<{ localAddress: string; localEndpoint: string; remoteEndpoint: string; state: string }>;
+  bindingCount: number;
+  remoteConnectionCount: number;
+  relatedPorts: number[];
+  sourceRecordCount: number;
+  hasIpv4: boolean;
+  hasIpv6: boolean;
+  scanSources: Array<{ source: string; scannedAt: number; recordCount: number; fallback: boolean; conflicts: string[] }>;
   commonUsage: string;
   explanation: string;
   risk: string;
   identity: string;
+  identityId: string;
+  identityCategory: string;
+  identityEcosystem: string;
   confidence: number;
+  confidenceLevel: "verified" | "high" | "medium" | "low" | "unknown" | "conflict";
+  identityCatalogVersion: string;
   evidenceCount: number;
   conflictCount: number;
   riskLevel: string;
   recommendation: string;
+  recommendationZh: string;
+  recommendationEn: string;
   evidence: string[];
   conflictEvidence: string[];
 };
 
+export type PortScanSnapshot = {
+  scanId: string;
+  scope: "recommended" | "full";
+  status: "idle" | "scanning" | "success" | "stale" | "failed";
+  source: string;
+  scannedAt: number;
+  elapsedMs: number;
+  rawCount: number;
+  filteredCount: number;
+  truncated: boolean;
+  cached: boolean;
+  complete: boolean;
+  userMessage: string;
+  debugSummary: string;
+  records: PortRecord[];
+};
+
 export type PortResolutionPlan = {
   planId: string;
+  groupId: string;
+  groupFingerprint: string;
+  scanId: string;
   pid: number;
   port: number;
   protocol: string;
+  processStartTime: number;
   processName: string;
   processPath: string;
-  commandLine: string;
+  commandLineFingerprint: string;
   parentPid?: number;
   parentProcessName?: string;
   childProcesses: Array<{ pid: number; name: string }>;
   serviceNames: string[];
+  bindings: PortRecord["bindings"];
   relatedPorts: number[];
+  expectedOwnerIdentity: string;
+  createdAt: number;
+  expiresAt: number;
   projectRoot?: string;
   riskLevel: "low" | "medium" | "high" | "critical";
   warnings: string[];
@@ -298,6 +366,8 @@ export type PortResolutionResult = {
   nextSteps: string[];
   pidExited: boolean;
   portReleased: boolean;
+  relatedPortsReleased: boolean;
+  remainingRelatedPorts: number[];
   releaseCheckedAt: string;
   remainingOwners: PortRecord[];
 };
@@ -1045,7 +1115,23 @@ export type MovePlan = {
   risk: string;
   requiresAdmin: boolean;
   reversible: boolean;
+  selectedItems: MovePlanItem[];
   warnings: string[];
+};
+
+export type MovePlanItem = {
+  source: string;
+  target: string;
+  size: number;
+  sha256: string;
+};
+
+export type MoveReceipt = {
+  source: string;
+  target: string;
+  size: number;
+  sourceSha256: string;
+  targetSha256: string;
 };
 
 export type MoveResult = {
@@ -1058,6 +1144,7 @@ export type MoveResult = {
   junctionCreated: boolean;
   failures: string[];
   rollbackId?: string;
+  receipts: MoveReceipt[];
   reportMarkdown: string;
 };
 
@@ -1070,6 +1157,7 @@ export type RollbackRecord = {
   backupPath?: string;
   junctionPath?: string;
   reversible: boolean;
+  movedFiles: MoveReceipt[];
   notes: string[];
 };
 
@@ -1131,7 +1219,67 @@ export type DiskVolumeInfo = {
   usedBytes: number;
   usedPercent: number;
   fileSystem?: string;
+  diskKind: string;
+  removable: boolean;
+  readOnly: boolean;
+  systemVolume: boolean;
+  archiveTargetEligible: boolean;
+  archiveTargetReason: string;
   risk: string;
+};
+
+export type RecycleBinItem = {
+  id: string;
+  name: string;
+  originalPath: string;
+  recyclePath: string;
+  sourceDrive: string;
+  size: number;
+  deletedAt: string;
+  recoverable: boolean;
+};
+
+export type RecycleBinVolumeSummary = {
+  drive: string;
+  itemCount: number;
+  totalBytes: number;
+  recoverableCount: number;
+};
+
+export type RecycleBinReport = {
+  generatedAt: string;
+  itemCount: number;
+  totalBytes: number;
+  recoverableCount: number;
+  items: RecycleBinItem[];
+  volumes: RecycleBinVolumeSummary[];
+  warnings: string[];
+};
+
+export type RecycleBinCleanupPlan = {
+  planId: string;
+  createdAt: string;
+  selectedDrives: string[];
+  itemIds: string[];
+  itemCount: number;
+  estimatedBytes: number;
+  snapshotFingerprint: string;
+  riskLevel: "critical";
+  warnings: string[];
+};
+
+export type RecycleBinCleanupResult = {
+  planId: string;
+  success: boolean;
+  beforeItemCount: number;
+  beforeBytes: number;
+  afterItemCount: number;
+  afterBytes: number;
+  cleanedItems: number;
+  cleanedBytes: number;
+  selectedDrives: string[];
+  failures: string[];
+  message: string;
 };
 
 export type MaintenanceOverview = {
@@ -1169,6 +1317,8 @@ export type LargeFileItem = {
   openStatus: string;
   suggestion: string;
   risk: string;
+  actionable: boolean;
+  blockedReason?: string | null;
 };
 
 export type ArchivePlanItem = {
@@ -1221,6 +1371,9 @@ export type FolderUsageReport = {
   name: string;
   path: string;
   totalBytes: number;
+  fileCount: number;
+  folderCount: number;
+  protectedCount: number;
   categories: Array<{
     name: string;
     path: string;

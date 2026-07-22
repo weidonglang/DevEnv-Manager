@@ -1,5 +1,5 @@
 import { escapeHtml, renderActionButton, renderMetric } from "../sharedView";
-import { t } from "../../core/i18n";
+import { localize, t } from "../../core/i18n";
 import { renderFeatureGuide } from "../../components/featureGuide";
 import type { DashboardState } from "./state";
 import { toDashboardViewModel } from "./viewModel";
@@ -50,11 +50,18 @@ export function renderQuickActions(): string {
 }
 
 function renderPortsMetric(state: DashboardState): string {
-  if (state.errors.ports) {
-    return renderMetric(t("dashboard.portScanTimedOut"), t("state.notAvailable"), `${t("dashboard.portSummaryUnavailable")} ${t("dashboard.openPortsToRetry")}`);
+  const scannedAt = state.portSnapshot?.scannedAt ? new Date(state.portSnapshot.scannedAt * 1000).toLocaleString() : "";
+  if (state.portStatus === "scanning") {
+    return renderMetric(t("dashboard.portRecords"), localize("Scanning...", "正在扫描…"), state.ports.length ? localize("The previous result remains visible.", "上次结果仍然可见。") : localize("The Dashboard remains available while scanning.", "扫描期间仪表盘仍可操作。"));
+  }
+  if (state.portStatus === "unavailable") {
+    return renderMetric(t("dashboard.portScanTimedOut"), t("state.notAvailable"), `${state.errors.ports || t("dashboard.portSummaryUnavailable")} ${t("dashboard.openPortsToRetry")}`);
+  }
+  if (state.portStatus === "stale") {
+    return renderMetric(t("dashboard.portRecords"), state.ports.length, `${localize("Last successful result", "上次成功结果")} ${scannedAt}`);
   }
   if (state.portStatus === "cached") {
-    return renderMetric(t("dashboard.portRecords"), state.ports.length);
+    return renderMetric(t("dashboard.portRecords"), state.ports.length, scannedAt ? `${localize("Last scan", "最近扫描")}: ${scannedAt}` : "");
   }
   return renderMetric(t("dashboard.portRecords"), t("dashboard.portsNotScanned"), t("dashboard.portsNotScannedDetail"));
 }

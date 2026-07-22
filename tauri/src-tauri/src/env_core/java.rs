@@ -196,7 +196,7 @@ pub fn create_java_stabilize_plan(
             java_probe_arguments(tool),
             10,
         )
-            .map_err(|err| format!("Failed to run {tool}: {err}"))?;
+        .map_err(|err| format!("Failed to run {tool}: {err}"))?;
         if !java_probe_succeeded(tool, &output) {
             return Err(format!(
                 "{tool} probe failed: {}",
@@ -292,7 +292,11 @@ pub(crate) fn proposed_path_with_jdk(
 mod tests {
     use super::*;
 
-    fn probe_result(success: bool, exit_code: Option<i32>, timed_out: bool) -> crate::powershell_runner::NativeCommandResult {
+    fn probe_result(
+        success: bool,
+        exit_code: Option<i32>,
+        timed_out: bool,
+    ) -> crate::powershell_runner::NativeCommandResult {
         crate::powershell_runner::NativeCommandResult {
             success,
             exit_code,
@@ -307,9 +311,18 @@ mod tests {
     #[test]
     fn jdk8_jar_usage_exit_is_accepted_without_help_switch() {
         assert!(java_probe_arguments("jar.exe").is_empty());
-        assert!(java_probe_succeeded("jar.exe", &probe_result(false, Some(1), false)));
-        assert!(!java_probe_succeeded("jar.exe", &probe_result(false, Some(1), true)));
-        assert!(!java_probe_succeeded("java.exe", &probe_result(false, Some(1), false)));
+        assert!(java_probe_succeeded(
+            "jar.exe",
+            &probe_result(false, Some(1), false)
+        ));
+        assert!(!java_probe_succeeded(
+            "jar.exe",
+            &probe_result(false, Some(1), true)
+        ));
+        assert!(!java_probe_succeeded(
+            "java.exe",
+            &probe_result(false, Some(1), false)
+        ));
     }
 
     #[test]

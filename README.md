@@ -2,9 +2,9 @@
 
 [GitHub 主仓库](https://github.com/weidonglang/DevEnv-Manager) · [Gitee 国内镜像](https://gitee.com/weidonglang/DevEnv-Manager) · [GitHub Release](https://github.com/weidonglang/DevEnv-Manager/releases) · [Gitee Release](https://gitee.com/weidonglang/DevEnv-Manager/releases) · [完整操作手册](docs/user-guide.md) · [安全说明](docs/safety-and-disclaimer.md) · [问题反馈](https://github.com/weidonglang/DevEnv-Manager/issues)
 
-面向 Windows 的开发环境诊断器与安全操作面板。当前版本：**1.8.2 Stable**。
+面向 Windows 的开发环境诊断器与安全操作面板。当前版本：**1.8.3 Stable**。
 
-1.8.2 是前端重构后的稳定性恢复版本：恢复并加固 Cleanup、Ports、Environment、Projects、Reports、File Associations 等核心工作流，加入自动验收与真实 Tauri/Hyper-V 验证。Runtime 最终重构继续由 #130 / v1.9.0 跟踪。
+1.8.3 是 v1.8.2 之后的集中修复版本：解决端口扫描超时与重复分组、清理页暗色/高对比可读性、归档目标选择、Downloads 恢复、回收站复扫，以及执行计划可篡改或重复消费等问题。Runtime 最终重构继续由 #130 / v1.9.0 跟踪。
 
 ## 下载与镜像
 
@@ -12,9 +12,9 @@
 - Gitee 国内镜像：https://gitee.com/weidonglang/DevEnv-Manager
 - GitHub Release：https://github.com/weidonglang/DevEnv-Manager/releases
 - Gitee Release：https://gitee.com/weidonglang/DevEnv-Manager/releases
-- v1.8.2 NSIS：https://github.com/weidonglang/DevEnv-Manager/releases/download/v1.8.2/DevEnv.Manager_1.8.2_x64-setup.exe
-- 国内下载：https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.8.2/DevEnv.Manager_1.8.2_x64-setup.exe
-- NSIS SHA256：`b910f56674abca837baaff662e159d6025d66dce933c2f758af34211a27e49a6`
+- v1.8.3 NSIS：https://github.com/weidonglang/DevEnv-Manager/releases/download/v1.8.3/DevEnv.Manager_1.8.3_x64-setup.exe
+- 国内下载：https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.8.3/DevEnv.Manager_1.8.3_x64-setup.exe
+- NSIS SHA256：`a6663ab2e409f936b11105f4d827b4d41cbfbe9e225ce55aa7a92e4eb601d20c`
 
 适合：
 
@@ -46,6 +46,27 @@ DevEnv Manager 解决的是 Windows 上多个开发生态互相影响的问题�
 - 适合希望用图形界面查看诊断证据，同时保留 CLI 自动化入口的用户。
 - 不适合希望软件自动接管整台机器、清理任意个人文件或替代专业包管理器的场景。
 - 熟练使用 mise/asdf/Scoop/Chocolatey 且环境已经稳定的用户，可以只使用诊断能力。
+
+## 1.8.3 Stable
+
+我们向所有在 v1.8.2 中遇到端口扫描超时、IPv4/IPv6 重复行、深色或高对比模式文字看不清、归档目标必须手写、归档后无法恢复或清理回收站，以及中英文混杂问题的用户郑重道歉。这些缺陷本应在发布前由自动化与真实 Windows 验收发现，而不应让用户反复截图和手测。
+
+v1.8.3 集中完成了以下修复和加固：
+
+- 端口扫描改为有界快速快照和异步增强，加入单航班、缓存、最近成功结果、强制刷新、取消与来源诊断；高连接压力下不再因 `netstat` 拖住页面。
+- IPv4、IPv6 和重复来源记录合并为稳定的一行，同时保留所有绑定、服务、进程路径、命令行、父进程、发布者和置信度证据。
+- `ESTABLISHED` 等非监听连接保持只读；系统进程、受保护进程和服务拥有目标继续禁止普通强制结束。
+- 桌面与下载目录归档会自动推荐可用的非系统盘，也可打开目录选择器，不再要求手写盘符或路径。
+- 归档预览固定列出每个源文件、目标文件、大小和 SHA256；跨盘执行采用“复制、校验哈希、删除源文件”，并为桌面和 Downloads 都提供持久的恢复入口。
+- 回收站增加独立快照、卷选择、计划、确认令牌、执行结果和最终复扫；只有权威复扫证明目标已消失时才判定成功。
+- Move、C 盘扩容和文件关联计划改为后端保存的精确计划，加入过期时间、容量上限、篡改拒绝和单次消费；扩容执行前重新读取分区布局。
+- Junction 在无法保存回滚记录时会立即失败并恢复原目录，不再留下无法追踪的连接。
+- 清理页在 Light、Dark、System 和 High Contrast 下统一使用主题令牌，修复白底白字、低对比和内容溢出。
+- 补齐清理、归档、环境和验证结果的中英文适配，并让视觉测试超时可控，避免 CI 被 Edge 探针无限挂起。
+
+冻结提交通过 211 项 Rust 测试、Clippy、113 模块前端生产构建、165 个 P0/P1 selector、全部前后端契约检查和 GitHub CI。最终 Windows ReleaseLab 从精确 HEAD 安装 NSIS，15 项关键功能断言全部通过：端口压力扫描约 59 ms，桌面和 Downloads 归档后按原 SHA256 恢复，回收站执行后复扫为空，D/HC 截图可读；清理后无应用注册、测试进程、计划任务或测试磁盘残留。
+
+正式资产、SHA256、验收边界和发布顺序记录在 [docs/release-v1.8.3.md](docs/release-v1.8.3.md)。v1.9.0 Runtime 重构和 Profile 历史模型仍在后续 issue 中跟踪，不会被本次热修复误报为完成。
 
 ## 1.8.2 Stable
 

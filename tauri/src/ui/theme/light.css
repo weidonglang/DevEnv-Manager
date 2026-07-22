@@ -9,8 +9,10 @@
   --border: #d7dde8;
   --accent: #2563eb;
   --accent-strong: #1d4ed8;
+  --accent-foreground: #ffffff;
   --hover: #eef4ff;
   --danger: #b42318;
+  --danger-foreground: #ffffff;
   --warning: #b45309;
   --success: #15803d;
 }

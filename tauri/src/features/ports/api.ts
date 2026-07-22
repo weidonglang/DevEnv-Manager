@@ -1,16 +1,28 @@
 import { invoke } from "../../core/invoke";
-import type { LocalServiceStatus, OperationResult, PortHistorySummary, PortRecord, PortResolutionPlan, PortResolutionResult } from "../../types";
+import type { LocalServiceStatus, OperationResult, PortHistorySummary, PortResolutionPlan, PortResolutionResult, PortScanSnapshot } from "../../types";
 
-export function scanPorts(): Promise<PortRecord[]> {
-  return invoke<PortRecord[]>("scan_ports");
+export function scanPorts(force = false, scope: "recommended" | "full" = "recommended"): Promise<PortScanSnapshot> {
+  return invoke<PortScanSnapshot>("scan_ports", { force, scope });
+}
+
+export function enrichPortScan(scanId: string): Promise<PortScanSnapshot> {
+  return invoke<PortScanSnapshot>("enrich_port_scan", { scanId });
+}
+
+export function portScanStatus(): Promise<PortScanSnapshot> {
+  return invoke<PortScanSnapshot>("port_scan_status");
+}
+
+export function cancelPortScan(): Promise<OperationResult> {
+  return invoke<OperationResult>("cancel_port_scan");
 }
 
 export function portHistory(): Promise<PortHistorySummary[]> {
   return invoke<PortHistorySummary[]>("port_history");
 }
 
-export function createPortResolutionPlan(pid: number, port: number): Promise<PortResolutionPlan> {
-  return invoke<PortResolutionPlan>("create_port_resolution_plan", { pid, port });
+export function createPortResolutionPlan(groupId: string): Promise<PortResolutionPlan> {
+  return invoke<PortResolutionPlan>("create_port_resolution_plan", { groupId });
 }
 
 export function executePortResolutionPlan(planId: string, confirmationToken: string): Promise<PortResolutionResult> {

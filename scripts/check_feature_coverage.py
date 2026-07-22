@@ -5,6 +5,7 @@ from acceptance_common import feature_priority, feature_status, iter_features, s
 
 MIN_TOTAL_FEATURES = 20
 REQUIRED_MODES = {"static", "frontend", "safe"}
+INCOMPLETE_RELEASE_STATUSES = {"partial", "backendOnly", "uiOnly", "missing", "manualOnly"}
 
 
 def main() -> int:
@@ -33,6 +34,16 @@ def main() -> int:
             errors.append(f"{feature.get('featureId')}: P0/P1 feature must include static test mode")
         if status not in {"manualOnly", "deferred"} and priority == "P0" and "frontend" not in modes:
             errors.append(f"{feature.get('featureId')}: P0 non-manual feature must include frontend test mode")
+        if priority in {"P0", "P1"} and status in INCOMPLETE_RELEASE_STATUSES:
+            errors.append(
+                f"{feature.get('featureId')}: P0/P1 release feature is {status}; incomplete statuses cannot pass acceptance"
+            )
+        if priority in {"P0", "P1"} and status == "deferred":
+            target_version = str(feature.get("targetVersion") or "")
+            if not target_version.startswith("v1.9"):
+                errors.append(
+                    f"{feature.get('featureId')}: deferred P0/P1 feature must target the explicit v1.9.x follow-up"
+                )
 
     if errors:
         print("Feature coverage check failed.")

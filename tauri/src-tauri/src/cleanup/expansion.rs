@@ -29,7 +29,7 @@ pub fn create_c_drive_expansion_plan() -> Result<ExpansionPlan, String> {
             explanation: "C 盘右侧紧邻未分配空间，满足安全扩展条件；仍需要管理员权限与三次确认。"
                 .to_string(),
         })
-    } else if report.can_delete_empty_adjacent_partition {
+    } else if report.can_delete_empty_adjacent_partition && !report.bitlocker_suspected {
         let adjacent = report.adjacent_right.clone().unwrap_or_default();
         risks.push("将删除 C 盘右侧空分区；仅当确认没有用户文件时才可继续。".to_string());
         Ok(ExpansionPlan {
@@ -70,6 +70,28 @@ pub fn create_c_drive_expansion_plan() -> Result<ExpansionPlan, String> {
             explanation: report.explanation,
         })
     }
+}
+
+fn same_execution_shape(left: &ExpansionPlan, right: &ExpansionPlan) -> bool {
+    left.mode == right.mode
+        && left.can_execute == right.can_execute
+        && left.requires_admin == right.requires_admin
+        && left.estimated_added_bytes == right.estimated_added_bytes
+        && left.commands_preview == right.commands_preview
+        && left.backup_required == right.backup_required
+}
+
+pub fn revalidate_c_drive_expansion_plan(plan: &ExpansionPlan) -> Result<(), String> {
+    if !plan.can_execute {
+        return Err("该扩容计划不可执行，请重新检查分区布局".to_string());
+    }
+    let current = create_c_drive_expansion_plan()?;
+    if !same_execution_shape(plan, &current) {
+        return Err(
+            "分区布局或安全条件在预览后发生变化，已拒绝执行；请重新创建扩容计划".to_string(),
+        );
+    }
+    Ok(())
 }
 
 fn c_drive_totals() -> (u64, u64) {
@@ -230,5 +252,25 @@ mod tests {
         assert_eq!(verified_capacity_growth(100, 100), None);
         assert_eq!(verified_capacity_growth(100, 99), None);
         assert_eq!(verified_capacity_growth(100, 125), Some(25));
+    }
+
+    #[test]
+    fn execution_shape_detects_tampered_diskpart_target() {
+        let plan = ExpansionPlan {
+            mode: "delete_empty_adjacent_partition_then_extend".to_string(),
+            can_execute: true,
+            requires_admin: true,
+            estimated_added_bytes: 1024,
+            commands_preview: vec![
+                "diskpart".to_string(),
+                "select disk 0".to_string(),
+                "select partition 2".to_string(),
+            ],
+            backup_required: true,
+            ..ExpansionPlan::default()
+        };
+        let mut changed = plan.clone();
+        changed.commands_preview[2] = "select partition 3".to_string();
+        assert!(!same_execution_shape(&plan, &changed));
     }
 }

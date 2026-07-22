@@ -168,8 +168,15 @@ def validate_manifest() -> list[str]:
         commands = feature.get("backendCommands")
         if not isinstance(commands, list):
             errors.append(f"{feature_id}: backendCommands must be an array")
-        elif priority == "P0" and not commands and status not in {"uiOnly", "missing", "deferred", "manualOnly"}:
-            errors.append(f"{feature_id}: P0 feature must declare backendCommands unless uiOnly/missing/deferred/manualOnly")
+        elif (
+            priority == "P0"
+            and not commands
+            and feature.get("requiresTauri") is not False
+            and status not in {"missing", "deferred", "manualOnly"}
+        ):
+            errors.append(
+                f"{feature_id}: P0 Tauri feature must declare backendCommands unless missing/deferred/manualOnly"
+            )
 
         checks = feature.get("acceptanceChecks")
         if not isinstance(checks, list) or not checks:

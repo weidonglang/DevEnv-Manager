@@ -13,6 +13,10 @@ export function setAutoCheckUpdate(enabled: boolean): Promise<ConfigView> {
   return invoke<ConfigView>("set_auto_check_update", { enabled });
 }
 
+export function setPortScanPreferences(enabled: boolean, scope: "recommended" | "full"): Promise<ConfigView> {
+  return invoke<ConfigView>("set_port_scan_preferences", { enabled, scope });
+}
+
 export function openAppConfigDir(): Promise<OperationResult> {
   return invoke<OperationResult>("open_app_config_dir");
 }

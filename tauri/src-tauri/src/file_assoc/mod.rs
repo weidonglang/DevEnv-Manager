@@ -1,16 +1,67 @@
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Mutex, OnceLock};
 
 const HIGH_RISK_EXTENSIONS: &[&str] = &[
     ".exe", ".msi", ".reg", ".bat", ".cmd", ".ps1", ".vbs", ".scr",
 ];
 static FILE_ASSOC_ID_COUNTER: AtomicU64 = AtomicU64::new(0);
+static FILE_ASSOCIATION_PLANS: OnceLock<Mutex<HashMap<String, FileAssociationPlan>>> =
+    OnceLock::new();
+const FILE_ASSOCIATION_PLAN_TTL_SECONDS: u64 = 30 * 60;
+const MAX_PENDING_FILE_ASSOCIATION_PLANS: usize = 128;
+
+fn file_association_plan_store() -> &'static Mutex<HashMap<String, FileAssociationPlan>> {
+    FILE_ASSOCIATION_PLANS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn plan_created_at(plan: &FileAssociationPlan) -> Option<u64> {
+    plan.created_at.parse::<u64>().ok()
+}
+
+fn plan_expired(plan: &FileAssociationPlan, now: u64) -> bool {
+    plan_created_at(plan)
+        .is_none_or(|created| created.saturating_add(FILE_ASSOCIATION_PLAN_TTL_SECONDS) < now)
+}
+
+fn store_file_association_plan(plan: &FileAssociationPlan) -> Result<(), String> {
+    let now = current_timestamp().parse::<u64>().unwrap_or_default();
+    let mut store = file_association_plan_store()
+        .lock()
+        .map_err(|_| "文件关联计划存储暂时不可用".to_string())?;
+    store.retain(|_, pending| !plan_expired(pending, now));
+    if store.len() >= MAX_PENDING_FILE_ASSOCIATION_PLANS {
+        return Err("待执行的文件关联计划过多，请完成或等待旧计划过期后重试".to_string());
+    }
+    store.insert(plan.plan_id.clone(), plan.clone());
+    Ok(())
+}
+
+fn consume_file_association_plan(
+    submitted: &FileAssociationPlan,
+) -> Result<FileAssociationPlan, String> {
+    let mut store = file_association_plan_store()
+        .lock()
+        .map_err(|_| "文件关联计划存储暂时不可用".to_string())?;
+    let stored = store
+        .remove(&submitted.plan_id)
+        .ok_or_else(|| "文件关联计划不存在、已执行或已经过期，请重新创建预览".to_string())?;
+    if serde_json::to_value(&stored).ok() != serde_json::to_value(submitted).ok() {
+        store.insert(stored.plan_id.clone(), stored);
+        return Err("文件关联计划内容在预览后发生变化，已拒绝执行".to_string());
+    }
+    let now = current_timestamp().parse::<u64>().unwrap_or_default();
+    if plan_expired(&stored, now) {
+        return Err("文件关联计划已超过 30 分钟，请重新创建预览".to_string());
+    }
+    Ok(stored)
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -390,6 +441,7 @@ pub fn create_file_association_plan_blocking(
         plan_fingerprint: String::new(),
     };
     plan.plan_fingerprint = plan_fingerprint(&plan);
+    store_file_association_plan(&plan)?;
     Ok(plan)
 }
 
@@ -465,8 +517,9 @@ pub fn search_file_association_app_blocking(
 }
 
 pub fn apply_file_association_plan_blocking(
-    plan: FileAssociationPlan,
+    submitted: FileAssociationPlan,
 ) -> Result<FileAssociationApplyResult, String> {
+    let plan = consume_file_association_plan(&submitted)?;
     validate_plan_fingerprint(&plan)?;
     if plan.changes.is_empty() {
         return Err("计划为空，未执行任何修改".to_string());
@@ -1877,5 +1930,54 @@ mod tests {
         assert_eq!(serialized["requiresConfirmationToken"], true);
         plan.target_app_name = "Other".to_string();
         assert!(validate_plan_fingerprint(&plan).is_err());
+    }
+
+    #[test]
+    fn backend_store_rejects_rehashed_tampered_plan_and_consumes_once() {
+        let record = unknown_record(
+            ".devenvplanbinding",
+            ExtensionDefinition {
+                extension: ".devenvplanbinding",
+                category: "fixture",
+                description: "fixture",
+            },
+        );
+        let mut plan = FileAssociationPlan {
+            plan_id: unique_file_assoc_id("file-assoc-binding"),
+            created_at: current_timestamp(),
+            target_app_name: "Fixture App".to_string(),
+            target_executable: "fixture.exe".to_string(),
+            changes: vec![FileAssociationChange {
+                extension: ".devenvplanbinding".to_string(),
+                before: record,
+                after: FileAssociationTarget {
+                    prog_id: "DevEnvManager.Fixture.devenvplanbinding".to_string(),
+                    app_name: "Fixture App".to_string(),
+                    executable: "fixture.exe".to_string(),
+                    command: "\"fixture.exe\" \"%1\"".to_string(),
+                },
+                apply_mode: FileAssociationApplyMode::OpenSystemSettings,
+                risk: FileAssociationRisk::Normal,
+                warnings: Vec::new(),
+            }],
+            backup_path: "fixture.json".to_string(),
+            warnings: Vec::new(),
+            risk_level: "high".to_string(),
+            requires_confirmation_token: true,
+            plan_fingerprint: String::new(),
+        };
+        plan.plan_fingerprint = plan_fingerprint(&plan);
+        store_file_association_plan(&plan).unwrap();
+
+        let mut tampered = plan.clone();
+        tampered.target_executable = "attacker.exe".to_string();
+        tampered.plan_fingerprint = plan_fingerprint(&tampered);
+        assert!(validate_plan_fingerprint(&tampered).is_ok());
+        assert!(consume_file_association_plan(&tampered).is_err());
+        assert_eq!(
+            consume_file_association_plan(&plan).unwrap().plan_id,
+            plan.plan_id
+        );
+        assert!(consume_file_association_plan(&plan).is_err());
     }
 }

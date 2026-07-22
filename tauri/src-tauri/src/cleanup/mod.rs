@@ -16,6 +16,7 @@ mod model;
 mod move_plan;
 mod partition;
 mod protect;
+mod recycle_bin;
 mod report;
 mod rollback;
 mod safe_clean;
@@ -35,19 +36,23 @@ pub(crate) use dev_cache::clean_dev_cache_isolated;
 pub use disk::inspect_disk_overview;
 pub use downloads::inspect_downloads;
 pub use duplicates::scan_duplicate_large_files_with_progress;
-pub use expansion::{create_c_drive_expansion_plan, execute_c_drive_expansion};
+pub use expansion::{
+    create_c_drive_expansion_plan, execute_c_drive_expansion, revalidate_c_drive_expansion_plan,
+};
 pub use large_files::scan_large_files_with_progress;
-pub use migration::execute_move_plan;
 #[cfg(feature = "acceptance-fixtures")]
 pub(crate) use migration::execute_isolated_move_plan;
+pub use migration::execute_move_plan;
 pub use model::{
     AppUsageReport, CleanupPlan, CleanupResult, CleanupScanReport, DiskVolumeInfo, DuplicateGroup,
     ExpansionPlan, ExpansionResult, FolderUsageReport, InstalledSoftwareUsage, LargeFileItem,
-    MaintenanceOverview, MovePlan, MoveResult, PartitionLayoutReport, RollbackRecord,
+    MaintenanceOverview, MovePlan, MoveResult, PartitionLayoutReport, RecycleBinCleanupPlan,
+    RecycleBinCleanupResult, RecycleBinReport, RollbackRecord,
 };
 pub use move_plan::{
-    create_desktop_archive_plan, create_downloads_archive_plan, create_junction_bridge_plan,
-    create_move_plan, execute_desktop_archive_plan, execute_downloads_archive_plan,
+    create_desktop_archive_plan, create_desktop_cleanup_plan, create_downloads_archive_plan,
+    create_junction_bridge_plan, create_move_plan, execute_desktop_archive_plan,
+    execute_desktop_cleanup_plan, execute_downloads_archive_plan,
 };
 pub use partition::inspect_partition_layout;
 #[allow(unused_imports)]
@@ -55,11 +60,14 @@ pub use protect::{
     classify_path_risk, is_inside_managed_runtime, is_inside_user_profile, is_protected_path,
     should_skip_path, CleanRisk,
 };
+pub use recycle_bin::{
+    create_recycle_bin_cleanup_plan, execute_recycle_bin_cleanup_plan, inspect_recycle_bin,
+};
 pub use report::inspect_maintenance_overview;
 pub use rollback::{list_rollback_records, rollback_move};
-pub use safe_clean::{clean_managed_download_cache, clean_selected_targets};
 #[cfg(feature = "acceptance-fixtures")]
 pub(crate) use safe_clean::clean_managed_download_cache_isolated;
+pub use safe_clean::{clean_managed_download_cache, clean_selected_targets};
 pub use scan::scan_cleanup_targets;
 pub use software::inspect_installed_software_usage;
 

@@ -8,8 +8,10 @@
   --border: #344157;
   --accent: #60a5fa;
   --accent-strong: #93c5fd;
+  --accent-foreground: #07111f;
   --hover: #223553;
   --danger: #f87171;
+  --danger-foreground: #160707;
   --warning: #fbbf24;
   --success: #4ade80;
 }
