@@ -1,64 +1,87 @@
 # DevEnv Manager v1.8.3 Release Candidate Review
 
-Status: **BLOCKED - do not publish**
+Status: **GO for PR review and merge; not published yet**
 
-This document records the current v1.8.3 candidate evidence without changing the public stable channel. `README.md`, `update-manifest.json`, and `update-manifest.cn.json` remain on v1.8.2 until every release gate below passes.
+The public stable channel remains on v1.8.2 until PR #135 is merged, the target-branch CI passes, and the GitHub/Gitee release and online update checks complete. The exact application source and validated local assets below are pinned to commit `152a6d8fbb44d7502b163c2db5eecd89719c7bcc`.
 
-## Scope
+## User Notice
 
-v1.8.3 is a focused hotfix for duplicate visible port groups, service-host identity evidence, archive target selection, Recycle Bin preview/cleanup, Dark and High Contrast readability, and backend text localization. Runtime redesign and Profile history remain separately tracked for v1.9.0.
+We apologize for the port-scan timeouts, duplicate IPv4/IPv6 rows, unreadable Dark/High Contrast cleanup cards, manual archive-path entry, incomplete Recycle Bin feedback, and mixed-language backend text that remained after v1.8.2. These problems should have been caught before users had to report them. v1.8.3 is a focused corrective release; the larger Runtime redesign remains isolated in #130 for v1.9.0.
 
-## Completed Code Gates
+## Scope Delivered
 
-- Candidate metadata: package, Cargo, and Tauri versions are aligned at `1.8.3`.
-- Public stable metadata: remains aligned at `1.8.2`.
-- Rust: 202 passed, 0 failed.
+- Port scanning now uses a bounded quick snapshot plus asynchronous enrichment, single-flight execution, caching, last-success fallback, force refresh, cancellation, and structured source diagnostics.
+- Equivalent IPv4/IPv6 bindings and duplicate source records render as one stable group without losing endpoint evidence.
+- Process identity uses executable, service, path, command line, parent, metadata, publisher, and port evidence. Service-owned and protected Windows targets remain outside ordinary force-kill actions.
+- Desktop archive uses recommended volumes or a directory picker, then plan, token, copy/hash verification, receipt, rollback, and partial-failure restoration.
+- Recycle Bin cleanup has a separate snapshot, volume selection, plan/token execution, post-clean rescan, and durable result/error area. A terminal `ERROR_FILE_NOT_FOUND` is accepted only when the authoritative rescan proves the selected scope is empty and every planned item disappeared.
+- Cleanup cards use theme tokens and remain readable in Light, Dark, System, and High Contrast layouts.
+- English UI output routes additional cleanup, archive, environment, and verification backend text through the localization adapter.
+- Visual acceptance is time-bounded and reports each case, preventing a stalled Edge probe from hanging CI indefinitely.
+
+## Automated Gates
+
+- Rust tests: 204 passed, 0 failed.
 - Clippy: `cargo clippy --locked --all-targets -- -D warnings` passed.
 - Formatting: `cargo fmt --all -- --check` passed.
-- Frontend production build: 113 modules built.
-- Frontend acceptance: service selection, toolchain actions, port grouping, cleanup workflow, and 228 selectors passed.
-- Static acceptance: 69 total, 66 passed, 0 failed, 2 deferred, 1 manual.
+- Frontend production build passed.
+- Frontend acceptance found 228 stable selectors.
+- Static acceptance: 69 total, 66 passed, 0 failed, 2 safely skipped, 1 manual/deferred.
 - Safe acceptance: 212 total, 167 passed, 0 failed, 38 safely skipped, 7 manual/deferred.
-- Aggregate acceptance: 283 total, 235 passed, 0 failed, 40 safely skipped, 8 manual/deferred.
-- Current feature inventory: 46 features; 43 implemented, 2 explicitly deferred, 1 manual-only; no `partial`, `backendOnly`, `uiOnly`, or `missing` feature.
-- Backend/UI drift, frontend data/action/quality/i18n, toast-only, Tauri command, repository hygiene, safety wording, and release consistency checks passed.
-- Isolated capability fixtures: 14/14 passed.
-- Automated visual acceptance: 30/30 passed twice after the new baseline was generated; the matrix covers Light, Dark, System, High Contrast, English/Chinese, compact/wide layouts, and high DPI.
-- Local installer build: fresh x64 MSI and NSIS bundles were generated on 2026-07-22 from the current candidate tree.
+- Frontend mode: 2 passed, 0 failed.
+- Aggregate report: 283 total, 235 passed, 0 failed, 40 safely skipped, 8 manual/deferred.
+- Automated visual acceptance: 30/30 passed across Light, Dark, System, High Contrast, Chinese/English, compact/wide, and high-DPI cases.
+- Backend/UI drift, frontend data/action/quality/i18n, toast-only, Tauri command, repository hygiene, safety wording, release consistency, and process-identity catalog checks passed.
+- GitHub Actions run `29921296085` passed for exact HEAD `152a6d8`.
 
-The 40 skipped cases are commands that require a running Tauri backend, app-specific token/state, or an installed Windows mutation boundary. They are not counted as passed. The eight manual/deferred records include the v1.9.0 Runtime redesign, Profile history storage, P2 advanced-mode visual policy, and destructive installed-app paths that must be covered by the release candidate gates below.
+The 40 skipped records require a real Tauri process, installed Windows state, privileged/destructive mutation, or another explicitly unavailable boundary; none is counted as passed. The eight manual/deferred records include the v1.9.0 Runtime redesign, Profile history storage, advanced-mode policy, and final publication/online-channel checks. They do not remove or weaken a v1.8.3 feature assertion.
 
-## Release Blockers
+## Exact Asset Identity
 
-1. **Installed lifecycle evidence is pending.** Fresh NSIS and MSI install/start/uninstall, v1.8.2 to v1.8.3 upgrade, settings/Profile retention, and final clean-state checks must run against the exact final assets.
-2. **ReleaseLab functional evidence is pending.** Disposable dual-stack ports, archive/rollback, and Recycle Bin plan/token/execute/rescan must run in an isolated Windows VM. No test may empty the host user's real Recycle Bin.
-3. **Repository/CI/review gates are pending.** The work is not committed, pushed, or validated by latest-head GitHub CI. Independent code and release-asset review has not completed.
-4. **Final asset identity is pending.** The hashes below identify the current local candidate only. Assets must be rebuilt from the reviewed commit and pass installed/online verification before publication.
+| Bundle | File | Size | SHA256 | Signature |
+|---|---|---:|---|---|
+| NSIS | `DevEnv Manager_1.8.3_x64-setup.exe` | 2,836,506 bytes | `aecafb9614179bbb480e6315f9903b9c228ce71669136a0ef40e1d12305466a6` | NotSigned |
+| MSI | `DevEnv Manager_1.8.3_x64_en-US.msi` | 5,058,560 bytes | `4b90b271b93620ebb66eb25ce46bfd815a7ddcc392a03c67849590ec6fd06452` | NotSigned |
+| App EXE | `dailytools-tauri.exe` | 6,722,560 bytes | `ce01955c5d2ebe006904ec3fd0ca000c05872acee2fbcb6835da825141df90a5` | NotSigned |
 
-## Current Local Candidate Assets
+The files are x64 and report product version 1.8.3 where the format exposes product-version metadata. They are local validated candidates, not online release assets yet. Earlier v1.8.3 candidate hashes are superseded and must not be uploaded.
 
-These files are eligible for the next isolated validation step but are not yet publishable final assets.
+## Installed ReleaseLab Evidence
 
-| Bundle | File | Size | SHA256 |
-|---|---|---:|---|
-| NSIS | `DevEnv Manager_1.8.3_x64-setup.exe` | 2,836,271 bytes | `7c8c318bb02463af19bc2d65dee4afa109e64ffdc03d4d38113ba511cb0724e4` |
-| MSI | `DevEnv Manager_1.8.3_x64_en-US.msi` | 5,058,560 bytes | `23da9345c0b046ae0389b58befff41edaa3e8ffc7c58e94194ee9239b1f423ec` |
+The exact assets above were tested in `DevEnv-Manager-ReleaseLab-2` under local administrator `DEVENV\ReleaseLabAdmin`:
 
-## Deferred Non-v1.8.3 Scope
+- Fresh NSIS install, launch, About 1.8.3, no global error, no blank toast, uninstall, and configuration retention passed.
+- Fresh MSI install, launch, About 1.8.3, ProductCode `{358FD189-5D64-4664-8D01-0E70B17D3AAA}`, uninstall, and configuration retention passed.
+- v1.8.2 to v1.8.3 upgrade passed with settings and `ReleaseLab-v1.8.3-Upgrade-Profile` visible and hash-preserved.
+- A 120-listener dual-stack load produced 240 sockets without timeout. Ports 5432, 5173, and 8080 each rendered as one IPv4+IPv6 group with PostgreSQL, Node.js, and Java identity evidence.
+- Desktop analyze, select, plan, execute, hash verification, rollback, and source restoration passed.
+- A disposable E: Recycle Bin fixture completed preview, plan, token, execution, authoritative rescan, zero remaining items, and source removal with no persistent error.
+- Six exact-HEAD screenshots and all 13 functional assertions passed, including Dark/High Contrast card geometry.
+- Final cleanup left zero app registrations, app/test processes, and ReleaseLab scheduled tasks. Relevant application error events were zero.
+- Settings SHA256 remained `6ba5fc215ab0d4ce08ece1d5c8835d57248cb6f4dec3b7e0d2dd5cfd73cd4e9d`; Profile SHA256 remained `44f68bda7bdd4299ab5761547a304fdbb8768438ba7c388bb80a8202cab7a00a`.
+- The Guest test root was removed and the dedicated 1 GiB VHD was detached.
 
-- `runtime.v19.fullRedesign`: tracked by #130 for v1.9.0.
-- `profiles.historyRestore`: requires Profile schema v2 and durable backend history storage for v1.9.0.
-- `advanced.mode`: P2 visual/policy follow-up; it cannot replace the v1.8.3 automated visual gate.
+Raw evidence is retained under the Git-ignored `artifacts/release-lab/v1.8.3/152a6d8/` directory. `installed-lifecycle.json`, `functional-validation.json`, and `final-cleanup.json` identify the exact source commit and preserve the detailed machine evidence.
 
-## Required Order
+## Non-Blocking Disclosures
 
-1. Generate fresh v1.8.3 MSI and NSIS assets from the reviewed candidate.
-2. Run automated visual acceptance and approve a new screenshot baseline.
-3. Run isolated ReleaseLab port, archive/rollback, and Recycle Bin evidence.
-4. Run NSIS/MSI lifecycle and v1.8.2 upgrade/retention tests using the exact assets.
-5. Record final sizes and SHA256 values; verify the workspace contains no unintended files.
-6. Commit and push the candidate, then require latest-head GitHub CI to pass.
-7. Perform independent code, evidence, metadata, and asset review.
-8. Only after a GO decision: merge, re-check target-branch CI, build/verify final assets from the merged commit, tag `v1.8.3`, publish GitHub and Gitee releases, switch stable manifests, verify online hashes, and run update-channel smoke.
+- The local bundles are not Authenticode-signed, matching the current project distribution model. Users may receive the normal Windows trust warning.
+- `PendingFileRenameOperations` contains only Microsoft Edge update paths and repeated `~nsu1.tmp` cleanup paths created by the isolated install/uninstall loop. There are zero unclassified entries, no remaining DevEnv Manager registration/process, and no related application error event.
+- `runtime.v19.fullRedesign`, `profiles.historyRestore`, and `advanced.mode` remain explicitly deferred. Their issues must stay open.
 
-Until all release blockers are cleared, v1.8.2 remains the public stable version and v1.8.3 must not be tagged or published.
+## Review Decision
+
+No application, installer, acceptance, CI, or ReleaseLab blocker remains for moving PR #135 from Draft to review and merge. Publication is not authorized by this document alone: the remaining operations are repository and online-release gates.
+
+Required order:
+
+1. Commit this evidence update and require latest-head PR CI to pass.
+2. Perform an independent code, security-boundary, evidence, metadata, and asset review.
+3. Mark PR #135 ready and merge it only after that review is GO.
+4. Require the target `main` CI to pass.
+5. Pin the validated NSIS/MSI identities, create and push tag `v1.8.3`, and create the GitHub Release.
+6. Upload only the reviewed NSIS/MSI assets and verify online size/SHA256.
+7. Create/synchronize the Gitee Release and verify its online size/SHA256.
+8. Switch `README.md`, `CHANGELOG.md`, `update-manifest.json`, and `update-manifest.cn.json` from v1.8.2 to the verified v1.8.3 URLs and SHA256 values.
+9. Run an update-channel smoke from v1.8.2 against GitHub and Gitee.
+10. Close #134 only after both platforms and the update channel pass; keep #130 and other deferred tracking issues open.
