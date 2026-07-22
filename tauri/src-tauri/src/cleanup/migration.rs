@@ -88,18 +88,67 @@ fn validate_new_move_target(target: &Path) -> Result<(), String> {
     Ok(())
 }
 
+pub(crate) fn validate_archive_target_boundary(target: &Path) -> Result<(), String> {
+    let target_text = normalized(target);
+    let bytes = target_text.as_bytes();
+    let drive_absolute =
+        bytes.len() >= 3 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':' && bytes[2] == b'\\';
+    let unc = target_text.starts_with("\\\\")
+        && !target_text.starts_with("\\\\?\\")
+        && !target_text.starts_with("\\\\.\\");
+    if !drive_absolute && !unc {
+        return Err("归档目标必须是绝对 Windows 路径".to_string());
+    }
+    if target_text.starts_with("c:\\") {
+        return Err("归档目标不能位于系统 C 盘".to_string());
+    }
+    if target
+        .ancestors()
+        .any(|path| path.exists() && path_is_reparse_point(path))
+    {
+        return Err("归档目标路径包含符号链接、Junction 或重解析点".to_string());
+    }
+    let existing_target_ancestor = target
+        .ancestors()
+        .find(|path| path.exists())
+        .ok_or_else(|| "无法解析归档目标所在卷".to_string())?;
+    let resolved_target_ancestor = existing_target_ancestor
+        .canonicalize()
+        .map_err(|error| format!("无法解析归档目标边界：{error}"))?;
+    if normalized(&resolved_target_ancestor).starts_with("c:\\") {
+        return Err("归档目标解析后位于系统 C 盘".to_string());
+    }
+    Ok(())
+}
+
 pub(crate) fn target_root_for_drive(target_drive: &str, category: &str) -> Result<PathBuf, String> {
-    let drive = target_drive
+    let selection = target_drive
         .trim()
         .trim_end_matches('\\')
         .trim_end_matches('/');
-    if drive.is_empty() {
+    if selection.is_empty() || selection.contains('\0') || selection.chars().any(char::is_control) {
         return Err("请选择目标盘或目标目录".to_string());
     }
-    let root = if drive.ends_with(':') {
-        PathBuf::from(format!(r"{drive}\DevEnvArchive\{category}"))
+    let bytes = selection.as_bytes();
+    let drive_only = bytes.len() == 2 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':';
+    let drive_absolute = bytes.len() >= 3
+        && bytes[0].is_ascii_alphabetic()
+        && bytes[1] == b':'
+        && matches!(bytes[2], b'\\' | b'/');
+    let unc = selection.starts_with("\\\\")
+        && !selection.starts_with("\\\\?\\")
+        && !selection.starts_with("\\\\.\\");
+    let root = if drive_only {
+        PathBuf::from(format!(
+            r"{}:\DevEnvArchive\{category}",
+            (bytes[0] as char).to_ascii_uppercase()
+        ))
+    } else if drive_absolute || unc {
+        PathBuf::from(selection)
+            .join("DevEnvArchive")
+            .join(category)
     } else {
-        PathBuf::from(drive).join("DevEnvArchive").join(category)
+        return Err("目标目录必须是绝对 Windows 路径".to_string());
     };
     if normalized(&root).starts_with("c:\\") {
         return Err("目标位置不能在 C 盘；空间搬家必须释放 C 盘空间".to_string());
@@ -362,22 +411,7 @@ fn archive_selected_files(
     target: &Path,
     selected_items: &[MovePlanItem],
 ) -> Result<(u64, usize, Vec<String>, Vec<MoveReceipt>), String> {
-    let existing_target_ancestor = target
-        .ancestors()
-        .find(|path| path.exists())
-        .ok_or_else(|| "无法解析归档目标所在卷".to_string())?;
-    if target
-        .ancestors()
-        .any(|path| path.exists() && path_is_reparse_point(path))
-    {
-        return Err("归档目标路径包含符号链接、Junction 或重解析点".to_string());
-    }
-    let resolved_target_ancestor = existing_target_ancestor
-        .canonicalize()
-        .map_err(|error| format!("无法解析归档目标边界：{error}"))?;
-    if normalized(&resolved_target_ancestor).starts_with("c:\\") {
-        return Err("归档目标解析后位于系统 C 盘".to_string());
-    }
+    validate_archive_target_boundary(target)?;
     let mut moved_bytes = 0_u64;
     let mut receipts = Vec::new();
     let mut failures = Vec::new();
@@ -549,6 +583,11 @@ where
 
     let rollback_id = format!("rollback-{}", &path_id(&plan.mode, &source)[..16]);
     if matches!(plan.mode.as_str(), "archive_only" | "desktop_archive") {
+        if let Err(error) = validate_archive_target_boundary(&target) {
+            result.failures.push(error);
+            result.report_markdown = move_report(&plan, &result);
+            return result;
+        }
         match archive_files(&source, &target, &plan.selected_items) {
             Ok((bytes, items, failures, receipts)) => {
                 result.success = failures.is_empty();
@@ -781,6 +820,10 @@ mod tests {
     fn target_drive_rejects_c_drive() {
         assert!(target_root_for_drive("C:", "Downloads").is_err());
         assert!(target_root_for_drive("D:", "Downloads").is_ok());
+        assert!(target_root_for_drive(r"D:\ReleaseLab\Archive", "Downloads").is_ok());
+        assert!(target_root_for_drive("relative-folder", "Downloads").is_err());
+        assert!(target_root_for_drive(r"D:relative-folder", "Downloads").is_err());
+        assert!(target_root_for_drive(r"\\?\D:\Archive", "Downloads").is_err());
     }
 
     #[test]

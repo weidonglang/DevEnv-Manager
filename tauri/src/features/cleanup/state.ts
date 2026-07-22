@@ -1,4 +1,4 @@
-import type { AppUsageReport, ArchivePlanItem, CleanupArchitecture, CleanupPlan, CleanupResult, CleanupScanReport, DiskVolumeInfo, DuplicateGroup, ExpansionPlan, ExpansionResult, FolderUsageReport, GenericArchivePlan, GenericArchiveResult, LargeFileItem, MaintenanceOverview, MovePlan, MoveResult, PartitionLayoutReport, RollbackRecord } from "../../types";
+import type { AppUsageReport, ArchivePlanItem, CleanupArchitecture, CleanupPlan, CleanupResult, CleanupScanReport, DiskVolumeInfo, DuplicateGroup, ExpansionPlan, ExpansionResult, FolderUsageReport, GenericArchivePlan, GenericArchiveResult, LargeFileItem, MaintenanceOverview, MovePlan, MoveResult, PartitionLayoutReport, RecycleBinCleanupPlan, RecycleBinCleanupResult, RecycleBinReport, RollbackRecord } from "../../types";
 
 export type DuplicateScanStatus = "notStarted" | "running" | "completedWithResults" | "completedEmpty" | "failed";
 
@@ -36,8 +36,15 @@ export type CleanupWorkbenchState = {
   desktopSelectedPaths: string[];
   desktopTargetDrive: string;
   desktopRecoveryResult: string;
+  desktopWorkflowNotice: string;
+  recycleBin: RecycleBinReport | null;
+  recycleBinSelectedDrives: string[];
+  recycleBinPlan: RecycleBinCleanupPlan | null;
+  recycleBinResult: RecycleBinCleanupResult | null;
+  recycleBinOperationMessage: string;
   downloadsArchivePlan: MovePlan | null;
   downloadsArchiveResult: MoveResult | null;
+  downloadsTargetDrive: string;
   appUsage: AppUsageReport | null;
   archiveItems: ArchivePlanItem[];
   archivePlan: GenericArchivePlan | null;
@@ -61,7 +68,7 @@ export const cleanupWorkbenchInitialState: CleanupWorkbenchState = {
   movePlan: null,
   moveOperationResult: "",
   moveSource: "",
-  moveTargetDrive: "D",
+  moveTargetDrive: "",
   moveMode: "archive",
   expansionPlan: null,
   expansionResult: null,
@@ -82,17 +89,24 @@ export const cleanupWorkbenchInitialState: CleanupWorkbenchState = {
   desktopCleanupPlan: null,
   desktopCleanupResult: null,
   desktopSelectedPaths: [],
-  desktopTargetDrive: "D",
+  desktopTargetDrive: "",
   desktopRecoveryResult: "",
+  desktopWorkflowNotice: "",
+  recycleBin: null,
+  recycleBinSelectedDrives: [],
+  recycleBinPlan: null,
+  recycleBinResult: null,
+  recycleBinOperationMessage: "",
   downloadsArchivePlan: null,
   downloadsArchiveResult: null,
+  downloadsTargetDrive: "",
   appUsage: null,
   archiveItems: [],
   archivePlan: null,
   archiveResult: null,
   archiveSource: "",
   archiveSourceLabel: "manual selection",
-  archiveTargetDrive: "D",
+  archiveTargetDrive: "",
   rollbackRecords: [],
   selectedIds: [],
   errors: {},

@@ -42,6 +42,10 @@ jobs:
         working-directory: tauri/src-tauri
         run: cargo test --all-targets
 
+      - name: Rust formatting
+        working-directory: tauri/src-tauri
+        run: cargo fmt --all -- --check
+
       - name: Rust clippy
         working-directory: tauri/src-tauri
         run: cargo clippy --all-targets -- -D warnings
@@ -64,6 +68,10 @@ jobs:
       - name: Feature acceptance (frontend)
         run: python scripts/run_feature_acceptance.py --mode frontend
 
+      - name: Visual acceptance (Edge)
+        working-directory: tauri
+        run: npm run acceptance:visual
+
       - name: Feature acceptance (report)
         run: python scripts/run_feature_acceptance.py --mode report
 
@@ -80,3 +88,4 @@ jobs:
             artifacts/feature-acceptance-report.md
             artifacts/manual-smoke-checklist.md
             artifacts/isolated-evidence/**
+            artifacts/visual-acceptance/**

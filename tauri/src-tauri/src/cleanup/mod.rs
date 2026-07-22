@@ -16,6 +16,7 @@ mod model;
 mod move_plan;
 mod partition;
 mod protect;
+mod recycle_bin;
 mod report;
 mod rollback;
 mod safe_clean;
@@ -43,7 +44,8 @@ pub use migration::execute_move_plan;
 pub use model::{
     AppUsageReport, CleanupPlan, CleanupResult, CleanupScanReport, DiskVolumeInfo, DuplicateGroup,
     ExpansionPlan, ExpansionResult, FolderUsageReport, InstalledSoftwareUsage, LargeFileItem,
-    MaintenanceOverview, MovePlan, MoveResult, PartitionLayoutReport, RollbackRecord,
+    MaintenanceOverview, MovePlan, MoveResult, PartitionLayoutReport, RecycleBinCleanupPlan,
+    RecycleBinCleanupResult, RecycleBinReport, RollbackRecord,
 };
 pub use move_plan::{
     create_desktop_archive_plan, create_desktop_cleanup_plan, create_downloads_archive_plan,
@@ -55,6 +57,9 @@ pub use partition::inspect_partition_layout;
 pub use protect::{
     classify_path_risk, is_inside_managed_runtime, is_inside_user_profile, is_protected_path,
     should_skip_path, CleanRisk,
+};
+pub use recycle_bin::{
+    create_recycle_bin_cleanup_plan, execute_recycle_bin_cleanup_plan, inspect_recycle_bin,
 };
 pub use report::inspect_maintenance_overview;
 pub use rollback::{list_rollback_records, rollback_move};

@@ -269,6 +269,19 @@ export type PortRecord = {
   serviceDisplayNames: string[];
   serviceStates: string[];
   serviceStartModes: string[];
+  serviceDetails: Array<{
+    name: string;
+    displayName: string;
+    state: string;
+    startMode: string;
+    processId: number;
+    serviceType: string;
+    description: string;
+    pathName: string;
+    serviceHostGroup: string;
+    serviceDll: string;
+    coreWindowsService: boolean;
+  }>;
   bindings: Array<{ localAddress: string; localEndpoint: string; remoteEndpoint: string; state: string }>;
   bindingCount: number;
   remoteConnectionCount: number;
@@ -1206,7 +1219,67 @@ export type DiskVolumeInfo = {
   usedBytes: number;
   usedPercent: number;
   fileSystem?: string;
+  diskKind: string;
+  removable: boolean;
+  readOnly: boolean;
+  systemVolume: boolean;
+  archiveTargetEligible: boolean;
+  archiveTargetReason: string;
   risk: string;
+};
+
+export type RecycleBinItem = {
+  id: string;
+  name: string;
+  originalPath: string;
+  recyclePath: string;
+  sourceDrive: string;
+  size: number;
+  deletedAt: string;
+  recoverable: boolean;
+};
+
+export type RecycleBinVolumeSummary = {
+  drive: string;
+  itemCount: number;
+  totalBytes: number;
+  recoverableCount: number;
+};
+
+export type RecycleBinReport = {
+  generatedAt: string;
+  itemCount: number;
+  totalBytes: number;
+  recoverableCount: number;
+  items: RecycleBinItem[];
+  volumes: RecycleBinVolumeSummary[];
+  warnings: string[];
+};
+
+export type RecycleBinCleanupPlan = {
+  planId: string;
+  createdAt: string;
+  selectedDrives: string[];
+  itemIds: string[];
+  itemCount: number;
+  estimatedBytes: number;
+  snapshotFingerprint: string;
+  riskLevel: "critical";
+  warnings: string[];
+};
+
+export type RecycleBinCleanupResult = {
+  planId: string;
+  success: boolean;
+  beforeItemCount: number;
+  beforeBytes: number;
+  afterItemCount: number;
+  afterBytes: number;
+  cleanedItems: number;
+  cleanedBytes: number;
+  selectedDrives: string[];
+  failures: string[];
+  message: string;
 };
 
 export type MaintenanceOverview = {

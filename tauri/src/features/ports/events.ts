@@ -1,9 +1,17 @@
 import type { FeatureContext } from "../../app/featureContext";
+import { logDebug } from "../../core/debugLog";
 import type { PortRecord } from "../../types";
 import { localize, t } from "../../core/i18n";
 import { bindAction } from "../sharedView";
 import { createPortResolutionPlan, enrichPortScan, executePortResolutionPlan, inspectLocalServices, portHistory, scanPorts } from "./api";
 import { assessPortTreatability, portRecordKey, selectedPortRecord } from "./portSafety";
+import {
+  arePortRecordsOperationallyCompatible,
+  isCurrentPortGeneration,
+  normalizePortRecords,
+  portVisualOperationKey,
+  type PortSnapshotStage,
+} from "./portGroups";
 import { renderPortsTable, renderPortsWorkbench } from "./render";
 import type { PortsWorkbenchState } from "./state";
 
@@ -76,15 +84,18 @@ export function bindPortEvents(context: FeatureContext, state: PortsWorkbenchSta
       });
       state.executionResult = result as PortsWorkbenchState["executionResult"];
       state.plan = null;
+      const generation = ++state.scanGeneration;
       try {
         const verification = await scanPorts(true, state.scanScope);
-        applySnapshot(state, verification);
+        if (!context.isCurrent() || !acceptGeneration(state, generation, "verification")) return;
+        applySnapshot(state, verification, generation, "verification");
         if (state.selectedKey && !selectedPortRecord(state.records, state.selectedKey)) {
           state.selectedKey = null;
           state.selectedPort = null;
         }
         state.scanError = "";
       } catch (error) {
+        if (!context.isCurrent() || !acceptGeneration(state, generation, "verification")) return;
         state.scanError = `${localize("Port verification refresh unavailable", "端口验证刷新不可用")}：${errorMessage(error)}`;
       }
     } catch (error) {
@@ -143,6 +154,7 @@ export function bindPortEvents(context: FeatureContext, state: PortsWorkbenchSta
 }
 
 export async function refreshPorts(context: FeatureContext, state: PortsWorkbenchState, force = false): Promise<void> {
+  const generation = ++state.scanGeneration;
   state.snapshot = state.snapshot ? { ...state.snapshot, status: "scanning" } : null;
   state.scanError = "";
   if (context.isCurrent()) {
@@ -150,9 +162,9 @@ export async function refreshPorts(context: FeatureContext, state: PortsWorkbenc
     bindPortEvents(context, state);
   }
   const [snapshot, history] = await Promise.allSettled([scanPorts(force, state.scanScope), portHistory()]);
-  if (!context.isCurrent()) return;
+  if (!context.isCurrent() || !acceptGeneration(state, generation, "quick")) return;
   if (snapshot.status === "fulfilled") {
-    applySnapshot(state, snapshot.value);
+    applySnapshot(state, snapshot.value, generation, snapshot.value.cached ? "cache" : "quick");
     state.page = 1;
     if (state.selectedKey && !selectedPortRecord(state.records, state.selectedKey)) {
       state.selectedKey = null;
@@ -175,37 +187,97 @@ export async function refreshPorts(context: FeatureContext, state: PortsWorkbenc
   if (snapshot.status === "fulfilled" && snapshot.value.scanId && !snapshot.value.complete && snapshot.value.status !== "failed") {
     try {
       const enriched = await enrichPortScan(snapshot.value.scanId);
-      if (!context.isCurrent()) return;
-      applySnapshot(state, enriched);
+      if (!context.isCurrent() || !acceptGeneration(state, generation, "enrichment")) return;
+      if (state.snapshot?.scanId !== enriched.scanId) {
+        logDebug({
+          type: "invoke",
+          name: "port-snapshot-scan-id-mismatch",
+          view: "ports",
+          status: "staleIgnored",
+          detail: "Ignored enrichment for a superseded port scan.",
+          data: { generation, activeScanId: state.snapshot?.scanId, resultScanId: enriched.scanId },
+        });
+        return;
+      }
+      applySnapshot(state, enriched, generation, "enrichment");
       context.root.innerHTML = renderPortsWorkbench(state);
       bindPortEvents(context, state);
     } catch {
-      if (!context.isCurrent()) return;
+      if (!context.isCurrent() || !acceptGeneration(state, generation, "enrichment")) return;
       state.scanError ||= localize("Process details could not be enriched; the port snapshot remains available.", "进程详情补充失败，端口快照仍可使用。");
     }
   }
 
   try {
-    state.services = await inspectLocalServices();
+    const services = await inspectLocalServices();
+    if (!context.isCurrent() || !acceptGeneration(state, generation, "enrichment")) return;
+    state.services = services;
     state.servicesError = "";
   } catch {
+    if (!context.isCurrent() || !acceptGeneration(state, generation, "enrichment")) return;
     state.servicesError = localize("Local service details are temporarily unavailable.", "本地服务详情暂时不可用。");
   }
-  if (!context.isCurrent()) return;
   context.root.innerHTML = renderPortsWorkbench(state);
   bindPortEvents(context, state);
 }
 
-function applySnapshot(state: PortsWorkbenchState, snapshot: PortsWorkbenchState["snapshot"]): void {
+function applySnapshot(
+  state: PortsWorkbenchState,
+  snapshot: PortsWorkbenchState["snapshot"],
+  generation: number,
+  stage: PortSnapshotStage,
+): void {
   if (!snapshot) return;
-  state.snapshot = snapshot;
+  const previousSelection = selectedPortRecord(state.records, state.selectedKey);
+  const normalized = normalizePortRecords(snapshot.records, {
+    source: snapshot.source,
+    generation,
+    cached: snapshot.cached,
+    stage,
+  });
+  state.groupDiagnostics = [...normalized.diagnostics, ...state.groupDiagnostics].slice(0, 40);
+  normalized.diagnostics.forEach((diagnostic) => {
+    logDebug({
+      type: "error",
+      name: diagnostic.type,
+      view: "ports",
+      status: "info",
+      detail: diagnostic.merged
+        ? "Merged duplicate-compatible visible port groups before rendering."
+        : "Kept visually similar port groups separate because owner identity differs.",
+      data: diagnostic,
+    });
+  });
+  state.snapshot = { ...snapshot, records: normalized.records };
   state.scanScope = snapshot.scope;
-  if (snapshot.records.length || snapshot.status !== "failed") state.records = snapshot.records;
+  if (normalized.records.length || snapshot.status !== "failed") state.records = normalized.records;
+  if (state.selectedKey && !selectedPortRecord(state.records, state.selectedKey) && previousSelection) {
+    const equivalent = state.records.find((record) =>
+      portVisualOperationKey(record) === portVisualOperationKey(previousSelection)
+      && arePortRecordsOperationallyCompatible(record, previousSelection));
+    if (equivalent) {
+      state.selectedKey = equivalent.groupId;
+      state.selectedPort = equivalent.localPort;
+    }
+  }
   state.scanError = snapshot.status === "failed"
     ? localize("Port scanning timed out or failed. Retry or export diagnostics.", "端口扫描超时或失败，可以重试或导出诊断。")
     : snapshot.status === "stale"
       ? localize("Port scanning failed; the last successful result is retained.", "端口扫描失败，已保留上次成功结果。")
       : "";
+}
+
+function acceptGeneration(state: PortsWorkbenchState, generation: number, stage: PortSnapshotStage): boolean {
+  if (isCurrentPortGeneration(state.scanGeneration, generation)) return true;
+  logDebug({
+    type: "invoke",
+    name: "port-snapshot-generation",
+    view: "ports",
+    status: "staleIgnored",
+    detail: "Ignored a stale port snapshot generation.",
+    data: { stage, resultGeneration: generation, activeGeneration: state.scanGeneration },
+  });
+  return false;
 }
 
 function updatePortsTable(context: FeatureContext, state: PortsWorkbenchState): void {

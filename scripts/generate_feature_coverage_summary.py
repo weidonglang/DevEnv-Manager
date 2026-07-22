@@ -73,6 +73,7 @@ def render_blockers(manifest: dict) -> str:
         "|---|---|---|---|---|---|",
     ]
     blockers = []
+    future_items = []
     for page, feature in iter_features(manifest):
         priority = feature_priority(page, feature)
         status = feature_status(feature)
@@ -81,11 +82,25 @@ def render_blockers(manifest: dict) -> str:
         if status in {"implemented"}:
             continue
         reason = feature.get("expectedFailureReason") or feature.get("deferredReason") or feature.get("manualOnlyReason") or f"status={status}"
+        if status == "deferred" and str(feature.get("targetVersion") or "").startswith("v1.9"):
+            future_items.append((priority, status, feature_domain(page, feature), feature_id(feature), reason, feature.get("targetVersion")))
+            continue
         next_step = "Implement UI wiring and durable result/error/debug/report surfaces." if status in {"backendOnly", "missing", "partial"} else "Keep tracked with reason."
         blockers.append((priority, status, feature_domain(page, feature), feature_id(feature), reason, next_step))
     for row in blockers:
         lines.append("| " + " | ".join(str(item).replace("|", "/") for item in row) + " |")
     if not blockers:
+        lines.append("| - | - | - | - | None | - |")
+    lines.extend([
+        "",
+        "## Future Tracked Items",
+        "",
+        "| Priority | Status | Domain | Feature | Reason | Target |",
+        "|---|---|---|---|---|---|",
+    ])
+    for row in future_items:
+        lines.append("| " + " | ".join(str(item).replace("|", "/") for item in row) + " |")
+    if not future_items:
         lines.append("| - | - | - | - | None | - |")
     return "\n".join(lines) + "\n"
 

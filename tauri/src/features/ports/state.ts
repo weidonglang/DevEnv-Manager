@@ -1,4 +1,5 @@
 import type { LocalServiceStatus, PortHistorySummary, PortRecord, PortResolutionPlan, PortResolutionResult, PortScanSnapshot } from "../../types";
+import type { PortGroupDiagnostic } from "./portGroups";
 
 export type PortsWorkbenchState = {
   records: PortRecord[];
@@ -17,6 +18,8 @@ export type PortsWorkbenchState = {
   planError: string;
   diagnosticsResult: string;
   retryPlanRequest: { groupId: string; pid: number; port: number } | null;
+  scanGeneration: number;
+  groupDiagnostics: PortGroupDiagnostic[];
   page: number;
 };
 
@@ -37,5 +40,7 @@ export const portsWorkbenchInitialState: PortsWorkbenchState = {
   planError: "",
   diagnosticsResult: "",
   retryPlanRequest: null,
+  scanGeneration: 0,
+  groupDiagnostics: [],
   page: 1,
 };

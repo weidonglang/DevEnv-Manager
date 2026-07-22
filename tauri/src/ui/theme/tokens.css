@@ -6,7 +6,9 @@
   --color-text-muted: var(--muted, #637083);
   --color-border: var(--border, #d7dde8);
   --color-accent: var(--accent, #2563eb);
+  --color-accent-foreground: var(--accent-foreground, #ffffff);
   --color-danger: var(--danger, #b42318);
+  --color-danger-foreground: var(--danger-foreground, #ffffff);
   --color-warning: var(--warning, #b45309);
   --color-success: var(--success, #15803d);
   --radius-card: 8px;
@@ -79,7 +81,7 @@ button:disabled {
 .primary {
   border-color: var(--color-accent);
   background: var(--color-accent);
-  color: #ffffff;
+  color: var(--color-accent-foreground);
 }
 
 .button--danger,
@@ -87,7 +89,7 @@ button:disabled {
 .danger-button {
   border-color: var(--color-danger);
   background: var(--color-danger);
-  color: #ffffff;
+  color: var(--color-danger-foreground);
 }
 
 .button--secondary,
@@ -135,7 +137,7 @@ button:disabled {
 
 .brand-mark {
   background: var(--color-accent);
-  color: #ffffff;
+  color: var(--color-accent-foreground);
 }
 
 .brand span {
@@ -493,7 +495,7 @@ button:disabled {
 }
 
 .risk-ux__panel button.danger {
-  color: #ffffff;
+  color: var(--color-danger-foreground);
 }
 
 .risk-section ul {

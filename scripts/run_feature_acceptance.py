@@ -106,9 +106,20 @@ def static_cases() -> list[Case]:
         status = feature_status(feature)
         case_status = "passed"
         reason = f"Manifest status recorded as {status}."
-        if priority == "P0" and status in {"backendOnly", "missing", "deferred"}:
+        if status == "deferred":
+            case_status = "skipped"
+            reason = feature.get("deferredReason") or "Feature is explicitly deferred to a future release."
+        elif status == "manualOnly":
+            case_status = "manual"
+            reason = feature.get("manualOnlyReason") or "Feature requires manual acceptance."
+        elif priority in {"P0", "P1"} and status in {
+            "partial",
+            "backendOnly",
+            "uiOnly",
+            "missing",
+        }:
             case_status = "failed"
-            reason = f"P0 feature is {status} and must not be treated as implemented."
+            reason = f"P0/P1 feature is {status} and must not be treated as implemented."
         cases.append(Case(f"{feature_id(feature)}.manifest", "static", page.get("pageId", ""), feature_id(feature), priority, case_status, reason))
     return cases
 
@@ -201,8 +212,24 @@ def frontend_cases() -> list[Case]:
 
 def report_cases() -> list[Case]:
     cases: list[Case] = []
-    for path in sorted(ARTIFACTS.glob("feature-acceptance-*.json")):
-        if path.name == REPORT_JSON.name:
+    required_reports = [
+        ARTIFACTS / "feature-acceptance-static.json",
+        ARTIFACTS / "feature-acceptance-safe.json",
+        ARTIFACTS / "feature-acceptance-frontend.json",
+    ]
+    for path in required_reports:
+        if not path.exists():
+            cases.append(
+                Case(
+                    f"report.missing.{path.stem.removeprefix('feature-acceptance-')}",
+                    "report",
+                    "cross-cutting",
+                    "report",
+                    "P0",
+                    "failed",
+                    f"Required current acceptance input is missing: {path.name}",
+                )
+            )
             continue
         data = json.loads(path.read_text(encoding="utf-8"))
         for item in data.get("cases", []):

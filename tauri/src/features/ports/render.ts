@@ -113,7 +113,7 @@ function renderPortRow(record: PortRecord, selectedKey: string | null): string {
   const selected = key === selectedKey;
   const treatability = assessPortTreatability(record);
   const friendlyName = localize(record.friendlyNameEn, record.friendlyNameZh);
-  return `<div class="data-row ${selected ? "is-selected" : ""}" data-testid="ports-row">
+  return `<div class="data-row ${selected ? "is-selected" : ""}" data-testid="ports-row" data-port-group-id="${escapeHtml(record.groupId)}" data-port-visual-key="${escapeHtml(`${record.protocol}:${record.localPort}:${record.pid}:${record.state}`)}">
     <span><button data-port-select="${escapeHtml(key)}" type="button" aria-pressed="${selected ? "true" : "false"}">${selected ? t("feature.ports.selectedRow") : t("feature.ports.select")}</button></span>
     <span>${escapeHtml(String(record.localPort))}</span><span>${escapeHtml(record.protocol)}</span><span>${escapeHtml(record.state)}</span>
     <span>${escapeHtml(String(record.pid))}</span><span>${escapeHtml(friendlyName)}</span><span>${escapeHtml(record.processName || t("state.notAvailable"))}</span>
@@ -150,6 +150,7 @@ function renderSelectedPortDetail(state: PortsWorkbenchState): string {
       ${detailRow(t("feature.ports.treatable"), treatability.treatable ? t("state.yes") : t("state.no"))}
       ${detailRow(t("feature.ports.recommendation"), localize(selected.recommendationEn, selected.recommendationZh) || selected.explanation || t("state.notAvailable"))}
     </dl>
+    ${renderServiceDetails(selected)}
     ${renderBindings(selected)}
     <div data-testid="ports-source-evidence">
       ${renderList(localize("Scan sources", "扫描来源"), selected.scanSources.map((source) => `${source.source} / ${new Date(source.scannedAt * 1000).toLocaleString()} / ${source.recordCount}${source.fallback ? ` / ${localize("fallback", "回退来源")}` : ""}`))}
@@ -195,6 +196,20 @@ function detailRow(label: string, value: string): string {
 
 function renderList(title: string, items: string[]): string {
   return `<div class="small-note"><strong>${escapeHtml(title)}</strong><ul>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul></div>`;
+}
+
+function renderServiceDetails(record: PortRecord): string {
+  if (!record.serviceDetails.length) {
+    if (!record.processName.toLowerCase().includes("svchost")) return "";
+    return `<div class="small-note" data-testid="ports-service-host-unresolved"><strong>${localize("Windows Service Host", "Windows 服务宿主")}</strong><p>${localize("The specific hosted service could not be resolved. This owner remains protected and cannot use ordinary process termination.", "具体宿主服务未解析；该占用方仍受保护，不能使用普通进程结束操作。")}</p></div>`;
+  }
+  return `<div class="table-wrap" data-testid="ports-service-details"><table><thead><tr><th>${localize("Service", "服务")}</th><th>${localize("State / start", "状态/启动")}</th><th>${localize("Type / host group", "类型/宿主组")}</th><th>${localize("Description", "说明")}</th><th>${localize("Service DLL", "服务 DLL")}</th></tr></thead><tbody>${record.serviceDetails.map((service) => `<tr>
+    <td><strong>${escapeHtml(service.displayName || service.name)}</strong><small>${escapeHtml(service.name)} / PID ${service.processId}${service.coreWindowsService ? ` / ${localize("Windows system path", "Windows 系统路径")}` : ""}</small></td>
+    <td>${escapeHtml([service.state, service.startMode].filter(Boolean).join(" / ") || t("state.notAvailable"))}</td>
+    <td>${escapeHtml([service.serviceType, service.serviceHostGroup ? `-k ${service.serviceHostGroup}` : ""].filter(Boolean).join(" / ") || t("state.notAvailable"))}</td>
+    <td>${escapeHtml(service.description || t("state.notAvailable"))}</td>
+    <td title="${escapeHtml(service.pathName)}">${escapeHtml(service.serviceDll || service.pathName || t("state.notAvailable"))}</td>
+  </tr>`).join("")}</tbody></table></div>`;
 }
 
 function bindingSummary(record: PortRecord): string {

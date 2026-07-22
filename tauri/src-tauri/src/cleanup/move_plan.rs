@@ -1,6 +1,7 @@
 use super::downloads::classify_file_type;
 use super::migration::{
     ensure_movable_source, execute_desktop_recycle_plan, execute_move_plan, target_root_for_drive,
+    validate_archive_target_boundary,
 };
 use super::model::{MovePlan, MovePlanItem, MoveResult};
 use super::protect::{is_inside_root, is_sensitive_account_data};
@@ -159,6 +160,9 @@ fn build_desktop_items(
 
 fn plan_for_source(source: &Path, target: PathBuf, mode: &str) -> Result<MovePlan, String> {
     let mut warnings = ensure_movable_source(source, mode)?;
+    if mode == "archive_only" {
+        validate_archive_target_boundary(&target)?;
+    }
     let (bytes, items, truncated) = directory_size_filtered(source, |_| false);
     if truncated {
         warnings.push("目录较大，估算可能被截断；执行前会重新校验".to_string());
@@ -217,6 +221,7 @@ pub fn create_desktop_archive_plan(
 ) -> Result<MovePlan, String> {
     let desktop = dirs::desktop_dir().ok_or_else(|| "无法识别桌面目录".to_string())?;
     let target = target_root_for_drive(&target_drive, "DesktopArchive")?;
+    validate_archive_target_boundary(&target)?;
     let selected_items = build_desktop_items(&desktop, &target, selected_paths)?;
     Ok(MovePlan {
         plan_id: unique_id("desktop-archive"),

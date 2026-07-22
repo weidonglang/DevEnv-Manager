@@ -424,6 +424,7 @@ struct PortRecord {
     service_display_names: Vec<String>,
     service_states: Vec<String>,
     service_start_modes: Vec<String>,
+    service_details: Vec<PortServiceDetail>,
     bindings: Vec<port_scan::PortBinding>,
     binding_count: usize,
     remote_connection_count: usize,
@@ -450,6 +451,22 @@ struct PortRecord {
     recommendation_en: String,
     evidence: Vec<String>,
     conflict_evidence: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+struct PortServiceDetail {
+    name: String,
+    display_name: String,
+    state: String,
+    start_mode: String,
+    process_id: u32,
+    service_type: String,
+    description: String,
+    path_name: String,
+    service_host_group: String,
+    service_dll: String,
+    core_windows_service: bool,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -1288,6 +1305,8 @@ static DOCTOR_REPAIR_PLANS: OnceLock<Mutex<HashMap<String, PendingDoctorRepairPl
     OnceLock::new();
 static GENERIC_ARCHIVE_PLANS: OnceLock<Mutex<HashMap<String, GenericArchivePlan>>> =
     OnceLock::new();
+static RECYCLE_BIN_CLEANUP_PLANS: OnceLock<Mutex<HashMap<String, cleanup::RecycleBinCleanupPlan>>> =
+    OnceLock::new();
 
 fn confirmation_tokens() -> &'static Mutex<HashMap<String, ConfirmationToken>> {
     CONFIRMATION_TOKENS.get_or_init(|| Mutex::new(HashMap::new()))
@@ -1303,6 +1322,10 @@ fn profile_apply_plans() -> &'static Mutex<HashMap<String, PendingProfileApplyPl
 
 fn doctor_repair_plans() -> &'static Mutex<HashMap<String, PendingDoctorRepairPlan>> {
     DOCTOR_REPAIR_PLANS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn recycle_bin_cleanup_plans() -> &'static Mutex<HashMap<String, cleanup::RecycleBinCleanupPlan>> {
+    RECYCLE_BIN_CLEANUP_PLANS.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
 const RISK_OPERATION_REGISTRY: &[RiskOperationSpec] = &[
@@ -1563,6 +1586,15 @@ const RISK_OPERATION_REGISTRY: &[RiskOperationSpec] = &[
         description: "将用户所选桌面文件移动到 Windows 回收站",
     },
     RiskOperationSpec {
+        command: "execute_recycle_bin_cleanup_plan",
+        action_id: "execute_recycle_bin_cleanup_plan",
+        risk_level: "critical",
+        requires_backup: false,
+        requires_token: true,
+        description:
+            "Permanently empty selected Windows Recycle Bin source volumes after a snapshot recheck",
+    },
+    RiskOperationSpec {
         command: "execute_generic_archive_plan",
         action_id: "execute_generic_archive_plan",
         risk_level: "high",
@@ -1584,7 +1616,7 @@ const RISK_OPERATION_REGISTRY: &[RiskOperationSpec] = &[
         risk_level: "medium",
         requires_backup: false,
         requires_token: true,
-        description: "鎵ц宸查瑙堢殑瀹夊叏娓呯悊璁″垝",
+        description: "执行已预览的安全清理计划",
     },
     RiskOperationSpec {
         command: "clear_download_cache",
@@ -2654,6 +2686,62 @@ async fn execute_desktop_cleanup_plan(
             confirmation_token,
         )?;
         Ok(cleanup::execute_desktop_cleanup_plan(plan))
+    })
+    .await?
+}
+
+#[tauri::command]
+async fn inspect_recycle_bin() -> Result<cleanup::RecycleBinReport, String> {
+    run_blocking(cleanup::inspect_recycle_bin).await?
+}
+
+#[tauri::command]
+async fn create_recycle_bin_cleanup_plan(
+    selected_drives: Vec<String>,
+) -> Result<cleanup::RecycleBinCleanupPlan, String> {
+    run_blocking(move || {
+        let plan = cleanup::create_recycle_bin_cleanup_plan(selected_drives)?;
+        let mut store = recycle_bin_cleanup_plans()
+            .lock()
+            .map_err(|_| "Recycle Bin cleanup plan storage is unavailable".to_string())?;
+        store.clear();
+        store.insert(plan.plan_id.clone(), plan.clone());
+        Ok(plan)
+    })
+    .await?
+}
+
+#[tauri::command]
+async fn execute_recycle_bin_cleanup_plan(
+    plan_id: String,
+    confirmation_token: Option<String>,
+) -> Result<cleanup::RecycleBinCleanupResult, String> {
+    run_blocking(move || {
+        {
+            let store = recycle_bin_cleanup_plans()
+                .lock()
+                .map_err(|_| "Recycle Bin cleanup plan storage is unavailable".to_string())?;
+            if !store.contains_key(&plan_id) {
+                return Err(
+                    "Recycle Bin cleanup plan does not exist, was replaced, or was already used"
+                        .to_string(),
+                );
+            }
+        }
+        require_risk_operation_token(
+            "execute_recycle_bin_cleanup_plan",
+            &plan_id,
+            confirmation_token,
+        )?;
+        let plan = recycle_bin_cleanup_plans()
+            .lock()
+            .map_err(|_| "Recycle Bin cleanup plan storage is unavailable".to_string())?
+            .remove(&plan_id)
+            .ok_or_else(|| {
+                "Recycle Bin cleanup plan does not exist, was replaced, or was already used"
+                    .to_string()
+            })?;
+        cleanup::execute_recycle_bin_cleanup_plan(plan)
     })
     .await?
 }
@@ -5206,6 +5294,7 @@ fn build_quick_port_record(
         service_display_names: Vec::new(),
         service_states: Vec::new(),
         service_start_modes: Vec::new(),
+        service_details: Vec::new(),
         bindings,
         binding_count: group.binding_count,
         remote_connection_count: group.remote_connection_count,
@@ -5316,12 +5405,14 @@ fn enrich_port_record(
         &identity.display_name_zh,
         &service_display_names,
         &service_names,
+        "Windows 服务宿主，具体服务未解析",
     );
     let friendly_name_en = service_host_friendly_name(
         &identity.identity_id,
         &identity.display_name_en,
         &service_display_names,
         &service_names,
+        "Windows Service Host (specific service unresolved)",
     );
     record.process_start_time = details.process_start_time;
     record.process_name = process_name;
@@ -5352,6 +5443,22 @@ fn enrich_port_record(
         .iter()
         .map(|service| service.start_mode.clone())
         .filter(|value| !value.trim().is_empty())
+        .collect();
+    record.service_details = service_items
+        .iter()
+        .map(|service| PortServiceDetail {
+            name: service.name.clone(),
+            display_name: service.display_name.clone(),
+            state: service.state.clone(),
+            start_mode: service.start_mode.clone(),
+            process_id: service.process_id,
+            service_type: service.service_type.clone(),
+            description: service.description.clone(),
+            path_name: service.path_name.clone(),
+            service_host_group: service.service_host_group.clone(),
+            service_dll: service.service_dll.clone(),
+            core_windows_service: service.core_windows_service,
+        })
         .collect();
     record.common_usage = identity.display_name_zh.clone();
     record.explanation = identity_explanation(&identity);
@@ -6440,19 +6547,33 @@ fn validate_generic_archive_source(path: &str) -> Result<(PathBuf, u64), String>
     Ok((candidate, metadata.len()))
 }
 
-fn generic_archive_target_root(target_drive: &str) -> Result<PathBuf, String> {
-    let drive = target_drive.trim().trim_end_matches([':', '\\', '/']);
-    if drive.len() != 1 || !drive.as_bytes()[0].is_ascii_alphabetic() {
-        return Err("Archive target must be a drive letter such as D".to_string());
+fn generic_archive_target_root(target_selection: &str) -> Result<PathBuf, String> {
+    let selection = target_selection.trim().trim_end_matches(['\\', '/']);
+    if selection.is_empty() || selection.contains('\0') || selection.chars().any(char::is_control) {
+        return Err("Choose a valid archive target drive or directory".to_string());
     }
-    let drive = drive.to_ascii_uppercase();
-    if drive == "C" {
-        return Err("Generic archive target must not be the system C drive".to_string());
+    let drive = selection.trim_end_matches(':');
+    let base = if drive.len() == 1 && drive.as_bytes()[0].is_ascii_alphabetic() {
+        PathBuf::from(format!("{}:\\DevEnvArchive", drive.to_ascii_uppercase()))
+    } else {
+        let bytes = selection.as_bytes();
+        let drive_absolute = bytes.len() >= 3
+            && bytes[0].is_ascii_alphabetic()
+            && bytes[1] == b':'
+            && matches!(bytes[2], b'\\' | b'/');
+        let unc = selection.starts_with("\\\\")
+            && !selection.starts_with("\\\\?\\")
+            && !selection.starts_with("\\\\.\\");
+        if !drive_absolute && !unc {
+            return Err("Archive target directory must be an absolute Windows path".to_string());
+        }
+        PathBuf::from(selection).join("DevEnvArchive")
+    };
+    let target = base.join(format!("Selected-{}", filename_timestamp()));
+    if path_key(&display_path(&target)).starts_with("c:\\") {
+        return Err("Generic archive target must not be on the system C drive".to_string());
     }
-    Ok(PathBuf::from(format!(
-        "{drive}:\\DevEnvArchive\\Selected-{}",
-        filename_timestamp()
-    )))
+    Ok(target)
 }
 
 fn path_is_reparse_point(path: &Path) -> bool {
@@ -6472,7 +6593,7 @@ fn path_is_reparse_point(path: &Path) -> bool {
     false
 }
 
-fn validate_archive_target_boundary(target_root: &Path) -> Result<PathBuf, String> {
+fn validate_archive_target_ancestor(target_root: &Path) -> Result<(), String> {
     let mut cursor = Some(target_root);
     while let Some(path) = cursor {
         if path.exists() && path_is_reparse_point(path) {
@@ -6483,6 +6604,21 @@ fn validate_archive_target_boundary(target_root: &Path) -> Result<PathBuf, Strin
         }
         cursor = path.parent();
     }
+    let existing_ancestor = target_root
+        .ancestors()
+        .find(|path| path.exists())
+        .ok_or_else(|| "Archive target volume or parent directory is unavailable".to_string())?;
+    let canonical_ancestor = existing_ancestor
+        .canonicalize()
+        .map_err(|error| format!("Cannot resolve archive target parent: {error}"))?;
+    if path_key(&display_path(&canonical_ancestor)).starts_with("c:\\") {
+        return Err("Archive target resolved onto the system C drive".to_string());
+    }
+    Ok(())
+}
+
+fn validate_archive_target_boundary(target_root: &Path) -> Result<PathBuf, String> {
+    validate_archive_target_ancestor(target_root)?;
     fs::create_dir_all(target_root)
         .map_err(|error| format!("Cannot create archive target: {error}"))?;
     let canonical = target_root
@@ -6562,10 +6698,9 @@ fn build_generic_archive_plan(
 #[tauri::command]
 fn create_generic_archive_plan(target_drive: String) -> Result<GenericArchivePlan, String> {
     let paths = load_paths()?;
-    let plan = build_generic_archive_plan(
-        load_archive_plan(&paths)?,
-        generic_archive_target_root(&target_drive)?,
-    )?;
+    let target_root = generic_archive_target_root(&target_drive)?;
+    validate_archive_target_ancestor(&target_root)?;
+    let plan = build_generic_archive_plan(load_archive_plan(&paths)?, target_root)?;
     let mut store = generic_archive_plan_store()
         .lock()
         .map_err(|_| "Generic archive plan storage is unavailable".to_string())?;
@@ -11785,6 +11920,9 @@ pub fn run() {
             execute_desktop_archive_plan,
             create_desktop_cleanup_plan,
             execute_desktop_cleanup_plan,
+            inspect_recycle_bin,
+            create_recycle_bin_cleanup_plan,
+            execute_recycle_bin_cleanup_plan,
             open_recycle_bin,
             create_downloads_archive_plan,
             execute_downloads_archive_plan,
@@ -14348,6 +14486,18 @@ struct WindowsServiceIdentity {
     start_mode: String,
     #[serde(default)]
     process_id: u32,
+    #[serde(default)]
+    service_type: String,
+    #[serde(default)]
+    description: String,
+    #[serde(default)]
+    path_name: String,
+    #[serde(default)]
+    service_host_group: String,
+    #[serde(default)]
+    service_dll: String,
+    #[serde(default)]
+    core_windows_service: bool,
 }
 
 fn process_details(system: &sysinfo::System, pid: u32) -> ProcessDetails {
@@ -14380,7 +14530,30 @@ fn windows_service_map() -> std::collections::HashMap<u32, Vec<WindowsServiceIde
     #[cfg(windows)]
     {
         let script = r#"$items = @(Get-CimInstance Win32_Service -ErrorAction Stop | Where-Object { $_.ProcessId -gt 0 } | ForEach-Object {
-  [pscustomobject]@{ Name=[string]$_.Name; DisplayName=[string]$_.DisplayName; State=[string]$_.State; StartMode=[string]$_.StartMode; ProcessId=[int]$_.ProcessId }
+  $pathName = [Environment]::ExpandEnvironmentVariables([string]$_.PathName)
+  $serviceDll = ''
+  try {
+    $parameters = Get-ItemProperty -LiteralPath (\"Registry::HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Services\\$($_.Name)\\Parameters\") -ErrorAction Stop
+    $serviceDll = [Environment]::ExpandEnvironmentVariables([string]$parameters.ServiceDll)
+  } catch {}
+  $hostGroup = ''
+  $match = [regex]::Match($pathName, '(?i)(?:^|\\s)-k\\s+([^\\s]+)')
+  if ($match.Success) { $hostGroup = [string]$match.Groups[1].Value }
+  $windowsRoot = [IO.Path]::GetFullPath($env:SystemRoot).TrimEnd('\\')
+  $corePath = @($pathName, $serviceDll) | Where-Object { $_ -and $_.StartsWith($windowsRoot, [StringComparison]::OrdinalIgnoreCase) }
+  [pscustomobject]@{
+    Name=[string]$_.Name
+    DisplayName=[string]$_.DisplayName
+    State=[string]$_.State
+    StartMode=[string]$_.StartMode
+    ProcessId=[int]$_.ProcessId
+    ServiceType=[string]$_.ServiceType
+    Description=[string]$_.Description
+    PathName=$pathName
+    ServiceHostGroup=$hostGroup
+    ServiceDll=$serviceDll
+    CoreWindowsService=[bool]$corePath
+  }
 })
 @($items) | ConvertTo-Json -Compress -Depth 3"#;
         if let Ok(output) = powershell_runner::run_powershell_script(script, Vec::new(), 6) {
@@ -14630,6 +14803,7 @@ fn service_host_friendly_name(
     fallback: &str,
     display_names: &[String],
     service_names: &[String],
+    unresolved: &str,
 ) -> String {
     if identity_id != "windows-service-host" {
         return fallback.to_string();
@@ -14640,7 +14814,7 @@ fn service_host_friendly_name(
         display_names
     };
     if labels.is_empty() {
-        fallback.to_string()
+        unresolved.to_string()
     } else {
         format!("{}: {}", fallback, labels.join(" / "))
     }
@@ -17593,6 +17767,28 @@ mod tests {
     }
 
     #[test]
+    fn generic_archive_target_accepts_drive_or_absolute_folder_and_rejects_unsafe_inputs() {
+        let drive_target = generic_archive_target_root("d:\\").unwrap();
+        assert!(display_path(&drive_target)
+            .to_ascii_lowercase()
+            .contains("d:\\devenvarchive"));
+        assert!(drive_target
+            .file_name()
+            .and_then(|value| value.to_str())
+            .is_some_and(|value| value.starts_with("Selected-")));
+
+        let folder_target = generic_archive_target_root(r"D:\ReleaseLab\ArchiveTarget").unwrap();
+        let folder_display = display_path(folder_target).to_ascii_lowercase();
+        assert!(folder_display.contains(r"d:\releaselab\archivetarget"));
+        assert!(folder_display.contains("devenvarchive"));
+
+        assert!(generic_archive_target_root("C:").is_err());
+        assert!(generic_archive_target_root(r"C:\ReleaseLab\ArchiveTarget").is_err());
+        assert!(generic_archive_target_root("relative-folder").is_err());
+        assert!(generic_archive_target_root(r"\\?\D:\ArchiveTarget").is_err());
+    }
+
+    #[test]
     fn generic_archive_moves_and_verifies_only_fixture_file() {
         let source_root = tempfile::tempdir().unwrap();
         let target_root = tempfile::tempdir_in(env::current_dir().unwrap()).unwrap();
@@ -17716,5 +17912,29 @@ mod tests {
         fs::write(&executable, b"test").unwrap();
         let command = format!("\"{}\" --service", executable.display());
         assert_eq!(service_executable_path(&command).unwrap(), executable);
+    }
+
+    #[test]
+    fn service_host_name_distinguishes_resolved_and_unresolved_owners() {
+        assert_eq!(
+            service_host_friendly_name(
+                "windows-service-host",
+                "Windows Service Host",
+                &["IKE and AuthIP IPsec Keying Modules".to_string()],
+                &["IKEEXT".to_string()],
+                "Windows Service Host (specific service unresolved)",
+            ),
+            "Windows Service Host: IKE and AuthIP IPsec Keying Modules"
+        );
+        assert_eq!(
+            service_host_friendly_name(
+                "windows-service-host",
+                "Windows Service Host",
+                &[],
+                &[],
+                "Windows Service Host (specific service unresolved)",
+            ),
+            "Windows Service Host (specific service unresolved)"
+        );
     }
 }

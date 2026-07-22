@@ -1,9 +1,31 @@
 import { formatBytes } from "../../core/format";
-import type { CleanupCandidate, DiskVolumeInfo, DuplicateGroup, FolderUsageReport, LargeFileItem, MovePlan, MoveResult } from "../../types";
+import type { CleanupCandidate, DiskVolumeInfo, DuplicateGroup, FolderUsageReport, LargeFileItem, MovePlan, MoveResult, RecycleBinItem, RecycleBinVolumeSummary } from "../../types";
 import { escapeHtml, pageItems, renderActionButton, renderBadge, renderEmptyState, renderMetric, renderObjectTable, renderPagination, valueOf } from "../sharedView";
 import { localize, t } from "../../core/i18n";
 import { renderFeatureGuide } from "../../components/featureGuide";
+import { eligibleArchiveTargets, isDriveRootSelection, targetMatchesVolume } from "./archiveTargets";
 import type { CleanupWorkbenchState } from "./state";
+
+const archiveTargetSelectors = {
+  generic: {
+    picker: "cleanup-generic-archive-target-picker",
+    select: "cleanup-generic-archive-target-select",
+    recommendedAction: "use-recommended-generic-archive-target",
+    chooseAction: "choose-generic-archive-target",
+  },
+  desktop: {
+    picker: "cleanup-desktop-archive-target-picker",
+    select: "cleanup-desktop-archive-target-select",
+    recommendedAction: "use-recommended-desktop-archive-target",
+    chooseAction: "choose-desktop-archive-target",
+  },
+  downloads: {
+    picker: "cleanup-downloads-archive-target-picker",
+    select: "cleanup-downloads-archive-target-select",
+    recommendedAction: "use-recommended-downloads-archive-target",
+    chooseAction: "choose-downloads-archive-target",
+  },
+} as const;
 
 export function renderCleanupWorkbench(state: CleanupWorkbenchState): string {
   const selected = selectedCleanableCandidates(state);
@@ -48,6 +70,7 @@ export function renderCleanupWorkbench(state: CleanupWorkbenchState): string {
       ${renderGenericArchive(state)}
       ${renderDuplicateFiles(state)}
       ${renderDesktopArchiveSection(state)}
+      ${renderRecycleBinManagement(state)}
       ${renderDownloadsArchiveSection(state)}
       ${renderCleanupReport(state)}
       ${renderLargeFiles(state)}
@@ -154,8 +177,8 @@ function renderGenericArchive(state: CleanupWorkbenchState): string {
     <div class="form-grid">
       <input id="cleanup-archive-source" value="${escapeHtml(state.archiveSource)}" readonly placeholder="${localize("Choose an allowed file", "选择允许的文件")}" />
       <input id="cleanup-archive-source-label" value="${escapeHtml(state.archiveSourceLabel)}" placeholder="${localize("Evidence/source label", "证据或来源标签")}" />
-      <input id="cleanup-archive-target-drive" value="${escapeHtml(state.archiveTargetDrive)}" placeholder="${localize("Target drive, for example D", "目标驱动器，例如 D")}" />
     </div>
+    ${renderArchiveTargetPicker(state, "generic", "cleanup-archive-target-drive", state.archiveTargetDrive)}
     <div class="toolbar">
       ${renderActionButton("choose-archive-file", localize("Choose file", "选择文件"))}
       ${renderActionButton("add-archive-plan-item", localize("Add to archive list", "添加到归档列表"))}
@@ -275,7 +298,7 @@ function renderDesktopArchiveSection(state: CleanupWorkbenchState): string {
       <div class="desktop-operation-section" data-testid="cleanup-desktop-archive-plan-section">
         <h3>${localize("Archive selected files", "归档所选文件")}</h3>
         <p>${localize("Copies to a non-system drive, verifies SHA-256, then removes the source. Existing files are never overwritten.", "复制到非系统盘、校验 SHA-256 后再移除源文件，绝不覆盖现有文件。")}</p>
-        <label>${localize("Target drive", "目标盘符")}<input id="cleanup-desktop-target-drive" value="${escapeHtml(state.desktopTargetDrive)}" placeholder="D" maxlength="3" /></label>
+        ${renderArchiveTargetPicker(state, "desktop", "cleanup-desktop-target-drive", state.desktopTargetDrive)}
         <div class="toolbar">
           ${renderActionButton("create-desktop-archive-plan", localize("Create archive preview", "创建归档预览"))}
           ${renderActionButton("execute-desktop-archive-plan", localize("Execute archive", "执行归档"), "danger")}
@@ -283,10 +306,11 @@ function renderDesktopArchiveSection(state: CleanupWorkbenchState): string {
         </div>
         <div data-testid="cleanup-desktop-archive-plan-result">${state.desktopArchivePlan ? renderArchivePlan(state.desktopArchivePlan) : renderEmptyState(localize("No archive preview", "尚无归档预览"), localize("Select files and create a preview before execution.", "勾选文件并在执行前创建预览。"))}</div>
         <div data-testid="cleanup-desktop-archive-execute-result">${state.desktopArchiveResult ? renderMoveResult(state.desktopArchiveResult) : renderEmptyState(localize("No archive result", "尚无归档结果"), localize("Verified receipts and failures appear here.", "校验回执和失败原因会显示在这里。"))}</div>
+        ${state.desktopWorkflowNotice ? `<div class="small-note" data-testid="cleanup-desktop-workflow-notice"><strong>${localize("Next step", "下一步")}</strong><p>${escapeHtml(state.desktopWorkflowNotice)}</p></div>` : ""}
       </div>
       <div class="desktop-operation-section" data-testid="cleanup-desktop-recycle-section">
         <h3>${localize("Move selected files to Recycle Bin", "将所选文件移入回收站")}</h3>
-        <p>${localize("Uses the Windows Recycle Bin only. Permanent deletion is not available in this workflow.", "只使用 Windows 回收站；此流程不提供永久删除。")}</p>
+        <p>${localize("Alternative to archive: moves the currently selected Desktop files to Windows Recycle Bin. Files already archived do not need this step. Permanent deletion is not available here.", "这是归档的替代操作：把当前勾选的桌面文件移入 Windows 回收站。已成功归档的文件不需要再执行此步骤；这里不提供永久删除。")}</p>
         <div class="toolbar">
           ${renderActionButton("create-desktop-cleanup-plan", localize("Create Recycle Bin preview", "创建回收站预览"))}
           ${renderActionButton("execute-desktop-cleanup-plan", localize("Move to Recycle Bin", "移入回收站"), "danger")}
@@ -300,6 +324,85 @@ function renderDesktopArchiveSection(state: CleanupWorkbenchState): string {
     ${state.errors.desktopRecovery ? `<p class="error-text" data-testid="cleanup-desktop-recovery-error">${escapeHtml(state.errors.desktopRecovery)}</p>` : ""}
     <div data-testid="cleanup-desktop-archive-rollback" class="small-note"><strong>${localize("Recovery", "恢复")}</strong><p>${escapeHtml(state.desktopRecoveryResult || localize("Archived files can be restored by their hash-verified rollback receipt. Recycled files are restored from Windows Recycle Bin.", "归档文件可通过哈希校验的回滚回执恢复；回收站文件请从 Windows 回收站还原。"))}</p></div>
   </section>`;
+}
+
+function renderRecycleBinManagement(state: CleanupWorkbenchState): string {
+  const report = state.recycleBin;
+  const selected = new Set(state.recycleBinSelectedDrives);
+  const plan = state.recycleBinPlan;
+  const result = state.recycleBinResult;
+  return `<section class="panel" data-testid="cleanup-recycle-bin-section">
+    <div class="panel-head"><div><h2>${localize("Windows Recycle Bin", "Windows 回收站")}</h2><p>${localize("Read the current user's Recycle Bin, select source volumes, review a snapshot, then confirm permanent volume-scoped cleanup. Nothing is selected by default.", "读取当前用户的回收站，选择来源卷并检查快照后，再确认按卷永久清理；默认不选择任何卷。")}</p></div></div>
+    <div class="toolbar">
+      ${renderActionButton("refresh-recycle-bin", localize("Refresh preview", "刷新预览"), "primary")}
+      ${renderActionButton("create-recycle-bin-cleanup-plan", localize("Create cleanup plan", "创建清理计划"))}
+      ${renderActionButton("execute-recycle-bin-cleanup-plan", localize("Permanently clean selected volumes", "永久清理所选卷"), "danger", !plan)}
+      ${renderActionButton("open-managed-recycle-bin", localize("Open Windows Recycle Bin", "打开 Windows 回收站"))}
+    </div>
+    ${state.errors.recycleBin ? `<div class="error-state" data-testid="cleanup-recycle-bin-error">${escapeHtml(state.errors.recycleBin)}</div>` : ""}
+    ${state.recycleBinOperationMessage ? `<div class="small-note" data-testid="cleanup-recycle-bin-operation-status">${escapeHtml(state.recycleBinOperationMessage)}</div>` : ""}
+    <div class="metrics" data-testid="cleanup-recycle-bin-summary">
+      ${renderMetric(localize("Items", "项目数"), report ? report.itemCount : t("state.notChecked"))}
+      ${renderMetric(localize("Total size", "总大小"), report ? formatBytes(report.totalBytes) : t("state.notChecked"))}
+      ${renderMetric(localize("Recoverable", "可恢复"), report ? report.recoverableCount : t("state.notChecked"))}
+      ${renderMetric(localize("Scanned at", "扫描时间"), report ? formatGeneratedAt(report.generatedAt) : t("state.notChecked"))}
+    </div>
+    <div data-testid="cleanup-recycle-bin-volume-scope">
+      ${report ? renderRecycleBinVolumes(report.volumes, selected) : renderEmptyState(localize("Recycle Bin not inspected", "尚未检查回收站"), localize("Refresh the read-only preview before selecting cleanup scope.", "请先刷新只读预览，再选择清理范围。"))}
+    </div>
+    <div data-testid="cleanup-recycle-bin-preview">
+      ${report ? report.items.length ? renderRecycleBinItems(report.items) : renderEmptyState(localize("Recycle Bin is empty", "回收站为空"), localize("No items are available to preview or clean for the current user.", "当前用户没有可预览或清理的回收站项目。")) : ""}
+    </div>
+    ${report?.warnings.length ? `<div class="small-note"><strong>${localize("Inspection notes", "检查说明")}</strong><ul>${report.warnings.map((warning) => `<li>${escapeHtml(recycleBinWarning(warning))}</li>`).join("")}</ul></div>` : ""}
+    <div data-testid="cleanup-recycle-bin-plan-preview">
+      ${plan ? `<dl class="kv-list">
+        <div><dt>${localize("Plan ID", "计划 ID")}</dt><dd>${escapeHtml(plan.planId)}</dd></div>
+        <div><dt>${localize("Selected volumes", "所选卷")}</dt><dd>${escapeHtml(plan.selectedDrives.join(", "))}</dd></div>
+        <div><dt>${localize("Snapshot items", "快照项目")}</dt><dd>${plan.itemCount}</dd></div>
+        <div><dt>${localize("Estimated bytes", "预计大小")}</dt><dd>${formatBytes(plan.estimatedBytes)}</dd></div>
+        <div><dt>${localize("Risk", "风险")}</dt><dd>${localize("Critical - permanent removal", "严重 - 永久移除")}</dd></div>
+        <div><dt>${localize("Snapshot fingerprint", "快照指纹")}</dt><dd class="hash-cell">${escapeHtml(plan.snapshotFingerprint)}</dd></div>
+      </dl>${renderStringList(localize("Warnings", "警告"), plan.warnings.map(recycleBinWarning))}` : renderEmptyState(localize("No cleanup plan", "尚无清理计划"), localize("Select one or more source volumes and create a snapshot preview before execution.", "请选择一个或多个来源卷，并在执行前创建快照预览。"))}
+    </div>
+    <div data-testid="cleanup-recycle-bin-result">
+      ${result ? `<div class="cleanup-result ${result.success ? "ok" : "warn"}"><div class="metrics">
+        ${renderMetric(localize("Verified", "已验证"), result.success ? t("state.yes") : t("state.no"))}
+        ${renderMetric(localize("Removed items", "已移除项目"), result.cleanedItems)}
+        ${renderMetric(localize("Removed bytes", "已移除大小"), formatBytes(result.cleanedBytes))}
+        ${renderMetric(localize("Remaining in scope", "范围内剩余"), result.afterItemCount)}
+      </div>${result.failures.length ? renderStringList(localize("Failures", "失败原因"), result.failures) : `<p class="small-note">${localize("Cleanup was verified by a fresh Recycle Bin scan.", "已通过重新扫描回收站验证清理结果。")}</p>`}</div>` : renderEmptyState(localize("No cleanup result", "尚无清理结果"), localize("Execution and post-cleanup rescan results remain visible here.", "执行结果和清理后重扫结果会持续显示在这里。"))}
+    </div>
+    <div class="small-note"><strong>${localize("Irreversible boundary", "不可逆边界")}</strong><p>${localize("After a final snapshot recheck, Windows empties each selected source volume as a whole. A detected change rejects the plan, but an item added in the brief interval before the Windows command completes could also be removed. No volume is selected automatically.", "最终重核快照后，Windows 会按卷整体清空所选来源卷。检测到变化时会拒绝计划，但在重核后到 Windows 命令完成前的短暂间隔内新增的项目也可能被移除。系统不会自动勾选任何卷。")}</p></div>
+  </section>`;
+}
+
+function renderRecycleBinVolumes(
+  volumes: RecycleBinVolumeSummary[],
+  selected: Set<string>,
+): string {
+  if (!volumes.length) return renderEmptyState(localize("No source volumes", "没有来源卷"), localize("The Recycle Bin is empty or source volumes could not be resolved.", "回收站为空，或无法解析项目的来源卷。"));
+  return `<div class="recycle-bin-volume-grid">${volumes.map((volume) => {
+    const selectable = volume.drive !== "unknown";
+    return `<label class="recycle-bin-volume-card"><input type="checkbox" data-recycle-bin-drive value="${escapeHtml(volume.drive)}" ${selected.has(volume.drive) ? "checked" : ""} ${selectable ? "" : "disabled"} /><span><strong>${escapeHtml(volume.drive)}</strong><small>${volume.itemCount} ${localize("item(s)", "项")} · ${formatBytes(volume.totalBytes)} · ${volume.recoverableCount} ${localize("recoverable", "可恢复")}</small></span></label>`;
+  }).join("")}</div>`;
+}
+
+function renderRecycleBinItems(items: RecycleBinItem[]): string {
+  return `<div class="table-wrap recycle-bin-table"><table data-testid="cleanup-recycle-bin-table"><thead><tr><th>${localize("Name", "名称")}</th><th>${localize("Original location", "原始位置")}</th><th>${localize("Source volume", "来源卷")}</th><th>${localize("Size", "大小")}</th><th>${localize("Deleted at", "删除时间")}</th><th>${localize("Recoverable", "可恢复")}</th></tr></thead><tbody>${items.map((item) => `<tr><td>${escapeHtml(item.name)}</td><td title="${escapeHtml(item.originalPath)}">${escapeHtml(item.originalPath || localize("Unknown", "未知"))}</td><td>${escapeHtml(item.sourceDrive || localize("Unknown", "未知"))}</td><td>${formatBytes(item.size)}</td><td>${escapeHtml(item.deletedAt || localize("Unknown", "未知"))}</td><td>${item.recoverable ? t("state.yes") : t("state.no")}</td></tr>`).join("")}</tbody></table></div>`;
+}
+
+function recycleBinWarning(value: string): string {
+  if (value === "permanent-removal") return localize("Cleanup permanently empties the selected volume scope; Windows Restore is no longer available.", "清理会永久清空所选卷范围，之后无法再使用 Windows 还原。")
+  if (value === "scope-by-volume") return localize("Windows cleanup operates by source volume, not by individual item; an item added after the final recheck could also be removed.", "Windows 清理按来源卷而不是按单个项目执行；最终重核后新增的项目也可能被移除。")
+  if (value === "snapshot-must-match") return localize("Any change detected during the final snapshot recheck invalidates this plan.", "最终重核快照时检测到任何变化都会使本计划失效。")
+  if (value === "unresolved-source-drive") return localize("One or more items have an unresolved source volume and cannot be selected for cleanup.", "一个或多个项目无法解析来源卷，不能纳入清理范围。")
+  if (value === "unrecoverable-item") return localize("One or more shell items do not expose complete restore metadata.", "一个或多个回收站项目没有提供完整的恢复元数据。")
+  return value;
+}
+
+function formatGeneratedAt(value: string): string {
+  const seconds = Number(value);
+  return Number.isFinite(seconds) && seconds > 0 ? new Date(seconds * 1000).toLocaleString() : value;
 }
 
 function desktopCandidates(report: FolderUsageReport | null): LargeFileItem[] {
@@ -335,13 +438,29 @@ function renderDesktopCandidateTable(candidates: LargeFileItem[], selected: Set<
   if (!candidates.length) return renderEmptyState(localize("No candidate files", "没有候选文件"), localize("The Desktop is empty or contains only protected items.", "桌面为空或只包含受保护项目。"));
   return `<div class="table-wrap desktop-candidate-table"><table data-testid="cleanup-desktop-candidate-table"><thead><tr><th>${localize("Select", "选择")}</th><th>${localize("File", "文件")}</th><th>${localize("Category", "类别")}</th><th>${localize("Size", "大小")}</th><th>${localize("Modified", "修改时间")}</th><th>${localize("Eligibility", "处理条件")}</th></tr></thead><tbody>${candidates.map((item) => {
     const { eligible, reason } = desktopCandidateEligibility(item);
-    return `<tr><td><input type="checkbox" data-desktop-selection value="${escapeHtml(item.path)}" ${selected.has(item.path) ? "checked" : ""} ${eligible ? "" : "disabled"} aria-label="${escapeHtml(item.fileName)}" /></td><td title="${escapeHtml(item.path)}">${escapeHtml(item.fileName)}</td><td>${escapeHtml(item.fileType)}</td><td>${formatBytes(item.size)}</td><td>${escapeHtml(formatModifiedAt(item.modifiedAt))}</td><td>${renderBadge(reason, eligible ? "success" : "neutral")}</td></tr>`;
+    return `<tr><td><input type="checkbox" data-desktop-selection value="${escapeHtml(item.path)}" ${selected.has(item.path) ? "checked" : ""} ${eligible ? "" : "disabled"} aria-label="${escapeHtml(item.fileName)}" /></td><td title="${escapeHtml(item.path)}">${escapeHtml(item.fileName)}</td><td>${escapeHtml(localizeCleanupFileType(item.fileType))}</td><td>${formatBytes(item.size)}</td><td>${escapeHtml(formatModifiedAt(item.modifiedAt))}</td><td>${renderBadge(reason, eligible ? "success" : "neutral")}</td></tr>`;
   }).join("")}</tbody></table></div>`;
+}
+
+function localizeCleanupFileType(value: string): string {
+  const labels: Record<string, readonly [string, string]> = {
+    "安装包": ["Installer", "安装包"],
+    "压缩包": ["Archive", "压缩包"],
+    "视频": ["Video", "视频"],
+    "图片": ["Image", "图片"],
+    "文档": ["Document", "文档"],
+    "ISO/磁盘镜像": ["ISO / disk image", "ISO/磁盘镜像"],
+    "快捷方式": ["Shortcut", "快捷方式"],
+    "其他": ["Other", "其他"],
+  };
+  const label = labels[value.trim()];
+  return label ? localize(label[0], label[1]) : value;
 }
 
 function renderDownloadsArchiveSection(state: CleanupWorkbenchState): string {
   return `<section class="panel" data-testid="cleanup-downloads-archive-section">
     <div class="panel-head"><div><h2>${localize("Downloads rescue archive", "下载目录整理归档")}</h2><p>${localize("Analyze and archive selected Downloads clutter through a token-gated move plan.", "分析下载目录内容，并通过确认令牌保护的移动计划归档所选文件。")}</p></div></div>
+    ${renderArchiveTargetPicker(state, "downloads", "cleanup-downloads-target-drive", state.downloadsTargetDrive)}
     <div class="toolbar">
       ${renderActionButton("create-downloads-archive-plan", localize("Create archive plan", "创建归档计划"))}
       ${renderActionButton("execute-downloads-archive-plan", localize("Execute archive plan", "执行归档计划"), "danger")}
@@ -501,8 +620,55 @@ function renderVolumes(volumes: DiskVolumeInfo[]): string {
     <div class="disk-volume-heading"><strong>${escapeHtml(volume.drive)}</strong>${renderBadge(diskRiskLabel(volume.risk), diskRiskTone(volume.risk))}</div>
     <span>${formatBytes(volume.freeBytes)} ${localize("free", "可用")} / ${formatBytes(volume.totalBytes)} ${localize("total", "总计")}</span>
     <small>${escapeHtml(volume.fileSystem ?? localize("Unknown file system", "未知文件系统"))} · ${volume.usedPercent.toFixed(1)}% ${localize("used", "已使用")}</small>
+    <small>${localize("Archive target", "归档目标")}: ${escapeHtml(archiveTargetReasonLabel(volume))}</small>
     <div class="row-actions compact"><button data-disk-open="${escapeHtml(volume.drive)}" type="button">${t("feature.cleanup.openLocation")}</button><button data-disk-copy="${escapeHtml(diskSummary(volume))}" type="button">${t("feature.runtimes.copyPath")}</button></div>
   </article>`).join("")}</div>`;
+}
+
+function renderArchiveTargetPicker(
+  state: CleanupWorkbenchState,
+  kind: "generic" | "desktop" | "downloads",
+  selectId: string,
+  selectedTarget: string,
+): string {
+  const selectors = archiveTargetSelectors[kind];
+  const targets = eligibleArchiveTargets(state.diskOverview);
+  const selectedVolume = targets.find((volume) => targetMatchesVolume(selectedTarget, volume));
+  const selectedIsVolumeRoot = Boolean(selectedVolume && isDriveRootSelection(selectedTarget));
+  const selectedIsFolder = Boolean(selectedTarget && !selectedIsVolumeRoot);
+  const options = targets.map((volume, index) => {
+    const value = volume.drive.replace(/[\\/]+$/, "");
+    const label = `${value} - ${formatBytes(volume.freeBytes)} ${localize("free", "可用")}${index === 0 ? ` - ${localize("recommended", "推荐")}` : ""}`;
+    return `<option value="${escapeHtml(value)}" ${selectedIsVolumeRoot && targetMatchesVolume(selectedTarget, volume) ? "selected" : ""}>${escapeHtml(label)}</option>`;
+  });
+  if (selectedIsFolder) {
+    options.unshift(`<option value="${escapeHtml(selectedTarget)}" selected>${escapeHtml(selectedTarget)} - ${localize("chosen folder", "已选目录")}</option>`);
+  }
+  if (!options.length) {
+    options.push(`<option value="">${localize("No eligible non-system target detected", "未检测到符合条件的非系统盘目标")}</option>`);
+  }
+  const detail = selectedIsFolder && selectedVolume
+    ? `${selectedTarget} · ${selectedVolume.drive} · ${formatBytes(selectedVolume.freeBytes)} ${localize("free", "可用")}`
+    : selectedVolume
+      ? `${selectedVolume.drive} · ${formatBytes(selectedVolume.freeBytes)} ${localize("free", "可用")} · ${selectedVolume.fileSystem || localize("unknown file system", "未知文件系统")}`
+    : selectedTarget || localize("Choose an eligible drive or directory", "请选择符合条件的目标盘或目录");
+  return `<div class="archive-target-picker" data-testid="${selectors.picker}">
+    <label>${localize("Archive target", "归档目标")}<select id="${selectId}" data-testid="${selectors.select}">${options.join("")}</select></label>
+    <div class="toolbar">
+      ${renderActionButton(selectors.recommendedAction, localize("Use recommended", "使用推荐目标"))}
+      ${renderActionButton(selectors.chooseAction, localize("Choose target folder", "选择目标目录"))}
+    </div>
+    <small>${escapeHtml(detail)}</small>
+  </div>`;
+}
+
+function archiveTargetReasonLabel(volume: DiskVolumeInfo): string {
+  if (volume.archiveTargetReason === "eligible") return localize("Eligible", "可用");
+  if (volume.archiveTargetReason === "system-volume") return localize("System volume excluded", "系统卷已排除");
+  if (volume.archiveTargetReason === "read-only") return localize("Read-only volume excluded", "只读卷已排除");
+  if (volume.archiveTargetReason === "removable") return localize("Removable volume excluded", "可移动卷已排除");
+  if (volume.archiveTargetReason === "insufficient-space") return localize("Insufficient free space", "可用空间不足");
+  return localize("Unsupported mount", "不支持的挂载点");
 }
 
 function diskRiskLabel(risk: string): string {

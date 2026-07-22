@@ -537,7 +537,6 @@ pub fn stable_group_id(group: &PortEndpointGroup, process_start_time: u64) -> St
     hasher.update(group.pid.to_le_bytes());
     hasher.update(process_start_time.to_le_bytes());
     hasher.update(group.state_category.as_bytes());
-    hasher.update(group.group_fingerprint.as_bytes());
     format!("port-group-{:x}", hasher.finalize())
 }
 
@@ -744,6 +743,46 @@ mod tests {
     }
 
     #[test]
+    fn real_failure_udp_4500_dual_stack_fixture_is_one_protected_display_group() {
+        let parsed = parse_netstat(
+            "UDP 0.0.0.0:4500 *:* 8496\nUDP [::]:4500 *:* 8496\n",
+            ScanScope::Recommended,
+            DEFAULT_RECORD_LIMIT,
+        );
+        let groups = group_seeds(parsed.seeds);
+        assert_eq!(groups.len(), 1);
+        let group = &groups[0];
+        assert_eq!(group.protocol, "UDP");
+        assert_eq!(group.local_port, 4500);
+        assert_eq!(group.pid, 8496);
+        assert_eq!(group.state_category, "BOUND");
+        assert_eq!(group.binding_count, 2);
+        assert!(group.has_ipv4);
+        assert!(group.has_ipv6);
+        assert_eq!(group.bindings[0].local_endpoint, "0.0.0.0:4500");
+        assert_eq!(group.bindings[1].local_endpoint, "[::]:4500");
+    }
+
+    #[test]
+    fn real_failure_tcp_5043_postgres_fixture_is_one_display_group() {
+        let parsed = parse_netstat(
+            "TCP 0.0.0.0:5043 0.0.0.0:0 LISTENING 11116\nTCP [::]:5043 [::]:0 LISTENING 11116\n",
+            ScanScope::Recommended,
+            DEFAULT_RECORD_LIMIT,
+        );
+        let groups = group_seeds(parsed.seeds);
+        assert_eq!(groups.len(), 1);
+        let group = &groups[0];
+        assert_eq!(group.protocol, "TCP");
+        assert_eq!(group.local_port, 5043);
+        assert_eq!(group.pid, 11116);
+        assert_eq!(group.state_category, "LISTENING");
+        assert_eq!(group.binding_count, 2);
+        assert_eq!(group.bindings[0].local_endpoint, "0.0.0.0:5043");
+        assert_eq!(group.bindings[1].local_endpoint, "[::]:5043");
+    }
+
+    #[test]
     fn grouping_keeps_pid_protocol_port_and_state_boundaries() {
         let seeds = vec![
             seed("TCP", "0.0.0.0", 8080, "LISTENING", 10),
@@ -775,6 +814,21 @@ mod tests {
         let group = group_seeds(vec![seed("TCP", "127.0.0.1", 5173, "LISTENING", 42)]).remove(0);
         assert_eq!(stable_group_id(&group, 100), stable_group_id(&group, 100));
         assert_ne!(stable_group_id(&group, 100), stable_group_id(&group, 101));
+    }
+
+    #[test]
+    fn stable_group_id_does_not_change_when_bindings_are_enriched() {
+        let ipv4 = group_seeds(vec![seed("TCP", "0.0.0.0", 5043, "LISTENING", 11116)]).remove(0);
+        let dual_stack = group_seeds(vec![
+            seed("TCP", "0.0.0.0", 5043, "LISTENING", 11116),
+            seed("TCP", "::", 5043, "LISTENING", 11116),
+        ])
+        .remove(0);
+        assert_ne!(ipv4.group_fingerprint, dual_stack.group_fingerprint);
+        assert_eq!(
+            stable_group_id(&ipv4, 900),
+            stable_group_id(&dual_stack, 900)
+        );
     }
 
     #[test]

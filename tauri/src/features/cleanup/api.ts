@@ -1,5 +1,5 @@
 import { invoke } from "../../core/invoke";
-import type { AppUsageReport, ArchivePlanItem, CleanupArchitecture, CleanupPlan, CleanupResult, CleanupScanReport, DiskVolumeInfo, DuplicateGroup, ExpansionPlan, ExpansionResult, FolderUsageReport, GenericArchivePlan, GenericArchiveResult, InstalledSoftwareUsage, LargeFileItem, MaintenanceOverview, MovePlan, MoveResult, OperationResult, PartitionLayoutReport, RollbackRecord } from "../../types";
+import type { AppUsageReport, ArchivePlanItem, CleanupArchitecture, CleanupPlan, CleanupResult, CleanupScanReport, DiskVolumeInfo, DuplicateGroup, ExpansionPlan, ExpansionResult, FolderUsageReport, GenericArchivePlan, GenericArchiveResult, InstalledSoftwareUsage, LargeFileItem, MaintenanceOverview, MovePlan, MoveResult, OperationResult, PartitionLayoutReport, RecycleBinCleanupPlan, RecycleBinCleanupResult, RecycleBinReport, RollbackRecord } from "../../types";
 
 export function fileDirectory(path: string, directory?: string) {
   return directory || path.replace(/[\\/][^\\/]*$/, "");
@@ -99,6 +99,21 @@ export function executeDesktopCleanupPlan(plan: MovePlan, confirmationToken: str
 
 export function openRecycleBin(): Promise<OperationResult> {
   return invoke<OperationResult>("open_recycle_bin");
+}
+
+export function inspectRecycleBin(): Promise<RecycleBinReport> {
+  return invoke<RecycleBinReport>("inspect_recycle_bin");
+}
+
+export function createRecycleBinCleanupPlan(selectedDrives: string[]): Promise<RecycleBinCleanupPlan> {
+  return invoke<RecycleBinCleanupPlan>("create_recycle_bin_cleanup_plan", { selectedDrives });
+}
+
+export function executeRecycleBinCleanupPlan(
+  planId: string,
+  confirmationToken: string,
+): Promise<RecycleBinCleanupResult> {
+  return invoke<RecycleBinCleanupResult>("execute_recycle_bin_cleanup_plan", { planId, confirmationToken });
 }
 
 export function createDownloadsArchivePlan(targetDrive: string): Promise<MovePlan> {
