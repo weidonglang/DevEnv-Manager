@@ -36,7 +36,9 @@ pub(crate) use dev_cache::clean_dev_cache_isolated;
 pub use disk::inspect_disk_overview;
 pub use downloads::inspect_downloads;
 pub use duplicates::scan_duplicate_large_files_with_progress;
-pub use expansion::{create_c_drive_expansion_plan, execute_c_drive_expansion};
+pub use expansion::{
+    create_c_drive_expansion_plan, execute_c_drive_expansion, revalidate_c_drive_expansion_plan,
+};
 pub use large_files::scan_large_files_with_progress;
 #[cfg(feature = "acceptance-fixtures")]
 pub(crate) use migration::execute_isolated_move_plan;

@@ -46,6 +46,7 @@ for (const action of [
   "refresh-recycle-bin",
   "create-recycle-bin-cleanup-plan",
   "execute-recycle-bin-cleanup-plan",
+  "rollback-downloads-archive",
 ]) {
   assert.ok(renderSource.includes(action), `missing ${action}`);
 }
@@ -78,6 +79,9 @@ assert.match(backendTextSource, /Files are moved only to Windows Recycle Bin and
 assert.match(renderSource, /brief interval before the Windows command completes could also be removed/);
 assert.doesNotMatch(eventsSource, /Permanently removes the exact previewed items/);
 assert.match(eventsSource, /assessArchiveTarget\(selected, state\.diskOverview\)/);
+assert.match(eventsSource, /rollbackArchive\(context, state, "downloads"\)/);
+assert.match(renderSource, /downloadsArchiveResult\?\.rollbackId/);
+assert.match(renderSource, /downloadsRecoveryResult/);
 assert.match(eventsSource, /validOrRecommended/);
 assert.match(apiSource, /execute_recycle_bin_cleanup_plan["'],\s*\{ planId, confirmationToken \}/);
 assert.match(backendSource, /static RECYCLE_BIN_CLEANUP_PLANS/);

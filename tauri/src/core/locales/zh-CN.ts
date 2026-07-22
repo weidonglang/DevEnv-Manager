@@ -247,6 +247,7 @@ export const zhCN = {
   "feature.ports.serviceOwnedReason": "这是 Windows 服务托管的端口，建议先通过服务管理入口处理，不走普通进程释放流程。",
   "feature.ports.systemProcessReason": "该占用方是 Windows 系统进程，仅提供只读检查。",
   "feature.ports.criticalOwnerReason": "该占用方被识别为关键或系统占用，除非后续有专门修复流程验证安全，否则不创建停止计划。",
+  "feature.ports.nonListeningReason": "该记录是连接状态，不是本机监听或绑定端口；仅提供只读检查，不创建停止计划。",
   "feature.ports.treatableReason": "该占用方可以进入后端计划检查。执行前请确认进程身份正确。",
   "feature.ports.relatedPorts": "相关端口",
   "feature.ports.recommendedActions": "建议操作",

@@ -44,6 +44,7 @@ export type CleanupWorkbenchState = {
   recycleBinOperationMessage: string;
   downloadsArchivePlan: MovePlan | null;
   downloadsArchiveResult: MoveResult | null;
+  downloadsRecoveryResult: string;
   downloadsTargetDrive: string;
   appUsage: AppUsageReport | null;
   archiveItems: ArchivePlanItem[];
@@ -99,6 +100,7 @@ export const cleanupWorkbenchInitialState: CleanupWorkbenchState = {
   recycleBinOperationMessage: "",
   downloadsArchivePlan: null,
   downloadsArchiveResult: null,
+  downloadsRecoveryResult: "",
   downloadsTargetDrive: "",
   appUsage: null,
   archiveItems: [],

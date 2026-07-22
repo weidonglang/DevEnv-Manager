@@ -348,9 +348,10 @@ export function bindCleanupEvents(context: FeatureContext, state: CleanupWorkben
   bindAction(context.root, "refresh-recycle-bin", () => refreshRecycleBin(context, state));
   bindAction(context.root, "create-recycle-bin-cleanup-plan", () => createRecycleBinPlan(context, state));
   bindAction(context.root, "execute-recycle-bin-cleanup-plan", () => executeRecycleBinPlan(context, state));
-  bindAction(context.root, "rollback-desktop-archive", () => rollbackDesktopArchive(context, state));
+  bindAction(context.root, "rollback-desktop-archive", () => rollbackArchive(context, state, "desktop"));
   bindAction(context.root, "create-downloads-archive-plan", () => createArchivePlan(context, state, "downloads"));
   bindAction(context.root, "execute-downloads-archive-plan", () => executeArchivePlan(context, state, "downloads"));
+  bindAction(context.root, "rollback-downloads-archive", () => rollbackArchive(context, state, "downloads"));
   bindAction(context.root, "create-expansion-plan", async () => {
     context.progress.start(t("feature.cleanup.expansion"));
     try {
@@ -964,10 +965,12 @@ function reconcileRecycleBinSelection(state: CleanupWorkbenchState): void {
   state.recycleBinSelectedDrives = state.recycleBinSelectedDrives.filter((drive) => available.has(drive));
 }
 
-async function rollbackDesktopArchive(context: FeatureContext, state: CleanupWorkbenchState): Promise<void> {
-  const rollbackId = state.desktopArchiveResult?.rollbackId;
+async function rollbackArchive(context: FeatureContext, state: CleanupWorkbenchState, kind: "desktop" | "downloads"): Promise<void> {
+  const rollbackId = kind === "desktop" ? state.desktopArchiveResult?.rollbackId : state.downloadsArchiveResult?.rollbackId;
   if (!rollbackId) {
-    state.errors.desktopRecovery = localize("No automatic Desktop archive rollback is available.", "当前没有可用的桌面归档自动回滚。");
+    state.errors[kind === "desktop" ? "desktopRecovery" : "downloadsArchive"] = kind === "desktop"
+      ? localize("No automatic Desktop archive rollback is available.", "当前没有可用的桌面归档自动回滚。")
+      : localize("No automatic Downloads archive rollback is available.", "当前没有可用的下载目录归档自动回滚。");
     renderAndBind(context, state);
     return;
   }
@@ -977,19 +980,26 @@ async function rollbackDesktopArchive(context: FeatureContext, state: CleanupWor
       actionId: "rollback_move",
       planId: rollbackId,
       riskLevel: "high",
-      title: localize("Restore Desktop archive", "恢复桌面归档"),
-      summary: localize("Verifies archived hashes and copies files back without overwriting existing Desktop files.", "校验归档文件哈希，并在不覆盖现有桌面文件的前提下复制回原位置。"),
+      title: kind === "desktop" ? localize("Restore Desktop archive", "恢复桌面归档") : localize("Restore Downloads archive", "恢复下载目录归档"),
+      summary: localize("Verifies archived hashes and copies files back without overwriting files at their original locations.", "校验归档文件哈希，并在不覆盖原位置现有文件的前提下复制回去。"),
       warnings: [localize("Changed or conflicting files are refused and remain for manual review.", "已变化或冲突的文件会被拒绝并保留供人工检查。")],
       execute: (confirmationToken) => rollbackMove(rollbackId, confirmationToken),
     }) as OperationResult;
-    state.desktopRecoveryResult = result.message;
-    state.desktopArchiveResult = null;
     state.rollbackRecords = await listRollbackRecords();
-    state.desktop = await inspectDesktop();
-    state.desktopWorkflowNotice = localize("Archived files were restored and Desktop was reanalyzed.", "归档文件已恢复，并已重新分析桌面。");
-    delete state.errors.desktopRecovery;
+    if (kind === "desktop") {
+      state.desktopRecoveryResult = result.message;
+      state.desktopArchiveResult = null;
+      state.desktop = await inspectDesktop();
+      state.desktopWorkflowNotice = localize("Archived files were restored and Desktop was reanalyzed.", "归档文件已恢复，并已重新分析桌面。");
+      delete state.errors.desktopRecovery;
+    } else {
+      state.downloadsRecoveryResult = result.message;
+      state.downloadsArchiveResult = null;
+      state.downloads = await inspectDownloads();
+      delete state.errors.downloadsArchive;
+    }
   } catch (error) {
-    state.errors.desktopRecovery = errorMessage(error);
+    state.errors[kind === "desktop" ? "desktopRecovery" : "downloadsArchive"] = errorMessage(error);
   }
   if (!context.isCurrent()) return;
   renderAndBind(context, state);

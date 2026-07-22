@@ -364,6 +364,7 @@ export const cleanupAcceptanceFixture: CleanupWorkbenchState = {
   recycleBinOperationMessage: "",
   downloadsArchivePlan: null,
   downloadsArchiveResult: null,
+  downloadsRecoveryResult: "",
   downloadsTargetDrive: "D:",
   appUsage: null,
   archiveItems: [],

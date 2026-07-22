@@ -1,7 +1,7 @@
 use super::downloads::classify_file_type;
 use super::migration::{
-    ensure_movable_source, execute_desktop_recycle_plan, execute_move_plan, target_root_for_drive,
-    validate_archive_target_boundary,
+    archive_category, ensure_movable_source, execute_desktop_recycle_plan, execute_move_plan,
+    target_root_for_drive, validate_archive_target_boundary,
 };
 use super::model::{MovePlan, MovePlanItem, MoveResult};
 use super::protect::{is_inside_root, is_sensitive_account_data};
@@ -32,7 +32,7 @@ fn sha256_file(path: &Path) -> Result<String, String> {
     Ok(format!("{:x}", hasher.finalize()))
 }
 
-fn unsafe_desktop_attributes(metadata: &fs::Metadata) -> bool {
+fn unsafe_file_attributes(metadata: &fs::Metadata) -> bool {
     #[cfg(windows)]
     {
         use std::os::windows::fs::MetadataExt;
@@ -69,9 +69,7 @@ fn validate_desktop_selection(
     }
     let metadata =
         fs::symlink_metadata(&path).map_err(|error| format!("无法读取所选文件属性：{error}"))?;
-    if !metadata.is_file()
-        || metadata.file_type().is_symlink()
-        || unsafe_desktop_attributes(&metadata)
+    if !metadata.is_file() || metadata.file_type().is_symlink() || unsafe_file_attributes(&metadata)
     {
         return Err("桌面归档只允许普通、本地、非隐藏且非重解析文件".to_string());
     }
@@ -96,7 +94,7 @@ fn validate_desktop_selection(
     Ok((path, metadata.len()))
 }
 
-fn archive_category(path: &Path) -> &'static str {
+fn desktop_archive_category(path: &Path) -> &'static str {
     match classify_file_type(path) {
         "安装包" => "Installers",
         "压缩包" => "Archives",
@@ -128,7 +126,7 @@ fn build_desktop_items(
         let file_name = source
             .file_name()
             .ok_or_else(|| "所选文件没有有效文件名".to_string())?;
-        let directory = target.join(archive_category(&source));
+        let directory = target.join(desktop_archive_category(&source));
         let mut planned_target = directory.join(file_name);
         let stem = source
             .file_stem()
@@ -158,18 +156,94 @@ fn build_desktop_items(
     Ok(items)
 }
 
+fn build_archive_items(
+    source_root: &Path,
+    target_root: &Path,
+) -> Result<Vec<MovePlanItem>, String> {
+    let source_root = source_root
+        .canonicalize()
+        .map_err(|error| format!("无法解析归档源目录：{error}"))?;
+    let mut targets = BTreeSet::new();
+    let mut items = Vec::new();
+    for entry in fs::read_dir(&source_root).map_err(|error| format!("读取归档源失败：{error}"))?
+    {
+        let Ok(entry) = entry else {
+            continue;
+        };
+        let path = entry.path();
+        let Ok(metadata) = fs::symlink_metadata(&path) else {
+            continue;
+        };
+        if !metadata.is_file()
+            || metadata.file_type().is_symlink()
+            || metadata.permissions().readonly()
+            || unsafe_file_attributes(&metadata)
+            || is_sensitive_account_data(&path)
+        {
+            continue;
+        }
+        let Some(category) = archive_category(&path, metadata.modified().ok()) else {
+            continue;
+        };
+        let Some(file_name) = path.file_name() else {
+            continue;
+        };
+        let directory = target_root.join(category);
+        let mut planned_target = directory.join(file_name);
+        let stem = path
+            .file_stem()
+            .and_then(|value| value.to_str())
+            .unwrap_or("file");
+        let extension = path.extension().and_then(|value| value.to_str());
+        let mut index = 1_u32;
+        while planned_target.exists()
+            || !targets.insert(planned_target.to_string_lossy().to_ascii_lowercase())
+        {
+            let name = extension
+                .map(|ext| format!("{stem}-{index}.{ext}"))
+                .unwrap_or_else(|| format!("{stem}-{index}"));
+            planned_target = directory.join(name);
+            index += 1;
+        }
+        items.push(MovePlanItem {
+            source: path.to_string_lossy().to_string(),
+            target: planned_target.to_string_lossy().to_string(),
+            size: metadata.len(),
+            sha256: sha256_file(&path)?,
+        });
+    }
+    if items.is_empty() {
+        return Err("没有找到符合归档条件的普通文件；安装包、压缩包、媒体文件和 30 天以上旧文件才会进入计划".to_string());
+    }
+    Ok(items)
+}
+
 fn plan_for_source(source: &Path, target: PathBuf, mode: &str) -> Result<MovePlan, String> {
     let mut warnings = ensure_movable_source(source, mode)?;
     if mode == "archive_only" {
         validate_archive_target_boundary(&target)?;
     }
-    let (bytes, items, truncated) = directory_size_filtered(source, |_| false);
-    if truncated {
-        warnings.push("目录较大，估算可能被截断；执行前会重新校验".to_string());
-    }
+    let selected_items = if mode == "archive_only" {
+        build_archive_items(source, &target)?
+    } else {
+        Vec::new()
+    };
+    let (bytes, items) = if selected_items.is_empty() {
+        let (bytes, items, truncated) = directory_size_filtered(source, |_| false);
+        if truncated {
+            warnings.push("目录较大，估算可能被截断；执行前会重新校验".to_string());
+        }
+        (bytes, items)
+    } else {
+        (
+            selected_items.iter().map(|item| item.size).sum(),
+            selected_items.len(),
+        )
+    };
     let risk = match mode {
         "junction_bridge" | "move_user_folder" => "high",
         "move_cache_folder" => "medium",
+        "archive_only" => "high",
         _ => "low",
     };
     if mode == "junction_bridge" {
@@ -185,8 +259,8 @@ fn plan_for_source(source: &Path, target: PathBuf, mode: &str) -> Result<MovePla
         item_count: items,
         risk: risk.to_string(),
         requires_admin: false,
-        reversible: mode != "archive_only",
-        selected_items: Vec::new(),
+        reversible: true,
+        selected_items,
         warnings,
     })
 }
@@ -318,5 +392,20 @@ mod tests {
         let outside = root.path().join("outside.txt");
         fs::write(&outside, b"outside").unwrap();
         assert!(validate_desktop_selection(&desktop, &outside.to_string_lossy()).is_err());
+    }
+
+    #[test]
+    fn automatic_archive_plan_binds_exact_eligible_files() {
+        let root = tempfile::tempdir().unwrap();
+        let source = root.path().join("Downloads");
+        let target = root.path().join("Archive");
+        fs::create_dir_all(&source).unwrap();
+        fs::write(source.join("package.zip"), b"archive").unwrap();
+        fs::write(source.join("recent.txt"), b"recent").unwrap();
+
+        let items = build_archive_items(&source, &target).unwrap();
+        assert_eq!(items.len(), 1);
+        assert!(items[0].source.ends_with("package.zip"));
+        assert_eq!(items[0].sha256.len(), 64);
     }
 }

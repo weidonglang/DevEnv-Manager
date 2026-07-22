@@ -85,7 +85,7 @@ pub fn rollback_move(managed_root: &Path, rollback_id: String) -> Result<String,
         return Err("该操作被标记为不可自动回滚，请根据报告手动处理".to_string());
     }
 
-    if record.operation_type == "desktop_archive" && !record.moved_files.is_empty() {
+    if !record.moved_files.is_empty() {
         let mut failures = Vec::new();
         for receipt in record.moved_files.iter().rev() {
             if let Err(error) = restore_archived_file(receipt) {
@@ -93,7 +93,7 @@ pub fn rollback_move(managed_root: &Path, rollback_id: String) -> Result<String,
             }
         }
         if !failures.is_empty() {
-            return Err(format!("桌面归档回滚未完全成功：{}", failures.join("；")));
+            return Err(format!("归档回滚未完全成功：{}", failures.join("；")));
         }
     }
 
@@ -147,5 +147,41 @@ mod tests {
         };
         save_rollback_record(root.path(), record).unwrap();
         assert_eq!(list_rollback_records(root.path()).len(), 1);
+    }
+
+    #[test]
+    fn downloads_archive_receipt_is_restored() {
+        let root = tempfile::tempdir().unwrap();
+        let source = root.path().join("Downloads").join("archive.zip");
+        let target = root.path().join("Archive").join("archive.zip");
+        fs::create_dir_all(target.parent().unwrap()).unwrap();
+        fs::write(&target, b"archive").unwrap();
+        let hash = sha256_file(&target).unwrap();
+        save_rollback_record(
+            root.path(),
+            RollbackRecord {
+                rollback_id: "downloads-r1".to_string(),
+                created_at: "1".to_string(),
+                operation_type: "archive_only".to_string(),
+                source: source.parent().unwrap().to_string_lossy().to_string(),
+                target: target.parent().unwrap().to_string_lossy().to_string(),
+                backup_path: None,
+                junction_path: None,
+                reversible: true,
+                moved_files: vec![MoveReceipt {
+                    source: source.to_string_lossy().to_string(),
+                    target: target.to_string_lossy().to_string(),
+                    size: 7,
+                    source_sha256: hash.clone(),
+                    target_sha256: hash,
+                }],
+                notes: Vec::new(),
+            },
+        )
+        .unwrap();
+
+        rollback_move(root.path(), "downloads-r1".to_string()).unwrap();
+        assert_eq!(fs::read(&source).unwrap(), b"archive");
+        assert!(!target.exists());
     }
 }

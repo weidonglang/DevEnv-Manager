@@ -247,6 +247,7 @@ export const enUS = {
   "feature.ports.serviceOwnedReason": "This port is owned by a Windows service. Use service management first instead of the normal process-release flow.",
   "feature.ports.systemProcessReason": "This owner is a Windows system process. Only read-only inspection is available.",
   "feature.ports.criticalOwnerReason": "This owner is classified as critical or system-owned. Create no stop plan unless a future dedicated repair flow can verify it safely.",
+  "feature.ports.nonListeningReason": "This row represents a connection, not a local listening or bound port. It is read-only and cannot create a stop plan.",
   "feature.ports.treatableReason": "This owner can be reviewed with a backend plan. Confirm the process identity before execution.",
   "feature.ports.relatedPorts": "Related ports",
   "feature.ports.recommendedActions": "Recommended actions",

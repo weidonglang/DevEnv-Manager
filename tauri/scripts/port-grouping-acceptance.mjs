@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { isCurrentPortGeneration, normalizePortRecords } from "../src/features/ports/portGroups.ts";
-import { portRecordKey, selectedPortRecord } from "../src/features/ports/portSafety.ts";
+import { assessPortTreatability, portRecordKey, selectedPortRecord } from "../src/features/ports/portSafety.ts";
 
 const records = [
   { groupId: "group-ipv4-ipv6", protocol: "TCP", localPort: 5043, pid: 11116 },
@@ -72,6 +72,11 @@ const base = {
   evidence: [],
   conflictEvidence: [],
 };
+assert.equal(assessPortTreatability(base).treatable, true);
+assert.deepEqual(
+  assessPortTreatability({ ...base, state: "ESTABLISHED" }),
+  { treatable: false, reasonKey: "feature.ports.nonListeningReason" },
+);
 const udpIpv4 = {
   ...base,
   groupId: "legacy-udp-4500-ipv4",

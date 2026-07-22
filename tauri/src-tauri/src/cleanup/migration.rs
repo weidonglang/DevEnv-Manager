@@ -2,7 +2,7 @@ use super::downloads::classify_file_type;
 use super::model::{MovePlan, MovePlanItem, MoveReceipt, MoveResult, RollbackRecord};
 use super::protect::{is_inside_root, is_sensitive_account_data, should_skip_path};
 use super::rollback::save_rollback_record;
-use super::utils::{directory_size_filtered, generated_at, path_id};
+use super::utils::{directory_size_filtered, generated_at, unique_id};
 use sha2::{Digest, Sha256};
 use std::ffi::OsStr;
 use std::fs;
@@ -275,7 +275,7 @@ fn create_junction(_source: &Path, _target: &Path) -> Result<(), String> {
     Err("Junction 仅支持 Windows".to_string())
 }
 
-fn archive_category(path: &Path, modified: Option<SystemTime>) -> Option<&'static str> {
+pub(crate) fn archive_category(path: &Path, modified: Option<SystemTime>) -> Option<&'static str> {
     let name = path.file_name().and_then(OsStr::to_str).unwrap_or("");
     if path
         .extension()
@@ -489,74 +489,10 @@ fn archive_files(
     target: &Path,
     selected_items: &[MovePlanItem],
 ) -> Result<(u64, usize, Vec<String>, Vec<MoveReceipt>), String> {
-    if !selected_items.is_empty() {
-        return archive_selected_files(source, target, selected_items);
+    if selected_items.is_empty() {
+        return Err("归档计划没有绑定具体文件，请重新创建预览".to_string());
     }
-    let mut moved_bytes = 0_u64;
-    let mut moved_items = 0_usize;
-    let mut failures = Vec::new();
-    for entry in fs::read_dir(source).map_err(|err| format!("读取归档源失败：{err}"))? {
-        let Ok(entry) = entry else {
-            continue;
-        };
-        let path = entry.path();
-        if is_sensitive_account_data(&path) {
-            continue;
-        }
-        let Ok(metadata) = fs::symlink_metadata(&path) else {
-            continue;
-        };
-        if metadata.file_type().is_symlink()
-            || metadata.is_dir()
-            || metadata.permissions().readonly()
-        {
-            continue;
-        }
-        let Some(category) = archive_category(&path, metadata.modified().ok()) else {
-            continue;
-        };
-        let destination_dir = target.join(category);
-        let destination =
-            unique_destination(&destination_dir, path.file_name().unwrap_or_default());
-        if let Some(parent) = destination.parent() {
-            fs::create_dir_all(parent).map_err(|err| format!("创建归档目录失败：{err}"))?;
-        }
-        match fs::rename(&path, &destination) {
-            Ok(()) => {
-                moved_bytes = moved_bytes.saturating_add(metadata.len());
-                moved_items += 1;
-            }
-            Err(err) => failures.push(format!("{}：{err}", path.display())),
-        }
-    }
-    Ok((moved_bytes, moved_items, failures, Vec::new()))
-}
-
-fn unique_destination(directory: &Path, file_name: &OsStr) -> PathBuf {
-    let candidate = directory.join(file_name);
-    if !candidate.exists() {
-        return candidate;
-    }
-    let stem = Path::new(file_name)
-        .file_stem()
-        .and_then(OsStr::to_str)
-        .unwrap_or("file");
-    let extension = Path::new(file_name).extension().and_then(OsStr::to_str);
-    for index in 1..1000 {
-        let name = match extension {
-            Some(ext) => format!("{stem}-{index}.{ext}"),
-            None => format!("{stem}-{index}"),
-        };
-        let candidate = directory.join(name);
-        if !candidate.exists() {
-            return candidate;
-        }
-    }
-    directory.join(format!(
-        "{}-{}",
-        generated_at(),
-        file_name.to_string_lossy()
-    ))
+    archive_selected_files(source, target, selected_items)
 }
 
 fn execute_move_plan_with<F>(managed_root: &Path, plan: MovePlan, validate_source: F) -> MoveResult
@@ -581,7 +517,7 @@ where
         return result;
     }
 
-    let rollback_id = format!("rollback-{}", &path_id(&plan.mode, &source)[..16]);
+    let rollback_id = unique_id("rollback");
     if matches!(plan.mode.as_str(), "archive_only" | "desktop_archive") {
         if let Err(error) = validate_archive_target_boundary(&target) {
             result.failures.push(error);
@@ -597,7 +533,6 @@ where
                 result.receipts = receipts.clone();
                 if !receipts.is_empty() {
                     result.rollback_id = Some(rollback_id.clone());
-                    let selected_archive = !plan.selected_items.is_empty();
                     let record_result = save_rollback_record(
                         managed_root,
                         RollbackRecord {
@@ -608,14 +543,11 @@ where
                             target: plan.target.clone(),
                             backup_path: None,
                             junction_path: None,
-                            reversible: selected_archive,
+                            reversible: true,
                             moved_files: receipts.clone(),
-                            notes: if selected_archive {
-                                vec!["回滚会逐项校验归档目标 SHA-256，再复制回原位置。".to_string()]
-                            } else {
-                                vec!["旧版批量归档没有逐文件哈希回执，需要根据报告手动移回。"
-                                    .to_string()]
-                            },
+                            notes: vec![
+                                "回滚会逐项校验归档目标 SHA-256，再复制回原位置。".to_string()
+                            ],
                         },
                     );
                     if let Err(error) = record_result {
@@ -624,21 +556,19 @@ where
                         result.failures.push(format!(
                             "无法持久保存归档回滚记录，已停止完成本次操作：{error}"
                         ));
-                        if selected_archive {
-                            let recovery_failures = restore_archive_receipts(&receipts);
-                            if recovery_failures.is_empty() {
-                                result.failures.push(
-                                    "已自动恢复本次已移动的桌面文件，源文件保持不变".to_string(),
-                                );
-                                result.moved_bytes = 0;
-                                result.moved_items = 0;
-                                result.receipts.clear();
-                            } else {
-                                result
-                                    .failures
-                                    .push("自动恢复未完全成功，请按页面回执人工核对".to_string());
-                                result.failures.extend(recovery_failures);
-                            }
+                        let recovery_failures = restore_archive_receipts(&receipts);
+                        if recovery_failures.is_empty() {
+                            result
+                                .failures
+                                .push("已自动恢复本次已移动的归档文件，源文件保持不变".to_string());
+                            result.moved_bytes = 0;
+                            result.moved_items = 0;
+                            result.receipts.clear();
+                        } else {
+                            result
+                                .failures
+                                .push("自动恢复未完全成功，请按页面回执人工核对".to_string());
+                            result.failures.extend(recovery_failures);
                         }
                     }
                 }
@@ -686,7 +616,7 @@ where
                         result.moved_items = items;
                         result.source_backup = Some(backup.to_string_lossy().to_string());
                         result.rollback_id = Some(rollback_id.clone());
-                        let _ = save_rollback_record(
+                        if let Err(error) = save_rollback_record(
                             managed_root,
                             RollbackRecord {
                                 rollback_id,
@@ -702,7 +632,27 @@ where
                                     "回滚会删除 Junction 并恢复 .devenv-backup 目录。".to_string()
                                 ],
                             },
-                        );
+                        ) {
+                            result.success = false;
+                            result.junction_created = false;
+                            result.rollback_id = None;
+                            result.source_backup = None;
+                            result.failures.push(format!(
+                                "无法持久保存 Junction 回滚记录，正在恢复原目录：{error}"
+                            ));
+                            if let Err(remove_error) = fs::remove_dir(&source) {
+                                result
+                                    .failures
+                                    .push(format!("移除未记录的 Junction 失败：{remove_error}"));
+                            } else if let Err(restore_error) = fs::rename(&backup, &source) {
+                                result
+                                    .failures
+                                    .push(format!("恢复原目录失败：{restore_error}"));
+                            } else {
+                                result.moved_bytes = 0;
+                                result.moved_items = 0;
+                            }
+                        }
                     }
                     Err(err) => {
                         let _ = fs::rename(&backup, &source);

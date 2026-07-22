@@ -464,12 +464,13 @@ function renderDownloadsArchiveSection(state: CleanupWorkbenchState): string {
     <div class="toolbar">
       ${renderActionButton("create-downloads-archive-plan", localize("Create archive plan", "创建归档计划"))}
       ${renderActionButton("execute-downloads-archive-plan", localize("Execute archive plan", "执行归档计划"), "danger")}
+      ${state.downloadsArchiveResult?.rollbackId ? renderActionButton("rollback-downloads-archive", localize("Restore archived files", "恢复已归档文件"), "danger") : ""}
     </div>
     ${state.errors.downloadsArchive ? `<p class="error-text" data-testid="cleanup-downloads-archive-error">${escapeHtml(state.errors.downloadsArchive)}</p>` : ""}
     ${state.downloads ? renderFolderArchiveSummary(state.downloads) : renderEmptyState(localize("Folder not analyzed yet", "尚未分析目录"), localize("Refresh C-drive rescue or create an archive plan to analyze this folder.", "刷新 C 盘救援信息或创建归档计划以分析此目录。"))}
     <div data-testid="cleanup-downloads-archive-plan-result">${state.downloadsArchivePlan ? renderArchivePlan(state.downloadsArchivePlan) : renderEmptyState(localize("No archive plan", "尚无归档计划"), localize("Create a plan before executing. High-risk and unsafe items stay skipped.", "执行前请先创建计划；高风险和不安全项目会保持跳过。"))}</div>
     <div data-testid="cleanup-downloads-archive-execute-result">${state.downloadsArchiveResult ? renderMoveResult(state.downloadsArchiveResult) : renderEmptyState(localize("No execution result", "尚无执行结果"), localize("Execution results, skipped items, failures, and report summary appear here.", "执行结果、跳过项目、失败和报告摘要会显示在这里。"))}</div>
-    <div data-testid="cleanup-downloads-archive-rollback" class="small-note"><strong>${localize("Recovery", "恢复")}</strong><p>${localize("Use the target folder and report summary to move files back manually, or use matching rollback records when available.", "可根据目标目录和报告摘要手动移回文件；存在匹配回滚记录时也可使用回滚。")}</p></div>
+    <div data-testid="cleanup-downloads-archive-rollback" class="small-note"><strong>${localize("Recovery", "恢复")}</strong><p>${localize("Use Restore archived files while the verified rollback receipt is available. Changed or conflicting files are left for manual review.", "存在已验证回滚回执时可使用“恢复已归档文件”；已变化或冲突的文件会保留供人工检查。")}</p>${state.downloadsRecoveryResult ? `<p>${escapeHtml(state.downloadsRecoveryResult)}</p>` : ""}</div>
   </section>`;
 }
 

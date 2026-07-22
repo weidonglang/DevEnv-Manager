@@ -1306,8 +1306,20 @@ static DOCTOR_REPAIR_PLANS: OnceLock<Mutex<HashMap<String, PendingDoctorRepairPl
 static GENERIC_ARCHIVE_PLANS: OnceLock<Mutex<HashMap<String, GenericArchivePlan>>> =
     OnceLock::new();
 static MOVE_PLANS: OnceLock<Mutex<HashMap<String, cleanup::MovePlan>>> = OnceLock::new();
+static EXPANSION_PLANS: OnceLock<Mutex<HashMap<String, PendingExpansionPlan>>> = OnceLock::new();
 static RECYCLE_BIN_CLEANUP_PLANS: OnceLock<Mutex<HashMap<String, cleanup::RecycleBinCleanupPlan>>> =
     OnceLock::new();
+
+#[derive(Debug, Clone)]
+struct PendingExpansionPlan {
+    created_at: u64,
+    plan: cleanup::ExpansionPlan,
+}
+
+const MOVE_PLAN_TTL_SECONDS: u64 = 30 * 60;
+const MAX_PENDING_MOVE_PLANS: usize = 128;
+const EXPANSION_PLAN_TTL_SECONDS: u64 = 15 * 60;
+const MAX_PENDING_EXPANSION_PLANS: usize = 32;
 
 fn confirmation_tokens() -> &'static Mutex<HashMap<String, ConfirmationToken>> {
     CONFIRMATION_TOKENS.get_or_init(|| Mutex::new(HashMap::new()))
@@ -1327,6 +1339,10 @@ fn doctor_repair_plans() -> &'static Mutex<HashMap<String, PendingDoctorRepairPl
 
 fn move_plans() -> &'static Mutex<HashMap<String, cleanup::MovePlan>> {
     MOVE_PLANS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn expansion_plans() -> &'static Mutex<HashMap<String, PendingExpansionPlan>> {
+    EXPANSION_PLANS.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
 fn recycle_bin_cleanup_plans() -> &'static Mutex<HashMap<String, cleanup::RecycleBinCleanupPlan>> {
@@ -2592,11 +2608,26 @@ fn open_app_config_dir() -> Result<OperationResult, String> {
 }
 
 fn store_move_plan(plan: cleanup::MovePlan) -> Result<cleanup::MovePlan, String> {
-    move_plans()
+    let now = unix_timestamp();
+    let mut store = move_plans()
         .lock()
-        .map_err(|_| "Move plan storage is unavailable".to_string())?
-        .insert(plan.plan_id.clone(), plan.clone());
+        .map_err(|_| "Move plan storage is unavailable".to_string())?;
+    store.retain(|_, pending| !move_plan_expired(pending, now));
+    if store.len() >= MAX_PENDING_MOVE_PLANS {
+        return Err(
+            "Too many pending move plans; complete an existing plan or wait for it to expire"
+                .to_string(),
+        );
+    }
+    store.insert(plan.plan_id.clone(), plan.clone());
     Ok(plan)
+}
+
+fn move_plan_expired(plan: &cleanup::MovePlan, now: u64) -> bool {
+    plan.created_at
+        .parse::<u64>()
+        .ok()
+        .is_none_or(|created| created.saturating_add(MOVE_PLAN_TTL_SECONDS) < now)
 }
 
 fn verify_move_plan(plan: &cleanup::MovePlan) -> Result<(), String> {
@@ -2608,6 +2639,9 @@ fn verify_move_plan(plan: &cleanup::MovePlan) -> Result<(), String> {
         .ok_or_else(|| "Move plan does not exist, was replaced, or was already used".to_string())?;
     if stored != plan {
         return Err("Move plan content changed after preview; execution refused".to_string());
+    }
+    if move_plan_expired(stored, unix_timestamp()) {
+        return Err("Move plan expired; create a new preview before execution".to_string());
     }
     Ok(())
 }
@@ -2622,6 +2656,74 @@ fn consume_move_plan(plan: cleanup::MovePlan) -> Result<cleanup::MovePlan, Strin
     if stored != plan {
         store.insert(stored.plan_id.clone(), stored);
         return Err("Move plan content changed after preview; execution refused".to_string());
+    }
+    if move_plan_expired(&stored, unix_timestamp()) {
+        return Err("Move plan expired; create a new preview before execution".to_string());
+    }
+    Ok(plan)
+}
+
+fn store_expansion_plan(plan: cleanup::ExpansionPlan) -> Result<cleanup::ExpansionPlan, String> {
+    let now = unix_timestamp();
+    let mut store = expansion_plans()
+        .lock()
+        .map_err(|_| "Expansion plan storage is unavailable".to_string())?;
+    store.retain(|_, pending| {
+        pending
+            .created_at
+            .saturating_add(EXPANSION_PLAN_TTL_SECONDS)
+            >= now
+    });
+    if store.len() >= MAX_PENDING_EXPANSION_PLANS {
+        return Err("Too many pending expansion plans; wait for an old plan to expire".to_string());
+    }
+    store.insert(
+        plan.plan_id.clone(),
+        PendingExpansionPlan {
+            created_at: now,
+            plan: plan.clone(),
+        },
+    );
+    Ok(plan)
+}
+
+fn verify_expansion_plan(plan: &cleanup::ExpansionPlan) -> Result<(), String> {
+    let store = expansion_plans()
+        .lock()
+        .map_err(|_| "Expansion plan storage is unavailable".to_string())?;
+    let pending = store
+        .get(&plan.plan_id)
+        .ok_or_else(|| "Expansion plan does not exist, expired, or was already used".to_string())?;
+    if &pending.plan != plan {
+        return Err("Expansion plan content changed after preview; execution refused".to_string());
+    }
+    if pending
+        .created_at
+        .saturating_add(EXPANSION_PLAN_TTL_SECONDS)
+        < unix_timestamp()
+    {
+        return Err("Expansion plan expired; inspect the partition layout again".to_string());
+    }
+    Ok(())
+}
+
+fn consume_expansion_plan(plan: cleanup::ExpansionPlan) -> Result<cleanup::ExpansionPlan, String> {
+    let mut store = expansion_plans()
+        .lock()
+        .map_err(|_| "Expansion plan storage is unavailable".to_string())?;
+    let pending = store
+        .remove(&plan.plan_id)
+        .ok_or_else(|| "Expansion plan does not exist, expired, or was already used".to_string())?;
+    if pending.plan != plan {
+        store.insert(pending.plan.plan_id.clone(), pending);
+        return Err("Expansion plan content changed after preview; execution refused".to_string());
+    }
+    if pending
+        .created_at
+        .saturating_add(EXPANSION_PLAN_TTL_SECONDS)
+        < unix_timestamp()
+    {
+        return Err("Expansion plan expired; inspect the partition layout again".to_string());
     }
     Ok(plan)
 }
@@ -2845,7 +2947,7 @@ async fn inspect_partition_layout() -> Result<cleanup::PartitionLayoutReport, St
 
 #[tauri::command]
 async fn create_c_drive_expansion_plan() -> Result<cleanup::ExpansionPlan, String> {
-    run_blocking(cleanup::create_c_drive_expansion_plan).await?
+    run_blocking(|| store_expansion_plan(cleanup::create_c_drive_expansion_plan()?)).await?
 }
 
 #[tauri::command]
@@ -2854,7 +2956,10 @@ async fn execute_c_drive_expansion(
     confirmation_token: Option<String>,
 ) -> Result<cleanup::ExpansionResult, String> {
     run_blocking(move || {
+        verify_expansion_plan(&plan)?;
         require_risk_operation_token("execute_expansion_plan", &plan.plan_id, confirmation_token)?;
+        let plan = consume_expansion_plan(plan)?;
+        cleanup::revalidate_c_drive_expansion_plan(&plan)?;
         Ok(cleanup::execute_c_drive_expansion(plan))
     })
     .await?
@@ -17227,6 +17332,38 @@ mod tests {
         assert!(verify_move_plan(&plan).is_ok());
         assert_eq!(consume_move_plan(plan.clone()).unwrap(), plan);
         assert!(consume_move_plan(plan).is_err());
+    }
+
+    #[test]
+    fn move_plan_expiration_is_enforced() {
+        let plan = cleanup::MovePlan {
+            plan_id: format!("expired-move-plan-{}", unix_timestamp()),
+            created_at: "1".to_string(),
+            ..cleanup::MovePlan::default()
+        };
+        store_move_plan(plan.clone()).unwrap();
+        assert!(verify_move_plan(&plan).is_err());
+        let _ = move_plans().lock().unwrap().remove(&plan.plan_id);
+    }
+
+    #[test]
+    fn expansion_plan_is_backend_bound_and_single_use() {
+        let plan = cleanup::ExpansionPlan {
+            plan_id: format!("test-expansion-plan-{}", unix_timestamp()),
+            mode: "safe_extend_unallocated".to_string(),
+            can_execute: true,
+            commands_preview: vec!["select volume C".to_string(), "extend".to_string()],
+            ..cleanup::ExpansionPlan::default()
+        };
+        store_expansion_plan(plan.clone()).unwrap();
+
+        let mut tampered = plan.clone();
+        tampered.mode = "delete_empty_adjacent_partition_then_extend".to_string();
+        assert!(verify_expansion_plan(&tampered).is_err());
+        assert!(consume_expansion_plan(tampered).is_err());
+        assert!(verify_expansion_plan(&plan).is_ok());
+        assert_eq!(consume_expansion_plan(plan.clone()).unwrap(), plan);
+        assert!(consume_expansion_plan(plan).is_err());
     }
 
     #[test]
