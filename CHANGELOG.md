@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.8.3 (Unreleased)
+## 1.8.3
 
 - Group IPv4/IPv6 and duplicate source records into one stable visible port row while preserving every binding in diagnostics.
 - Keep port selection stable across quick scan and enrichment generations, reject stale owners, and verify target and related-port release after execution.
@@ -10,8 +10,11 @@
 - Correct Dark and High Contrast cleanup card readability and add automated layout, contrast, overflow, localization, and screenshot regression checks.
 - Add an About panel sourced from build metadata and translate additional backend cleanup/archive guidance in the English interface.
 - Harden acceptance reporting so deferred/manual work is not counted as passed and stale reports cannot contaminate a current release result.
+- Bind move, partition expansion, and file-association execution to backend-stored exact plans with expiry, tamper rejection, bounded storage, and single consumption.
+- Enumerate exact Desktop and Downloads archive files at preview time, verify cross-volume copies by SHA256 before deleting sources, and expose verified restore actions for both workflows.
+- Fail junction creation closed when rollback evidence cannot be persisted, restoring the original source instead of leaving an untracked junction.
 
-The public stable update channel remains on 1.8.2 until the 1.8.3 installed-app and release gates are complete.
+Exact asset identities and ReleaseLab evidence are recorded in [docs/release-v1.8.3.md](docs/release-v1.8.3.md).
 
 ## 1.8.2 Stable
 

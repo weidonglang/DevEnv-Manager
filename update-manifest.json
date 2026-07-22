@@ -1,28 +1,28 @@
 {
   "schemaVersion": 2,
   "channel": "stable",
-  "version": "1.8.2",
-  "date": "2026-07-16",
+  "version": "1.8.3",
+  "date": "2026-07-22",
   "notes": [
-    "v1.8.2 stable restores and hardens Cleanup, Ports, Environment, Projects, Reports, File Associations, Runtime boundaries, bilingual rendering, and dark/high-contrast readability after the frontend refactor. It adds automated acceptance plus installed NSIS/MSI, upgrade, rollback, UAC, and safety verification. Runtime final redesign remains tracked by v1.9.0 / #130."
+    "v1.8.3 fixes port scan timeouts and duplicate binding rows, restores readable Dark/High Contrast cleanup cards, adds automatic archive target selection plus Desktop/Downloads recovery, completes Recycle Bin rescan feedback, improves bilingual output, and binds move, expansion, and file-association execution to expiring single-use backend plans."
   ],
   "assets": [
     {
       "platform": "windows-x64",
-      "fileName": "DevEnv.Manager_1.8.2_x64-setup.exe",
-      "size": 2775318,
-      "sha256": "b910f56674abca837baaff662e159d6025d66dce933c2f758af34211a27e49a6",
-      "primaryUrl": "https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.8.2/DevEnv.Manager_1.8.2_x64-setup.exe",
+      "fileName": "DevEnv.Manager_1.8.3_x64-setup.exe",
+      "size": 2841914,
+      "sha256": "a6663ab2e409f936b11105f4d827b4d41cbfbe9e225ce55aa7a92e4eb601d20c",
+      "primaryUrl": "https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.8.3/DevEnv.Manager_1.8.3_x64-setup.exe",
       "mirrors": [
         {
           "name": "Gitee Release",
           "region": "cn",
-          "url": "https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.8.2/DevEnv.Manager_1.8.2_x64-setup.exe"
+          "url": "https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.8.3/DevEnv.Manager_1.8.3_x64-setup.exe"
         },
         {
           "name": "GitHub Release",
           "region": "global",
-          "url": "https://github.com/weidonglang/DevEnv-Manager/releases/download/v1.8.2/DevEnv.Manager_1.8.2_x64-setup.exe"
+          "url": "https://github.com/weidonglang/DevEnv-Manager/releases/download/v1.8.3/DevEnv.Manager_1.8.3_x64-setup.exe"
         }
       ]
     }
