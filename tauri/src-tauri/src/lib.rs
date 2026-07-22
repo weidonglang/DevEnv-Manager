@@ -1305,6 +1305,7 @@ static DOCTOR_REPAIR_PLANS: OnceLock<Mutex<HashMap<String, PendingDoctorRepairPl
     OnceLock::new();
 static GENERIC_ARCHIVE_PLANS: OnceLock<Mutex<HashMap<String, GenericArchivePlan>>> =
     OnceLock::new();
+static MOVE_PLANS: OnceLock<Mutex<HashMap<String, cleanup::MovePlan>>> = OnceLock::new();
 static RECYCLE_BIN_CLEANUP_PLANS: OnceLock<Mutex<HashMap<String, cleanup::RecycleBinCleanupPlan>>> =
     OnceLock::new();
 
@@ -1322,6 +1323,10 @@ fn profile_apply_plans() -> &'static Mutex<HashMap<String, PendingProfileApplyPl
 
 fn doctor_repair_plans() -> &'static Mutex<HashMap<String, PendingDoctorRepairPlan>> {
     DOCTOR_REPAIR_PLANS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn move_plans() -> &'static Mutex<HashMap<String, cleanup::MovePlan>> {
+    MOVE_PLANS.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
 fn recycle_bin_cleanup_plans() -> &'static Mutex<HashMap<String, cleanup::RecycleBinCleanupPlan>> {
@@ -2586,13 +2591,49 @@ fn open_app_config_dir() -> Result<OperationResult, String> {
     })
 }
 
+fn store_move_plan(plan: cleanup::MovePlan) -> Result<cleanup::MovePlan, String> {
+    move_plans()
+        .lock()
+        .map_err(|_| "Move plan storage is unavailable".to_string())?
+        .insert(plan.plan_id.clone(), plan.clone());
+    Ok(plan)
+}
+
+fn verify_move_plan(plan: &cleanup::MovePlan) -> Result<(), String> {
+    let store = move_plans()
+        .lock()
+        .map_err(|_| "Move plan storage is unavailable".to_string())?;
+    let stored = store
+        .get(&plan.plan_id)
+        .ok_or_else(|| "Move plan does not exist, was replaced, or was already used".to_string())?;
+    if stored != plan {
+        return Err("Move plan content changed after preview; execution refused".to_string());
+    }
+    Ok(())
+}
+
+fn consume_move_plan(plan: cleanup::MovePlan) -> Result<cleanup::MovePlan, String> {
+    let mut store = move_plans()
+        .lock()
+        .map_err(|_| "Move plan storage is unavailable".to_string())?;
+    let stored = store
+        .remove(&plan.plan_id)
+        .ok_or_else(|| "Move plan does not exist, was replaced, or was already used".to_string())?;
+    if stored != plan {
+        store.insert(stored.plan_id.clone(), stored);
+        return Err("Move plan content changed after preview; execution refused".to_string());
+    }
+    Ok(plan)
+}
+
 #[tauri::command]
 async fn create_move_plan(
     source: String,
     target_drive: String,
     mode: String,
 ) -> Result<cleanup::MovePlan, String> {
-    run_blocking(move || cleanup::create_move_plan(source, target_drive, mode)).await?
+    run_blocking(move || store_move_plan(cleanup::create_move_plan(source, target_drive, mode)?))
+        .await?
 }
 
 #[tauri::command]
@@ -2601,7 +2642,9 @@ async fn execute_move_plan(
     confirmation_token: Option<String>,
 ) -> Result<cleanup::MoveResult, String> {
     run_blocking(move || {
+        verify_move_plan(&plan)?;
         require_risk_operation_token("execute_move_plan", &plan.plan_id, confirmation_token)?;
+        let plan = consume_move_plan(plan)?;
         let paths = load_paths()?;
         Ok(cleanup::execute_move_plan(&paths.root, plan))
     })
@@ -2639,7 +2682,8 @@ async fn create_junction_bridge_plan(
     source: String,
     target: String,
 ) -> Result<cleanup::MovePlan, String> {
-    run_blocking(move || cleanup::create_junction_bridge_plan(source, target)).await?
+    run_blocking(move || store_move_plan(cleanup::create_junction_bridge_plan(source, target)?))
+        .await?
 }
 
 #[tauri::command]
@@ -2647,7 +2691,13 @@ async fn create_desktop_archive_plan(
     target_drive: String,
     selected_paths: Vec<String>,
 ) -> Result<cleanup::MovePlan, String> {
-    run_blocking(move || cleanup::create_desktop_archive_plan(target_drive, selected_paths)).await?
+    run_blocking(move || {
+        store_move_plan(cleanup::create_desktop_archive_plan(
+            target_drive,
+            selected_paths,
+        )?)
+    })
+    .await?
 }
 
 #[tauri::command]
@@ -2656,11 +2706,13 @@ async fn execute_desktop_archive_plan(
     confirmation_token: Option<String>,
 ) -> Result<cleanup::MoveResult, String> {
     run_blocking(move || {
+        verify_move_plan(&plan)?;
         require_risk_operation_token(
             "execute_desktop_archive_plan",
             &plan.plan_id,
             confirmation_token,
         )?;
+        let plan = consume_move_plan(plan)?;
         let paths = load_paths()?;
         Ok(cleanup::execute_desktop_archive_plan(&paths.root, plan))
     })
@@ -2671,7 +2723,8 @@ async fn execute_desktop_archive_plan(
 async fn create_desktop_cleanup_plan(
     selected_paths: Vec<String>,
 ) -> Result<cleanup::MovePlan, String> {
-    run_blocking(move || cleanup::create_desktop_cleanup_plan(selected_paths)).await?
+    run_blocking(move || store_move_plan(cleanup::create_desktop_cleanup_plan(selected_paths)?))
+        .await?
 }
 
 #[tauri::command]
@@ -2680,11 +2733,13 @@ async fn execute_desktop_cleanup_plan(
     confirmation_token: Option<String>,
 ) -> Result<cleanup::MoveResult, String> {
     run_blocking(move || {
+        verify_move_plan(&plan)?;
         require_risk_operation_token(
             "execute_desktop_cleanup_plan",
             &plan.plan_id,
             confirmation_token,
         )?;
+        let plan = consume_move_plan(plan)?;
         Ok(cleanup::execute_desktop_cleanup_plan(plan))
     })
     .await?
@@ -2760,7 +2815,8 @@ fn open_recycle_bin() -> Result<OperationResult, String> {
 
 #[tauri::command]
 async fn create_downloads_archive_plan(target_drive: String) -> Result<cleanup::MovePlan, String> {
-    run_blocking(move || cleanup::create_downloads_archive_plan(target_drive)).await?
+    run_blocking(move || store_move_plan(cleanup::create_downloads_archive_plan(target_drive)?))
+        .await?
 }
 
 #[tauri::command]
@@ -2769,11 +2825,13 @@ async fn execute_downloads_archive_plan(
     confirmation_token: Option<String>,
 ) -> Result<cleanup::MoveResult, String> {
     run_blocking(move || {
+        verify_move_plan(&plan)?;
         require_risk_operation_token(
             "execute_downloads_archive_plan",
             &plan.plan_id,
             confirmation_token,
         )?;
+        let plan = consume_move_plan(plan)?;
         let paths = load_paths()?;
         Ok(cleanup::execute_downloads_archive_plan(&paths.root, plan))
     })
@@ -17140,6 +17198,35 @@ mod tests {
             false,
         )
         .is_err());
+    }
+
+    #[test]
+    fn move_plan_is_backend_bound_and_single_use() {
+        let plan = cleanup::MovePlan {
+            plan_id: format!("test-move-plan-{}-{}", std::process::id(), unix_timestamp()),
+            created_at: unix_timestamp().to_string(),
+            source: r"C:\ReleaseLab\source".to_string(),
+            target: r"D:\DevEnvArchive\source".to_string(),
+            mode: "archive".to_string(),
+            estimated_bytes: 128,
+            item_count: 1,
+            risk: "high".to_string(),
+            requires_admin: false,
+            reversible: true,
+            selected_items: Vec::new(),
+            warnings: vec!["fixture".to_string()],
+        };
+
+        store_move_plan(plan.clone()).unwrap();
+
+        let mut tampered = plan.clone();
+        tampered.target = r"C:\Windows\System32".to_string();
+        assert!(verify_move_plan(&tampered).is_err());
+        assert!(consume_move_plan(tampered).is_err());
+
+        assert!(verify_move_plan(&plan).is_ok());
+        assert_eq!(consume_move_plan(plan.clone()).unwrap(), plan);
+        assert!(consume_move_plan(plan).is_err());
     }
 
     #[test]
