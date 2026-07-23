@@ -1,14 +1,15 @@
 import type { FeatureContext } from "../../app/featureContext";
 import { open } from "../../api/tauri";
 import { getActiveLocale, t } from "../../core/i18n";
-import type { OperationResult } from "../../types";
+import type { OperationResult, ProfileHistoryRestoreResult } from "../../types";
 import { bindAction } from "../sharedView";
-import { copyConfigProfile, createProfileApplyPlan, deleteConfigProfile, executeProfileApplyPlan, exportConfigProfiles, importConfigProfiles, listProfiles, previewConfigProfiles, renameConfigProfile, saveCurrentProfile } from "./api";
+import { copyConfigProfile, createProfileApplyPlan, createProfileHistoryRestorePlan, deleteConfigProfile, executeProfileApplyPlan, executeProfileHistoryRestorePlan, exportConfigProfiles, importConfigProfiles, listConfigProfileHistory, listProfiles, previewConfigProfiles, renameConfigProfile, saveCurrentProfile } from "./api";
 import { renderProfilesWorkbench } from "./render";
 import type { ProfilesState } from "./state";
 
 export function bindProfileEvents(context: FeatureContext, state: ProfilesState): void {
   bindAction(context.root, "refresh-profiles", () => refreshProfiles(context, state));
+  bindAction(context.root, "refresh-profile-history", () => refreshProfiles(context, state));
   context.root.querySelectorAll<HTMLButtonElement>("[data-profile-id]").forEach((button) => {
     button.addEventListener("click", () => {
       state.selectedProfileId = button.dataset.profileId || null;
@@ -22,6 +23,13 @@ export function bindProfileEvents(context: FeatureContext, state: ProfilesState)
       if (button.dataset.pageAction === "profiles:next") state.page += 1;
       context.root.innerHTML = renderProfilesWorkbench(state);
       bindProfileEvents(context, state);
+    });
+  });
+  context.root.querySelectorAll<HTMLButtonElement>("[data-profile-history-id]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.selectedHistoryId = button.dataset.profileHistoryId || null;
+      state.historyPlan = null;
+      renderAndBind(context, state);
     });
   });
   bindAction(context.root, "save-profile", async () => {
@@ -234,6 +242,59 @@ export function bindProfileEvents(context: FeatureContext, state: ProfilesState)
       renderAndBind(context, state);
     }
   });
+  bindAction(context.root, "create-profile-history-restore-plan", async () => {
+    const historyId = state.selectedHistoryId || state.history[0]?.id;
+    state.operationResult = "";
+    state.operationError = "";
+    state.historyResult = null;
+    if (!historyId) {
+      state.operationError = label("Select a profile history snapshot first.", "请先选择一个配置档案历史快照。");
+      renderAndBind(context, state);
+      return;
+    }
+    try {
+      state.historyPlan = await createProfileHistoryRestorePlan(historyId);
+    } catch (error) {
+      state.operationError = errorMessage(error);
+    }
+    renderAndBind(context, state);
+  });
+  bindAction(context.root, "execute-profile-history-restore-plan", async () => {
+    const plan = state.historyPlan;
+    state.operationResult = "";
+    state.operationError = "";
+    if (!plan) {
+      state.operationError = label("Create a profile history restore plan first.", "请先创建配置档案历史恢复计划。");
+      renderAndBind(context, state);
+      return;
+    }
+    try {
+      const result = await context.risk.run({
+        command: "execute_profile_history_restore_plan",
+        actionId: "execute_profile_history_restore_plan",
+        planId: plan.planId,
+        planFingerprint: plan.planFingerprint,
+        riskLevel: "medium",
+        backupReceipt: plan.backupHistoryId,
+        title: label("Restore profile history", "恢复配置档案历史"),
+        summary: label("Replace the current profile collection with the reviewed historical snapshot.", "使用已审阅的历史快照替换当前完整配置档案集合。"),
+        before: [
+          { label: label("Snapshot", "历史快照"), value: plan.historyId },
+          { label: label("Profiles", "配置档案数"), value: String(plan.profileCount) },
+          { label: label("Current backup", "当前状态备份"), value: plan.backupHistoryId },
+        ],
+        warnings: plan.warnings,
+        execute: (confirmationToken) => executeProfileHistoryRestorePlan(plan.planId, confirmationToken),
+      }) as ProfileHistoryRestoreResult;
+      state.historyResult = result;
+      state.historyPlan = null;
+      state.operationResult = result.message;
+      await reloadProfiles(state);
+    } catch (error) {
+      state.operationError = errorMessage(error);
+    }
+    renderAndBind(context, state);
+  });
 }
 
 function renderAndBind(context: FeatureContext, state: ProfilesState): void {
@@ -268,9 +329,10 @@ function errorMessage(error: unknown): string {
 export async function refreshProfiles(context: FeatureContext, state: ProfilesState): Promise<void> {
   context.progress.start(t("feature.profiles.loading"));
   try {
-    state.profiles = await listProfiles();
+    [state.profiles, state.history] = await Promise.all([listProfiles(), listConfigProfileHistory()]);
     if (!context.isCurrent()) return;
     state.selectedProfileId = state.selectedProfileId ?? state.profiles[0]?.id ?? null;
+    state.selectedHistoryId = state.selectedHistoryId ?? state.history[0]?.id ?? null;
     state.page = Math.min(state.page, Math.max(1, Math.ceil(state.profiles.length / 10)));
     context.progress.done(t("feature.profiles.loaded"));
     context.root.innerHTML = renderProfilesWorkbench(state);
@@ -280,4 +342,12 @@ export async function refreshProfiles(context: FeatureContext, state: ProfilesSt
     context.progress.fail(state.operationError);
     renderAndBind(context, state);
   }
+}
+
+async function reloadProfiles(state: ProfilesState): Promise<void> {
+  [state.profiles, state.history] = await Promise.all([listProfiles(), listConfigProfileHistory()]);
+  state.selectedProfileId = state.profiles.some((profile) => profile.id === state.selectedProfileId)
+    ? state.selectedProfileId
+    : state.profiles[0]?.id ?? null;
+  state.selectedHistoryId = state.history[0]?.id ?? null;
 }

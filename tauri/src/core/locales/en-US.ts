@@ -14,7 +14,7 @@ export const enUS = {
   "route.dashboard.label": "Dashboard",
   "route.dashboard.description": "Health summary and safe shortcuts.",
   "route.runtimes.label": "Runtimes",
-  "route.runtimes.description": "JDK, Node.js, Python, Go, Maven, and Gradle.",
+  "route.runtimes.description": "Java, Python, Node.js, Go, Maven, Gradle, Rust, .NET, and other tools.",
   "route.environment.label": "Environment",
   "route.environment.description": "JAVA_HOME, PATH, Maven, Gradle, and backups.",
   "route.projects.label": "Projects",
@@ -98,7 +98,7 @@ export const enUS = {
   "dashboard.openPortsToRetry": "Open Ports & Services to retry.",
   "dashboard.sectionUnavailable": "{section} is unavailable.",
 
-  "feature.runtimes.description": "Manage JDK, Node, Python, Go, Maven, and Gradle through plan-first actions.",
+  "feature.runtimes.description": "Manage Java, Python, Node.js, Go, Maven, Gradle, Rust, .NET, and other tools with explicit managed and external boundaries.",
   "feature.runtimes.installed": "Installed runtimes",
   "feature.runtimes.distributions": "JDK distributions",
   "feature.runtimes.verification": "Strong verification",

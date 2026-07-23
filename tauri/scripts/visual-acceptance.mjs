@@ -11,7 +11,7 @@ const tauriDirectory = resolve(scriptDirectory, "..");
 const repositoryDirectory = resolve(tauriDirectory, "..");
 const artifactDirectory = join(repositoryDirectory, "artifacts", "visual-acceptance");
 const screenshotDirectory = join(artifactDirectory, "screenshots");
-const baselinePath = join(repositoryDirectory, "acceptance", "visual-baseline.v1.8.3.json");
+const baselinePath = join(repositoryDirectory, "acceptance", "visual-baseline.v1.9.0.json");
 const updateBaseline = process.argv.includes("--update-baseline");
 const maximumHashDistance = 120;
 
@@ -220,7 +220,7 @@ async function perceptualHash(cdp, pngBase64) {
 
 async function writeVisualBaseline(results) {
   const baseline = {
-    version: "1.8.3",
+    version: "1.9.0",
     algorithm: "dHash-32x32",
     maximumHashDistance,
     generatedAt: new Date().toISOString(),

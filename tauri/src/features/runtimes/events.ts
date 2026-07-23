@@ -1,8 +1,9 @@
 import type { FeatureContext } from "../../app/featureContext";
 import { open } from "../../api/tauri";
 import { localize, t } from "../../core/i18n";
+import type { RuntimeSwitchResult } from "../../types";
 import { bindAction } from "../sharedView";
-import { discoverRuntimes, getJdkDistributions, inspectRuntimeStrongVerification, installRuntime, openAppsFeatures, openRuntimeDirectory, switchRuntime, uninstallRuntime, verifyExternalJdk } from "./api";
+import { createRuntimeSwitchPlan, discoverRuntimes, executeRuntimeSwitchPlan, exportRuntimeVerificationReport, getJdkDistributions, inspectRuntimeStrongVerification, installRuntime, openAppsFeatures, openRuntimeDirectory, uninstallRuntime, verifyExternalJdk } from "./api";
 import { renderRuntimeWorkbench } from "./render";
 import type { RuntimeWorkbenchState } from "./state";
 
@@ -72,6 +73,7 @@ export function bindRuntimeEvents(context: FeatureContext, state: RuntimeWorkben
         execute: (confirmationToken) => installRuntime("install_jdk", { version, distribution, switchAfterInstall: false, confirmationToken }),
       });
       state.operationResult = resultMessage(result, t("feature.runtimes.installJdk"));
+      await reloadRuntimeData(state);
     } catch (error) {
       state.operationError = errorMessage(error);
     }
@@ -80,8 +82,58 @@ export function bindRuntimeEvents(context: FeatureContext, state: RuntimeWorkben
   bindAction(context.root, "install-node", () => installWithRisk(context, state, "install_node", context.root.querySelector<HTMLSelectElement>("#node-version")?.value || "22"));
   bindAction(context.root, "install-python", () => installWithRisk(context, state, "install_python", context.root.querySelector<HTMLSelectElement>("#python-version")?.value || "3.12"));
   bindAction(context.root, "install-go", () => installWithRisk(context, state, "install_go", context.root.querySelector<HTMLSelectElement>("#go-version")?.value || "1.25"));
-  bindAction(context.root, "install-maven", () => installLatestWithRisk(context, state, "install_maven_latest", "Maven"));
-  bindAction(context.root, "install-gradle", () => installLatestWithRisk(context, state, "install_gradle_latest", "Gradle"));
+  bindAction(context.root, "install-maven", () => installSelectedWithRisk(context, state, "install_maven", "Maven", context.root.querySelector<HTMLSelectElement>("#maven-version")?.value || "latest"));
+  bindAction(context.root, "install-gradle", () => installSelectedWithRisk(context, state, "install_gradle", "Gradle", context.root.querySelector<HTMLSelectElement>("#gradle-version")?.value || "latest"));
+  bindAction(context.root, "export-runtime-report", async () => {
+    state.operationResult = "";
+    state.operationError = "";
+    context.progress.start(localize("Exporting runtime verification report", "正在导出运行时验证报告"));
+    try {
+      const path = await exportRuntimeVerificationReport("markdown");
+      state.operationResult = localize(`Runtime verification report exported: ${path}`, `运行时验证报告已导出：${path}`);
+      context.progress.done(state.operationResult);
+    } catch (error) {
+      state.operationError = errorMessage(error);
+      context.progress.fail(state.operationError);
+    }
+    renderAndBind(context, state);
+  });
+  bindAction(context.root, "execute-runtime-switch-plan", async () => {
+    const plan = state.switchPlan;
+    if (!plan) {
+      state.operationError = localize("Create a runtime switch plan first.", "请先创建运行时切换计划。");
+      renderAndBind(context, state);
+      return;
+    }
+    state.operationResult = "";
+    state.operationError = "";
+    try {
+      const result = await context.risk.run({
+        command: "execute_runtime_switch_plan",
+        actionId: "execute_runtime_switch_plan",
+        planId: plan.planId,
+        planFingerprint: plan.planFingerprint,
+        riskLevel: "medium",
+        backupReceipt: plan.backupName,
+        title: t("feature.runtimes.switchTitle", { name: plan.kind, version: plan.version }),
+        summary: localize("Switch the reviewed managed runtime, update the current pointer and user environment, then run command-level verification.", "切换已审阅的受管运行时，更新 current 指针和用户环境，并执行命令级强校验。"),
+        before: [
+          { label: localize("Previous version", "原版本"), value: plan.previousVersion || t("state.notAvailable") },
+          { label: localize("Target root", "目标目录"), value: plan.targetRoot },
+          { label: localize("Environment backup", "环境备份"), value: plan.backupName },
+        ],
+        warnings: plan.warnings,
+        execute: (confirmationToken) => executeRuntimeSwitchPlan(plan.planId, confirmationToken),
+      }) as RuntimeSwitchResult;
+      state.switchResult = result;
+      state.switchPlan = null;
+      state.operationResult = result.message;
+      await reloadRuntimeData(state);
+    } catch (error) {
+      state.operationError = errorMessage(error);
+    }
+    renderAndBind(context, state);
+  });
   bindAction(context.root, "verify-runtimes", async () => {
     context.progress.start(t("feature.runtimes.healthCheck"));
     state.operationResult = "";
@@ -100,28 +152,14 @@ export function bindRuntimeEvents(context: FeatureContext, state: RuntimeWorkben
   context.root.querySelectorAll<HTMLButtonElement>("[data-runtime-action]").forEach((button) => {
     button.addEventListener("click", () => runRuntimeRowAction(context, state, button));
   });
-  context.root.querySelectorAll<HTMLButtonElement>("[data-page-action]").forEach((button) => {
-    button.addEventListener("click", () => {
-      if (button.dataset.pageAction === "runtimes:prev") state.page = Math.max(1, state.page - 1);
-      if (button.dataset.pageAction === "runtimes:next") state.page += 1;
-      if (!context.isCurrent()) return;
-      context.root.innerHTML = renderRuntimeWorkbench(state);
-      bindRuntimeEvents(context, state);
-    });
-  });
 }
 
 export async function refreshRuntimes(context: FeatureContext, state: RuntimeWorkbenchState): Promise<void> {
-  const [runtimes, distributions, strongVerification] = await Promise.all([
-    discoverRuntimes(),
-    getJdkDistributions(),
-    inspectRuntimeStrongVerification(),
-  ]);
+  const [runtimes, distributions, strongVerification] = await loadRuntimeData();
   if (!context.isCurrent()) return;
   state.runtimes = runtimes;
   state.distributions = distributions;
   state.strongVerification = strongVerification;
-  state.page = 1;
   context.root.innerHTML = renderRuntimeWorkbench(state);
   bindRuntimeEvents(context, state);
 }
@@ -140,27 +178,29 @@ async function installWithRisk(context: FeatureContext, state: RuntimeWorkbenchS
       execute: (confirmationToken) => installRuntime(command, { version, confirmationToken }),
     });
     state.operationResult = resultMessage(result, t("feature.runtimes.installGenericTitle", { name: runtimeName(command), version }));
+    await reloadRuntimeData(state);
   } catch (error) {
     state.operationError = errorMessage(error);
   }
   renderAndBind(context, state);
 }
 
-async function installLatestWithRisk(context: FeatureContext, state: RuntimeWorkbenchState, command: "install_maven_latest" | "install_gradle_latest", label: string) {
+async function installSelectedWithRisk(context: FeatureContext, state: RuntimeWorkbenchState, command: "install_maven" | "install_gradle", label: string, version: string) {
   state.operationResult = "";
   state.operationError = "";
   try {
     const result = await context.risk.run({
       command,
-      planId: `${command}:latest`,
+      planId: `${command}:${version}`,
       riskLevel: "high",
-      title: t("feature.runtimes.installGenericTitle", { name: label, version: "latest" }),
+      title: t("feature.runtimes.installGenericTitle", { name: label, version }),
       summary: t("feature.runtimes.installGenericSummary"),
-      before: [{ label: t("feature.runtimes.version"), value: t("feature.runtimes.latest") }],
+      before: [{ label: t("feature.runtimes.version"), value: version === "latest" ? t("feature.runtimes.latest") : version }],
       warnings: [t("feature.runtimes.installGenericWarning")],
-      execute: (confirmationToken) => installRuntime(command, { confirmationToken }),
+      execute: (confirmationToken) => installRuntime(command, { version, confirmationToken }),
     });
-    state.operationResult = resultMessage(result, t("feature.runtimes.installGenericTitle", { name: label, version: "latest" }));
+    state.operationResult = resultMessage(result, t("feature.runtimes.installGenericTitle", { name: label, version }));
+    await reloadRuntimeData(state);
   } catch (error) {
     state.operationError = errorMessage(error);
   }
@@ -251,19 +291,12 @@ async function runRuntimeRowAction(context: FeatureContext, state: RuntimeWorkbe
   if (action === "switch") {
     state.operationResult = "";
     state.operationError = "";
+    state.switchResult = null;
     try {
-      const result = await context.risk.run({
-        command: "switch_runtime",
-        planId: `${kind}:${version}:${path}`,
-        riskLevel: "medium",
-        backupReceipt: `managed-runtime-current-pointer:${kind}:<pre-switch>`,
-        title: t("feature.runtimes.switchTitle", { name: label, version }),
-        summary: t("feature.runtimes.switchSummary"),
-        warnings: [t("feature.runtimes.switchWarning")],
-        execute: (confirmationToken) => switchRuntime(kind, version, path, confirmationToken),
-      });
-      state.operationResult = resultMessage(result, t("feature.runtimes.switchTitle", { name: label, version }));
+      state.switchPlan = await createRuntimeSwitchPlan(kind, version, path);
+      state.operationResult = localize("Runtime switch plan created. Review the backup and environment diff before execution.", "运行时切换计划已创建，请检查备份和环境差异后再执行。");
     } catch (error) {
+      state.switchPlan = null;
       state.operationError = errorMessage(error);
     }
     renderAndBind(context, state);
@@ -284,11 +317,27 @@ async function runRuntimeRowAction(context: FeatureContext, state: RuntimeWorkbe
         execute: (confirmationToken) => uninstallRuntime(kind, version, path, confirmationToken),
       });
       state.operationResult = resultMessage(result, t("feature.runtimes.uninstallTitle", { name: label, version }));
+      await reloadRuntimeData(state);
     } catch (error) {
       state.operationError = errorMessage(error);
     }
     renderAndBind(context, state);
   }
+}
+
+async function loadRuntimeData() {
+  return Promise.all([
+    discoverRuntimes(),
+    getJdkDistributions(),
+    inspectRuntimeStrongVerification(),
+  ]);
+}
+
+async function reloadRuntimeData(state: RuntimeWorkbenchState): Promise<void> {
+  const [runtimes, distributions, strongVerification] = await loadRuntimeData();
+  state.runtimes = runtimes;
+  state.distributions = distributions;
+  state.strongVerification = strongVerification;
 }
 
 function runtimeName(command: "install_node" | "install_python" | "install_go"): string {

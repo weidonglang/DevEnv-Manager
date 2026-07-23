@@ -12,7 +12,7 @@ TAURI_SRC = ROOT / "tauri" / "src"
 RUST_SRC = ROOT / "tauri" / "src-tauri" / "src"
 
 INVOKE_RE = re.compile(r"\binvoke(?:<[^>]+>)?\s*\(\s*[\"'`]([A-Za-z0-9_]+)[\"'`]")
-DYNAMIC_COMMAND_RE = re.compile(r"\b(?:installRuntime|installWithRisk|installLatestWithRisk)\s*\([^)]*[\"'`](install_[A-Za-z0-9_]+)[\"'`]", re.DOTALL)
+DYNAMIC_COMMAND_RE = re.compile(r"\b(?:installRuntime|installWithRisk|installSelectedWithRisk|installLatestWithRisk)\s*\([^)]*[\"'`](install_[A-Za-z0-9_]+)[\"'`]", re.DOTALL)
 VARIABLE_INVOKE_RE = re.compile(
     r"\bconst\s+(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*=\s*(?P<value>[^;]+);"
     r"(?P<tail>.{0,400}?)\binvoke(?:<[^>]+>)?\s*\(\s*(?P=name)\b",

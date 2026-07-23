@@ -234,6 +234,56 @@ pub fn run_probe_command(
     run_native_command_with_timeout(executable, args, timeout_seconds)
 }
 
+pub fn run_probe_command_with_env(
+    executable: impl AsRef<OsStr>,
+    args: &[&str],
+    timeout_seconds: u64,
+    environment: &[(&str, &str)],
+) -> Result<NativeCommandResult, String> {
+    let timeout_seconds = timeout_seconds.clamp(1, 300);
+    let executable_ref = executable.as_ref();
+    let executable_label = executable_ref.to_string_lossy().to_string();
+    let mut command = Command::new(executable_ref);
+    hide_command_window(&mut command);
+    command
+        .args(args)
+        .envs(environment.iter().copied())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    let start = Instant::now();
+    let mut child = command
+        .spawn()
+        .map_err(|err| format!("Failed to start {executable_label}: {err}"))?;
+    let mut timed_out = false;
+    loop {
+        if child
+            .try_wait()
+            .map_err(|err| format!("Failed to wait for {executable_label}: {err}"))?
+            .is_some()
+        {
+            break;
+        }
+        if start.elapsed() >= Duration::from_secs(timeout_seconds) {
+            timed_out = true;
+            let _ = child.kill();
+            break;
+        }
+        thread::sleep(Duration::from_millis(50));
+    }
+    let output = child
+        .wait_with_output()
+        .map_err(|err| format!("Failed to read {executable_label} output: {err}"))?;
+    Ok(NativeCommandResult {
+        success: output.status.success() && !timed_out,
+        exit_code: output.status.code(),
+        stdout: decode_output(&output.stdout),
+        stderr: decode_output(&output.stderr),
+        elapsed_ms: start.elapsed().as_millis(),
+        timed_out,
+        executable: executable_label,
+    })
+}
+
 pub fn native_command_message(result: &NativeCommandResult) -> String {
     let first_line = result
         .stderr

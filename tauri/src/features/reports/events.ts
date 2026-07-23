@@ -13,6 +13,7 @@ import {
   exportPortReport,
   exportProjectReport,
   exportPythonDiagnosticReport,
+  exportRuntimeVerificationReport,
   openReportLocation,
   runDoctorReport,
 } from "./api";
@@ -156,6 +157,7 @@ export function bindReportEvents(context: FeatureContext, state: ReportsWorkbenc
   bindAction(context.root, "export-cleanup-report", () => exportWithProgress(context, state, () => exportCleanupReport("json")));
   bindAction(context.root, "export-port-report", () => exportWithProgress(context, state, () => exportPortReport("json")));
   bindAction(context.root, "export-project-report", () => exportWithProgress(context, state, () => exportProjectReport("json")));
+  bindAction(context.root, "export-runtime-report", () => exportWithProgress(context, state, () => exportRuntimeVerificationReport("markdown")));
 }
 
 export async function refreshReports(context: FeatureContext, state: ReportsWorkbenchState): Promise<void> {

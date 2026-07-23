@@ -1,5 +1,5 @@
 import { invoke } from "../../core/invoke";
-import type { JdkDistribution, OperationResult, RuntimeInfo, RuntimeStrongVerificationReport, ValidationCheck } from "../../types";
+import type { JdkDistribution, OperationResult, RuntimeInfo, RuntimeStrongVerificationReport, RuntimeSwitchPlan, RuntimeSwitchResult, ValidationCheck } from "../../types";
 
 export function discoverRuntimes(): Promise<RuntimeInfo[]> {
   return invoke<RuntimeInfo[]>("discover_runtimes");
@@ -13,12 +13,20 @@ export function inspectRuntimeStrongVerification(): Promise<RuntimeStrongVerific
   return invoke<RuntimeStrongVerificationReport>("inspect_runtime_strong_verification");
 }
 
-export function installRuntime(command: "install_jdk" | "install_node" | "install_python" | "install_go" | "install_maven_latest" | "install_gradle_latest", args: Record<string, unknown>): Promise<OperationResult> {
+export function exportRuntimeVerificationReport(format: "markdown" | "json"): Promise<string> {
+  return invoke<string>("export_runtime_verification_report", { format });
+}
+
+export function installRuntime(command: "install_jdk" | "install_node" | "install_python" | "install_go" | "install_maven" | "install_gradle", args: Record<string, unknown>): Promise<OperationResult> {
   return invoke<OperationResult>(command, args);
 }
 
-export function switchRuntime(kind: string, version: string, path: string | null, confirmationToken: string): Promise<OperationResult> {
-  return invoke<OperationResult>("switch_runtime", { kind, version, path, confirmationToken });
+export function createRuntimeSwitchPlan(kind: string, version: string, path: string | null): Promise<RuntimeSwitchPlan> {
+  return invoke<RuntimeSwitchPlan>("create_runtime_switch_plan", { kind, version, path });
+}
+
+export function executeRuntimeSwitchPlan(planId: string, confirmationToken: string): Promise<RuntimeSwitchResult> {
+  return invoke<RuntimeSwitchResult>("execute_runtime_switch_plan", { planId, confirmationToken });
 }
 
 export function uninstallRuntime(kind: string, version: string, path: string | null, confirmationToken: string): Promise<OperationResult> {
