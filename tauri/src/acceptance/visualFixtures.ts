@@ -276,7 +276,7 @@ export function profilesVisualState(): ProfilesState {
   };
   state.historyResult = {
     success: true,
-    message: "Profile history fixture restore completed.",
+    message: "Restored 1 profiles from history snapshot profile-history-fixture",
     restoredHistoryId: "profile-history-fixture",
     backupHistoryId: "profile-history-backup-fixture",
     restoredProfileCount: 1,

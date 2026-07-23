@@ -14,7 +14,7 @@ export const zhCN = {
   "route.dashboard.label": "仪表盘",
   "route.dashboard.description": "健康摘要和安全快捷入口。",
   "route.runtimes.label": "运行时",
-  "route.runtimes.description": "JDK、Node.js、Python、Go、Maven 和 Gradle。",
+  "route.runtimes.description": "Java、Python、Node.js、Go、Maven、Gradle、Rust、.NET 和其他工具。",
   "route.environment.label": "环境",
   "route.environment.description": "JAVA_HOME、PATH、Maven、Gradle 和备份。",
   "route.projects.label": "项目",
@@ -98,7 +98,7 @@ export const zhCN = {
   "dashboard.openPortsToRetry": "你可以进入“端口与服务”页面手动重试。",
   "dashboard.sectionUnavailable": "{section} 暂不可用。",
 
-  "feature.runtimes.description": "通过计划优先的操作管理 JDK、Node、Python、Go、Maven 和 Gradle。",
+  "feature.runtimes.description": "明确区分受管与外部安装，统一管理 Java、Python、Node.js、Go、Maven、Gradle、Rust、.NET 和其他工具。",
   "feature.runtimes.installed": "已安装运行时",
   "feature.runtimes.distributions": "JDK 发行版",
   "feature.runtimes.verification": "强校验",
