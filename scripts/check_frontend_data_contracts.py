@@ -88,13 +88,15 @@ def main() -> int:
     runtime_events = read("tauri/src/features/runtimes/events.ts")
     if "runtime.managed ? renderManagedActions(runtime) : renderExternalActions(runtime)" not in runtime_render:
         return fail("Runtimes must render managed and external runtimes through separate action paths")
-    if "switchRuntime(kind, version, path" not in runtime_events or "uninstallRuntime(kind, version, path" not in runtime_events:
-        return fail("Managed runtime switch/uninstall buttons must execute through token-gated API calls")
+    for required in ["createRuntimeSwitchPlan", "executeRuntimeSwitchPlan", "uninstallRuntime(kind, version, path"]:
+        if required not in runtime_events:
+            return fail(f"Managed runtime actions must execute through plan/token-gated API calls: {required}")
     if "data-runtime-action" not in runtime_events:
         return fail("Runtime row actions must be bound from rendered rows")
-    if "pageItems(vm.rows" not in runtime_render or 'renderPagination("runtimes"' not in runtime_render:
-        return fail("Runtimes discovery list must be paginated")
-    for required in ["node-version", "python-version", "go-version", "install-maven", "install-gradle", "install_maven_latest", "install_gradle_latest"]:
+    for required in ["runtime-group-java", "runtime-group-python", "runtime-group-node", "runtime-group-go", "runtime-group-maven", "runtime-group-gradle", "runtime-group-rust", "runtime-group-dotnet"]:
+        if required not in runtime_render:
+            return fail(f"Runtimes discovery must render ecosystem groups: {required}")
+    for required in ["node-version", "python-version", "go-version", "install-maven", "install-gradle", '"install_maven"', '"install_gradle"']:
         if required not in runtime_render + runtime_events:
             return fail(f"Runtimes must expose multi-runtime install controls: {required}")
 

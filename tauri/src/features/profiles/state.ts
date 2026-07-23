@@ -1,4 +1,4 @@
-import type { ConfigProfile, ConfigProfileImportPreview, ProfileApplyPlan } from "../../types";
+import type { ConfigProfile, ConfigProfileHistoryEntry, ConfigProfileImportPreview, ProfileApplyPlan, ProfileHistoryRestorePlan, ProfileHistoryRestoreResult } from "../../types";
 
 export type ProfilesState = {
   profiles: ConfigProfile[];
@@ -9,6 +9,10 @@ export type ProfilesState = {
   importResult: string;
   operationResult: string;
   operationError: string;
+  history: ConfigProfileHistoryEntry[];
+  selectedHistoryId: string | null;
+  historyPlan: ProfileHistoryRestorePlan | null;
+  historyResult: ProfileHistoryRestoreResult | null;
   page: number;
 };
 
@@ -21,5 +25,9 @@ export const profilesInitialState: ProfilesState = {
   importResult: "",
   operationResult: "",
   operationError: "",
+  history: [],
+  selectedHistoryId: null,
+  historyPlan: null,
+  historyResult: null,
   page: 1,
 };

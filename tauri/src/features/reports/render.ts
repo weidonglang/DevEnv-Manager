@@ -30,6 +30,7 @@ export function renderReportsWorkbench(state: ReportsWorkbenchState): string {
           ${renderActionButton("export-cleanup-report", t("feature.reports.exportCleanup"))}
           ${renderActionButton("export-port-report", t("feature.reports.exportPort"))}
           ${renderActionButton("export-project-report", t("feature.reports.exportProject"))}
+          ${renderActionButton("export-runtime-report", label("Export runtime verification", "导出运行时验证报告"))}
         </div>
       </section>
       <section class="panel" data-testid="reports-doctor-result">
@@ -48,6 +49,7 @@ export function renderReportsWorkbench(state: ReportsWorkbenchState): string {
           ${renderReportCoverageRow(label("Cleanup report", "清理报告"), label("Markdown or JSON export from cleanup scan data", "从清理扫描数据导出 Markdown 或 JSON"), "available")}
           ${renderReportCoverageRow(label("Port report", "端口报告"), label("JSON export with port scan, history, and local service status", "导出包含端口扫描、历史和本地服务状态的 JSON"), "available")}
           ${renderReportCoverageRow(label("Project report", "项目报告"), label("JSON export with project analysis, config preview signals, ports, IDEA, and agent traces", "导出包含项目分析、配置预览信号、端口、IDEA 和代理轨迹的 JSON"), "available")}
+          ${renderReportCoverageRow(label("Runtime verification report", "运行时验证报告"), label("Markdown export with managed and external command-level verification", "导出包含受管与外部运行时命令级验证的 Markdown"), "available")}
         </div>
       </section>
       <section class="panel" data-testid="reports-export-result">

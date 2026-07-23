@@ -1,5 +1,5 @@
 import { escapeHtml, pageItems, renderActionButton, renderMetric, renderObjectTable, renderPagination, valueOf } from "../sharedView";
-import { t } from "../../core/i18n";
+import { localize, t } from "../../core/i18n";
 import { renderFeatureGuide } from "../../components/featureGuide";
 import type { ProfilesState } from "./state";
 
@@ -29,6 +29,23 @@ export function renderProfilesWorkbench(state: ProfilesState): string {
       <section class="panel" data-testid="profiles-list"><h2>${t("feature.profiles.profiles")}</h2><div class="data-table">${page.items.map((profile) => `<button class="data-row" data-profile-id="${escapeHtml(profile.id)}"><span>${escapeHtml(profile.name)}</span><span>${escapeHtml(profile.path)}</span><span>${escapeHtml(profile.createdAt)}</span></button>`).join("") || `<div class="empty">${t("feature.profiles.empty")}</div>`}</div>${renderPagination("profiles", page.page, page.totalPages, page.total)}</section>
       <section class="panel" data-testid="profiles-result"><h2>${t("feature.profiles.applyPlan")}</h2>${state.plan ? renderObjectTable(state.plan, ["profileName", "profileId", "runtimeSwitches", "missingRequirements", "willInstall", "willWriteEnvironment", "backupName", "warnings", "planId"]) : `<div class="empty">${t("feature.profiles.noApplyPlan")}</div>`}${renderOperationResult(state)}</section>
       <section class="panel"><h2>${t("feature.profiles.importPreview")}</h2>${state.importPreview ? renderObjectTable(state.importPreview, ["source", "exportedAt", "profiles"]) : `<div class="empty">${t("feature.profiles.noImportPreview")}</div>`}${state.importResult ? `<p>${escapeHtml(state.importResult)}</p>` : ""}</section>
+      <section class="panel" data-testid="profiles-history-section">
+        <div class="panel-head"><div><h2>${localize("Profile history", "配置档案历史")}</h2><p>${localize("Every profile mutation keeps the previous complete collection. Review a snapshot before restoring it.", "每次修改配置档案前都会保存完整旧状态；恢复前必须先预览计划。")}</p></div></div>
+        <div class="toolbar">
+          ${renderActionButton("refresh-profile-history", localize("Refresh history", "刷新历史"))}
+          ${renderActionButton("create-profile-history-restore-plan", localize("Create restore plan", "创建恢复计划"), "primary")}
+          ${renderActionButton("execute-profile-history-restore-plan", localize("Execute restore", "执行恢复"), "danger")}
+        </div>
+        <div class="data-table" data-testid="profiles-history-list">
+          ${state.history.map((entry) => `<button class="data-row ${entry.id === state.selectedHistoryId ? "is-selected" : ""}" data-profile-history-id="${escapeHtml(entry.id)}"><span>${escapeHtml(entry.createdAt)}</span><span>${escapeHtml(entry.reason)}</span><span>${entry.profileCount}</span></button>`).join("") || `<div class="empty">${localize("No profile history yet.", "尚无配置档案历史。")}</div>`}
+        </div>
+        <div data-testid="profiles-history-restore-plan">
+          ${state.historyPlan ? renderObjectTable(state.historyPlan, ["planId", "historyId", "snapshotCreatedAt", "snapshotReason", "profileCount", "backupHistoryId", "riskLevel", "planFingerprint", "warnings"]) : `<div class="empty">${localize("No restore plan.", "尚未创建恢复计划。")}</div>`}
+        </div>
+        <div data-testid="profiles-history-restore-result">
+          ${state.historyResult ? renderObjectTable(state.historyResult, ["success", "message", "restoredHistoryId", "backupHistoryId", "restoredProfileCount"]) : `<div class="empty">${localize("No restore has been executed.", "尚未执行历史恢复。")}</div>`}
+        </div>
+      </section>
     </div>
   `;
 }

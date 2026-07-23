@@ -293,7 +293,7 @@ def main() -> int:
 
     runtimes_render = (SRC / "features" / "runtimes" / "render.ts").read_text(encoding="utf-8")
     runtimes_events = (SRC / "features" / "runtimes" / "events.ts").read_text(encoding="utf-8")
-    for required in ["node-version", "python-version", "go-version", "install-maven", "install-gradle", "install_maven_latest", "install_gradle_latest"]:
+    for required in ["node-version", "python-version", "go-version", "install-maven", "install-gradle", '"install_maven"', '"install_gradle"', "runtime-switch-workflow"]:
         if required not in runtimes_render + runtimes_events:
             return fail(f"Runtimes workbench missing multi-version install coverage for {required}")
 

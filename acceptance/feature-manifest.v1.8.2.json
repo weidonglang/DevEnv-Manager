@@ -194,8 +194,8 @@
             "install_node",
             "install_python",
             "install_go",
-            "install_maven_latest",
-            "install_gradle_latest"
+            "install_maven",
+            "install_gradle"
           ],
           "backendExists": true,
           "frontendWired": true,
@@ -260,7 +260,8 @@
           "backendCommands": [
             "discover_runtimes",
             "inspect_runtime_strong_verification",
-            "switch_runtime",
+            "create_runtime_switch_plan",
+            "execute_runtime_switch_plan",
             "uninstall_runtime",
             "open_analysis_path",
             "open_apps_features"
@@ -279,7 +280,7 @@
           "requiresToken": true,
           "requiresVerify": true,
           "requiresRollback": false,
-          "requiresPagination": true,
+          "requiresPagination": false,
           "requiresI18n": true,
           "requiresDarkReadable": true,
           "safeSmokeMode": "dryRun",
@@ -371,7 +372,7 @@
           "name": "Runtime v1.9.0 architecture redesign",
           "priority": "P1",
           "targetVersion": "v1.9.0",
-          "status": "deferred",
+          "status": "implemented",
           "oldFeature": false,
           "oldEntry": null,
           "currentEntry": null,
@@ -379,7 +380,17 @@
           "frontendEntry": {
             "route": "runtimes",
             "testIds": [
-              "runtime-installed-list"
+              "runtime-installed-list",
+              "runtime-group-java",
+              "runtime-group-python",
+              "runtime-group-node",
+              "runtime-group-go",
+              "runtime-group-maven",
+              "runtime-group-gradle",
+              "runtime-group-rust",
+              "runtime-group-dotnet",
+              "runtime-switch-workflow",
+              "runtime-verification-result"
             ]
           },
           "selectors": {
@@ -387,9 +398,15 @@
             "result": "runtime-operation-result",
             "error": "runtime-operation-error"
           },
-          "backendCommands": [],
-          "backendExists": false,
-          "frontendWired": false,
+          "backendCommands": [
+            "discover_runtimes",
+            "inspect_runtime_strong_verification",
+            "export_runtime_verification_report",
+            "create_runtime_switch_plan",
+            "execute_runtime_switch_plan"
+          ],
+          "backendExists": true,
+          "frontendWired": true,
           "riskLevel": "medium",
           "requiresTauri": true,
           "requiresWindows": true,
@@ -401,23 +418,24 @@
           "requiresRiskPlan": true,
           "requiresToken": true,
           "requiresVerify": true,
-          "requiresRollback": false,
-          "requiresPagination": true,
+          "requiresRollback": true,
+          "requiresPagination": false,
           "requiresI18n": true,
           "requiresDarkReadable": true,
-          "safeSmokeMode": "manual",
-          "manualOnlyReason": "Large runtime model redesign belongs to #130 and v1.9.0.",
-          "deferredReason": "Tracked by #130; v1.8.2 only keeps basic action and safety coverage.",
+          "safeSmokeMode": "dryRun",
+          "manualOnlyReason": null,
+          "deferredReason": null,
           "testModes": [
             "static",
-            "manual"
+            "frontend",
+            "safe"
           ],
-          "manualAllowed": true,
+          "manualAllowed": false,
           "acceptanceChecks": [
-            "deferredReasonPresent",
+            "selectorsPresent",
             "debugContract",
             "riskContract",
-            "noReportNeeded"
+            "reportContract"
           ]
         }
       ]
@@ -2545,7 +2563,7 @@
           "name": "Profile history restore",
           "priority": "P1",
           "targetVersion": "v1.9.0",
-          "status": "deferred",
+          "status": "implemented",
           "oldFeature": false,
           "oldEntry": null,
           "currentEntry": null,
@@ -2553,45 +2571,53 @@
           "frontendEntry": {
             "route": "profiles",
             "testIds": [
-              "profiles-history-restore"
+              "profiles-history-section",
+              "profiles-history-list",
+              "profiles-history-restore-plan",
+              "profiles-history-restore-result"
             ]
           },
           "selectors": {
-            "entry": "profiles-history-restore",
-            "result": "profiles-result",
-            "error": "profiles-error"
+            "entry": "profiles-history-section",
+            "result": "profiles-history-restore-result",
+            "error": "profiles-operation-result"
           },
-          "backendCommands": [],
-          "backendExists": false,
-          "frontendWired": false,
-          "riskLevel": "high",
+          "backendCommands": [
+            "list_config_profile_history",
+            "create_profile_history_restore_plan",
+            "execute_profile_history_restore_plan"
+          ],
+          "backendExists": true,
+          "frontendWired": true,
+          "riskLevel": "medium",
           "requiresTauri": true,
           "requiresWindows": true,
           "requiresLoading": true,
           "requiresResultArea": true,
           "requiresErrorArea": true,
           "requiresDebug": true,
-          "requiresReport": true,
+          "requiresReport": false,
           "requiresRiskPlan": true,
           "requiresToken": true,
           "requiresVerify": true,
           "requiresRollback": true,
-          "requiresPagination": true,
+          "requiresPagination": false,
           "requiresI18n": true,
           "requiresDarkReadable": true,
-          "safeSmokeMode": "manual",
-          "manualOnlyReason": "No durable profile-history backend model/storage/command exists yet.",
-          "deferredReason": "Tracked by the v1.9.0 Profile schema v2 work; no durable profile-history backend model/storage/command exists in v1.8.x.",
+          "safeSmokeMode": "dryRun",
+          "manualOnlyReason": null,
+          "deferredReason": null,
           "testModes": [
             "static",
-            "manual"
+            "frontend",
+            "safe"
           ],
-          "manualAllowed": true,
+          "manualAllowed": false,
           "acceptanceChecks": [
-            "deferredReasonPresent",
+            "selectorsPresent",
             "debugContract",
             "riskContract",
-            "noReportNeeded"
+            "resultPanelVisible"
           ]
         }
       ]

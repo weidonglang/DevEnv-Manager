@@ -1,10 +1,12 @@
 import { renderCleanupWorkbench } from "../features/cleanup/render";
 import { renderFileAssociations } from "../features/fileAssociations/render";
 import { renderPortsWorkbench } from "../features/ports/render";
+import { renderProfilesWorkbench } from "../features/profiles/render";
 import { renderRuntimeWorkbench } from "../features/runtimes/render";
 import { renderToolchainWorkbench } from "../features/toolchains/render";
 import { acceptanceFixtures } from "./fixtures";
 import { acceptanceSelectors } from "./selectors";
+import { profilesVisualState } from "./visualFixtures";
 
 export type FrontendAcceptanceResult = {
   caseId: string;
@@ -18,6 +20,7 @@ const pageHtml = {
   runtimes: () => renderRuntimeWorkbench(acceptanceFixtures.runtimes),
   fileAssociations: () => renderFileAssociations(acceptanceFixtures.fileAssociations),
   toolchains: () => renderToolchainWorkbench(acceptanceFixtures.toolchains),
+  profiles: () => renderProfilesWorkbench(profilesVisualState()),
 };
 
 export function renderAcceptancePage(pageId: keyof typeof pageHtml): string {
@@ -36,6 +39,12 @@ export function runFrontendAcceptanceSnapshot(): FrontendAcceptanceResult[] {
   const runtimeHtml = renderAcceptancePage("runtimes");
   checks.push(hasSelector("runtime.install.jdk", runtimeHtml, acceptanceSelectors.runtime.installJdkGroup));
   checks.push(hasSelector("runtime.install.node", runtimeHtml, acceptanceSelectors.runtime.installNodeGroup));
+  for (const group of ["javaGroup", "pythonGroup", "nodeGroup", "goGroup", "mavenGroup", "gradleGroup", "rustGroup", "dotnetGroup"] as const) {
+    checks.push(hasSelector(`runtime.group.${group}`, runtimeHtml, acceptanceSelectors.runtime[group]));
+  }
+  checks.push(hasSelector("runtime.switch.workflow", runtimeHtml, acceptanceSelectors.runtime.switchWorkflow));
+  checks.push(hasSelector("runtime.switch.plan", runtimeHtml, acceptanceSelectors.runtime.switchPlan));
+  checks.push(hasSelector("runtime.switch.result", runtimeHtml, acceptanceSelectors.runtime.switchResult));
 
   const fileAssocHtml = renderAcceptancePage("fileAssociations");
   checks.push(hasSelector("fileAssociations.search", fileAssocHtml, acceptanceSelectors.fileAssociations.searchInput));
@@ -66,6 +75,11 @@ export function runFrontendAcceptanceSnapshot(): FrontendAcceptanceResult[] {
   const toolchainsHtml = renderAcceptancePage("toolchains");
   for (const [name, selector] of Object.entries(acceptanceSelectors.toolchains)) {
     checks.push(hasSelector(`toolchains.${name}`, toolchainsHtml, selector));
+  }
+
+  const profilesHtml = renderAcceptancePage("profiles");
+  for (const [name, selector] of Object.entries(acceptanceSelectors.profiles)) {
+    checks.push(hasSelector(`profiles.${name}`, profilesHtml, selector));
   }
 
   return checks;

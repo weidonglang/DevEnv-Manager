@@ -331,11 +331,15 @@ fn runtime_lifecycle_fixture(
     let mut zip = zip::ZipWriter::new(archive_file);
     let options = zip::write::SimpleFileOptions::default()
         .compression_method(zip::CompressionMethod::Deflated);
-    for (name, content) in [
-        ("node.exe", b"fixture-node".as_slice()),
-        ("npm.cmd", b"@echo fixture-npm\r\n".as_slice()),
-        ("npx.cmd", b"@echo fixture-npx\r\n".as_slice()),
-    ] {
+    let fixture_executable = fs::read(std::env::current_exe().map_err(|error| error.to_string())?)
+        .map_err(|error| error.to_string())?;
+    let npm_fixture = b"@echo off\r\nif \"%1 %2 %3\"==\"config get registry\" (echo https://registry.npmjs.org/) else if \"%1 %2\"==\"config get\" (echo C:\\fixture-npm) else (echo 10.0.0)\r\n";
+    let files = [
+        ("node.exe", fixture_executable.as_slice()),
+        ("npm.cmd", npm_fixture.as_slice()),
+        ("npx.cmd", b"@echo 10.0.0\r\n".as_slice()),
+    ];
+    for (name, content) in files {
         zip.start_file(name, options)
             .map_err(|error| error.to_string())?;
         zip.write_all(content).map_err(|error| error.to_string())?;

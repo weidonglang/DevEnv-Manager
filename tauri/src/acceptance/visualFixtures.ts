@@ -36,8 +36,8 @@ export function dashboardVisualState(): DashboardState {
     killedProcessTree: false,
   };
   state.update = {
-    currentVersion: "1.8.3",
-    latestVersion: "1.8.3",
+    currentVersion: "1.9.0",
+    latestVersion: "1.9.0",
     updateAvailable: false,
     date: "2026-07-22",
     notes: ["Visual acceptance fixture"],
@@ -47,7 +47,7 @@ export function dashboardVisualState(): DashboardState {
     sourceUrl: "https://github.com/weidonglang/DevEnv-Manager",
     failedSources: [],
     mirrors: [],
-    fileName: "DevEnv.Manager_1.8.3_x64-setup.exe",
+    fileName: "DevEnv.Manager_1.9.0_x64-setup.exe",
     platform: "windows-x86_64",
     size: 1,
     checkedAt: "2026-07-22T08:00:00Z",
@@ -254,6 +254,33 @@ export function profilesVisualState(): ProfilesState {
     warnings: ["Open terminals and IDEs must be restarted after the switch."],
   };
   state.operationResult = "Profile preview is ready; no changes were applied by this fixture.";
+  state.history = [{
+    id: "profile-history-fixture",
+    createdAt: "2026-07-22T07:30:00Z",
+    reason: "Before saving profile: Java 21 + Node 22",
+    profileCount: 1,
+    fingerprint: "profile-history-fingerprint",
+    profiles: [state.profiles[0]],
+  }];
+  state.selectedHistoryId = "profile-history-fixture";
+  state.historyPlan = {
+    planId: "profile-history-restore-fixture",
+    historyId: "profile-history-fixture",
+    snapshotCreatedAt: "2026-07-22T07:30:00Z",
+    snapshotReason: "Before saving profile: Java 21 + Node 22",
+    profileCount: 1,
+    backupHistoryId: "profile-history-backup-fixture",
+    riskLevel: "medium",
+    planFingerprint: "profile-history-plan-fingerprint",
+    warnings: ["The plan is single-use and keeps the current profile collection as a backup."],
+  };
+  state.historyResult = {
+    success: true,
+    message: "Profile history fixture restore completed.",
+    restoredHistoryId: "profile-history-fixture",
+    backupHistoryId: "profile-history-backup-fixture",
+    restoredProfileCount: 1,
+  };
   return state;
 }
 
@@ -296,8 +323,8 @@ export function settingsVisualState(theme: SettingsWorkbenchState["theme"]): Set
     killedProcessTree: false,
   };
   state.update = {
-    currentVersion: "1.8.3",
-    latestVersion: "1.8.3",
+    currentVersion: "1.9.0",
+    latestVersion: "1.9.0",
     updateAvailable: false,
     date: "2026-07-22",
     notes: ["Visual acceptance fixture"],
@@ -307,7 +334,7 @@ export function settingsVisualState(theme: SettingsWorkbenchState["theme"]): Set
     sourceUrl: "https://github.com/weidonglang/DevEnv-Manager",
     failedSources: [],
     mirrors: [{ name: "Gitee", region: "CN", url: "https://gitee.com/weidonglang/DevEnv-Manager/releases" }],
-    fileName: "DevEnv.Manager_1.8.3_x64-setup.exe",
+    fileName: "DevEnv.Manager_1.9.0_x64-setup.exe",
     platform: "windows-x86_64",
     size: 2675263,
     checkedAt: "2026-07-22T08:00:00Z",

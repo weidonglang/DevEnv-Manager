@@ -1,17 +1,18 @@
-import type { JdkDistribution, RuntimeInfo, RuntimeStrongVerificationReport, ValidationCheck } from "../../types";
+import type { JdkDistribution, RuntimeInfo, RuntimeStrongVerificationReport, RuntimeSwitchPlan, RuntimeSwitchResult, ValidationCheck } from "../../types";
 
 export type RuntimeWorkbenchState = {
   runtimes: RuntimeInfo[];
   distributions: JdkDistribution[];
   strongVerification: RuntimeStrongVerificationReport | null;
   selectedRuntimeId: string | null;
+  switchPlan: RuntimeSwitchPlan | null;
+  switchResult: RuntimeSwitchResult | null;
   operationResult: string;
   operationError: string;
   externalJdkPath: string;
   externalJdkChecks: ValidationCheck[];
   externalJdkResult: string;
   externalJdkError: string;
-  page: number;
 };
 
 export const runtimeWorkbenchInitialState: RuntimeWorkbenchState = {
@@ -19,11 +20,12 @@ export const runtimeWorkbenchInitialState: RuntimeWorkbenchState = {
   distributions: [],
   strongVerification: null,
   selectedRuntimeId: null,
+  switchPlan: null,
+  switchResult: null,
   operationResult: "",
   operationError: "",
   externalJdkPath: "",
   externalJdkChecks: [],
   externalJdkResult: "",
   externalJdkError: "",
-  page: 1,
 };

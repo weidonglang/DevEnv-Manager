@@ -169,6 +169,7 @@ export type PythonIntegrityReport = {
 export type RuntimeStrongVerificationReport = {
   generatedAt: string;
   items: Array<{
+    runtimeId: string;
     kind: string;
     version: string;
     path: string;
@@ -176,11 +177,48 @@ export type RuntimeStrongVerificationReport = {
     current: boolean;
     environmentEffective: boolean;
     status: string;
-    checks: ValidationCheck[];
+    checks: RuntimeVerificationCheck[];
     failureStage?: string;
     report: string[];
   }>;
   summary: string[];
+};
+
+export type RuntimeVerificationCheck = {
+  id: string;
+  label: string;
+  command: string;
+  expected: string;
+  actual: string;
+  status: "passed" | "failed" | "skipped";
+  error?: string;
+  elapsedMs: number;
+  required: boolean;
+  suggestion: string;
+};
+
+export type RuntimeSwitchPlan = {
+  planId: string;
+  createdAt: string;
+  kind: string;
+  version: string;
+  targetRoot: string;
+  previousVersion?: string;
+  previousRoot?: string;
+  environmentChanges: string[];
+  pathDiff: string[];
+  backupName: string;
+  warnings: string[];
+  riskLevel: string;
+  planFingerprint: string;
+};
+
+export type RuntimeSwitchResult = {
+  success: boolean;
+  message: string;
+  planId: string;
+  backupName: string;
+  verification: RuntimeStrongVerificationReport["items"][number];
 };
 
 export type IdeaProjectReport = {
@@ -222,10 +260,17 @@ export type KillResult = OperationResult & {
 };
 
 export type RuntimeInfo = {
+  id: string;
   kind: string;
+  displayName: string;
+  ecosystem: string;
   version: string;
   executable: string;
+  runtimeRoot: string;
   source: string;
+  management: "managed" | "external";
+  current: boolean;
+  installedAt?: string;
 };
 
 export type JavaEnvironmentReport = {
@@ -467,6 +512,35 @@ export type ConfigProfile = {
   devenvHome?: string;
   javaHome?: string;
   path: string;
+};
+
+export type ConfigProfileHistoryEntry = {
+  id: string;
+  createdAt: string;
+  reason: string;
+  profileCount: number;
+  fingerprint: string;
+  profiles: ConfigProfile[];
+};
+
+export type ProfileHistoryRestorePlan = {
+  planId: string;
+  historyId: string;
+  snapshotCreatedAt: string;
+  snapshotReason: string;
+  profileCount: number;
+  backupHistoryId: string;
+  riskLevel: string;
+  planFingerprint: string;
+  warnings: string[];
+};
+
+export type ProfileHistoryRestoreResult = {
+  success: boolean;
+  message: string;
+  restoredHistoryId: string;
+  backupHistoryId: string;
+  restoredProfileCount: number;
 };
 
 export type DoctorReport = {

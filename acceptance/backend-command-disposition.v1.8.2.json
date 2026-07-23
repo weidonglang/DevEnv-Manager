@@ -2003,7 +2003,7 @@
     {
       "command": "install_gradle_latest",
       "oldCommand": "install_gradle_latest",
-      "currentCommand": "install_gradle_latest",
+      "currentCommand": "install_gradle",
       "capabilityId": "runtime.install",
       "frontendLocation": [],
       "dynamicWrapper": [
@@ -2011,17 +2011,19 @@
         "tauri/src/features/runtimes/events.ts",
         "tauri/src/features/runtimes/events.ts"
       ],
-      "replacementChain": [],
-      "replacementResolution": "not-required",
+      "replacementChain": [
+        "install_gradle"
+      ],
+      "replacementResolution": "explicit-replacement",
       "testEvidence": [
         "feature-manifest:runtime.install.groups"
       ],
-      "classification": "dynamic-user-command",
+      "classification": "compatibility-alias",
       "releaseDisposition": "ready",
-      "exactReason": "A recognized dynamic invoke wrapper exposes this command.",
-      "compatibilityConsumer": null,
-      "compatibilityTest": null,
-      "removalCondition": null,
+      "exactReason": "The latest-only command remains registered for profile and v1.8 compatibility; the v1.9 frontend uses the selected-version install_gradle command.",
+      "compatibilityConsumer": "v1.8 frontend, profile automation, or external automation",
+      "compatibilityTest": "Runtime installer compatibility tests",
+      "removalCondition": "Remove after all profile and external callers use install_gradle",
       "followUpIssue": null
     },
     {
@@ -2049,23 +2051,25 @@
     {
       "command": "install_maven_latest",
       "oldCommand": "install_maven_latest",
-      "currentCommand": "install_maven_latest",
+      "currentCommand": "install_maven",
       "capabilityId": "runtime.install",
       "frontendLocation": [],
       "dynamicWrapper": [
         "tauri/src/features/runtimes/events.ts"
       ],
-      "replacementChain": [],
-      "replacementResolution": "not-required",
+      "replacementChain": [
+        "install_maven"
+      ],
+      "replacementResolution": "explicit-replacement",
       "testEvidence": [
         "feature-manifest:runtime.install.groups"
       ],
-      "classification": "dynamic-user-command",
+      "classification": "compatibility-alias",
       "releaseDisposition": "ready",
-      "exactReason": "A recognized dynamic invoke wrapper exposes this command.",
-      "compatibilityConsumer": null,
-      "compatibilityTest": null,
-      "removalCondition": null,
+      "exactReason": "The latest-only command remains registered for profile and v1.8 compatibility; the v1.9 frontend uses the selected-version install_maven command.",
+      "compatibilityConsumer": "v1.8 frontend, profile automation, or external automation",
+      "compatibilityTest": "Runtime installer compatibility tests",
+      "removalCondition": "Remove after all profile and external callers use install_maven",
       "followUpIssue": null
     },
     {
@@ -3494,23 +3498,24 @@
     {
       "command": "switch_runtime",
       "oldCommand": "switch_runtime",
-      "currentCommand": "switch_runtime",
+      "currentCommand": "execute_runtime_switch_plan",
       "capabilityId": "runtime.switch",
-      "frontendLocation": [
-        "tauri/src/features/runtimes/api.ts:21"
-      ],
+      "frontendLocation": [],
       "dynamicWrapper": [],
-      "replacementChain": [],
-      "replacementResolution": "not-required",
+      "replacementChain": [
+        "create_runtime_switch_plan",
+        "execute_runtime_switch_plan"
+      ],
+      "replacementResolution": "explicit-replacement",
       "testEvidence": [
         "feature-manifest:runtime.installed.actions"
       ],
-      "classification": "direct-user-command",
+      "classification": "compatibility-alias",
       "releaseDisposition": "ready",
-      "exactReason": "A current frontend invoke exposes this command.",
-      "compatibilityConsumer": null,
-      "compatibilityTest": null,
-      "removalCondition": null,
+      "exactReason": "The direct switch command remains for CLI and v1.8 compatibility; the v1.9 frontend requires a backend-created single-use switch plan.",
+      "compatibilityConsumer": "CLI, v1.8 frontend, or external automation",
+      "compatibilityTest": "Runtime switch compatibility tests",
+      "removalCondition": "Remove after CLI and external callers migrate to the plan commands",
       "followUpIssue": null
     },
     {

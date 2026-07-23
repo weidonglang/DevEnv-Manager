@@ -1,5 +1,5 @@
 import { invoke } from "../../core/invoke";
-import type { ConfigProfile, ConfigProfileImportPreview, OperationResult, ProfileApplyPlan } from "../../types";
+import type { ConfigProfile, ConfigProfileHistoryEntry, ConfigProfileImportPreview, OperationResult, ProfileApplyPlan, ProfileHistoryRestorePlan, ProfileHistoryRestoreResult } from "../../types";
 
 export function listProfiles(): Promise<ConfigProfile[]> {
   return invoke<ConfigProfile[]>("list_config_profiles");
@@ -39,4 +39,16 @@ export function renameConfigProfile(id: string, name: string): Promise<Operation
 
 export function copyConfigProfile(id: string, name: string): Promise<OperationResult> {
   return invoke<OperationResult>("copy_config_profile", { id, name });
+}
+
+export function listConfigProfileHistory(): Promise<ConfigProfileHistoryEntry[]> {
+  return invoke<ConfigProfileHistoryEntry[]>("list_config_profile_history");
+}
+
+export function createProfileHistoryRestorePlan(historyId: string): Promise<ProfileHistoryRestorePlan> {
+  return invoke<ProfileHistoryRestorePlan>("create_profile_history_restore_plan", { historyId });
+}
+
+export function executeProfileHistoryRestorePlan(planId: string, confirmationToken: string): Promise<ProfileHistoryRestoreResult> {
+  return invoke<ProfileHistoryRestoreResult>("execute_profile_history_restore_plan", { planId, confirmationToken });
 }

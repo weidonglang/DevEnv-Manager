@@ -89,7 +89,8 @@ def main() -> None:
     require(runtime_render, "runtime-external-jdk-result", "Runtime render")
     require(runtime_render, "java executable", "Runtime executable evidence")
     require(runtime_render, "Suggested JAVA_HOME", "Runtime JAVA_HOME guidance")
-    require(runtime_render, "row.backendKind === \"jdk\" && !row.managed", "External-only JDK candidates")
+    require(runtime_render, "renderExternalJdkPanel(state, group.external)", "External-only JDK group boundary")
+    require(runtime_render, 'candidates.filter((candidate) => candidate.backendKind === "jdk")', "External JDK candidate filter")
 
     print("Environment and external JDK workflow check passed.")
 

@@ -8,6 +8,7 @@ mod mysql_repair;
 mod port_scan;
 mod powershell_runner;
 mod process_identity;
+mod runtime_verification;
 mod safety;
 
 #[cfg(feature = "acceptance-fixtures")]
@@ -241,6 +242,49 @@ struct PendingProfileApplyPlan {
     requirements_fingerprint: String,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct ConfigProfileHistoryEntry {
+    id: String,
+    created_at: String,
+    reason: String,
+    profile_count: usize,
+    fingerprint: String,
+    profiles: Vec<ConfigProfile>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct ProfileHistoryRestorePlan {
+    plan_id: String,
+    history_id: String,
+    snapshot_created_at: String,
+    snapshot_reason: String,
+    profile_count: usize,
+    backup_history_id: String,
+    risk_level: String,
+    plan_fingerprint: String,
+    warnings: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct ProfileHistoryRestoreResult {
+    success: bool,
+    message: String,
+    restored_history_id: String,
+    backup_history_id: String,
+    restored_profile_count: usize,
+}
+
+#[derive(Clone)]
+struct PendingProfileHistoryRestorePlan {
+    public: ProfileHistoryRestorePlan,
+    current_profiles_fingerprint: String,
+    target_profiles: Vec<ConfigProfile>,
+    target_profiles_fingerprint: String,
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct PathSummary {
@@ -370,13 +414,20 @@ struct PendingEnvironmentConfig {
 static ENVIRONMENT_PREVIEWS: OnceLock<Mutex<HashMap<String, PendingEnvironmentConfig>>> =
     OnceLock::new();
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 struct RuntimeInfo {
+    id: String,
     kind: String,
+    display_name: String,
+    ecosystem: String,
     version: String,
     executable: String,
+    runtime_root: String,
     source: String,
+    management: String,
+    current: bool,
+    installed_at: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -873,6 +924,7 @@ struct PythonIntegrityReport {
 #[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 struct RuntimeStrongStatus {
+    runtime_id: String,
     kind: String,
     version: String,
     path: String,
@@ -880,7 +932,7 @@ struct RuntimeStrongStatus {
     current: bool,
     environment_effective: bool,
     status: String,
-    checks: Vec<ValidationCheck>,
+    checks: Vec<runtime_verification::RuntimeVerificationCheck>,
     failure_stage: Option<String>,
     report: Vec<String>,
 }
@@ -891,6 +943,40 @@ struct RuntimeStrongVerificationReport {
     generated_at: String,
     items: Vec<RuntimeStrongStatus>,
     summary: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct RuntimeSwitchPlan {
+    plan_id: String,
+    created_at: String,
+    kind: String,
+    version: String,
+    target_root: String,
+    previous_version: Option<String>,
+    previous_root: Option<String>,
+    environment_changes: Vec<String>,
+    path_diff: Vec<String>,
+    backup_name: String,
+    warnings: Vec<String>,
+    risk_level: String,
+    plan_fingerprint: String,
+}
+
+#[derive(Debug, Clone)]
+struct PendingRuntimeSwitchPlan {
+    public: RuntimeSwitchPlan,
+    installed_fingerprint: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RuntimeSwitchResult {
+    success: bool,
+    message: String,
+    plan_id: String,
+    backup_name: String,
+    verification: RuntimeStrongStatus,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -1301,6 +1387,11 @@ static PORT_RESOLUTION_PLANS: OnceLock<Mutex<HashMap<String, PortResolutionPlan>
     OnceLock::new();
 static PROFILE_APPLY_PLANS: OnceLock<Mutex<HashMap<String, PendingProfileApplyPlan>>> =
     OnceLock::new();
+static PROFILE_HISTORY_RESTORE_PLANS: OnceLock<
+    Mutex<HashMap<String, PendingProfileHistoryRestorePlan>>,
+> = OnceLock::new();
+static RUNTIME_SWITCH_PLANS: OnceLock<Mutex<HashMap<String, PendingRuntimeSwitchPlan>>> =
+    OnceLock::new();
 static DOCTOR_REPAIR_PLANS: OnceLock<Mutex<HashMap<String, PendingDoctorRepairPlan>>> =
     OnceLock::new();
 static GENERIC_ARCHIVE_PLANS: OnceLock<Mutex<HashMap<String, GenericArchivePlan>>> =
@@ -1331,6 +1422,15 @@ fn port_resolution_plans() -> &'static Mutex<HashMap<String, PortResolutionPlan>
 
 fn profile_apply_plans() -> &'static Mutex<HashMap<String, PendingProfileApplyPlan>> {
     PROFILE_APPLY_PLANS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn profile_history_restore_plans(
+) -> &'static Mutex<HashMap<String, PendingProfileHistoryRestorePlan>> {
+    PROFILE_HISTORY_RESTORE_PLANS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn runtime_switch_plans() -> &'static Mutex<HashMap<String, PendingRuntimeSwitchPlan>> {
+    RUNTIME_SWITCH_PLANS.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
 fn doctor_repair_plans() -> &'static Mutex<HashMap<String, PendingDoctorRepairPlan>> {
@@ -1431,6 +1531,14 @@ const RISK_OPERATION_REGISTRY: &[RiskOperationSpec] = &[
         description: "Install missing runtimes and apply config profile",
     },
     RiskOperationSpec {
+        command: "execute_profile_history_restore_plan",
+        action_id: "execute_profile_history_restore_plan",
+        risk_level: "medium",
+        requires_backup: true,
+        requires_token: true,
+        description: "Restore a reviewed configuration profile history snapshot",
+    },
+    RiskOperationSpec {
         command: "execute_doctor_repair_plan",
         action_id: "execute_doctor_repair_plan",
         risk_level: "high",
@@ -1447,6 +1555,14 @@ const RISK_OPERATION_REGISTRY: &[RiskOperationSpec] = &[
         description: "Switch managed runtime current pointer and environment",
     },
     RiskOperationSpec {
+        command: "execute_runtime_switch_plan",
+        action_id: "execute_runtime_switch_plan",
+        risk_level: "medium",
+        requires_backup: true,
+        requires_token: true,
+        description: "Execute a backend-created managed runtime switch plan",
+    },
+    RiskOperationSpec {
         command: "uninstall_runtime",
         action_id: "uninstall_runtime",
         risk_level: "high",
@@ -1460,47 +1576,65 @@ const RISK_OPERATION_REGISTRY: &[RiskOperationSpec] = &[
         risk_level: "high",
         requires_backup: false,
         requires_token: true,
-        description: "Install managed JDK and optionally switch current runtime",
+        description: "Install and verify a managed JDK without switching current runtime",
     },
     RiskOperationSpec {
         command: "install_node",
         action_id: "install_node",
         risk_level: "high",
-        requires_backup: true,
+        requires_backup: false,
         requires_token: true,
-        description: "Install managed Node.js and switch current runtime",
+        description: "Install and verify managed Node.js without switching current runtime",
     },
     RiskOperationSpec {
         command: "install_python",
         action_id: "install_python",
         risk_level: "high",
-        requires_backup: true,
+        requires_backup: false,
         requires_token: true,
-        description: "Install managed Python and switch current runtime",
+        description: "Install and verify managed Python without switching current runtime",
     },
     RiskOperationSpec {
         command: "install_go",
         action_id: "install_go",
         risk_level: "high",
-        requires_backup: true,
+        requires_backup: false,
         requires_token: true,
-        description: "Install managed Go and switch current runtime",
+        description: "Install and verify managed Go without switching current runtime",
     },
     RiskOperationSpec {
         command: "install_maven_latest",
         action_id: "install_maven_latest",
         risk_level: "high",
-        requires_backup: true,
+        requires_backup: false,
         requires_token: true,
-        description: "Install managed Maven and switch current runtime",
+        description: "Install and verify managed Maven without switching current runtime",
+    },
+    RiskOperationSpec {
+        command: "install_maven",
+        action_id: "install_maven",
+        risk_level: "high",
+        requires_backup: false,
+        requires_token: true,
+        description:
+            "Install and verify a selected managed Maven version without switching current runtime",
     },
     RiskOperationSpec {
         command: "install_gradle_latest",
         action_id: "install_gradle_latest",
         risk_level: "high",
-        requires_backup: true,
+        requires_backup: false,
         requires_token: true,
-        description: "Install managed Gradle and switch current runtime",
+        description: "Install and verify managed Gradle without switching current runtime",
+    },
+    RiskOperationSpec {
+        command: "install_gradle",
+        action_id: "install_gradle",
+        risk_level: "high",
+        requires_backup: false,
+        requires_token: true,
+        description:
+            "Install and verify a selected managed Gradle version without switching current runtime",
     },
     RiskOperationSpec {
         command: "manage_system_platform",
@@ -3825,13 +3959,19 @@ fn discover_runtimes_blocking() -> Vec<RuntimeInfo> {
         ("Java", "java", vec!["-version"]),
         ("Python", "python", vec!["--version"]),
         ("Python Launcher", "py", vec!["--version"]),
+        ("pip", "pip", vec!["--version"]),
         ("Node.js", "node", vec!["--version"]),
         ("npm", "npm", vec!["--version"]),
+        ("npx", "npx", vec!["--version"]),
+        ("Corepack", "corepack", vec!["--version"]),
+        ("pnpm", "pnpm", vec!["--version"]),
+        ("Yarn", "yarn", vec!["--version"]),
         ("Maven", "mvn", vec!["--version"]),
         ("Gradle", "gradle", vec!["--version"]),
         ("Go", "go", vec!["version"]),
         ("Rust", "rustc", vec!["--version"]),
         ("Cargo", "cargo", vec!["--version"]),
+        ("rustup", "rustup", vec!["show", "active-toolchain"]),
         (".NET SDK", "dotnet", vec!["--version"]),
     ] {
         for candidate in find_all_on_path(exe) {
@@ -3865,10 +4005,12 @@ fn discover_runtimes_blocking() -> Vec<RuntimeInfo> {
     }
     add_python_launcher_discoveries(&mut runtimes);
     add_python_registry_discoveries(&mut runtimes);
+    mark_path_current_runtimes(&mut runtimes);
 
     runtimes.sort_by(|a, b| {
-        a.kind
-            .cmp(&b.kind)
+        a.ecosystem
+            .cmp(&b.ecosystem)
+            .then(a.management.cmp(&b.management).reverse())
             .then(
                 version_key(&a.version)
                     .cmp(&version_key(&b.version))
@@ -3890,10 +4032,22 @@ fn inspect_runtime_strong_verification() -> Result<RuntimeStrongVerificationRepo
             items.push(verify_registered_runtime(&paths, &installed, meta, record));
         }
     }
+    let managed_ids = items
+        .iter()
+        .map(|item| item.runtime_id.clone())
+        .collect::<BTreeSet<_>>();
+    for runtime in discover_runtimes_blocking()
+        .into_iter()
+        .filter(|runtime| runtime.management != "managed")
+        .filter(|runtime| !managed_ids.contains(&runtime.id))
+    {
+        items.push(verify_external_runtime(runtime));
+    }
     let summary = vec![
         "目录存在只代表文件夹存在；版本命令通过才代表基本能运行。".to_string(),
         "组件检查通过才代表开发所需组件完整；环境生效还需要 current 指针和用户 PATH/JAVA_HOME 命中。"
             .to_string(),
+        "外部安装保持只读；验证不会切换、登记或卸载外部运行时。".to_string(),
         "组件缺失不会显示为完全可用。".to_string(),
     ];
     Ok(RuntimeStrongVerificationReport {
@@ -3937,137 +4091,33 @@ fn verify_registered_runtime(
         .map(PathBuf::from)
         .unwrap_or_default();
     let current = current_version_for_kind(installed, meta.kind) == Some(version.as_str());
-    let mut checks = Vec::new();
-    checks.push(ValidationCheck {
-        id: "directory".to_string(),
-        title: "目录存在".to_string(),
-        success: root.is_dir(),
-        required: true,
-        detail: display_path(&root),
-        stage: "DirectoryInvalid".to_string(),
-    });
-    checks.push(ValidationCheck {
-        id: "executable".to_string(),
-        title: "可执行文件存在".to_string(),
-        success: executable.is_file(),
-        required: true,
-        detail: display_path(&executable),
-        stage: "ExecutableMissing".to_string(),
-    });
-    match meta.kind {
-        "jdk" => {
-            checks.push(validation_check(
-                "java",
-                "java -version",
-                true,
-                "PostInstallVerify",
-                run_command_output(root.join("bin/java.exe"), &["-version"], 30),
-            ));
-            checks.push(validation_check(
-                "javac",
-                "javac -version",
-                true,
-                "PostInstallVerify",
-                run_command_output(root.join("bin/javac.exe"), &["-version"], 30),
-            ));
-            checks.push(validation_check(
-                "jar",
-                "jar --help",
-                true,
-                "ComponentMissing",
-                run_command_output(root.join("bin/jar.exe"), &["--help"], 30),
-            ));
-        }
-        "python" => {
-            let report = python_integrity_for_path(&executable, paths);
-            checks.extend(report.checks);
-        }
-        "node" => {
-            checks.push(validation_check(
-                "node",
-                "node -v",
-                true,
-                "PostInstallVerify",
-                run_command_output(root.join("node.exe"), &["-v"], 30),
-            ));
-            checks.push(validation_check(
-                "npm",
-                "npm -v",
-                true,
-                "ComponentMissing",
-                run_command_output(root.join("npm.cmd"), &["-v"], 30),
-            ));
-            checks.push(validation_check(
-                "npx",
-                "npx -v",
-                true,
-                "ComponentMissing",
-                run_command_output(root.join("npx.cmd"), &["-v"], 30),
-            ));
-            checks.push(validation_check(
-                "corepack",
-                "corepack --version",
-                false,
-                "OptionalComponentMissing",
-                run_command_output(root.join("corepack.cmd"), &["--version"], 30),
-            ));
-        }
-        "maven" => {
-            checks.push(validation_check(
-                "mvn",
-                "mvn -version",
-                true,
-                "PostInstallVerify",
-                run_command_output(root.join("bin/mvn.cmd"), &["-version"], 60),
-            ));
-        }
-        "gradle" => {
-            checks.push(validation_check(
-                "gradle",
-                "gradle -version",
-                true,
-                "PostInstallVerify",
-                run_command_output(root.join("bin/gradle.bat"), &["--version"], 60),
-            ));
-        }
-        "go" => {
-            checks.push(validation_check(
-                "go",
-                "go version",
-                true,
-                "PostInstallVerify",
-                run_command_output(root.join("bin/go.exe"), &["version"], 30),
-            ));
-            checks.push(validation_check(
-                "goroot",
-                "go env GOROOT",
-                true,
-                "PostInstallVerify",
-                run_command_output(root.join("bin/go.exe"), &["env", "GOROOT"], 30),
-            ));
-            checks.push(validation_check(
-                "gopath",
-                "go env GOPATH",
-                false,
-                "PostInstallVerify",
-                run_command_output(root.join("bin/go.exe"), &["env", "GOPATH"], 30),
-            ));
-            checks.push(validation_check(
-                "goproxy",
-                "go env GOPROXY",
-                false,
-                "PostInstallVerify",
-                run_command_output(root.join("bin/go.exe"), &["env", "GOPROXY"], 30),
-            ));
-        }
-        _ => {}
-    }
+    let user = user_environment().unwrap_or_default();
+    let selected_java = select_java_home(paths, &user)
+        .map(|value| PathBuf::from(expand_environment_path(&value, paths)))
+        .filter(|value| value.join("bin/java.exe").is_file());
+    let mut verification = runtime_verification::verify_installed_runtime(
+        meta.kind,
+        &root,
+        &executable,
+        &version,
+        selected_java.as_deref(),
+    );
     let user = user_environment().unwrap_or_default();
     let path_value = user
         .get("Path")
         .or_else(|| user.get("PATH"))
         .cloned()
         .unwrap_or_default();
+    append_runtime_environment_checks(
+        paths,
+        installed,
+        meta,
+        &root,
+        current,
+        &path_value,
+        &user,
+        &mut verification,
+    );
     let environment_effective = match meta.kind {
         "jdk" => user
             .get("JAVA_HOME")
@@ -4092,19 +4142,11 @@ fn verify_registered_runtime(
             .unwrap_or(false),
         _ => false,
     };
-    let required_ok = checks
-        .iter()
-        .filter(|item| item.required)
-        .all(|item| item.success);
-    let failure_stage = checks
-        .iter()
-        .find(|item| item.required && !item.success)
-        .map(|item| item.stage.clone());
     let status = if !root.exists() {
         "已登记但目录不存在"
     } else if !executable.is_file() {
         "已登记但不可用"
-    } else if !required_ok {
+    } else if !verification.fully_usable {
         "组件缺失"
     } else if current && environment_effective {
         "当前生效"
@@ -4114,7 +4156,22 @@ fn verify_registered_runtime(
         "可用"
     }
     .to_string();
+    let runtime = runtime_info(
+        meta.kind,
+        version.clone(),
+        &executable,
+        Some(&root),
+        "DevEnv managed registry".to_string(),
+        "managed",
+        current,
+        record
+            .get("installed_at")
+            .or_else(|| record.get("installedAt"))
+            .and_then(Value::as_str)
+            .map(str::to_string),
+    );
     RuntimeStrongStatus {
+        runtime_id: runtime.id,
         kind: meta.kind.to_string(),
         version,
         path: display_path(root),
@@ -4122,12 +4179,283 @@ fn verify_registered_runtime(
         current,
         environment_effective,
         status,
-        checks,
-        failure_stage,
+        checks: verification.checks,
+        failure_stage: verification.failure_stage,
         report: vec![
             "安装失败不会写入 installed.json；本报告只检查已登记记录。".to_string(),
             "current 指针和环境生效是独立状态，请重新打开终端/IDE 后验证。".to_string(),
         ],
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn append_runtime_environment_checks(
+    paths: &AppPaths,
+    installed: &InstalledData,
+    meta: RuntimeMeta,
+    root: &Path,
+    current: bool,
+    path_value: &str,
+    user: &HashMap<String, String>,
+    verification: &mut runtime_verification::RuntimeVerificationOutcome,
+) {
+    if !current {
+        return;
+    }
+    match meta.kind {
+        "jdk" => {
+            let java_home = user
+                .get("JAVA_HOME")
+                .map(|value| expand_environment_path(value, paths))
+                .unwrap_or_default();
+            verification
+                .checks
+                .push(runtime_verification::condition_check(
+                    "java-home-binding",
+                    "JAVA_HOME expanded binding",
+                    display_path(root),
+                    java_home.clone(),
+                    path_key(&java_home) == path_key(&display_path(root)),
+                    true,
+                    "Recreate the JDK switch plan to repair JAVA_HOME.",
+                ));
+            append_runtime_path_binding_check(
+                paths,
+                root,
+                path_value,
+                verification,
+                "path-first-java",
+                "PATH first java",
+                "java",
+                true,
+            );
+            append_runtime_path_binding_check(
+                paths,
+                root,
+                path_value,
+                verification,
+                "path-first-javac",
+                "PATH first javac",
+                "javac",
+                true,
+            );
+            append_runtime_path_binding_check(
+                paths,
+                root,
+                path_value,
+                verification,
+                "path-first-jar",
+                "PATH first jar",
+                "jar",
+                true,
+            );
+            append_java_build_tool_checks(installed, root, verification);
+        }
+        "python" => {
+            append_runtime_path_binding_check(
+                paths,
+                root,
+                path_value,
+                verification,
+                "path-first-python",
+                "PATH first python",
+                "python",
+                true,
+            );
+            append_runtime_path_binding_check(
+                paths,
+                root,
+                path_value,
+                verification,
+                "path-first-pip",
+                "PATH first pip",
+                "pip",
+                true,
+            );
+            let first_python = find_in_configured_path("python", path_value, paths);
+            let first_text = first_python
+                .as_deref()
+                .map(display_path)
+                .unwrap_or_else(|| "not found on user PATH".to_string());
+            verification
+                .checks
+                .push(runtime_verification::condition_check(
+                    "python-store-alias",
+                    "Windows Store execution alias risk",
+                    "PATH first python outside WindowsApps",
+                    first_text.clone(),
+                    !first_text.to_ascii_lowercase().contains("windowsapps"),
+                    true,
+                    "Disable the Windows Python execution alias if it takes priority over the managed runtime.",
+                ));
+            let launcher = find_in_configured_path("py", path_value, paths);
+            verification
+                .checks
+                .push(runtime_verification::condition_check(
+                "python-launcher",
+                "Python launcher discovery",
+                "optional",
+                launcher
+                    .as_deref()
+                    .map(display_path)
+                    .unwrap_or_else(|| "not installed".to_string()),
+                launcher.is_some(),
+                false,
+                "The Python launcher is optional and is not required for the managed interpreter.",
+            ));
+        }
+        "node" => {
+            append_runtime_path_binding_check(
+                paths,
+                root,
+                path_value,
+                verification,
+                "path-first-node",
+                "PATH first node",
+                "node",
+                true,
+            );
+            append_runtime_path_binding_check(
+                paths,
+                root,
+                path_value,
+                verification,
+                "path-first-npm",
+                "PATH first npm",
+                "npm",
+                true,
+            );
+            append_runtime_path_binding_check(
+                paths,
+                root,
+                path_value,
+                verification,
+                "path-first-npx",
+                "PATH first npx",
+                "npx",
+                true,
+            );
+        }
+        "maven" => append_runtime_path_binding_check(
+            paths,
+            root,
+            path_value,
+            verification,
+            "path-first-maven",
+            "PATH first mvn",
+            "mvn",
+            true,
+        ),
+        "gradle" => append_runtime_path_binding_check(
+            paths,
+            root,
+            path_value,
+            verification,
+            "path-first-gradle",
+            "PATH first gradle",
+            "gradle",
+            true,
+        ),
+        "go" => append_runtime_path_binding_check(
+            paths,
+            root,
+            path_value,
+            verification,
+            "path-first-go",
+            "PATH first go",
+            "go",
+            true,
+        ),
+        _ => {}
+    }
+    verification.fully_usable = verification
+        .checks
+        .iter()
+        .filter(|check| check.required)
+        .all(|check| check.status == "passed");
+    verification.failure_stage = verification
+        .checks
+        .iter()
+        .find(|check| check.required && check.status != "passed")
+        .map(|check| check.id.clone());
+}
+
+#[allow(clippy::too_many_arguments)]
+fn append_runtime_path_binding_check(
+    paths: &AppPaths,
+    root: &Path,
+    path_value: &str,
+    verification: &mut runtime_verification::RuntimeVerificationOutcome,
+    id: &str,
+    label: &str,
+    command: &str,
+    required: bool,
+) {
+    let actual = find_in_configured_path(command, path_value, paths);
+    let passed = actual
+        .as_deref()
+        .map(|path| is_path_inside(path, root))
+        .unwrap_or(false);
+    verification
+        .checks
+        .push(runtime_verification::condition_check(
+        id,
+        label,
+        display_path(root),
+        actual
+            .as_deref()
+            .map(display_path)
+            .unwrap_or_else(|| "not found on user PATH".to_string()),
+        passed,
+        required,
+        "Recreate the runtime switch plan so the user PATH points to the selected managed runtime.",
+    ));
+}
+
+fn append_java_build_tool_checks(
+    installed: &InstalledData,
+    java_home: &Path,
+    verification: &mut runtime_verification::RuntimeVerificationOutcome,
+) {
+    for kind in ["maven", "gradle"] {
+        let Some(version) = current_version_for_kind(installed, kind) else {
+            continue;
+        };
+        let Ok(meta) = runtime_meta(kind) else {
+            continue;
+        };
+        let Some(record) = collection(installed, meta.collection)
+            .iter()
+            .find(|record| record.get("version").and_then(Value::as_str) == Some(version))
+        else {
+            continue;
+        };
+        let root = record
+            .get("path")
+            .and_then(Value::as_str)
+            .map(PathBuf::from)
+            .unwrap_or_default();
+        let executable = record
+            .get(meta.exe_key)
+            .and_then(Value::as_str)
+            .map(PathBuf::from)
+            .unwrap_or_default();
+        let build_tool = runtime_verification::verify_installed_runtime(
+            kind,
+            &root,
+            &executable,
+            version,
+            Some(java_home),
+        );
+        for mut check in build_tool
+            .checks
+            .into_iter()
+            .filter(|check| check.id.ends_with("-version") || check.id.ends_with("-java-home"))
+        {
+            check.id = format!("jdk-switch-{}-{}", kind, check.id);
+            check.label = format!("JDK switch: {}", check.label);
+            verification.checks.push(check);
+        }
     }
 }
 
@@ -4164,7 +4492,7 @@ fn install_jdk_blocking(
     app: tauri::AppHandle,
     version: String,
     distribution: Option<String>,
-    switch_after_install: bool,
+    _switch_after_install: bool,
     _confirmation_token: Option<String>,
 ) -> Result<OperationResult, String> {
     let version = version.trim();
@@ -4190,9 +4518,13 @@ fn install_jdk_blocking(
     let target = paths.jdks().join(format!("{distribution}-{version}"));
     let installed_version = format!("{version}-{distribution}");
     paths.assert_inside_root(&target)?;
-    if target.exists() {
-        return Err(format!("JDK {version} 已安装：{}", display_path(&target)));
-    }
+    prepare_runtime_install_target(
+        &paths,
+        "jdk",
+        &installed_version,
+        &target,
+        &target.join("bin/java.exe"),
+    )?;
     emit_task_progress(&app, &task, 18, "正在下载 JDK");
     download_file_with_progress(
         &release.url,
@@ -4207,9 +4539,19 @@ fn install_jdk_blocking(
         &["bin/java.exe", "bin/javac.exe", "bin/jar.exe"],
     )?;
     emit_task_progress(&app, &task, 88, "正在验证 JDK");
-    let output = run_command_output(target.join("bin/java.exe"), &["-version"], 30)?;
-    run_command_output(target.join("bin/javac.exe"), &["-version"], 30)?;
-    run_command_output(target.join("bin/jar.exe"), &["--help"], 30)?;
+    let verification = verify_runtime_install(
+        &paths,
+        "jdk",
+        &installed_version,
+        &target,
+        &target.join("bin/java.exe"),
+    )?;
+    let output = verification
+        .checks
+        .iter()
+        .find(|check| check.id == "java-version")
+        .map(|check| check.actual.as_str())
+        .unwrap_or("");
     record_install(
         &paths,
         runtime_meta("jdk")?,
@@ -4222,19 +4564,11 @@ fn install_jdk_blocking(
             "detail": output.lines().next().unwrap_or(""),
         }),
     )?;
-    if switch_after_install {
-        switch_runtime_blocking(
-            "jdk".to_string(),
-            installed_version,
-            Some(display_path(&target)),
-        )?;
-        refresh_user_java_home(&paths)?;
-    }
     emit_task_progress(&app, &task, 100, "安装完成");
     Ok(OperationResult {
         success: true,
         message: format!(
-            "安装成功 {} JDK {version}",
+            "安装成功 {} JDK {version}；已完成强校验，但未切换当前运行时",
             jdk_distribution_name(distribution)
         ),
     })
@@ -4275,12 +4609,7 @@ fn install_node_blocking(
     let archive = paths.downloads().join(&release.name);
     let target = paths.nodes().join(format!("node-{version}"));
     paths.assert_inside_root(&target)?;
-    if target.exists() {
-        return Err(format!(
-            "Node.js {version} 已安装：{}",
-            display_path(&target)
-        ));
-    }
+    prepare_runtime_install_target(&paths, "node", version, &target, &target.join("node.exe"))?;
     emit_task_progress(&app, &task, 18, "正在下载 Node.js");
     download_file_with_progress(
         &release.url,
@@ -4291,8 +4620,14 @@ fn install_node_blocking(
     emit_task_progress(&app, &task, 70, "正在解压 Node.js");
     install_zip_payload(&archive, &target, &["node.exe", "npm.cmd", "npx.cmd"])?;
     emit_task_progress(&app, &task, 88, "正在验证 Node.js");
-    let output = run_command_output(target.join("node.exe"), &["-v"], 30)?;
-    run_command_output(target.join("npm.cmd"), &["-v"], 30)?;
+    let verification =
+        verify_runtime_install(&paths, "node", version, &target, &target.join("node.exe"))?;
+    let output = verification
+        .checks
+        .iter()
+        .find(|check| check.id == "node-version")
+        .map(|check| check.actual.as_str())
+        .unwrap_or("");
     record_install(
         &paths,
         runtime_meta("node")?,
@@ -4304,11 +4639,10 @@ fn install_node_blocking(
             "tag": release.tag,
         }),
     )?;
-    switch_runtime_blocking("node".to_string(), version.to_string(), None)?;
     emit_task_progress(&app, &task, 100, "安装完成");
     Ok(OperationResult {
         success: true,
-        message: format!("安装成功 Node.js {version}"),
+        message: format!("安装成功 Node.js {version}；已完成强校验，但未切换当前运行时"),
     })
 }
 
@@ -4343,9 +4677,7 @@ fn install_go_blocking(app: tauri::AppHandle, version: String) -> Result<Operati
     let archive = paths.downloads().join(&release.name);
     let target = paths.gos().join(format!("go-{version}"));
     paths.assert_inside_root(&target)?;
-    if target.exists() {
-        return Err(format!("Go {version} 已安装：{}", display_path(&target)));
-    }
+    prepare_runtime_install_target(&paths, "go", version, &target, &target.join("bin/go.exe"))?;
     emit_task_progress(&app, &task, 18, "正在下载 Go");
     download_file_with_progress(
         &release.url,
@@ -4356,7 +4688,14 @@ fn install_go_blocking(app: tauri::AppHandle, version: String) -> Result<Operati
     emit_task_progress(&app, &task, 72, "正在解压 Go");
     install_zip_payload(&archive, &target, &["bin/go.exe"])?;
     emit_task_progress(&app, &task, 88, "正在验证 Go");
-    let output = run_command_output(target.join("bin/go.exe"), &["version"], 30)?;
+    let verification =
+        verify_runtime_install(&paths, "go", version, &target, &target.join("bin/go.exe"))?;
+    let output = verification
+        .checks
+        .iter()
+        .find(|check| check.id == "go-version")
+        .map(|check| check.actual.as_str())
+        .unwrap_or("");
     record_install(
         &paths,
         runtime_meta("go")?,
@@ -4368,11 +4707,10 @@ fn install_go_blocking(app: tauri::AppHandle, version: String) -> Result<Operati
             "tag": release.tag,
         }),
     )?;
-    switch_runtime_blocking("go".to_string(), version.to_string(), None)?;
     emit_task_progress(&app, &task, 100, "安装完成");
     Ok(OperationResult {
         success: true,
-        message: format!("安装成功 Go {version}"),
+        message: format!("安装成功 Go {version}；已完成强校验，但未切换当前运行时"),
     })
 }
 
@@ -4410,23 +4748,8 @@ fn install_python_blocking(
     let archive = paths.downloads().join(&release.name);
     let target = paths.pythons().join(format!("python-{version}"));
     paths.assert_inside_root(&target)?;
-    if target.exists() {
-        if locate_python_exe(&target).is_some() {
-            return Err(format!(
-                "Python {version} 已安装：{}",
-                display_path(&target)
-            ));
-        }
-        let failed = paths
-            .pythons()
-            .join(format!("python-{version}.failed-{}", filename_timestamp()));
-        fs::rename(&target, &failed).map_err(|err| {
-            format!(
-                "发现上次安装留下的空目录，但无法保留为失败备份：{}：{err}",
-                display_path(&target)
-            )
-        })?;
-    }
+    let existing_python = locate_python_exe(&target).unwrap_or_else(|| target.join("python.exe"));
+    prepare_runtime_install_target(&paths, "python", version, &target, &existing_python)?;
     emit_task_progress(&app, &task, 20, "正在下载 Python 官方 NuGet 完整包");
     download_file_with_progress(&release.url, &archive, None, Some((&app, &task, 20, 62)))?;
     emit_task_progress(&app, &task, 64, "正在解压到受管目录");
@@ -4490,6 +4813,7 @@ fn install_python_blocking(
         ));
     }
     run_command_output(pip_exe, &["--version"], 30)?;
+    verify_runtime_install(&paths, "python", version, &python_home, &python_exe)?;
     record_install(
         &paths,
         runtime_meta("python")?,
@@ -4502,11 +4826,10 @@ fn install_python_blocking(
             "archive": display_path(&archive),
         }),
     )?;
-    switch_runtime_blocking("python".to_string(), version.to_string(), None)?;
     emit_task_progress(&app, &task, 100, "安装完成");
     Ok(OperationResult {
         success: true,
-        message: format!("安装成功 Python {version}"),
+        message: format!("安装成功 Python {version}；已完成强校验，但未切换当前运行时"),
     })
 }
 
@@ -4521,27 +4844,89 @@ async fn install_maven_latest(
             &install_runtime_plan_id("install_maven_latest", "latest"),
             confirmation_token,
         )?;
-        install_maven_latest_blocking(app)
+        install_maven_blocking(app, "latest".to_string())
     })
     .await?
 }
 
+fn verify_external_runtime(runtime: RuntimeInfo) -> RuntimeStrongStatus {
+    let root = PathBuf::from(&runtime.runtime_root);
+    let executable = PathBuf::from(&runtime.executable);
+    let verification_kind = match runtime.kind.as_str() {
+        "java" | "javac" => "jdk",
+        other => other,
+    };
+    let verification = runtime_verification::verify_installed_runtime(
+        verification_kind,
+        &root,
+        &executable,
+        &runtime.version,
+        None,
+    );
+    let status = if !root.exists() {
+        "外部安装目录不存在"
+    } else if !executable.is_file() {
+        "外部命令不可用"
+    } else if verification.fully_usable {
+        "外部安装可用（只读）"
+    } else {
+        "外部安装验证失败（只读）"
+    }
+    .to_string();
+    RuntimeStrongStatus {
+        runtime_id: runtime.id,
+        kind: runtime.kind,
+        version: runtime.version,
+        path: runtime.runtime_root,
+        registered: false,
+        current: runtime.current,
+        environment_effective: runtime.current,
+        status,
+        checks: verification.checks,
+        failure_stage: verification.failure_stage,
+        report: vec![
+            "External runtime verification is read-only.".to_string(),
+            "Use the operating system or original package manager to update or uninstall it."
+                .to_string(),
+        ],
+    }
+}
+
 fn install_maven_latest_blocking(app: tauri::AppHandle) -> Result<OperationResult, String> {
-    let task = "Maven".to_string();
+    install_maven_blocking(app, "latest".to_string())
+}
+
+#[tauri::command]
+async fn install_maven(
+    app: tauri::AppHandle,
+    version: String,
+    confirmation_token: Option<String>,
+) -> Result<OperationResult, String> {
+    run_blocking(move || {
+        require_risk_operation_token(
+            "install_maven",
+            &install_runtime_plan_id("install_maven", &version),
+            confirmation_token,
+        )?;
+        install_maven_blocking(app, version)
+    })
+    .await?
+}
+
+fn install_maven_blocking(
+    app: tauri::AppHandle,
+    requested_version: String,
+) -> Result<OperationResult, String> {
+    let task = format!("Maven {}", requested_version.trim());
     emit_task_progress(&app, &task, 3, "正在查询 Maven 版本");
     let paths = load_paths()?;
     paths.ensure().map_err(|err| err.to_string())?;
-    let release = resolve_maven_release()?;
+    let release = resolve_maven_release_for(requested_version.trim())?;
     let archive = paths.downloads().join(&release.name);
     let target = paths.mavens().join(format!("maven-{}", release.tag));
     paths.assert_inside_root(&target)?;
     if target.exists() {
-        emit_task_progress(
-            &app,
-            &task,
-            18,
-            "检测到 Maven 已安装，正在修复登记与 current 指针",
-        );
+        emit_task_progress(&app, &task, 18, "检测到 Maven 已安装，正在修复登记");
     } else {
         emit_task_progress(&app, &task, 18, "正在下载 Maven");
         download_file_with_progress(&release.url, &archive, None, Some((&app, &task, 18, 70)))?;
@@ -4549,7 +4934,19 @@ fn install_maven_latest_blocking(app: tauri::AppHandle) -> Result<OperationResul
         install_zip_payload(&archive, &target, &["bin/mvn.cmd"])?;
     }
     emit_task_progress(&app, &task, 88, "正在验证 Maven");
-    let output = run_managed_command_output(&paths, target.join("bin/mvn.cmd"), &["-v"], 60)?;
+    let verification = verify_runtime_install(
+        &paths,
+        "maven",
+        &release.tag,
+        &target,
+        &target.join("bin/mvn.cmd"),
+    )?;
+    let output = verification
+        .checks
+        .iter()
+        .find(|check| check.id == "maven-version")
+        .map(|check| check.actual.as_str())
+        .unwrap_or("");
     record_install(
         &paths,
         runtime_meta("maven")?,
@@ -4558,11 +4955,13 @@ fn install_maven_latest_blocking(app: tauri::AppHandle) -> Result<OperationResul
         &target.join("bin/mvn.cmd"),
         json!({ "detail": output.lines().next().unwrap_or("") }),
     )?;
-    switch_runtime_blocking("maven".to_string(), release.tag.clone(), None)?;
     emit_task_progress(&app, &task, 100, "安装完成");
     Ok(OperationResult {
         success: true,
-        message: format!("Maven {} 已就绪并已切换到 current", release.tag),
+        message: format!(
+            "Maven {} 已安装并完成强校验，但未切换当前运行时",
+            release.tag
+        ),
     })
 }
 
@@ -4577,27 +4976,46 @@ async fn install_gradle_latest(
             &install_runtime_plan_id("install_gradle_latest", "latest"),
             confirmation_token,
         )?;
-        install_gradle_latest_blocking(app)
+        install_gradle_blocking(app, "latest".to_string())
     })
     .await?
 }
 
 fn install_gradle_latest_blocking(app: tauri::AppHandle) -> Result<OperationResult, String> {
-    let task = "Gradle".to_string();
+    install_gradle_blocking(app, "latest".to_string())
+}
+
+#[tauri::command]
+async fn install_gradle(
+    app: tauri::AppHandle,
+    version: String,
+    confirmation_token: Option<String>,
+) -> Result<OperationResult, String> {
+    run_blocking(move || {
+        require_risk_operation_token(
+            "install_gradle",
+            &install_runtime_plan_id("install_gradle", &version),
+            confirmation_token,
+        )?;
+        install_gradle_blocking(app, version)
+    })
+    .await?
+}
+
+fn install_gradle_blocking(
+    app: tauri::AppHandle,
+    requested_version: String,
+) -> Result<OperationResult, String> {
+    let task = format!("Gradle {}", requested_version.trim());
     emit_task_progress(&app, &task, 3, "正在查询 Gradle 版本");
     let paths = load_paths()?;
     paths.ensure().map_err(|err| err.to_string())?;
-    let release = resolve_gradle_release()?;
+    let release = resolve_gradle_release_for(requested_version.trim())?;
     let archive = paths.downloads().join(&release.name);
     let target = paths.gradles().join(format!("gradle-{}", release.tag));
     paths.assert_inside_root(&target)?;
     if target.exists() {
-        emit_task_progress(
-            &app,
-            &task,
-            18,
-            "检测到 Gradle 已安装，正在修复登记与 current 指针",
-        );
+        emit_task_progress(&app, &task, 18, "检测到 Gradle 已安装，正在修复登记");
     } else {
         emit_task_progress(&app, &task, 18, "正在下载 Gradle");
         download_file_with_progress(
@@ -4610,7 +5028,19 @@ fn install_gradle_latest_blocking(app: tauri::AppHandle) -> Result<OperationResu
         install_zip_payload(&archive, &target, &["bin/gradle.bat"])?;
     }
     emit_task_progress(&app, &task, 88, "正在验证 Gradle");
-    let output = run_managed_command_output(&paths, target.join("bin/gradle.bat"), &["-v"], 120)?;
+    let verification = verify_runtime_install(
+        &paths,
+        "gradle",
+        &release.tag,
+        &target,
+        &target.join("bin/gradle.bat"),
+    )?;
+    let output = verification
+        .checks
+        .iter()
+        .find(|check| check.id == "gradle-version")
+        .map(|check| check.actual.as_str())
+        .unwrap_or("");
     record_install(
         &paths,
         runtime_meta("gradle")?,
@@ -4619,11 +5049,13 @@ fn install_gradle_latest_blocking(app: tauri::AppHandle) -> Result<OperationResu
         &target.join("bin/gradle.bat"),
         json!({ "detail": output.lines().next().unwrap_or("") }),
     )?;
-    switch_runtime_blocking("gradle".to_string(), release.tag.clone(), None)?;
     emit_task_progress(&app, &task, 100, "安装完成");
     Ok(OperationResult {
         success: true,
-        message: format!("Gradle {} 已就绪并已切换到 current", release.tag),
+        message: format!(
+            "Gradle {} 已安装并完成强校验，但未切换当前运行时",
+            release.tag
+        ),
     })
 }
 
@@ -4638,6 +5070,175 @@ async fn switch_runtime(
         let plan_id = runtime_plan_id(&kind, &version, path.as_deref());
         require_risk_operation_token("switch_runtime", &plan_id, confirmation_token)?;
         switch_runtime_blocking(kind, version, path)
+    })
+    .await?
+}
+
+#[tauri::command]
+async fn create_runtime_switch_plan(
+    kind: String,
+    version: String,
+    path: Option<String>,
+) -> Result<RuntimeSwitchPlan, String> {
+    run_blocking(move || create_runtime_switch_plan_blocking(kind, version, path)).await?
+}
+
+fn create_runtime_switch_plan_blocking(
+    kind: String,
+    version: String,
+    path: Option<String>,
+) -> Result<RuntimeSwitchPlan, String> {
+    let paths = load_paths()?;
+    let installed = load_installed(&paths)?;
+    let meta = runtime_meta(&kind)?;
+    let record = find_managed_runtime_record(&installed, meta, &version, path.as_deref())?;
+    let target = PathBuf::from(record.get("path").and_then(Value::as_str).unwrap_or(""));
+    let expected_parent = runtime_parent(&paths, meta.collection)?;
+    if target.parent() != Some(expected_parent.as_path()) || !target.is_dir() {
+        return Err(format!(
+            "拒绝为非标准受管目录创建切换计划：{}",
+            display_path(&target)
+        ));
+    }
+    let selected_version = record
+        .get("version")
+        .and_then(Value::as_str)
+        .unwrap_or(version.as_str())
+        .to_string();
+    let previous_version = current_version(&installed, meta.kind);
+    let previous_root = previous_version.as_deref().and_then(|current| {
+        collection(&installed, meta.collection)
+            .iter()
+            .find(|item| item.get("version").and_then(Value::as_str) == Some(current))
+            .and_then(|item| item.get("path").and_then(Value::as_str))
+            .map(str::to_string)
+    });
+    let environment = user_environment()?;
+    let backup_name = create_environment_backup(&paths, &environment)?;
+    let installed_fingerprint = managed_runtime_state_fingerprint(&installed, meta, &record);
+    let created_at = current_timestamp();
+    let mut hasher = Sha256::new();
+    hasher.update(meta.kind.as_bytes());
+    hasher.update(selected_version.as_bytes());
+    hasher.update(path_key(&display_path(&target)).as_bytes());
+    hasher.update(installed_fingerprint.as_bytes());
+    hasher.update(created_at.as_bytes());
+    let plan_fingerprint = format!("{:x}", hasher.finalize());
+    let plan_id = format!("runtime-switch-{}", &plan_fingerprint[..24]);
+    let managed_path = match meta.kind {
+        "jdk" => r"%DEVENV_HOME%\current\jdk\bin",
+        "python" => r"%DEVENV_HOME%\current\python; %DEVENV_HOME%\current\python\Scripts",
+        "node" => r"%DEVENV_HOME%\current\node",
+        "maven" => r"%DEVENV_HOME%\current\maven\bin",
+        "gradle" => r"%DEVENV_HOME%\current\gradle\bin",
+        "go" => r"%DEVENV_HOME%\current\go\bin",
+        _ => "",
+    };
+    let plan = RuntimeSwitchPlan {
+        plan_id: plan_id.clone(),
+        created_at,
+        kind: meta.kind.to_string(),
+        version: selected_version,
+        target_root: display_path(&target),
+        previous_version,
+        previous_root,
+        environment_changes: vec![
+            format!("current\\{} -> {}", meta.link_name, display_path(&target)),
+            if meta.kind == "jdk" {
+                "JAVA_HOME -> %DEVENV_HOME%\\current\\jdk".to_string()
+            } else {
+                "JAVA_HOME remains on the selected Java runtime".to_string()
+            },
+        ],
+        path_diff: vec![format!("Ensure managed PATH entry: {managed_path}")],
+        backup_name,
+        warnings: vec![
+            "The plan is single-use and is rejected if installed.json changes.".to_string(),
+            "Open terminals, IDEs, services, and agents must be restarted to inherit the new environment."
+                .to_string(),
+            "Execution automatically verifies the selected runtime and restores the previous pointer and environment if verification fails."
+                .to_string(),
+        ],
+        risk_level: "medium".to_string(),
+        plan_fingerprint,
+    };
+    runtime_switch_plans()
+        .lock()
+        .map_err(|_| "运行时切换计划存储不可用".to_string())?
+        .insert(
+            plan_id,
+            PendingRuntimeSwitchPlan {
+                public: plan.clone(),
+                installed_fingerprint,
+            },
+        );
+    Ok(plan)
+}
+
+#[tauri::command]
+async fn execute_runtime_switch_plan(
+    plan_id: String,
+    confirmation_token: Option<String>,
+) -> Result<RuntimeSwitchResult, String> {
+    run_blocking(move || {
+        let pending = runtime_switch_plans()
+            .lock()
+            .map_err(|_| "运行时切换计划存储不可用".to_string())?
+            .get(&plan_id)
+            .cloned()
+            .ok_or_else(|| "运行时切换计划不存在、已执行或已过期，请重新创建。".to_string())?;
+        require_confirmation_token(
+            confirmation_token,
+            "execute_runtime_switch_plan",
+            "execute_runtime_switch_plan",
+            &plan_id,
+            &pending.public.risk_level,
+            &pending.public.plan_fingerprint,
+            true,
+        )?;
+        let pending = runtime_switch_plans()
+            .lock()
+            .map_err(|_| "运行时切换计划存储不可用".to_string())?
+            .remove(&plan_id)
+            .ok_or_else(|| "运行时切换计划不存在、已执行或已过期，请重新创建。".to_string())?;
+        let paths = load_paths()?;
+        let installed = load_installed(&paths)?;
+        let meta = runtime_meta(&pending.public.kind)?;
+        let record = find_managed_runtime_record(
+            &installed,
+            meta,
+            &pending.public.version,
+            Some(&pending.public.target_root),
+        )?;
+        if managed_runtime_state_fingerprint(&installed, meta, &record)
+            != pending.installed_fingerprint
+        {
+            return Err("运行时安装记录或 current 状态已变化，请重新创建切换计划。".to_string());
+        }
+        switch_runtime_with_paths(
+            &paths,
+            pending.public.kind.clone(),
+            pending.public.version.clone(),
+            Some(pending.public.target_root.clone()),
+        )?;
+        let installed = load_installed(&paths)?;
+        let record = find_managed_runtime_record(
+            &installed,
+            meta,
+            &pending.public.version,
+            Some(&pending.public.target_root),
+        )?;
+        let verification = verify_registered_runtime(&paths, &installed, meta, &record);
+        Ok(RuntimeSwitchResult {
+            success: true,
+            message: format!(
+                "已切换当前 {} 到 {}，并完成环境与命令强校验；请重新打开终端和 IDE。",
+                meta.kind, pending.public.version
+            ),
+            plan_id: pending.public.plan_id,
+            backup_name: pending.public.backup_name,
+            verification,
+        })
     })
     .await?
 }
@@ -4672,8 +5273,167 @@ fn switch_runtime_with_paths(
 ) -> Result<OperationResult, String> {
     let meta = runtime_meta(&kind)?;
     let mut installed = load_installed(paths)?;
-    let requested_path = path.as_deref().map(path_key);
-    let record = collection(&installed, meta.collection)
+    let record = find_managed_runtime_record(&installed, meta, &version, path.as_deref())?;
+    let selected_version = record
+        .get("version")
+        .and_then(Value::as_str)
+        .unwrap_or(version.as_str())
+        .to_string();
+    let target = PathBuf::from(record.get("path").and_then(Value::as_str).unwrap_or(""));
+    if !target.exists() {
+        return Err(format!("版本目录不存在：{}", display_path(&target)));
+    }
+    let previous_current = installed.current.clone();
+    let previous_environment = user_environment()?;
+    let backup_name = create_environment_backup(paths, &previous_environment)?;
+    let previous_target = current_version_for_kind(&installed, meta.kind).and_then(|previous| {
+        collection(&installed, meta.collection)
+            .iter()
+            .find(|item| item.get("version").and_then(Value::as_str) == Some(previous))
+            .and_then(|item| item.get("path").and_then(Value::as_str))
+            .map(PathBuf::from)
+    });
+    switch_junction(&paths.current().join(meta.link_name), &target, &paths.root)?;
+    set_current(&mut installed, meta.kind, Some(selected_version.clone()));
+    save_json(&paths.installed_file(), &installed)?;
+    let apply_result = refresh_user_java_home(paths);
+    let verification = apply_result
+        .as_ref()
+        .ok()
+        .map(|_| verify_registered_runtime(paths, &installed, meta, &record));
+    let verified = verification.as_ref().is_some_and(|result| {
+        result.current
+            && result.environment_effective
+            && result
+                .checks
+                .iter()
+                .filter(|check| check.required)
+                .all(|check| check.status == "passed")
+    });
+    if !verified {
+        if let Some(previous_target) = previous_target {
+            let _ = switch_junction(
+                &paths.current().join(meta.link_name),
+                &previous_target,
+                &paths.root,
+            );
+        } else {
+            let _ = remove_junction(&paths.current().join(meta.link_name));
+        }
+        installed.current = previous_current;
+        let _ = save_json(&paths.installed_file(), &installed);
+        let previous_path = previous_environment
+            .get("Path")
+            .or_else(|| previous_environment.get("PATH"))
+            .cloned()
+            .unwrap_or_default();
+        let _ = restore_environment_values(
+            previous_environment.get("DEVENV_HOME").map(String::as_str),
+            previous_environment.get("JAVA_HOME").map(String::as_str),
+            &previous_path,
+        );
+        broadcast_environment_change();
+        let reason = apply_result
+            .err()
+            .or_else(|| {
+                verification.and_then(|result| {
+                    result
+                        .checks
+                        .into_iter()
+                        .find(|check| check.required && check.status != "passed")
+                        .and_then(|check| check.error.or(Some(check.actual)))
+                })
+            })
+            .unwrap_or_else(|| "环境未命中新的 current 指针".to_string());
+        return Err(format!(
+            "{} 切换验证失败，已恢复上一个 current 和环境：{reason}",
+            meta.kind
+        ));
+    }
+    Ok(OperationResult {
+        success: true,
+        message: format!(
+            "已切换当前 {} 到 {}；环境备份：{}；强校验通过，请重开终端和 IDE",
+            meta.kind, selected_version, backup_name
+        ),
+    })
+}
+
+#[tauri::command]
+fn export_runtime_verification_report(format: String) -> Result<String, String> {
+    let report = inspect_runtime_strong_verification()?;
+    let extension = match format.as_str() {
+        "json" => "json",
+        "markdown" => "md",
+        _ => return Err("运行时报告格式仅支持 markdown 或 json".to_string()),
+    };
+    let reports = app_config_dir().join("reports");
+    fs::create_dir_all(&reports).map_err(|err| format!("创建报告目录失败：{err}"))?;
+    let target = reports.join(format!(
+        "runtime-verification-{}.{}",
+        filename_timestamp(),
+        extension
+    ));
+    let content = if format == "json" {
+        serde_json::to_string_pretty(&report)
+            .map_err(|err| format!("生成运行时 JSON 报告失败：{err}"))?
+    } else {
+        runtime_verification_markdown(&report)
+    };
+    fs::write(&target, redact_report_text(&content))
+        .map_err(|err| format!("写入运行时报告失败：{err}"))?;
+    Ok(display_path(target))
+}
+
+fn runtime_verification_markdown(report: &RuntimeStrongVerificationReport) -> String {
+    let mut text = format!(
+        "# DevEnv Manager Runtime Verification\n\nGenerated: {}\n\n",
+        report.generated_at
+    );
+    for item in &report.items {
+        text.push_str(&format!(
+            "## {} {}\n\n- Path: `{}`\n- Current: {}\n- Environment effective: {}\n- Status: {}\n\n",
+            item.kind,
+            item.version,
+            item.path,
+            item.current,
+            item.environment_effective,
+            item.status
+        ));
+        text.push_str(
+            "| Check | Required | Status | Expected | Actual / Error | Elapsed | Suggestion |\n",
+        );
+        text.push_str("|---|---:|---|---|---|---:|---|\n");
+        for check in &item.checks {
+            text.push_str(&format!(
+                "| {} | {} | {} | {} | {} | {} ms | {} |\n",
+                check.label.replace('|', "\\|"),
+                check.required,
+                check.status,
+                check.expected.replace('|', "\\|"),
+                check
+                    .error
+                    .as_deref()
+                    .unwrap_or(&check.actual)
+                    .replace('|', "\\|")
+                    .replace('\n', "<br>"),
+                check.elapsed_ms,
+                check.suggestion.replace('|', "\\|")
+            ));
+        }
+        text.push('\n');
+    }
+    text
+}
+
+fn find_managed_runtime_record(
+    installed: &InstalledData,
+    meta: RuntimeMeta,
+    version: &str,
+    path: Option<&str>,
+) -> Result<Value, String> {
+    let requested_path = path.map(path_key);
+    collection(installed, meta.collection)
         .iter()
         .find(|item| {
             if let Some(requested) = requested_path.as_deref() {
@@ -4693,65 +5453,23 @@ fn switch_runtime_with_paths(
             }
         })
         .cloned()
-        .ok_or_else(|| format!("尚未安装 {} {}", meta.kind, version))?;
-    let selected_version = record
-        .get("version")
-        .and_then(Value::as_str)
-        .unwrap_or(version.as_str())
-        .to_string();
-    let target = PathBuf::from(record.get("path").and_then(Value::as_str).unwrap_or(""));
-    if !target.exists() {
-        return Err(format!("版本目录不存在：{}", display_path(&target)));
-    }
-    let previous_current = installed.current.clone();
-    let previous_environment = (meta.kind == "jdk")
-        .then(user_environment)
-        .transpose()?
-        .unwrap_or_default();
-    if meta.kind == "jdk" {
-        create_environment_backup(paths, &previous_environment)?;
-    }
-    switch_junction(&paths.current().join(meta.link_name), &target, &paths.root)?;
-    set_current(&mut installed, meta.kind, Some(selected_version.clone()));
-    save_json(&paths.installed_file(), &installed)?;
-    if meta.kind == "jdk" {
-        if let Err(error) = refresh_user_java_home(paths) {
-            if let Some(previous_version) = previous_current.jdk.as_deref() {
-                if let Some(previous_record) = installed.jdks.iter().find(|item| {
-                    item.get("version").and_then(Value::as_str) == Some(previous_version)
-                }) {
-                    if let Some(previous_path) = previous_record.get("path").and_then(Value::as_str)
-                    {
-                        let _ = switch_junction(
-                            &paths.current().join(meta.link_name),
-                            Path::new(previous_path),
-                            &paths.root,
-                        );
-                    }
-                }
-            } else {
-                let _ = remove_junction(&paths.current().join(meta.link_name));
-            }
-            installed.current = previous_current;
-            let _ = save_json(&paths.installed_file(), &installed);
-            let previous_path = previous_environment
-                .get("Path")
-                .or_else(|| previous_environment.get("PATH"))
-                .cloned()
-                .unwrap_or_default();
-            let _ = restore_environment_values(
-                previous_environment.get("DEVENV_HOME").map(String::as_str),
-                previous_environment.get("JAVA_HOME").map(String::as_str),
-                &previous_path,
-            );
-            broadcast_environment_change();
-            return Err(format!("JDK 切换验证失败，已恢复上一个环境：{error}"));
-        }
-    }
-    Ok(OperationResult {
-        success: true,
-        message: format!("已切换当前 {} 到 {}", meta.kind, selected_version),
-    })
+        .ok_or_else(|| format!("尚未安装受管 {} {}", meta.kind, version))
+}
+
+fn managed_runtime_state_fingerprint(
+    installed: &InstalledData,
+    meta: RuntimeMeta,
+    record: &Value,
+) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(meta.kind.as_bytes());
+    hasher.update(serde_json::to_vec(record).unwrap_or_default());
+    hasher.update(
+        current_version(installed, meta.kind)
+            .unwrap_or_default()
+            .as_bytes(),
+    );
+    format!("{:x}", hasher.finalize())
 }
 
 #[tauri::command]
@@ -10739,6 +11457,141 @@ fn list_config_profiles_blocking() -> Result<Vec<ConfigProfile>, String> {
 }
 
 #[tauri::command]
+async fn list_config_profile_history() -> Result<Vec<ConfigProfileHistoryEntry>, String> {
+    run_blocking(|| {
+        let paths = load_paths()?;
+        load_profile_history(&paths)
+    })
+    .await?
+}
+
+#[tauri::command]
+async fn create_profile_history_restore_plan(
+    history_id: String,
+) -> Result<ProfileHistoryRestorePlan, String> {
+    run_blocking(move || create_profile_history_restore_plan_blocking(history_id)).await?
+}
+
+fn create_profile_history_restore_plan_blocking(
+    history_id: String,
+) -> Result<ProfileHistoryRestorePlan, String> {
+    let paths = load_paths()?;
+    let history = load_profile_history(&paths)?;
+    let target = history
+        .iter()
+        .find(|entry| entry.id == history_id)
+        .cloned()
+        .ok_or_else(|| "Profile history snapshot not found".to_string())?;
+    let current = load_profiles(&paths)?;
+    let current_fingerprint = profile_collection_fingerprint(&current);
+    if current_fingerprint == target.fingerprint {
+        return Err(
+            "The selected history snapshot already matches the current profiles".to_string(),
+        );
+    }
+    let backup = create_profile_history_snapshot(
+        &paths,
+        format!("Before restoring history snapshot: {}", target.id),
+        &current,
+    )?;
+    let mut hasher = Sha256::new();
+    hasher.update(target.id.as_bytes());
+    hasher.update(target.fingerprint.as_bytes());
+    hasher.update(current_fingerprint.as_bytes());
+    hasher.update(backup.id.as_bytes());
+    let plan_fingerprint = format!("{:x}", hasher.finalize());
+    let plan = ProfileHistoryRestorePlan {
+        plan_id: format!("profile-history-restore-{}", &plan_fingerprint[..24]),
+        history_id: target.id,
+        snapshot_created_at: target.created_at,
+        snapshot_reason: target.reason,
+        profile_count: target.profile_count,
+        backup_history_id: backup.id,
+        risk_level: "medium".to_string(),
+        plan_fingerprint,
+        warnings: vec![
+            "Restoring replaces the complete current profile collection with the reviewed snapshot."
+                .to_string(),
+            "A backup history snapshot was created before this plan and can be restored later."
+                .to_string(),
+            "The plan is single-use and is rejected if profiles change before execution."
+                .to_string(),
+        ],
+    };
+    profile_history_restore_plans()
+        .lock()
+        .map_err(|_| "Profile history restore plan store is unavailable".to_string())?
+        .insert(
+            plan.plan_id.clone(),
+            PendingProfileHistoryRestorePlan {
+                public: plan.clone(),
+                current_profiles_fingerprint: current_fingerprint,
+                target_profiles: target.profiles,
+                target_profiles_fingerprint: target.fingerprint,
+            },
+        );
+    Ok(plan)
+}
+
+#[tauri::command]
+async fn execute_profile_history_restore_plan(
+    plan_id: String,
+    confirmation_token: Option<String>,
+) -> Result<ProfileHistoryRestoreResult, String> {
+    run_blocking(move || {
+        let pending = profile_history_restore_plans()
+            .lock()
+            .map_err(|_| "Profile history restore plan store is unavailable".to_string())?
+            .get(&plan_id)
+            .cloned()
+            .ok_or_else(|| {
+                "Profile history restore plan does not exist or was already used".to_string()
+            })?;
+        require_confirmation_token(
+            confirmation_token,
+            "execute_profile_history_restore_plan",
+            "execute_profile_history_restore_plan",
+            &plan_id,
+            &pending.public.risk_level,
+            &pending.public.plan_fingerprint,
+            true,
+        )?;
+        let pending = profile_history_restore_plans()
+            .lock()
+            .map_err(|_| "Profile history restore plan store is unavailable".to_string())?
+            .remove(&plan_id)
+            .ok_or_else(|| {
+                "Profile history restore plan does not exist or was already used".to_string()
+            })?;
+        let paths = load_paths()?;
+        let current = load_profiles(&paths)?;
+        if profile_collection_fingerprint(&current) != pending.current_profiles_fingerprint {
+            return Err(
+                "Profiles changed after the restore plan was created; create a new plan"
+                    .to_string(),
+            );
+        }
+        if pending.target_profiles_fingerprint
+            != profile_collection_fingerprint(&pending.target_profiles)
+        {
+            return Err("Profile history snapshot fingerprint is invalid".to_string());
+        }
+        save_json(&paths.profiles_file(), &pending.target_profiles)?;
+        Ok(ProfileHistoryRestoreResult {
+            success: true,
+            message: format!(
+                "Restored {} profiles from history snapshot {}",
+                pending.public.profile_count, pending.public.history_id
+            ),
+            restored_history_id: pending.public.history_id,
+            backup_history_id: pending.public.backup_history_id,
+            restored_profile_count: pending.public.profile_count,
+        })
+    })
+    .await?
+}
+
+#[tauri::command]
 async fn create_doctor_repair_plan() -> Result<DoctorRepairPlan, String> {
     run_blocking(create_doctor_repair_plan_blocking).await?
 }
@@ -11224,8 +12077,14 @@ fn save_config_profile_blocking(name: String) -> Result<OperationResult, String>
         path,
     };
     let mut profiles = load_profiles(&paths)?;
+    let previous_profiles = profiles.clone();
     profiles.retain(|item| item.name != name);
     profiles.push(profile);
+    create_profile_history_snapshot(
+        &paths,
+        format!("Before saving profile: {name}"),
+        &previous_profiles,
+    )?;
     save_json(&paths.profiles_file(), &profiles)?;
     Ok(OperationResult {
         success: true,
@@ -11357,6 +12216,12 @@ fn delete_config_profile_blocking(id: String) -> Result<OperationResult, String>
     if profiles.len() == before {
         return Err("没有找到配置模板".to_string());
     }
+    let previous_profiles = load_profiles(&paths)?;
+    create_profile_history_snapshot(
+        &paths,
+        format!("Before deleting profile: {id}"),
+        &previous_profiles,
+    )?;
     save_json(&paths.profiles_file(), &profiles)?;
     Ok(OperationResult {
         success: true,
@@ -11382,11 +12247,17 @@ fn rename_config_profile_blocking(id: String, name: String) -> Result<OperationR
     {
         return Err("已存在同名配置模板".to_string());
     }
+    let previous_profiles = profiles.clone();
     let profile = profiles
         .iter_mut()
         .find(|item| item.id == id)
         .ok_or_else(|| "没有找到配置模板".to_string())?;
     profile.name = name.to_string();
+    create_profile_history_snapshot(
+        &paths,
+        format!("Before renaming profile: {id}"),
+        &previous_profiles,
+    )?;
     save_json(&paths.profiles_file(), &profiles)?;
     Ok(OperationResult {
         success: true,
@@ -11414,6 +12285,7 @@ fn copy_config_profile_blocking(id: String, name: String) -> Result<OperationRes
     if profiles.iter().any(|item| item.name == name) {
         return Err("已存在同名配置模板".to_string());
     }
+    let previous_profiles = profiles.clone();
     let mut profile = source;
     profile.id = format!(
         "profile-copy-{}",
@@ -11422,6 +12294,11 @@ fn copy_config_profile_blocking(id: String, name: String) -> Result<OperationRes
     profile.name = name.clone();
     profile.created_at = current_timestamp();
     profiles.push(profile);
+    create_profile_history_snapshot(
+        &paths,
+        format!("Before copying profile: {id}"),
+        &previous_profiles,
+    )?;
     save_json(&paths.profiles_file(), &profiles)?;
     Ok(OperationResult {
         success: true,
@@ -11486,6 +12363,7 @@ fn import_config_profiles(path: String) -> Result<OperationResult, String> {
     let bundle = read_profile_bundle(&source)?;
     let paths = load_paths()?;
     let mut profiles = load_profiles(&paths)?;
+    let previous_profiles = profiles.clone();
     let mut imported = 0_usize;
     for (index, mut profile) in bundle.profiles.into_iter().enumerate() {
         profile.name = profile.name.trim().to_string();
@@ -11501,6 +12379,11 @@ fn import_config_profiles(path: String) -> Result<OperationResult, String> {
         profiles.push(profile);
         imported += 1;
     }
+    create_profile_history_snapshot(
+        &paths,
+        format!("Before importing {imported} profiles"),
+        &previous_profiles,
+    )?;
     save_json(&paths.profiles_file(), &profiles)?;
     Ok(OperationResult {
         success: true,
@@ -12061,6 +12944,7 @@ pub fn run() {
             create_managed_python_pip_repair_plan,
             apply_managed_python_pip_repair,
             inspect_runtime_strong_verification,
+            export_runtime_verification_report,
             validate_directory_path,
             inspect_idea_project,
             repair_maven_gradle_registration,
@@ -12118,7 +13002,11 @@ pub fn run() {
             install_go,
             install_python,
             install_maven_latest,
+            install_maven,
             install_gradle_latest,
+            install_gradle,
+            create_runtime_switch_plan,
+            execute_runtime_switch_plan,
             switch_runtime,
             uninstall_runtime,
             kill_process,
@@ -12182,6 +13070,9 @@ pub fn run() {
             create_profile_apply_plan,
             execute_profile_apply_plan,
             save_config_profile,
+            list_config_profile_history,
+            create_profile_history_restore_plan,
+            execute_profile_history_restore_plan,
             apply_config_profile,
             delete_config_profile,
             rename_config_profile,
@@ -12535,6 +13426,9 @@ impl AppPaths {
     fn profiles_file(&self) -> PathBuf {
         self.config().join("profiles.json")
     }
+    fn profile_history_file(&self) -> PathBuf {
+        self.config().join("profile_history.json")
+    }
     fn port_history_file(&self) -> PathBuf {
         self.config().join("port_history.json")
     }
@@ -12842,6 +13736,52 @@ fn load_installed(paths: &AppPaths) -> Result<InstalledData, String> {
 
 fn load_profiles(paths: &AppPaths) -> Result<Vec<ConfigProfile>, String> {
     load_json_with_default(&paths.profiles_file(), default_profiles())
+}
+
+fn load_profile_history(paths: &AppPaths) -> Result<Vec<ConfigProfileHistoryEntry>, String> {
+    load_json_with_default(&paths.profile_history_file(), Vec::new())
+}
+
+fn profile_collection_fingerprint(profiles: &[ConfigProfile]) -> String {
+    let mut ordered = profiles.to_vec();
+    ordered.sort_by(|left, right| left.id.cmp(&right.id));
+    let mut hasher = Sha256::new();
+    hasher.update(serde_json::to_vec(&ordered).unwrap_or_default());
+    format!("{:x}", hasher.finalize())
+}
+
+fn create_profile_history_snapshot(
+    paths: &AppPaths,
+    reason: impl Into<String>,
+    profiles: &[ConfigProfile],
+) -> Result<ConfigProfileHistoryEntry, String> {
+    let fingerprint = profile_collection_fingerprint(profiles);
+    let reason = reason.into();
+    let mut hasher = Sha256::new();
+    hasher.update(fingerprint.as_bytes());
+    hasher.update(reason.as_bytes());
+    hasher.update(unix_timestamp().to_le_bytes());
+    hasher.update(
+        SAVE_JSON_COUNTER
+            .fetch_add(1, Ordering::Relaxed)
+            .to_le_bytes(),
+    );
+    let entry = ConfigProfileHistoryEntry {
+        id: format!(
+            "profile-history-{}",
+            &format!("{:x}", hasher.finalize())[..24]
+        ),
+        created_at: current_timestamp(),
+        reason,
+        profile_count: profiles.len(),
+        fingerprint,
+        profiles: profiles.to_vec(),
+    };
+    let mut history = load_profile_history(paths)?;
+    history.insert(0, entry.clone());
+    history.truncate(100);
+    save_json(&paths.profile_history_file(), &history)?;
+    Ok(entry)
 }
 
 fn load_json_with_default<T>(path: &Path, default: T) -> Result<T, String>
@@ -13673,7 +14613,19 @@ fn resolve_python_release(version: &str) -> Result<ReleaseInfo, String> {
     })
 }
 
-fn resolve_maven_release() -> Result<ReleaseInfo, String> {
+fn resolve_maven_release_for(requested_version: &str) -> Result<ReleaseInfo, String> {
+    if requested_version != "latest" {
+        validate_runtime_version(requested_version, "Maven")?;
+        let name = format!("apache-maven-{requested_version}-bin.zip");
+        return Ok(ReleaseInfo {
+            name: name.clone(),
+            url: format!(
+                "https://archive.apache.org/dist/maven/maven-3/{requested_version}/binaries/{name}"
+            ),
+            sha256: None,
+            tag: requested_version.to_string(),
+        });
+    }
     let text = reqwest::blocking::get("https://downloads.apache.org/maven/maven-3/")
         .map_err(|err| format!("查询 Maven 失败：{err}"))?
         .error_for_status()
@@ -13696,7 +14648,10 @@ fn resolve_maven_release() -> Result<ReleaseInfo, String> {
     })
 }
 
-fn resolve_gradle_release() -> Result<ReleaseInfo, String> {
+fn resolve_gradle_release_for(requested_version: &str) -> Result<ReleaseInfo, String> {
+    if requested_version != "latest" {
+        validate_runtime_version(requested_version, "Gradle")?;
+    }
     let items: Value = reqwest::blocking::get("https://services.gradle.org/versions/all")
         .map_err(|err| format!("查询 Gradle 失败：{err}"))?
         .error_for_status()
@@ -13726,13 +14681,17 @@ fn resolve_gradle_release() -> Result<ReleaseInfo, String> {
                     .map(|version| !version.contains('-') && !version.contains('+'))
                     .unwrap_or(false)
         })
+        .filter(|item| {
+            requested_version == "latest"
+                || item.get("version").and_then(Value::as_str) == Some(requested_version)
+        })
         .max_by_key(|item| {
             item.get("version")
                 .and_then(Value::as_str)
                 .map(version_key)
                 .unwrap_or_default()
         })
-        .ok_or_else(|| "无法从 Gradle 获取稳定版本".to_string())?;
+        .ok_or_else(|| format!("无法从 Gradle 获取稳定版本 {requested_version}"))?;
     let version = item
         .get("version")
         .and_then(Value::as_str)
@@ -13750,6 +14709,20 @@ fn resolve_gradle_release() -> Result<ReleaseInfo, String> {
             .map(str::to_string),
         tag: version.to_string(),
     })
+}
+
+fn validate_runtime_version(version: &str, label: &str) -> Result<(), String> {
+    let valid = !version.is_empty()
+        && version.len() <= 32
+        && version.split('.').count() >= 2
+        && version
+            .chars()
+            .all(|character| character.is_ascii_digit() || character == '.');
+    if valid {
+        Ok(())
+    } else {
+        Err(format!("{label} 版本格式无效：{version}"))
+    }
 }
 
 fn version_key(tag: &str) -> (u64, u64, u64) {
@@ -14021,6 +14994,129 @@ fn record_install(
     save_json(&paths.installed_file(), &installed)
 }
 
+fn verify_runtime_install(
+    paths: &AppPaths,
+    kind: &str,
+    version: &str,
+    root: &Path,
+    executable: &Path,
+) -> Result<runtime_verification::RuntimeVerificationOutcome, String> {
+    let environment = user_environment().unwrap_or_default();
+    let java_home = select_java_home(paths, &environment)
+        .map(|value| PathBuf::from(expand_environment_path(&value, paths)))
+        .filter(|value| value.join("bin/java.exe").is_file());
+    let verification = runtime_verification::verify_installed_runtime(
+        kind,
+        root,
+        executable,
+        version,
+        java_home.as_deref(),
+    );
+    if verification.fully_usable {
+        return Ok(verification);
+    }
+    let failures = verification
+        .checks
+        .iter()
+        .filter(|check| check.required && check.status != "passed")
+        .map(|check| {
+            format!(
+                "{}：{}",
+                check.label,
+                check.error.as_deref().unwrap_or(&check.actual)
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("；");
+    let error = format!("运行时强校验失败，未登记且未切换：{failures}");
+    if matches!(kind, "jdk" | "node" | "python" | "go") {
+        Err(quarantine_failed_runtime_install(
+            root, kind, version, error,
+        ))
+    } else {
+        Err(format!(
+            "{error}；文件已保留，配置可用 JDK 后可重新验证安装"
+        ))
+    }
+}
+
+fn prepare_runtime_install_target(
+    paths: &AppPaths,
+    kind: &str,
+    version: &str,
+    target: &Path,
+    primary_executable: &Path,
+) -> Result<(), String> {
+    if !target.exists() {
+        return Ok(());
+    }
+    let meta = runtime_meta(kind)?;
+    let installed = load_installed(paths)?;
+    let target_key = path_key(&display_path(target));
+    let registered = collection(&installed, meta.collection)
+        .iter()
+        .any(|record| {
+            record.get("version").and_then(Value::as_str) == Some(version)
+                && record
+                    .get("path")
+                    .and_then(Value::as_str)
+                    .map(path_key)
+                    .as_deref()
+                    == Some(target_key.as_str())
+        });
+    if registered && primary_executable.is_file() {
+        return Err(format!("{kind} {version} 已安装：{}", display_path(target)));
+    }
+    let parent = target
+        .parent()
+        .ok_or_else(|| "运行时目标目录缺少父目录".to_string())?;
+    let failed = parent.join(format!(
+        "{}.failed-{}",
+        target
+            .file_name()
+            .and_then(OsStr::to_str)
+            .unwrap_or("runtime"),
+        filename_timestamp()
+    ));
+    fs::rename(target, &failed).map_err(|error| {
+        format!(
+            "发现未登记或不完整的运行时目录，但隔离失败：{}：{error}",
+            display_path(target)
+        )
+    })?;
+    Ok(())
+}
+
+fn quarantine_failed_runtime_install(
+    root: &Path,
+    kind: &str,
+    version: &str,
+    error: String,
+) -> String {
+    if !root.exists() {
+        return error;
+    }
+    let parent = match root.parent() {
+        Some(parent) => parent,
+        None => return error,
+    };
+    let original_name = root
+        .file_name()
+        .and_then(OsStr::to_str)
+        .unwrap_or("runtime");
+    let failed = parent.join(format!("{original_name}.failed-{}", filename_timestamp()));
+    match fs::rename(root, &failed) {
+        Ok(()) => format!(
+            "{error}；失败的 {kind} {version} 目录已隔离到 {}",
+            display_path(failed)
+        ),
+        Err(rename_error) => format!(
+            "{error}；隔离失败目录 {} 失败：{rename_error}",
+            display_path(root)
+        ),
+    }
+}
+
 fn runtime_meta(kind: &str) -> Result<RuntimeMeta, String> {
     match kind {
         "jdk" => Ok(RuntimeMeta {
@@ -14201,12 +15297,125 @@ fn detect_runtime_at(
     let version = first_meaningful_output_line(&text).unwrap_or_else(|| "unknown".to_string());
     let path = display_path(executable);
 
-    Some(RuntimeInfo {
-        kind: kind.to_string(),
+    Some(runtime_info(
+        kind,
         version,
-        executable: path.clone(),
-        source: source.unwrap_or_else(|| classify_source(&path)),
-    })
+        executable,
+        None,
+        source.unwrap_or_else(|| classify_source(&path)),
+        "external",
+        false,
+        None,
+    ))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn runtime_info(
+    label: &str,
+    version: String,
+    executable: &Path,
+    root: Option<&Path>,
+    source: String,
+    management: &str,
+    current: bool,
+    installed_at: Option<String>,
+) -> RuntimeInfo {
+    let executable_text = display_path(executable);
+    let (kind, ecosystem, display_name) = runtime_identity_parts(label);
+    let runtime_root = root
+        .map(display_path)
+        .unwrap_or_else(|| runtime_root_for_executable(&kind, executable));
+    let mut hasher = Sha256::new();
+    hasher.update(kind.as_bytes());
+    hasher.update(path_key(&executable_text).as_bytes());
+    RuntimeInfo {
+        id: format!("runtime-{:x}", hasher.finalize()),
+        kind,
+        display_name,
+        ecosystem,
+        version,
+        executable: executable_text,
+        runtime_root,
+        source,
+        management: management.to_string(),
+        current,
+        installed_at,
+    }
+}
+
+fn runtime_identity_parts(label: &str) -> (String, String, String) {
+    let lower = label.trim().to_ascii_lowercase();
+    let (kind, ecosystem, display_name) = match lower.as_str() {
+        "java" | "jdk" => ("jdk", "java", "Java / JDK"),
+        "python" => ("python", "python", "Python"),
+        "python launcher" | "py" => ("python-launcher", "python", "Python Launcher"),
+        "pip" => ("pip", "python", "pip"),
+        "node" | "node.js" => ("node", "node", "Node.js"),
+        "npm" => ("npm", "node", "npm"),
+        "npx" => ("npx", "node", "npx"),
+        "corepack" => ("corepack", "node", "Corepack"),
+        "pnpm" => ("pnpm", "node", "pnpm"),
+        "yarn" => ("yarn", "node", "Yarn"),
+        "go" | "golang" => ("go", "go", "Go"),
+        "maven" | "mvn" => ("maven", "maven", "Maven"),
+        "gradle" => ("gradle", "gradle", "Gradle"),
+        "rust" | "rustc" => ("rustc", "rust", "Rust"),
+        "cargo" => ("cargo", "rust", "Cargo"),
+        "rustup" => ("rustup", "rust", "rustup"),
+        ".net sdk" | "dotnet" => ("dotnet", "dotnet", ".NET SDK"),
+        _ => (lower.as_str(), "other", label),
+    };
+    (
+        kind.replace([' ', '.'], "-"),
+        ecosystem.to_string(),
+        display_name.to_string(),
+    )
+}
+
+fn runtime_root_for_executable(kind: &str, executable: &Path) -> String {
+    let parent = executable.parent().unwrap_or(executable);
+    let component_directory = parent.file_name().is_some_and(|name| {
+        let name = name.to_string_lossy();
+        (matches!(kind, "jdk" | "go") && name.eq_ignore_ascii_case("bin"))
+            || (kind == "pip" && name.eq_ignore_ascii_case("scripts"))
+    });
+    let root = if component_directory {
+        parent.parent().unwrap_or(parent)
+    } else {
+        parent
+    };
+    display_path(root)
+}
+
+fn mark_path_current_runtimes(runtimes: &mut [RuntimeInfo]) {
+    for runtime in runtimes {
+        if runtime.current {
+            continue;
+        }
+        let executable_name = match runtime.kind.as_str() {
+            "jdk" => "java",
+            "python" => "python",
+            "python-launcher" => "py",
+            "pip" => "pip",
+            "node" => "node",
+            "npm" => "npm",
+            "npx" => "npx",
+            "corepack" => "corepack",
+            "pnpm" => "pnpm",
+            "yarn" => "yarn",
+            "maven" => "mvn",
+            "gradle" => "gradle",
+            "go" => "go",
+            "rustc" => "rustc",
+            "cargo" => "cargo",
+            "rustup" => "rustup",
+            "dotnet" => "dotnet",
+            _ => continue,
+        };
+        runtime.current = find_on_path(executable_name)
+            .map(|path| path_key(&path) == path_key(&runtime.executable))
+            .unwrap_or(false);
+    }
 }
 
 fn find_on_path(executable: &str) -> Option<String> {
@@ -14276,21 +15485,38 @@ fn add_managed_runtime_discoveries(runtimes: &mut Vec<RuntimeInfo>, paths: &AppP
                 continue;
             };
             let version = item
-                .get("detail")
+                .get("version")
                 .and_then(Value::as_str)
-                .or_else(|| item.get("version").and_then(Value::as_str))
                 .unwrap_or("unknown")
                 .to_string();
             let path = PathBuf::from(executable);
+            let root = item
+                .get("path")
+                .and_then(Value::as_str)
+                .map(PathBuf::from)
+                .unwrap_or_else(|| {
+                    path.parent()
+                        .map(Path::to_path_buf)
+                        .unwrap_or_else(|| path.clone())
+                });
+            let current = current_version_for_kind(&installed, meta.kind)
+                == item.get("version").and_then(Value::as_str);
             if path.is_file() {
                 push_runtime(
                     runtimes,
-                    RuntimeInfo {
-                        kind: label.to_string(),
+                    runtime_info(
+                        label,
                         version,
-                        executable: display_path(path),
-                        source: "DevEnv managed".to_string(),
-                    },
+                        &path,
+                        Some(&root),
+                        "DevEnv managed registry".to_string(),
+                        "managed",
+                        current,
+                        item.get("installed_at")
+                            .or_else(|| item.get("installedAt"))
+                            .and_then(Value::as_str)
+                            .map(str::to_string),
+                    ),
                 );
             }
         }
@@ -15026,21 +16252,35 @@ fn run_managed_command_output(
     args: &[&str],
     timeout_seconds: u64,
 ) -> Result<String, String> {
-    let mut command = hidden_command(executable);
-    command.args(args);
-    apply_managed_environment(paths, &mut command);
-    let output = command
-        .output()
-        .map_err(|err| format!("执行命令失败：{err}"))?;
-    let _ = timeout_seconds;
-    if !output.status.success() {
-        return Err(command_text(&output.stdout, &output.stderr));
+    let values = managed_environment_values(paths);
+    let environment = values
+        .iter()
+        .map(|(key, value)| (key.as_str(), value.as_str()))
+        .collect::<Vec<_>>();
+    let output = powershell_runner::run_probe_command_with_env(
+        executable,
+        args,
+        timeout_seconds,
+        &environment,
+    )
+    .map_err(|err| format!("执行命令失败：{err}"))?;
+    if !output.success {
+        return Err(powershell_runner::native_command_message(&output));
     }
-    Ok(command_text(&output.stdout, &output.stderr))
+    Ok([output.stdout.trim(), output.stderr.trim()]
+        .into_iter()
+        .filter(|value| !value.is_empty())
+        .collect::<Vec<_>>()
+        .join("\n"))
 }
 
 fn apply_managed_environment(paths: &AppPaths, command: &mut Command) {
-    command.env("DEVENV_HOME", display_path(&paths.root));
+    command.envs(managed_environment_values(paths));
+}
+
+fn managed_environment_values(paths: &AppPaths) -> HashMap<String, String> {
+    let mut values = HashMap::new();
+    values.insert("DEVENV_HOME".to_string(), display_path(&paths.root));
     let user = user_environment().unwrap_or_default();
     let selected_java = select_java_home(paths, &user)
         .map(|value| expand_environment_path(&value, paths))
@@ -15049,7 +16289,7 @@ fn apply_managed_environment(paths: &AppPaths, command: &mut Command) {
                 && Path::new(value).join("bin/javac.exe").is_file()
         });
     if let Some(java_home) = &selected_java {
-        command.env("JAVA_HOME", java_home);
+        values.insert("JAVA_HOME".to_string(), java_home.clone());
     }
 
     let latest_user_path = user
@@ -15097,7 +16337,8 @@ fn apply_managed_environment(paths: &AppPaths, command: &mut Command) {
             entries.push(item);
         }
     }
-    command.env("PATH", entries.join(";"));
+    values.insert("PATH".to_string(), entries.join(";"));
+    values
 }
 
 pub(crate) fn command_text(stdout: &[u8], stderr: &[u8]) -> String {
@@ -17367,6 +18608,37 @@ mod tests {
     }
 
     #[test]
+    fn profile_history_snapshot_is_durable_and_fingerprinted() {
+        let root = env::temp_dir().join(format!(
+            "devenv-profile-history-test-{}-{}",
+            std::process::id(),
+            SAVE_JSON_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        let paths = AppPaths::new(root.clone());
+        paths.ensure().unwrap();
+        let profiles = vec![ConfigProfile {
+            id: "profile-fixture".to_string(),
+            name: "Fixture".to_string(),
+            created_at: "2026-07-23".to_string(),
+            current: CurrentVersions::default(),
+            devenv_home: Some(r"C:\DevEnvManager".to_string()),
+            java_home: None,
+            path: r"C:\DevEnvManager\current\node".to_string(),
+        }];
+        let snapshot =
+            create_profile_history_snapshot(&paths, "Before fixture mutation", &profiles).unwrap();
+        let loaded = load_profile_history(&paths).unwrap();
+        assert_eq!(loaded.len(), 1);
+        assert_eq!(loaded[0].id, snapshot.id);
+        assert_eq!(
+            loaded[0].fingerprint,
+            profile_collection_fingerprint(&profiles)
+        );
+        assert_eq!(loaded[0].profiles[0].name, "Fixture");
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
     fn risk_gate_rejects_missing_mismatch_expired_and_reused_tokens() {
         let command = "manage_system_platform";
         let plan_id = "docker_update:";
@@ -17431,6 +18703,7 @@ mod tests {
             "apply_python_repair",
             "apply_config_profile",
             "execute_profile_apply_plan",
+            "execute_profile_history_restore_plan",
             "execute_doctor_repair_plan",
             "switch_runtime",
             "uninstall_runtime",

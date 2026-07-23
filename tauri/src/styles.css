@@ -1160,6 +1160,61 @@ th {
   gap: 10px;
 }
 
+.runtime-groups {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.runtime-group {
+  min-width: 0;
+}
+
+.runtime-group__head {
+  align-items: start;
+}
+
+.runtime-group__sections {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.runtime-section {
+  min-width: 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border, #dce4e9);
+}
+
+.runtime-section h3,
+.runtime-external-verification h3 {
+  margin: 0 0 6px;
+  color: var(--color-text, #1d2a32);
+}
+
+.runtime-install-controls {
+  display: flex !important;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px !important;
+}
+
+.runtime-install-controls select {
+  flex: 1 1 150px;
+  min-width: 0;
+}
+
+.runtime-external-verification,
+.runtime-readonly-note {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--color-border, #dce4e9);
+  border-radius: 8px;
+  background: var(--color-surface-raised, #f8fbfc);
+  color: var(--color-text, #1d2a32);
+}
+
 .runtime-install-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -1203,6 +1258,11 @@ th {
   color: var(--color-text, #1d2a32);
 }
 
+.runtime--current {
+  border-color: var(--color-accent, #23745a);
+  box-shadow: inset 3px 0 0 var(--color-accent, #23745a);
+}
+
 .runtime div {
   display: flex;
   align-items: center;
@@ -1221,6 +1281,28 @@ th {
 
 .runtime-detail-panel .kv-list dd {
   overflow-wrap: anywhere;
+}
+
+.runtime-verification-table td {
+  min-width: 110px;
+  vertical-align: top;
+}
+
+.runtime-verification-table td:first-child {
+  min-width: 190px;
+}
+
+.runtime-verification-table small {
+  display: block;
+  margin-top: 4px;
+  color: var(--color-text-muted, #62717c);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 900px) {
+  .runtime-group__sections {
+    grid-template-columns: 1fr;
+  }
 }
 
 .warning-list {
