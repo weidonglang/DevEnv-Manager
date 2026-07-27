@@ -1,8 +1,8 @@
 # DevEnv Manager v1.9.0 Stable Release Review
 
-Status: **Approved for publication**
+Status: **Published and verified on GitHub and Gitee**
 
-The v1.9.0 application source and reviewed assets are pinned to source commit `6e65e8da242fe873077fd207bd2e13a46b2e06b9`. This document is the publication record for the Runtime and Profile-history release.
+The v1.9.0 application source and reviewed assets are pinned to source commit `6e65e8da242fe873077fd207bd2e13a46b2e06b9`. PR #139 was merged as release commit `4d1290a4bb0e8c6ce0e68a32c85b0bdc7ddf9cb4`. This document is the publication record for the Runtime and Profile-history release.
 
 ## User Notice
 
@@ -74,16 +74,18 @@ The final source delta after the exact-core Runtime and Profile smoke was fronte
 - Advanced-mode visual and policy behavior remains a manual acceptance item.
 - Issue #130 should remain open for the read-only ecosystem follow-up and any later Runtime lifecycle expansion. Issues with remaining work must not be closed by this release.
 
-## Publication Plan
+## Publication Verification
 
-1. Merge the release metadata PR and require target-branch CI to pass.
-2. Push the exact release commit and annotated `v1.9.0` tag to GitHub and Gitee.
-3. Create GitHub and Gitee releases with only the reviewed NSIS and MSI files.
-4. Download all four online assets and verify their sizes and SHA256 values.
-5. Verify both public update manifests return v1.9.0, x64, the reviewed NSIS identity, and both mirrors.
-6. Run an online update-channel smoke.
-7. Update this document to `Published and verified` with the online evidence.
+- PR #139 CI run `30235678298` and target `main` CI run `30236142300` passed before publication.
+- Annotated tag `v1.9.0` was pushed to GitHub and Gitee from release commit `4d1290a`.
+- [GitHub Release](https://github.com/weidonglang/DevEnv-Manager/releases/tag/v1.9.0) and [Gitee Release](https://gitee.com/weidonglang/DevEnv-Manager/releases/tag/v1.9.0) are public and contain only the reviewed NSIS and MSI assets.
+- The NSIS and MSI were independently downloaded from both platforms. All four online files matched the reviewed sizes and SHA256 values in this document.
+- The public `main` manifests on GitHub and Gitee returned version 1.9.0, platform `windows-x64`, the reviewed NSIS file name, 2,887,902-byte size, expected SHA256, and two mirrors.
+- The long-lived default `update` Release manifests used by installed applications were replaced on both platforms and independently returned the same v1.9.0 identity. This corrected a publication-channel metadata gap where those two assets initially still served v1.8.2.
+- An online update-channel smoke compared current version 1.8.3 with both default manifests. Gitee completed in 642 ms and GitHub in 1,329 ms; both returned `latestVersion=1.9.0`, `updateAvailable=true`, the expected x64 file name, size, SHA256, and Gitee/GitHub mirrors.
+- The production update-check, manifest normalization, download, and installer-launch functions are unchanged between v1.8.3 and frozen v1.9.0 source. Their installed-application lifecycle was already proven in the v1.8.3 ReleaseLab; this release repeated the affected live network channel instead of adding an unrelated VM/UAC cycle.
+- Issue #130 remains open because Rust, .NET, and other-tool installation lifecycle expansion is still future work. No issue with remaining follow-up content was closed.
 
 ## Release Decision
 
-The reviewed source and assets are GO for publication. No source, automated-test, CI, asset, installed-app, or ReleaseLab blocker remains.
+v1.9.0 is released. No source, automated-test, CI, asset, installed-app, ReleaseLab, publication, or update-channel blocker remains.
