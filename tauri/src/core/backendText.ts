@@ -18,6 +18,7 @@ const backendPhrases: ReadonlyArray<readonly [string, string]> = [
   ["尚未安装受管 Python；无法直接切换到 DevEnv 管理版本。", "No managed Python is installed, so DevEnv Manager cannot switch to a managed version."],
   ["Microsoft Store Python Alias 可能抢占 python 命令。", "The Microsoft Store Python Alias may take precedence over the python command."],
   ["Microsoft Store Python 执行别名可能抢占 python 命令", "The Microsoft Store Python execution alias may take precedence over the python command."],
+  ["Windows Store 执行别名（未安装 Python）", "Windows Store execution alias (Python is not installed)"],
   ["本程序不会自动关闭 Microsoft Store Alias，只会提示你打开系统设置手动处理。", "DevEnv Manager does not disable Microsoft Store aliases automatically; it only opens the system setting for manual changes."],
   ["安装包时尽量使用 python -m pip，而不是直接运行 pip。", "Use python -m pip instead of invoking pip directly when installing packages."],
   ["优先使用 python -m pip，避免 pip.exe 与 Python 版本不一致。", "Prefer python -m pip to avoid a pip.exe and Python version mismatch."],
