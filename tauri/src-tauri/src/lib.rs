@@ -8748,6 +8748,14 @@ fn analyze_python_environment_blocking() -> PythonAnalysis {
     let discovered_pythons = python_candidates()
         .into_iter()
         .filter_map(|path| {
+            if is_windows_store_python_alias(&path) {
+                return Some(PythonEntry {
+                    current: false,
+                    source: "Microsoft Store".to_string(),
+                    path: display_path(path),
+                    version: "Windows Store 执行别名（未安装 Python）".to_string(),
+                });
+            }
             detect_runtime_at("Python", &path, &["--version"], None).map(|runtime| PythonEntry {
                 current: current_python_key.as_deref()
                     == Some(path_key(&runtime.executable).as_str()),
@@ -8900,6 +8908,12 @@ fn analyze_python_environment_blocking() -> PythonAnalysis {
             .to_string(),
         alias_settings_command: "start ms-settings:appsfeatures-app".to_string(),
     }
+}
+
+fn is_windows_store_python_alias(path: &Path) -> bool {
+    let path = display_path(path).to_ascii_lowercase();
+    path.contains("\\windowsapps\\")
+        && (path.ends_with("\\python.exe") || path.ends_with("\\python3.exe"))
 }
 
 struct PythonDiagnosticInput<'a> {
@@ -15290,11 +15304,7 @@ fn detect_runtime_at(
         return None;
     }
     let output = hidden_command(executable).args(args).output().ok()?;
-    let mut text = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    if text.is_empty() {
-        text = String::from_utf8_lossy(&output.stderr).trim().to_string();
-    }
-    let version = first_meaningful_output_line(&text).unwrap_or_else(|| "unknown".to_string());
+    let version = runtime_probe_version(output.status.success(), &output.stdout, &output.stderr)?;
     let path = display_path(executable);
 
     Some(runtime_info(
@@ -15307,6 +15317,19 @@ fn detect_runtime_at(
         false,
         None,
     ))
+}
+
+fn runtime_probe_version(success: bool, stdout: &[u8], stderr: &[u8]) -> Option<String> {
+    if !success {
+        return None;
+    }
+    let stdout = String::from_utf8_lossy(stdout);
+    let stderr = String::from_utf8_lossy(stderr);
+    first_meaningful_output_line(if stdout.trim().is_empty() {
+        stderr.as_ref()
+    } else {
+        stdout.as_ref()
+    })
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -18351,6 +18374,36 @@ mod tests {
         let other = r"pip 24.0 from C:\Python311\Lib\site-packages\pip (python 3.11)";
         assert!(same_python_package_location(left, right));
         assert!(!same_python_package_location(left, other));
+    }
+
+    #[test]
+    fn runtime_probe_rejects_failed_store_alias_output() {
+        assert_eq!(
+            runtime_probe_version(
+                false,
+                b"",
+                b"Python was not found; run without arguments to install from the Microsoft Store"
+            ),
+            None
+        );
+        assert_eq!(
+            runtime_probe_version(true, b"", b"openjdk version \"21.0.8\""),
+            Some("openjdk version \"21.0.8\"".to_string())
+        );
+        assert_eq!(runtime_probe_version(true, b"", b""), None);
+    }
+
+    #[test]
+    fn python_store_alias_is_diagnostic_evidence_not_a_runtime() {
+        assert!(is_windows_store_python_alias(Path::new(
+            r"C:\Users\Alice\AppData\Local\Microsoft\WindowsApps\python.exe"
+        )));
+        assert!(is_windows_store_python_alias(Path::new(
+            r"C:\Users\Alice\AppData\Local\Microsoft\WindowsApps\python3.exe"
+        )));
+        assert!(!is_windows_store_python_alias(Path::new(
+            r"C:\Python312\python.exe"
+        )));
     }
 
     #[test]
