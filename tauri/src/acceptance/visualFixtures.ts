@@ -253,7 +253,7 @@ export function profilesVisualState(): ProfilesState {
     backupName: "environment-before-profile-fixture.json",
     warnings: ["Open terminals and IDEs must be restarted after the switch."],
   };
-  state.operationResult = "Profile preview is ready; no changes were applied by this fixture.";
+  state.operationResult = "Restored 1 profiles from history snapshot profile-history-fixture";
   state.history = [{
     id: "profile-history-fixture",
     createdAt: "2026-07-22T07:30:00Z",

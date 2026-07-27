@@ -72,6 +72,27 @@ function localizeProfileHistoryResult(message: string): string {
   return localize(message, `已从历史快照 ${match[2]} 恢复 ${match[1]} 个配置档案`);
 }
 
+function localizeProfileOperationResult(message: string): string {
+  const historyResult = localizeProfileHistoryResult(message);
+  if (historyResult !== message) return historyResult;
+  const patterns: Array<[RegExp, (match: RegExpMatchArray) => string]> = [
+    [/^已保存配置模板：(.+)$/, (match) => localize(`Saved profile: ${match[1]}`, match[0])],
+    [/^已删除配置模板$/, (match) => localize("Profile deleted.", match[0])],
+    [/^已重命名配置模板：(.+)$/, (match) => localize(`Renamed profile: ${match[1]}`, match[0])],
+    [/^已复制配置模板：(.+)$/, (match) => localize(`Copied profile: ${match[1]}`, match[0])],
+    [/^已导出配置模板：(.+)$/, (match) => localize(`Exported profiles: ${match[1]}`, match[0])],
+    [/^已导入 (\d+) 个配置模板；应用前会检查所需版本$/, (match) => localize(`Imported ${match[1]} profiles; runtime requirements will be checked before apply.`, match[0])],
+    [/^已恢复环境变量模板：(.+)$/, (match) => localize(`Restored environment profile: ${match[1]}`, match[0])],
+    [/^已应用模板 (.+)：(.+)$/, (match) => localize(`Applied profile ${match[1]}: ${match[2]}`, match[0])],
+    [/^已补装 (\d+) 个缺失运行时并应用模板$/, (match) => localize(`Installed ${match[1]} missing runtimes and applied the profile.`, match[0])],
+  ];
+  for (const [pattern, render] of patterns) {
+    const match = message.match(pattern);
+    if (match) return render(match);
+  }
+  return message;
+}
+
 function localizeRiskLevel(riskLevel: string): string {
   const labels: Record<string, readonly [string, string]> = {
     readOnly: ["Read-only", "只读"],
@@ -87,6 +108,6 @@ function localizeRiskLevel(riskLevel: string): string {
 function renderOperationResult(state: ProfilesState): string {
   return `<div data-testid="profiles-operation-result">
     ${state.operationError ? `<div class="error-state">${escapeHtml(state.operationError)}</div>` : ""}
-    ${state.operationResult ? `<div class="small-note">${escapeHtml(state.operationResult)}</div>` : `<div class="empty">${t("state.notChecked")}</div>`}
+    ${state.operationResult ? `<div class="small-note">${escapeHtml(localizeProfileOperationResult(state.operationResult))}</div>` : `<div class="empty">${t("state.notChecked")}</div>`}
   </div>`;
 }
