@@ -2,9 +2,9 @@
 
 [GitHub 主仓库](https://github.com/weidonglang/DevEnv-Manager) · [Gitee 国内镜像](https://gitee.com/weidonglang/DevEnv-Manager) · [GitHub Release](https://github.com/weidonglang/DevEnv-Manager/releases) · [Gitee Release](https://gitee.com/weidonglang/DevEnv-Manager/releases) · [完整操作手册](docs/user-guide.md) · [安全说明](docs/safety-and-disclaimer.md) · [问题反馈](https://github.com/weidonglang/DevEnv-Manager/issues)
 
-面向 Windows 的开发环境诊断器与安全操作面板。当前版本：**1.8.3 Stable**。
+面向 Windows 的开发环境诊断器与安全操作面板。当前版本：**1.9.0 Stable**。
 
-1.8.3 是 v1.8.2 之后的集中修复版本：解决端口扫描超时与重复分组、清理页暗色/高对比可读性、归档目标选择、Downloads 恢复、回收站复扫，以及执行计划可篡改或重复消费等问题。Runtime 最终重构继续由 #130 / v1.9.0 跟踪。
+1.9.0 完成 Runtime 管理主线与 Profile 历史恢复：统一识别九类开发生态，明确受管、外部和当前运行时边界，安装后强校验但不擅自切换，并把切换与历史恢复绑定到可验证、可回滚、单次消费的后端计划。
 
 ## 下载与镜像
 
@@ -12,9 +12,9 @@
 - Gitee 国内镜像：https://gitee.com/weidonglang/DevEnv-Manager
 - GitHub Release：https://github.com/weidonglang/DevEnv-Manager/releases
 - Gitee Release：https://gitee.com/weidonglang/DevEnv-Manager/releases
-- v1.8.3 NSIS：https://github.com/weidonglang/DevEnv-Manager/releases/download/v1.8.3/DevEnv.Manager_1.8.3_x64-setup.exe
-- 国内下载：https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.8.3/DevEnv.Manager_1.8.3_x64-setup.exe
-- NSIS SHA256：`a6663ab2e409f936b11105f4d827b4d41cbfbe9e225ce55aa7a92e4eb601d20c`
+- v1.9.0 NSIS：https://github.com/weidonglang/DevEnv-Manager/releases/download/v1.9.0/DevEnv.Manager_1.9.0_x64-setup.exe
+- 国内下载：https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.9.0/DevEnv.Manager_1.9.0_x64-setup.exe
+- NSIS SHA256：`0e44e6f9c591858c8981139c581ee70f6e79344b0850525d3f83f2bd257664c1`
 
 适合：
 
@@ -46,6 +46,27 @@ DevEnv Manager 解决的是 Windows 上多个开发生态互相影响的问题�
 - 适合希望用图形界面查看诊断证据，同时保留 CLI 自动化入口的用户。
 - 不适合希望软件自动接管整台机器、清理任意个人文件或替代专业包管理器的场景。
 - 熟练使用 mise/asdf/Scoop/Chocolatey 且环境已经稳定的用户，可以只使用诊断能力。
+
+## 1.9.0 Stable
+
+我们再次向受到此前版本 Runtime 状态混淆、安装与切换边界不清、Windows Store Alias 被误列为外部 Python，以及英文界面仍出现中文 Profile 结果影响的用户郑重道歉。用户不应该通过反复截图、重装和手工验证，替项目发现这些问题。v1.9.0 不只是增加页面选项，而是把运行时识别、安装、切换、验证和恢复重新收束到可审计的产品契约。
+
+本次版本完成：
+
+- Runtime 页面统一展示 JDK、Node.js、Python、Go、Maven、Gradle、Rust/Cargo/rustup、.NET 和其他工具九类生态，并按“当前生效、DevEnv Manager 受管、外部安装”分组。
+- 外部 Runtime 保持只读，只提供打开位置、复制路径和系统级管理入口；不会显示 DevEnv Manager 的直接切换或卸载操作。
+- JDK、Node、Python、Go、Maven 和 Gradle 安装区独立分组。安装完成后验证版本命令和必需组件，不完整目标进入重试或隔离流程，不会注册为可用 Runtime。
+- 安装 Runtime 不再自动修改当前环境。Maven 和 Gradle 支持明确选择版本；Rust、.NET 和其他工具在 1.9.0 中保持只读发现，不冒充完整安装管理。
+- Runtime 切换使用后端保存的精确计划，包含目标身份、PATH 差异、备份、状态指纹、风险和确认令牌；计划过期、状态变化、内容篡改或重复消费都会被拒绝。
+- 切换执行后重新验证实际命令和关键组件；失败时保留备份与回滚信息。Runtime 强验证报告可以从报告页导出。
+- Profile 历史记录持久化保存完整快照，默认保留最近 100 条；保存、删除、重命名、复制、导入、应用和恢复前都会留下可追踪快照。
+- Profile 历史恢复同样使用后端计划、指纹、备份和单次确认令牌，拒绝过期或已变化的目标状态。
+- Profile 操作摘要在中文和英文界面完整本地化；WindowsApps Store Alias 不再被当成可管理的 Python Runtime。
+- v1.8.3 的端口分组、归档选择与恢复、回收站复扫、暗色/高对比可读性，以及 Move、扩容、文件关联和 Junction 安全计划继续保留。
+
+冻结源码提交 `6e65e8d` 通过 216 项 Rust 测试、Clippy、113 模块前端构建、245 个前端 selector、30 项视觉验收和全部契约检查。功能验收报告为 246 通过、0 失败、40 项危险动作安全跳过、6 项人工或策略验收；P0/P1 失败、backend-only、ui-only、missing 和 partial 均为 0。最终 Windows ReleaseLab 从精确提交构建的 NSIS 安装，验证九类 Runtime 分组、Store Alias 过滤、中文/英文 Profile 历史恢复、Dark/High Contrast 可读性和卸载清理，结果全部通过。
+
+正式资产、SHA256、验收边界和非阻塞限制记录在 [docs/release-v1.9.0.md](docs/release-v1.9.0.md)。安装器暂未进行 Authenticode 签名，Windows 可能显示常规信任提示。
 
 ## 1.8.3 Stable
 

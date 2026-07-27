@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.9.0
+
+- Redesign Runtime discovery around nine ecosystem groups with explicit current, managed, and external authority boundaries.
+- Keep external runtimes read-only and prevent managed JDK, Node, Python, Go, Maven, and Gradle installs from silently changing the active environment.
+- Verify installed runtime commands and required components before registration, with retry and quarantine handling for incomplete targets.
+- Add selectable Maven and Gradle versions plus structured strong-verification results and report export.
+- Bind Runtime switching to backend-stored exact plans with PATH diffs, backups, state fingerprints, expiring confirmation tokens, single consumption, stale-state rejection, post-switch verification, and rollback evidence.
+- Persist up to 100 complete Profile history snapshots and protect restore with the same plan, fingerprint, backup, token, and single-use boundaries.
+- Localize Profile operation summaries in Chinese and English, including save, delete, rename, copy, import, export, apply, and history restore.
+- Exclude WindowsApps Store Alias shims from external Python Runtime inventory.
+- Preserve the v1.8.3 port, cleanup, archive, Recycle Bin, contrast, and high-risk plan hardening.
+
+Exact asset identities, ReleaseLab evidence, acceptance boundaries, and disclosures are recorded in [docs/release-v1.9.0.md](docs/release-v1.9.0.md).
+
 ## 1.8.3
 
 - Group IPv4/IPv6 and duplicate source records into one stable visible port row while preserving every binding in diagnostics.
