@@ -1,6 +1,6 @@
 [package]
 name = "dailytools-tauri"
-version = "1.9.0"
+version = "1.9.1"
 description = "A lightweight Tauri rewrite of DevEnv Manager."
 authors = ["weidonglang"]
 edition = "2021"

@@ -86,7 +86,7 @@ function renderInstallControl(groupId: string, state: RuntimeWorkbenchState): st
   if (groupId === "go") return renderVersionInstallControl("Go", "runtime-install-go-group", "go-version", "runtime-go-version-select", ["1.22", "1.23", "1.24", "1.25", "1.26"], "1.25", "install-go", t("feature.runtimes.installGo"));
   if (groupId === "maven") return renderVersionInstallControl("Maven", "runtime-install-maven-group", "maven-version", "runtime-maven-version-select", ["latest", "3.9.16", "3.9.15", "3.9.14", "3.9.12", "3.9.11"], "latest", "install-maven", t("feature.runtimes.installMaven"));
   if (groupId === "gradle") return renderVersionInstallControl("Gradle", "runtime-install-gradle-group", "gradle-version", "runtime-gradle-version-select", ["latest", "9.6.1", "9.5.0", "9.4.0", "8.14.3"], "latest", "install-gradle", t("feature.runtimes.installGradle"));
-  return `<div class="runtime-readonly-note">${localize("Read-only discovery in v1.9.0. Use the vendor tool or Windows package manager to install and update this ecosystem.", "v1.9.0 中提供只读发现；请使用厂商工具或 Windows 包管理器安装和更新此生态。")}</div>`;
+  return `<div class="runtime-readonly-note">${localize("Read-only discovery. Use the vendor tool or Windows package manager to install and update this ecosystem.", "此生态仅提供只读发现；请使用厂商工具或 Windows 包管理器安装和更新。")}</div>`;
 }
 
 function renderVersionInstallControl(title: string, testId: string, selectId: string, selectTestId: string, versions: string[], selected: string, action: string, label: string): string {
