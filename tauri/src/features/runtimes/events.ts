@@ -105,19 +105,26 @@ export function bindRuntimeEvents(context: FeatureContext, state: RuntimeWorkben
       renderAndBind(context, state);
       return;
     }
+    const requestId = ++state.switchRequestId;
+    state.switchPhase = "executing";
+    state.switchInlineMessage = localize("Executing the reviewed plan and verifying the result...", "正在执行已审阅计划并验证结果...");
+    state.switchInlineError = "";
     state.operationResult = "";
     state.operationError = "";
+    renderAndBind(context, state);
     try {
       const result = await context.risk.run({
         command: "execute_runtime_switch_plan",
         actionId: "execute_runtime_switch_plan",
         planId: plan.planId,
         planFingerprint: plan.planFingerprint,
-        riskLevel: "medium",
+        riskLevel: plan.riskLevel,
         backupReceipt: plan.backupName,
         title: t("feature.runtimes.switchTitle", { name: plan.kind, version: plan.version }),
-        summary: localize("Switch the reviewed managed runtime, update the current pointer and user environment, then run command-level verification.", "切换已审阅的受管运行时，更新 current 指针和用户环境，并执行命令级强校验。"),
+        summary: localize("Apply the reviewed runtime selection through its allowed mode, then run command-level verification and roll back on failure.", "按允许的模式应用已审阅的运行时选择，随后执行命令级验证，失败时自动回滚。"),
         before: [
+          { label: localize("Switch mode", "切换模式"), value: plan.switchMode },
+          { label: localize("Source authority", "来源权限"), value: plan.sourceAuthority },
           { label: localize("Previous version", "原版本"), value: plan.previousVersion || t("state.notAvailable") },
           { label: localize("Target root", "目标目录"), value: plan.targetRoot },
           { label: localize("Environment backup", "环境备份"), value: plan.backupName },
@@ -125,14 +132,39 @@ export function bindRuntimeEvents(context: FeatureContext, state: RuntimeWorkben
         warnings: plan.warnings,
         execute: (confirmationToken) => executeRuntimeSwitchPlan(plan.planId, confirmationToken),
       }) as RuntimeSwitchResult;
+      if (!context.isCurrent() || requestId !== state.switchRequestId) return;
       state.switchResult = result;
       state.switchPlan = null;
+      state.switchPhase = "succeeded";
+      state.switchInlineMessage = result.message;
       state.operationResult = result.message;
       await reloadRuntimeData(state);
     } catch (error) {
-      state.operationError = errorMessage(error);
+      if (!context.isCurrent() || requestId !== state.switchRequestId) return;
+      state.switchPhase = "failed";
+      state.switchInlineError = errorMessage(error);
+      state.operationError = state.switchInlineError;
     }
     renderAndBind(context, state);
+    focusSwitchWorkflow(context);
+  });
+  bindAction(context.root, "choose-runtime-project", async () => {
+    const selected = await open({ directory: true, multiple: false });
+    if (!selected || Array.isArray(selected)) return;
+    state.runtimeProjectRoot = selected;
+    if (!state.switchTargetRuntimeId || state.switchTargetMode !== "project") {
+      state.switchPhase = "failed";
+      state.switchInlineError = localize("Select a .NET SDK target before choosing its project.", "请先选择目标 .NET SDK，再选择项目目录。");
+      renderAndBind(context, state);
+      return;
+    }
+    await requestRuntimeSwitchPlan(
+      context,
+      state,
+      state.switchTargetRuntimeId,
+      "project",
+      state.switchTargetLabel,
+    );
   });
   bindAction(context.root, "verify-runtimes", async () => {
     context.progress.start(t("feature.runtimes.healthCheck"));
@@ -209,6 +241,8 @@ async function installSelectedWithRisk(context: FeatureContext, state: RuntimeWo
 
 async function runRuntimeRowAction(context: FeatureContext, state: RuntimeWorkbenchState, button: HTMLButtonElement): Promise<void> {
   const action = button.dataset.runtimeAction;
+  const runtimeId = button.dataset.runtimeId || "";
+  const switchMode = button.dataset.runtimeSwitchMode || "";
   const kind = button.dataset.runtimeKind || "";
   const label = button.dataset.runtimeLabel || kind;
   const version = button.dataset.runtimeVersion || "";
@@ -289,17 +323,26 @@ async function runRuntimeRowAction(context: FeatureContext, state: RuntimeWorkbe
   }
 
   if (action === "switch") {
-    state.operationResult = "";
-    state.operationError = "";
-    state.switchResult = null;
-    try {
-      state.switchPlan = await createRuntimeSwitchPlan(kind, version, path);
-      state.operationResult = localize("Runtime switch plan created. Review the backup and environment diff before execution.", "运行时切换计划已创建，请检查备份和环境差异后再执行。");
-    } catch (error) {
-      state.switchPlan = null;
-      state.operationError = errorMessage(error);
+    if (!runtimeId || !isRuntimeSwitchMode(switchMode)) {
+      state.switchPhase = "failed";
+      state.switchInlineError = localize("This runtime does not expose a trusted switch identity or mode.", "此运行时没有可信的切换身份或模式。");
+      state.operationError = state.switchInlineError;
+      renderAndBind(context, state);
+      return;
     }
-    renderAndBind(context, state);
+    state.switchTargetRuntimeId = runtimeId;
+    state.switchTargetMode = switchMode;
+    state.switchTargetLabel = `${label} ${version}`;
+    if (switchMode === "project" && !state.runtimeProjectRoot) {
+      state.switchPhase = "idle";
+      state.switchPlan = null;
+      state.switchInlineError = "";
+      state.switchInlineMessage = localize("Choose the project directory to create a project-scoped .NET SDK plan.", "请选择项目目录以创建项目级 .NET SDK 计划。");
+      renderAndBind(context, state);
+      focusSwitchWorkflow(context);
+      return;
+    }
+    await requestRuntimeSwitchPlan(context, state, runtimeId, switchMode, `${label} ${version}`);
     return;
   }
 
@@ -355,6 +398,61 @@ function renderAndBind(context: FeatureContext, state: RuntimeWorkbenchState): v
   if (!context.isCurrent()) return;
   context.root.innerHTML = renderRuntimeWorkbench(state);
   bindRuntimeEvents(context, state);
+}
+
+async function requestRuntimeSwitchPlan(
+  context: FeatureContext,
+  state: RuntimeWorkbenchState,
+  runtimeId: string,
+  switchMode: "managed" | "external-user" | "provider" | "project",
+  targetLabel: string,
+): Promise<void> {
+  const requestId = ++state.switchRequestId;
+  state.operationResult = "";
+  state.operationError = "";
+  state.switchResult = null;
+  state.switchPlan = null;
+  state.switchPhase = "planning";
+  state.switchTargetRuntimeId = runtimeId;
+  state.switchTargetMode = switchMode;
+  state.switchTargetLabel = targetLabel;
+  state.switchInlineMessage = localize("Creating a trusted plan. You can continue reviewing this row while the backend verifies the target.", "正在创建可信计划；后端验证目标期间可继续查看此行。");
+  state.switchInlineError = "";
+  renderAndBind(context, state);
+  try {
+    const plan = await createRuntimeSwitchPlan(
+      runtimeId,
+      switchMode,
+      switchMode === "project" ? state.runtimeProjectRoot : null,
+    );
+    if (!context.isCurrent() || requestId !== state.switchRequestId) return;
+    state.switchPlan = plan;
+    state.switchPhase = "planReady";
+    state.switchInlineMessage = localize("Runtime switch plan created. Review the backup, authority and environment diff before execution.", "运行时切换计划已创建，请在执行前审阅备份、来源权限和环境差异。");
+    state.operationResult = state.switchInlineMessage;
+  } catch (error) {
+    if (!context.isCurrent() || requestId !== state.switchRequestId) return;
+    state.switchPlan = null;
+    state.switchPhase = "failed";
+    state.switchInlineMessage = "";
+    state.switchInlineError = errorMessage(error);
+    state.operationError = state.switchInlineError;
+  }
+  renderAndBind(context, state);
+  focusSwitchWorkflow(context);
+}
+
+function focusSwitchWorkflow(context: FeatureContext): void {
+  requestAnimationFrame(() => {
+    if (!context.isCurrent()) return;
+    const target = context.root.querySelector<HTMLElement>('[data-testid="runtime-switch-workflow"]');
+    target?.scrollIntoView({ behavior: "smooth", block: "start" });
+    target?.focus({ preventScroll: true });
+  });
+}
+
+function isRuntimeSwitchMode(value: string): value is "managed" | "external-user" | "provider" | "project" {
+  return ["managed", "external-user", "provider", "project"].includes(value);
 }
 
 function resultMessage(result: unknown, fallback: string): string {

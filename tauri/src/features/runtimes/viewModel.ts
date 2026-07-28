@@ -13,6 +13,11 @@ export type RuntimeRowViewModel = {
   runtimeRoot: string;
   source: string;
   managed: boolean;
+  sourceAuthority: string;
+  provider: string;
+  switchEligible: boolean;
+  switchMode: "managed" | "external-user" | "provider" | "project" | null;
+  switchReason: string;
   readonlyLabel: string;
   current: boolean;
   currentLabel: string;
@@ -72,6 +77,10 @@ function toRuntimeRow(runtime: RuntimeInfo, report: RuntimeStrongVerificationRep
   const item = report?.items.find((candidate) => candidate.runtimeId === runtime.id);
   const managed = runtime.management === "managed";
   const current = runtime.current || Boolean(item?.current);
+  const requiredChecksPassed = Boolean(item)
+    && item!.checks
+      .filter((check) => check.required)
+      .every((check) => check.status === "passed");
   return {
     id: runtime.id,
     kind: runtime.displayName,
@@ -82,6 +91,18 @@ function toRuntimeRow(runtime: RuntimeInfo, report: RuntimeStrongVerificationRep
     runtimeRoot: runtime.runtimeRoot,
     source: runtime.source,
     managed,
+    sourceAuthority: runtime.sourceAuthority,
+    provider: runtime.provider || "",
+    switchEligible: managed
+      ? runtime.switchEligible
+      : runtime.switchEligible && requiredChecksPassed,
+    switchMode: runtime.switchModes[0] ?? null,
+    switchReason: localizeBackendText(
+      runtime.switchBlockers.join(" - ")
+      || (!managed && !requiredChecksPassed
+        ? localize("Run the strong health check and resolve every required failure before adoption.", "采用前请运行强健康检查并解决所有必需项失败。")
+        : ""),
+    ),
     readonlyLabel: managed ? localize("DevEnv managed", "DevEnv 受管") : localize("External install / read-only", "外部安装 / 只读"),
     current,
     currentLabel: current ? localize("Current", "当前生效") : managed ? localize("Installed, not current", "已安装，未切换") : localize("Discovered", "已发现"),

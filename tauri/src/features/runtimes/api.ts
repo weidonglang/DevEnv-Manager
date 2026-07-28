@@ -21,8 +21,8 @@ export function installRuntime(command: "install_jdk" | "install_node" | "instal
   return invoke<OperationResult>(command, args);
 }
 
-export function createRuntimeSwitchPlan(kind: string, version: string, path: string | null): Promise<RuntimeSwitchPlan> {
-  return invoke<RuntimeSwitchPlan>("create_runtime_switch_plan", { kind, version, path });
+export function createRuntimeSwitchPlan(runtimeId: string, switchMode: RuntimeSwitchPlan["switchMode"], projectRoot: string | null = null): Promise<RuntimeSwitchPlan> {
+  return invoke<RuntimeSwitchPlan>("create_runtime_switch_plan", { runtimeId, switchMode, projectRoot });
 }
 
 export function executeRuntimeSwitchPlan(planId: string, confirmationToken: string): Promise<RuntimeSwitchResult> {

@@ -426,8 +426,31 @@ struct RuntimeInfo {
     runtime_root: String,
     source: String,
     management: String,
+    source_authority: String,
+    provider: Option<String>,
+    switch_modes: Vec<String>,
+    switch_eligible: bool,
+    switch_blockers: Vec<String>,
+    verification_fingerprint: String,
     current: bool,
     installed_at: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+struct RuntimeSelectionState {
+    selections: HashMap<String, RuntimeSelectionRecord>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct RuntimeSelectionRecord {
+    runtime_id: String,
+    ecosystem: String,
+    switch_mode: String,
+    runtime_root: String,
+    version: String,
+    selected_at: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -950,6 +973,11 @@ struct RuntimeStrongVerificationReport {
 struct RuntimeSwitchPlan {
     plan_id: String,
     created_at: String,
+    expires_at: u64,
+    runtime_id: String,
+    switch_mode: String,
+    source_authority: String,
+    provider: Option<String>,
     kind: String,
     version: String,
     target_root: String,
@@ -958,6 +986,8 @@ struct RuntimeSwitchPlan {
     environment_changes: Vec<String>,
     path_diff: Vec<String>,
     backup_name: String,
+    state_fingerprint: String,
+    verification_steps: Vec<String>,
     warnings: Vec<String>,
     risk_level: String,
     plan_fingerprint: String,
@@ -967,6 +997,8 @@ struct RuntimeSwitchPlan {
 struct PendingRuntimeSwitchPlan {
     public: RuntimeSwitchPlan,
     installed_fingerprint: String,
+    candidate: Option<RuntimeInfo>,
+    project_root: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -976,6 +1008,8 @@ struct RuntimeSwitchResult {
     message: String,
     plan_id: String,
     backup_name: String,
+    rollback_performed: bool,
+    rollback_verified: bool,
     verification: RuntimeStrongStatus,
 }
 
@@ -3573,6 +3607,12 @@ fn create_environment_backup(
         "created_at": current_timestamp(),
         "DEVENV_HOME": environment.get("DEVENV_HOME"),
         "JAVA_HOME": environment.get("JAVA_HOME"),
+        "MAVEN_HOME": environment.get("MAVEN_HOME"),
+        "M2_HOME": environment.get("M2_HOME"),
+        "GRADLE_HOME": environment.get("GRADLE_HOME"),
+        "GOROOT": environment.get("GOROOT"),
+        "DOTNET_ROOT": environment.get("DOTNET_ROOT"),
+        "RUSTUP_TOOLCHAIN": environment.get("RUSTUP_TOOLCHAIN"),
         "Path": old_path,
     });
     save_json(&paths.env_backup_file(), &backup)?;
@@ -3904,10 +3944,7 @@ async fn restore_user_environment(
 fn restore_user_environment_blocking() -> Result<OperationResult, String> {
     let paths = load_paths()?;
     let backup: Value = read_json(&paths.env_backup_file())?;
-    let path = backup.get("Path").and_then(Value::as_str).unwrap_or("");
-    let devenv_home = backup.get("DEVENV_HOME").and_then(Value::as_str);
-    let java_home = backup.get("JAVA_HOME").and_then(Value::as_str);
-    restore_environment_values(devenv_home, java_home, path)?;
+    restore_runtime_environment(&environment_backup_values(&backup))?;
     broadcast_environment_change();
     Ok(OperationResult {
         success: true,
@@ -3934,10 +3971,7 @@ fn restore_environment_backup(
     let backup: Value = read_json(&source)?;
     let current = user_environment()?;
     let safety_backup = create_environment_backup(&paths, &current)?;
-    let path = backup.get("Path").and_then(Value::as_str).unwrap_or("");
-    let devenv_home = backup.get("DEVENV_HOME").and_then(Value::as_str);
-    let java_home = backup.get("JAVA_HOME").and_then(Value::as_str);
-    restore_environment_values(devenv_home, java_home, path)?;
+    restore_runtime_environment(&environment_backup_values(&backup))?;
     broadcast_environment_change();
     Ok(OperationResult {
         success: true,
@@ -4005,7 +4039,11 @@ fn discover_runtimes_blocking() -> Vec<RuntimeInfo> {
     }
     add_python_launcher_discoveries(&mut runtimes);
     add_python_registry_discoveries(&mut runtimes);
+    add_rustup_toolchain_discoveries(&mut runtimes);
+    add_dotnet_sdk_discoveries(&mut runtimes);
     mark_path_current_runtimes(&mut runtimes);
+    populate_runtime_switch_capabilities(&mut runtimes);
+    mark_persisted_runtime_selections(&mut runtimes);
 
     runtimes.sort_by(|a, b| {
         a.ecosystem
@@ -4856,13 +4894,14 @@ fn verify_external_runtime(runtime: RuntimeInfo) -> RuntimeStrongStatus {
         "java" | "javac" => "jdk",
         other => other,
     };
-    let verification = runtime_verification::verify_installed_runtime(
+    let mut verification = runtime_verification::verify_installed_runtime(
         verification_kind,
         &root,
         &executable,
         &runtime.version,
         None,
     );
+    append_provider_verification_checks(&runtime, &mut verification);
     let status = if !root.exists() {
         "外部安装目录不存在"
     } else if !executable.is_file() {
@@ -5060,29 +5099,371 @@ fn install_gradle_blocking(
 }
 
 #[tauri::command]
-async fn switch_runtime(
-    kind: String,
-    version: String,
-    path: Option<String>,
-    confirmation_token: Option<String>,
-) -> Result<OperationResult, String> {
+async fn create_runtime_switch_plan(
+    runtime_id: String,
+    switch_mode: String,
+    project_root: Option<String>,
+) -> Result<RuntimeSwitchPlan, String> {
     run_blocking(move || {
-        let plan_id = runtime_plan_id(&kind, &version, path.as_deref());
-        require_risk_operation_token("switch_runtime", &plan_id, confirmation_token)?;
-        switch_runtime_blocking(kind, version, path)
+        create_trusted_runtime_switch_plan_blocking(runtime_id, switch_mode, project_root)
     })
     .await?
 }
 
-#[tauri::command]
-async fn create_runtime_switch_plan(
-    kind: String,
-    version: String,
-    path: Option<String>,
-) -> Result<RuntimeSwitchPlan, String> {
-    run_blocking(move || create_runtime_switch_plan_blocking(kind, version, path)).await?
+fn environment_backup_values(backup: &Value) -> HashMap<String, String> {
+    [
+        "DEVENV_HOME",
+        "JAVA_HOME",
+        "MAVEN_HOME",
+        "M2_HOME",
+        "GRADLE_HOME",
+        "GOROOT",
+        "DOTNET_ROOT",
+        "RUSTUP_TOOLCHAIN",
+        "Path",
+    ]
+    .into_iter()
+    .filter_map(|name| {
+        backup
+            .get(name)
+            .and_then(Value::as_str)
+            .map(|value| (name.to_string(), value.to_string()))
+    })
+    .collect()
 }
 
+fn create_trusted_runtime_switch_plan_blocking(
+    runtime_id: String,
+    switch_mode: String,
+    project_root: Option<String>,
+) -> Result<RuntimeSwitchPlan, String> {
+    let paths = load_paths()?;
+    let installed = load_installed(&paths)?;
+    let candidate = resolve_trusted_runtime_candidate(&runtime_id, &switch_mode)?;
+    let project_root = validate_runtime_project_root(&candidate, &switch_mode, project_root)?;
+    let environment = user_environment()?;
+    let backup_name = create_environment_backup(&paths, &environment)?;
+    let created_at_unix = unix_timestamp();
+    let expires_at = created_at_unix.saturating_add(10 * 60);
+    let created_at = created_at_unix.to_string();
+    let state_fingerprint = runtime_switch_state_fingerprint(
+        &candidate,
+        &installed,
+        &environment,
+        project_root.as_deref(),
+    );
+    let mut hasher = Sha256::new();
+    hasher.update(candidate.id.as_bytes());
+    hasher.update(switch_mode.as_bytes());
+    hasher.update(state_fingerprint.as_bytes());
+    hasher.update(created_at.as_bytes());
+    let plan_fingerprint = format!("{:x}", hasher.finalize());
+    let plan_id = format!("runtime-switch-{}", &plan_fingerprint[..24]);
+    let (environment_changes, path_diff, verification_steps) =
+        runtime_switch_plan_details(&candidate, &switch_mode, project_root.as_deref());
+    let (previous_version, previous_root) = current_runtime_for_ecosystem(&candidate.ecosystem);
+    let mut warnings = vec![
+        "This plan is single-use, expires after 10 minutes, and is rejected if runtime or environment state changes.".to_string(),
+        "Open terminals, IDEs, services, and agents must be restarted to inherit a changed user environment.".to_string(),
+        "Execution verifies the selected runtime and automatically restores the captured state if verification fails.".to_string(),
+    ];
+    if candidate.management == "external" {
+        warnings.push(
+            "The external runtime directory remains read-only; only user environment, provider state, or a project selection file may change."
+                .to_string(),
+        );
+    }
+    let plan = RuntimeSwitchPlan {
+        plan_id: plan_id.clone(),
+        created_at,
+        expires_at,
+        runtime_id: candidate.id.clone(),
+        switch_mode,
+        source_authority: candidate.source_authority.clone(),
+        provider: candidate.provider.clone(),
+        kind: candidate.kind.clone(),
+        version: candidate.version.clone(),
+        target_root: candidate.runtime_root.clone(),
+        previous_version,
+        previous_root,
+        environment_changes,
+        path_diff,
+        backup_name,
+        state_fingerprint,
+        verification_steps,
+        warnings,
+        risk_level: "medium".to_string(),
+        plan_fingerprint,
+    };
+    runtime_switch_plans()
+        .lock()
+        .map_err(|_| "Runtime switch plan storage is unavailable.".to_string())?
+        .insert(
+            plan_id,
+            PendingRuntimeSwitchPlan {
+                public: plan.clone(),
+                installed_fingerprint: String::new(),
+                candidate: Some(candidate),
+                project_root,
+            },
+        );
+    Ok(plan)
+}
+
+fn resolve_trusted_runtime_candidate(
+    runtime_id: &str,
+    switch_mode: &str,
+) -> Result<RuntimeInfo, String> {
+    let mut candidate = discover_runtimes_blocking()
+        .into_iter()
+        .find(|runtime| runtime.id == runtime_id)
+        .ok_or_else(|| {
+            "The runtime is no longer present in the trusted discovery inventory. Refresh and try again."
+                .to_string()
+        })?;
+    if !candidate.switch_eligible
+        || !candidate
+            .switch_modes
+            .iter()
+            .any(|mode| mode == switch_mode)
+    {
+        return Err(candidate
+            .switch_blockers
+            .first()
+            .cloned()
+            .unwrap_or_else(|| {
+                "The requested switch mode is not allowed for this runtime authority.".to_string()
+            }));
+    }
+    let checks = if candidate.management == "managed" {
+        let paths = load_paths()?;
+        let installed = load_installed(&paths)?;
+        let meta = runtime_meta(&candidate.kind)?;
+        let record = find_managed_runtime_record(
+            &installed,
+            meta,
+            &candidate.version,
+            Some(&candidate.runtime_root),
+        )?;
+        verify_registered_runtime(&paths, &installed, meta, &record).checks
+    } else {
+        let mut verification = runtime_verification::verify_installed_runtime(
+            &candidate.kind,
+            Path::new(&candidate.runtime_root),
+            Path::new(&candidate.executable),
+            &candidate.version,
+            None,
+        );
+        append_provider_verification_checks(&candidate, &mut verification);
+        verification.checks
+    };
+    if let Some(failed) = checks
+        .iter()
+        .find(|check| check.required && check.status != "passed")
+    {
+        return Err(format!(
+            "Required runtime verification failed at {}: {}",
+            failed.id,
+            failed.error.as_deref().unwrap_or(&failed.actual)
+        ));
+    }
+    candidate.verification_fingerprint = runtime_identity_fingerprint(&candidate, &checks);
+    Ok(candidate)
+}
+
+fn append_provider_verification_checks(
+    candidate: &RuntimeInfo,
+    verification: &mut runtime_verification::RuntimeVerificationOutcome,
+) {
+    if candidate.provider.as_deref() == Some("rustup") {
+        let cargo = Path::new(&candidate.runtime_root).join("cargo.exe");
+        let cargo_verification = runtime_verification::verify_installed_runtime(
+            "cargo",
+            Path::new(&candidate.runtime_root),
+            &cargo,
+            "",
+            None,
+        );
+        verification.checks.extend(
+            cargo_verification
+                .checks
+                .into_iter()
+                .filter(|check| check.id == "cargo-version"),
+        );
+        verification.fully_usable = verification
+            .checks
+            .iter()
+            .filter(|check| check.required)
+            .all(|check| check.status == "passed");
+        verification.failure_stage = verification
+            .checks
+            .iter()
+            .find(|check| check.required && check.status != "passed")
+            .map(|check| check.id.clone());
+    }
+}
+
+fn validate_runtime_project_root(
+    candidate: &RuntimeInfo,
+    switch_mode: &str,
+    project_root: Option<String>,
+) -> Result<Option<String>, String> {
+    if switch_mode != "project" {
+        return Ok(None);
+    }
+    if candidate.kind != "dotnet" {
+        return Err(
+            "Project switch mode is currently restricted to .NET SDK selection.".to_string(),
+        );
+    }
+    let root = PathBuf::from(
+        project_root
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| {
+                "Choose a project directory before creating a .NET SDK plan.".to_string()
+            })?,
+    );
+    validate_dotnet_project_root(&root)?;
+    Ok(Some(display_path(root)))
+}
+
+fn validate_dotnet_project_root(root: &Path) -> Result<(), String> {
+    if !root.is_absolute() || !root.is_dir() || root.parent().is_none() {
+        return Err("The selected project directory is missing or unsafe.".to_string());
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
+        if fs::symlink_metadata(root)
+            .ok()
+            .is_some_and(|metadata| metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0)
+        {
+            return Err(
+                "Project roots that are symlinks or junctions are not writable.".to_string(),
+            );
+        }
+    }
+    let root_key = path_key(&display_path(root));
+    for protected in [
+        env::var_os("WINDIR").map(PathBuf::from),
+        env::var_os("ProgramFiles").map(PathBuf::from),
+        env::var_os("ProgramFiles(x86)").map(PathBuf::from),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        if root_key.starts_with(&path_key(&display_path(protected))) {
+            return Err(
+                "System and installed-program directories cannot be used as project roots."
+                    .to_string(),
+            );
+        }
+    }
+    if project_signals(root).is_empty() {
+        return Err(
+            "No supported project marker was found. Choose the actual project root before writing global.json."
+                .to_string(),
+        );
+    }
+    Ok(())
+}
+
+fn runtime_switch_state_fingerprint(
+    candidate: &RuntimeInfo,
+    installed: &InstalledData,
+    environment: &HashMap<String, String>,
+    project_root: Option<&str>,
+) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(candidate.verification_fingerprint.as_bytes());
+    hasher.update(serde_json::to_vec(installed).unwrap_or_default().as_slice());
+    hasher.update(runtime_environment_fingerprint(environment).as_bytes());
+    if candidate.provider.as_deref() == Some("rustup") {
+        hasher.update(active_rustup_toolchain().unwrap_or_default().as_bytes());
+        hasher.update(rustup_provider_fingerprint().as_bytes());
+    }
+    if let Some(project_root) = project_root {
+        hasher.update(path_key(project_root).as_bytes());
+        let global_json = PathBuf::from(project_root).join("global.json");
+        if let Ok(bytes) = fs::read(global_json) {
+            hasher.update(bytes);
+        }
+    }
+    format!("{:x}", hasher.finalize())
+}
+
+fn rustup_provider_fingerprint() -> String {
+    let rustup = find_all_on_path("rustup")
+        .into_iter()
+        .next()
+        .unwrap_or_else(|| PathBuf::from("rustup"));
+    let version = run_command_output(rustup.clone(), &["--version"], 30).unwrap_or_default();
+    sha256_text(&format!("{}|{}", path_key(&display_path(rustup)), version))
+}
+
+fn current_runtime_for_ecosystem(ecosystem: &str) -> (Option<String>, Option<String>) {
+    discover_runtimes_blocking()
+        .into_iter()
+        .find(|runtime| runtime.ecosystem == ecosystem && runtime.current)
+        .map(|runtime| (Some(runtime.version), Some(runtime.runtime_root)))
+        .unwrap_or((None, None))
+}
+
+fn runtime_switch_plan_details(
+    candidate: &RuntimeInfo,
+    switch_mode: &str,
+    project_root: Option<&str>,
+) -> (Vec<String>, Vec<String>, Vec<String>) {
+    if switch_mode == "provider" {
+        return (
+            vec![format!(
+                "rustup default -> {}",
+                rustup_toolchain_name(Path::new(&candidate.runtime_root))
+                    .unwrap_or_else(|| candidate.version.clone())
+            )],
+            Vec::new(),
+            vec![
+                "Verify rustup default output.".to_string(),
+                "Verify rustc and cargo resolve through rustup.".to_string(),
+            ],
+        );
+    }
+    if switch_mode == "project" {
+        return (
+            vec![format!(
+                "{}\\global.json SDK version -> {}",
+                project_root.unwrap_or("project"),
+                candidate.version
+            )],
+            Vec::new(),
+            vec![
+                "Run dotnet --version in the selected project.".to_string(),
+                "Verify global.json selects the requested SDK.".to_string(),
+            ],
+        );
+    }
+    let variables = runtime_environment_bindings(candidate)
+        .into_iter()
+        .map(|(name, value)| format!("{name} -> {value}"))
+        .collect();
+    let path_diff = runtime_path_entries(candidate)
+        .into_iter()
+        .map(|entry| format!("Prepend user PATH: {entry}"))
+        .collect();
+    (
+        variables,
+        path_diff,
+        vec![
+            "Re-resolve the primary executable from user PATH.".to_string(),
+            "Run ecosystem command-level strong verification.".to_string(),
+        ],
+    )
+}
+
+#[allow(dead_code)]
 fn create_runtime_switch_plan_blocking(
     kind: String,
     version: String,
@@ -5137,6 +5518,11 @@ fn create_runtime_switch_plan_blocking(
     let plan = RuntimeSwitchPlan {
         plan_id: plan_id.clone(),
         created_at,
+        expires_at: unix_timestamp().saturating_add(10 * 60),
+        runtime_id: String::new(),
+        switch_mode: "managed".to_string(),
+        source_authority: "devenv-managed-registry".to_string(),
+        provider: None,
         kind: meta.kind.to_string(),
         version: selected_version,
         target_root: display_path(&target),
@@ -5152,6 +5538,8 @@ fn create_runtime_switch_plan_blocking(
         ],
         path_diff: vec![format!("Ensure managed PATH entry: {managed_path}")],
         backup_name,
+        state_fingerprint: installed_fingerprint.clone(),
+        verification_steps: vec!["Run command-level strong verification.".to_string()],
         warnings: vec![
             "The plan is single-use and is rejected if installed.json changes.".to_string(),
             "Open terminals, IDEs, services, and agents must be restarted to inherit the new environment."
@@ -5170,6 +5558,8 @@ fn create_runtime_switch_plan_blocking(
             PendingRuntimeSwitchPlan {
                 public: plan.clone(),
                 installed_fingerprint,
+                candidate: None,
+                project_root: None,
             },
         );
     Ok(plan)
@@ -5187,6 +5577,13 @@ async fn execute_runtime_switch_plan(
             .get(&plan_id)
             .cloned()
             .ok_or_else(|| "运行时切换计划不存在、已执行或已过期，请重新创建。".to_string())?;
+        if runtime_switch_plan_is_expired(&pending.public, unix_timestamp()) {
+            runtime_switch_plans()
+                .lock()
+                .map_err(|_| "Runtime switch plan storage is unavailable.".to_string())?
+                .remove(&plan_id);
+            return Err("The runtime switch plan has expired. Create a new plan.".to_string());
+        }
         require_confirmation_token(
             confirmation_token,
             "execute_runtime_switch_plan",
@@ -5196,11 +5593,10 @@ async fn execute_runtime_switch_plan(
             &pending.public.plan_fingerprint,
             true,
         )?;
-        let pending = runtime_switch_plans()
-            .lock()
-            .map_err(|_| "运行时切换计划存储不可用".to_string())?
-            .remove(&plan_id)
-            .ok_or_else(|| "运行时切换计划不存在、已执行或已过期，请重新创建。".to_string())?;
+        let pending = take_runtime_switch_plan(&plan_id)?;
+        if pending.candidate.is_some() {
+            return execute_trusted_runtime_switch_plan(pending);
+        }
         let paths = load_paths()?;
         let installed = load_installed(&paths)?;
         let meta = runtime_meta(&pending.public.kind)?;
@@ -5237,10 +5633,613 @@ async fn execute_runtime_switch_plan(
             ),
             plan_id: pending.public.plan_id,
             backup_name: pending.public.backup_name,
+            rollback_performed: false,
+            rollback_verified: false,
             verification,
         })
     })
     .await?
+}
+
+fn runtime_switch_plan_is_expired(plan: &RuntimeSwitchPlan, now: u64) -> bool {
+    now > plan.expires_at
+}
+
+fn take_runtime_switch_plan(plan_id: &str) -> Result<PendingRuntimeSwitchPlan, String> {
+    runtime_switch_plans()
+        .lock()
+        .map_err(|_| "Runtime switch plan storage is unavailable.".to_string())?
+        .remove(plan_id)
+        .ok_or_else(|| {
+            "Runtime switch plan does not exist, was already consumed, or expired.".to_string()
+        })
+}
+
+fn execute_trusted_runtime_switch_plan(
+    pending: PendingRuntimeSwitchPlan,
+) -> Result<RuntimeSwitchResult, String> {
+    let paths = load_paths()?;
+    let planned = pending
+        .candidate
+        .as_ref()
+        .ok_or_else(|| "The trusted runtime candidate is missing from the plan.".to_string())?;
+    let current = resolve_trusted_runtime_candidate(&planned.id, &pending.public.switch_mode)?;
+    if current.verification_fingerprint != planned.verification_fingerprint
+        || current.runtime_root != planned.runtime_root
+        || current.executable != planned.executable
+        || current.source_authority != planned.source_authority
+    {
+        return Err(
+            "The runtime discovery or verification evidence changed after plan creation. Create a new plan."
+                .to_string(),
+        );
+    }
+    let installed_before = load_installed(&paths)?;
+    let environment_before = user_environment()?;
+    let selections_before = load_runtime_selections(&paths)?;
+    if runtime_switch_state_fingerprint(
+        &current,
+        &installed_before,
+        &environment_before,
+        pending.project_root.as_deref(),
+    ) != pending.public.state_fingerprint
+    {
+        return Err(
+            "The installed runtime, user environment, provider, or project state changed after plan creation."
+                .to_string(),
+        );
+    }
+
+    let provider_before = if pending.public.switch_mode == "provider" {
+        active_rustup_toolchain()
+    } else {
+        None
+    };
+    let project_backup = if pending.public.switch_mode == "project" {
+        backup_project_global_json(&paths, pending.project_root.as_deref())?
+    } else {
+        None
+    };
+    let apply_result = apply_runtime_switch_candidate(
+        &paths,
+        &current,
+        &pending.public.switch_mode,
+        pending.project_root.as_deref(),
+    );
+    if let Err(error) = apply_result {
+        let rollback_verified = rollback_runtime_switch(
+            &paths,
+            &installed_before,
+            &environment_before,
+            &selections_before,
+            provider_before.as_deref(),
+            pending.project_root.as_deref(),
+            project_backup.as_deref(),
+        );
+        return Err(format!(
+            "Runtime switch failed and rollback verification was {}: {error}",
+            if rollback_verified {
+                "successful"
+            } else {
+                "not conclusive"
+            }
+        ));
+    }
+    let verification = verify_switched_runtime(
+        &paths,
+        &current,
+        &pending.public.switch_mode,
+        pending.project_root.as_deref(),
+    );
+    let verification = match verification {
+        Ok(verification) => verification,
+        Err(error) => {
+            let rollback_verified = rollback_runtime_switch(
+                &paths,
+                &installed_before,
+                &environment_before,
+                &selections_before,
+                provider_before.as_deref(),
+                pending.project_root.as_deref(),
+                project_backup.as_deref(),
+            );
+            return Err(format!(
+                "Post-switch verification failed and rollback verification was {}: {error}",
+                if rollback_verified {
+                    "successful"
+                } else {
+                    "not conclusive"
+                }
+            ));
+        }
+    };
+    Ok(RuntimeSwitchResult {
+        success: true,
+        message: format!(
+            "{} {} is now selected through {} mode. Restart open terminals and IDEs.",
+            current.display_name, current.version, pending.public.switch_mode
+        ),
+        plan_id: pending.public.plan_id,
+        backup_name: pending.public.backup_name,
+        rollback_performed: false,
+        rollback_verified: false,
+        verification,
+    })
+}
+
+fn runtime_environment_fingerprint(environment: &HashMap<String, String>) -> String {
+    let mut hasher = Sha256::new();
+    for name in [
+        "DEVENV_HOME",
+        "JAVA_HOME",
+        "MAVEN_HOME",
+        "M2_HOME",
+        "GRADLE_HOME",
+        "GOROOT",
+        "DOTNET_ROOT",
+        "RUSTUP_TOOLCHAIN",
+    ] {
+        hasher.update(name.as_bytes());
+        hasher.update([0]);
+        hasher.update(
+            environment
+                .get(name)
+                .map(String::as_str)
+                .unwrap_or("")
+                .as_bytes(),
+        );
+        hasher.update([0]);
+    }
+    hasher.update(b"Path\0");
+    hasher.update(
+        environment
+            .get("Path")
+            .or_else(|| environment.get("PATH"))
+            .map(String::as_str)
+            .unwrap_or("")
+            .as_bytes(),
+    );
+    format!("{:x}", hasher.finalize())
+}
+
+fn runtime_environment_bindings(candidate: &RuntimeInfo) -> Vec<(String, String)> {
+    let managed_root = |kind: &str| format!(r"%DEVENV_HOME%\current\{kind}");
+    let root = if candidate.management == "managed" {
+        managed_root(&candidate.kind)
+    } else {
+        candidate.runtime_root.clone()
+    };
+    let bindings = match candidate.kind.as_str() {
+        "jdk" => vec![("JAVA_HOME".to_string(), root)],
+        "maven" => vec![
+            ("MAVEN_HOME".to_string(), root.clone()),
+            ("M2_HOME".to_string(), root),
+        ],
+        "gradle" => vec![("GRADLE_HOME".to_string(), root)],
+        "go" => vec![("GOROOT".to_string(), root)],
+        _ => Vec::new(),
+    };
+    bindings
+}
+
+fn runtime_path_entries(candidate: &RuntimeInfo) -> Vec<String> {
+    let root = if candidate.management == "managed" {
+        format!(r"%DEVENV_HOME%\current\{}", candidate.kind)
+    } else {
+        candidate.runtime_root.clone()
+    };
+    match candidate.kind.as_str() {
+        "jdk" | "go" | "maven" | "gradle" => vec![format!(r"{root}\bin")],
+        "python" => vec![root.clone(), format!(r"{root}\Scripts")],
+        "node" => vec![root],
+        _ => Vec::new(),
+    }
+}
+
+fn replace_runtime_path_entries(
+    existing: &str,
+    candidate: &RuntimeInfo,
+    discoveries: &[RuntimeInfo],
+) -> String {
+    let removable = discoveries
+        .iter()
+        .filter(|runtime| runtime.ecosystem == candidate.ecosystem)
+        .flat_map(runtime_path_entries)
+        .chain(
+            MANAGED_PATHS
+                .iter()
+                .filter(|entry| managed_path_ecosystem(entry) == candidate.ecosystem)
+                .map(|entry| entry.to_string()),
+        )
+        .map(|entry| path_key(&entry))
+        .collect::<BTreeSet<_>>();
+    let target = runtime_path_entries(candidate);
+    let target_keys = target
+        .iter()
+        .map(|entry| path_key(entry))
+        .collect::<BTreeSet<_>>();
+    let mut seen = target_keys.clone();
+    target
+        .into_iter()
+        .chain(
+            existing
+                .split(';')
+                .map(str::trim)
+                .filter(|entry| !entry.is_empty())
+                .filter(|entry| !removable.contains(&path_key(entry)))
+                .filter(|entry| seen.insert(path_key(entry)))
+                .map(str::to_string),
+        )
+        .collect::<Vec<_>>()
+        .join(";")
+}
+
+fn managed_path_ecosystem(entry: &str) -> &str {
+    let lower = entry.to_ascii_lowercase();
+    if lower.contains(r"\jdk\") {
+        "java"
+    } else if lower.contains(r"\python") {
+        "python"
+    } else if lower.contains(r"\node") || lower.contains("npm-global") {
+        "node"
+    } else if lower.contains(r"\maven") {
+        "maven"
+    } else if lower.contains(r"\gradle") {
+        "gradle"
+    } else if lower.contains(r"\go\") {
+        "go"
+    } else {
+        "other"
+    }
+}
+
+fn apply_runtime_switch_candidate(
+    paths: &AppPaths,
+    candidate: &RuntimeInfo,
+    switch_mode: &str,
+    project_root: Option<&str>,
+) -> Result<(), String> {
+    match switch_mode {
+        "managed" => {
+            let meta = runtime_meta(&candidate.kind)?;
+            let mut installed = load_installed(paths)?;
+            let record = find_managed_runtime_record(
+                &installed,
+                meta,
+                &candidate.version,
+                Some(&candidate.runtime_root),
+            )?;
+            let target = PathBuf::from(
+                record
+                    .get("path")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| "Managed runtime record has no path.".to_string())?,
+            );
+            switch_junction(&paths.current().join(meta.link_name), &target, &paths.root)?;
+            set_current(&mut installed, meta.kind, Some(candidate.version.clone()));
+            save_json(&paths.installed_file(), &installed)?;
+            apply_runtime_user_environment(paths, candidate)?;
+        }
+        "external-user" => {
+            let mut installed = load_installed(paths)?;
+            if let Ok(meta) = runtime_meta(&candidate.kind) {
+                set_current(&mut installed, meta.kind, None);
+                save_json(&paths.installed_file(), &installed)?;
+            }
+            apply_runtime_user_environment(paths, candidate)?;
+        }
+        "provider" => {
+            let toolchain = rustup_toolchain_name(Path::new(&candidate.runtime_root))
+                .ok_or_else(|| "The selected Rust runtime is not owned by rustup.".to_string())?;
+            run_command_output(
+                PathBuf::from("rustup"),
+                &["default", toolchain.as_str()],
+                60,
+            )?;
+        }
+        "project" => write_dotnet_global_json(
+            Path::new(project_root.ok_or_else(|| "Project root is required.".to_string())?),
+            &candidate.version,
+        )?,
+        _ => return Err("Unsupported runtime switch mode.".to_string()),
+    }
+    if switch_mode != "project" {
+        save_runtime_selection(paths, candidate, switch_mode)?;
+    }
+    broadcast_environment_change();
+    Ok(())
+}
+
+fn apply_runtime_user_environment(paths: &AppPaths, candidate: &RuntimeInfo) -> Result<(), String> {
+    let environment = user_environment()?;
+    let old_path = environment
+        .get("Path")
+        .or_else(|| environment.get("PATH"))
+        .map(String::as_str)
+        .unwrap_or("");
+    let mut discoveries = discover_runtimes_blocking();
+    if let Ok(state) = load_runtime_selections(paths) {
+        if let Some(previous) = state.selections.get(&candidate.ecosystem) {
+            if !discoveries
+                .iter()
+                .any(|runtime| runtime.id == previous.runtime_id)
+            {
+                let mut previous_runtime = candidate.clone();
+                previous_runtime.id = previous.runtime_id.clone();
+                previous_runtime.runtime_root = previous.runtime_root.clone();
+                previous_runtime.version = previous.version.clone();
+                discoveries.push(previous_runtime);
+            }
+        }
+    }
+    let new_path = replace_runtime_path_entries(old_path, candidate, &discoveries);
+    if candidate.management == "managed" {
+        set_user_environment_variable("DEVENV_HOME", Some(&display_path(&paths.root)))?;
+    }
+    for (name, value) in runtime_environment_bindings(candidate) {
+        set_user_environment_variable(&name, Some(&value))?;
+    }
+    set_user_environment_variable("Path", Some(&new_path))?;
+    let saved = user_environment()?;
+    if saved
+        .get("Path")
+        .or_else(|| saved.get("PATH"))
+        .map(String::as_str)
+        != Some(new_path.as_str())
+    {
+        return Err(
+            "User PATH verification failed after writing the runtime selection.".to_string(),
+        );
+    }
+    Ok(())
+}
+
+fn active_rustup_toolchain() -> Option<String> {
+    run_command_output(PathBuf::from("rustup"), &["show", "active-toolchain"], 30)
+        .ok()
+        .and_then(|output| output.split_whitespace().next().map(str::to_string))
+}
+
+fn backup_project_global_json(
+    paths: &AppPaths,
+    project_root: Option<&str>,
+) -> Result<Option<String>, String> {
+    let root = PathBuf::from(project_root.ok_or_else(|| "Project root is required.".to_string())?);
+    let target = root.join("global.json");
+    let backup_dir = paths.config().join("runtime_project_backups");
+    fs::create_dir_all(&backup_dir)
+        .map_err(|error| format!("Failed to create project backup directory: {error}"))?;
+    let backup = backup_dir.join(format!("global-json-{}.json", filename_timestamp()));
+    let record = json!({
+        "target": display_path(&target),
+        "existed": target.is_file(),
+        "content": fs::read_to_string(&target).ok(),
+    });
+    save_json(&backup, &record)?;
+    Ok(Some(display_path(backup)))
+}
+
+fn write_dotnet_global_json(project_root: &Path, version: &str) -> Result<(), String> {
+    validate_dotnet_project_root(project_root)?;
+    let target = project_root.join("global.json");
+    let mut document = if target.is_file() {
+        serde_json::from_str::<Value>(
+            &fs::read_to_string(&target)
+                .map_err(|error| format!("Failed to read global.json: {error}"))?,
+        )
+        .map_err(|error| format!("global.json is not valid JSON: {error}"))?
+    } else {
+        json!({})
+    };
+    let object = document
+        .as_object_mut()
+        .ok_or_else(|| "global.json must contain a JSON object.".to_string())?;
+    let sdk = object.entry("sdk").or_insert_with(|| json!({}));
+    let sdk = sdk
+        .as_object_mut()
+        .ok_or_else(|| "global.json sdk must contain a JSON object.".to_string())?;
+    sdk.insert("version".to_string(), Value::String(version.to_string()));
+    save_json(&target, &document)
+}
+
+fn restore_project_global_json(backup: &str) -> Result<(), String> {
+    let record: Value = read_json(Path::new(backup))?;
+    let target = PathBuf::from(
+        record
+            .get("target")
+            .and_then(Value::as_str)
+            .ok_or_else(|| "Project backup has no target.".to_string())?,
+    );
+    if record
+        .get("existed")
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+    {
+        fs::write(
+            target,
+            record
+                .get("content")
+                .and_then(Value::as_str)
+                .unwrap_or_default(),
+        )
+        .map_err(|error| format!("Failed to restore global.json: {error}"))
+    } else if target.exists() {
+        fs::remove_file(target).map_err(|error| format!("Failed to remove global.json: {error}"))
+    } else {
+        Ok(())
+    }
+}
+
+fn rollback_runtime_switch(
+    paths: &AppPaths,
+    installed: &InstalledData,
+    environment: &HashMap<String, String>,
+    selections: &RuntimeSelectionState,
+    rustup_toolchain: Option<&str>,
+    project_root: Option<&str>,
+    project_backup: Option<&str>,
+) -> bool {
+    let installed_restored = save_json(&paths.installed_file(), installed).is_ok();
+    let junctions_restored = restore_managed_runtime_junctions(paths, installed);
+    let environment_restored = restore_runtime_environment(environment).is_ok();
+    let selections_restored = save_json(&paths.runtime_selections_file(), selections).is_ok();
+    let provider_restored = rustup_toolchain
+        .map(|toolchain| {
+            run_command_output(PathBuf::from("rustup"), &["default", toolchain], 60).is_ok()
+        })
+        .unwrap_or(true);
+    let project_restored = match (project_root, project_backup) {
+        (Some(_), Some(backup)) => restore_project_global_json(backup).is_ok(),
+        _ => true,
+    };
+    broadcast_environment_change();
+    installed_restored
+        && junctions_restored
+        && environment_restored
+        && selections_restored
+        && provider_restored
+        && project_restored
+        && user_environment()
+            .map(|current| {
+                runtime_environment_fingerprint(&current)
+                    == runtime_environment_fingerprint(environment)
+            })
+            .unwrap_or(false)
+}
+
+fn restore_managed_runtime_junctions(paths: &AppPaths, installed: &InstalledData) -> bool {
+    ["jdk", "python", "node", "maven", "gradle", "go"]
+        .into_iter()
+        .all(|kind| {
+            let Ok(meta) = runtime_meta(kind) else {
+                return false;
+            };
+            let link = paths.current().join(meta.link_name);
+            let target = current_version_for_kind(installed, kind).and_then(|version| {
+                collection(installed, meta.collection)
+                    .iter()
+                    .find(|record| record.get("version").and_then(Value::as_str) == Some(version))
+                    .and_then(|record| record.get("path").and_then(Value::as_str))
+                    .map(PathBuf::from)
+            });
+            match target {
+                Some(target) => switch_junction(&link, &target, &paths.root).is_ok(),
+                None => remove_junction(&link).is_ok(),
+            }
+        })
+}
+
+fn restore_runtime_environment(environment: &HashMap<String, String>) -> Result<(), String> {
+    for name in [
+        "DEVENV_HOME",
+        "JAVA_HOME",
+        "MAVEN_HOME",
+        "M2_HOME",
+        "GRADLE_HOME",
+        "GOROOT",
+        "DOTNET_ROOT",
+        "RUSTUP_TOOLCHAIN",
+    ] {
+        set_user_environment_variable(name, environment.get(name).map(String::as_str))?;
+    }
+    set_user_environment_variable(
+        "Path",
+        environment
+            .get("Path")
+            .or_else(|| environment.get("PATH"))
+            .map(String::as_str),
+    )
+}
+
+fn verify_switched_runtime(
+    paths: &AppPaths,
+    candidate: &RuntimeInfo,
+    switch_mode: &str,
+    project_root: Option<&str>,
+) -> Result<RuntimeStrongStatus, String> {
+    if switch_mode == "project" {
+        let root =
+            PathBuf::from(project_root.ok_or_else(|| "Project root is required.".to_string())?);
+        if dotnet_required_sdk(&root).as_deref() != Some(candidate.version.as_str()) {
+            return Err("global.json does not contain the requested .NET SDK version.".to_string());
+        }
+    } else if switch_mode == "provider" {
+        let expected = rustup_toolchain_name(Path::new(&candidate.runtime_root))
+            .ok_or_else(|| "The selected rustup toolchain is invalid.".to_string())?;
+        if active_rustup_toolchain().as_deref() != Some(expected.as_str()) {
+            return Err("rustup did not select the requested default toolchain.".to_string());
+        }
+    }
+    let mut verification = verify_external_runtime(candidate.clone());
+    if candidate.management == "managed" {
+        let installed = load_installed(paths)?;
+        let meta = runtime_meta(&candidate.kind)?;
+        let record = find_managed_runtime_record(
+            &installed,
+            meta,
+            &candidate.version,
+            Some(&candidate.runtime_root),
+        )?;
+        verification = verify_registered_runtime(paths, &installed, meta, &record);
+    }
+    let required_passed = verification
+        .checks
+        .iter()
+        .filter(|check| check.required)
+        .all(|check| check.status == "passed");
+    if !required_passed {
+        return Err(format!(
+            "Required verification failed at {}.",
+            verification.failure_stage.as_deref().unwrap_or("unknown")
+        ));
+    }
+    if switch_mode == "external-user" {
+        verify_external_user_environment(paths, candidate)?;
+    } else if switch_mode == "managed"
+        && (!verification.current || !verification.environment_effective)
+    {
+        return Err(
+            "The managed runtime pointer or user environment is not effective.".to_string(),
+        );
+    }
+    verification.current = true;
+    verification.environment_effective = true;
+    Ok(verification)
+}
+
+fn verify_external_user_environment(
+    paths: &AppPaths,
+    candidate: &RuntimeInfo,
+) -> Result<(), String> {
+    let environment = user_environment()?;
+    let path = environment
+        .get("Path")
+        .or_else(|| environment.get("PATH"))
+        .map(String::as_str)
+        .unwrap_or("");
+    let command = match candidate.kind.as_str() {
+        "jdk" => "java",
+        "python" => "python",
+        "node" => "node",
+        "go" => "go",
+        "maven" => "mvn",
+        "gradle" => "gradle",
+        _ => return Err("No user-environment verification adapter exists.".to_string()),
+    };
+    let first = find_in_configured_path(command, path, paths)
+        .ok_or_else(|| format!("{command} is not resolvable from the saved user PATH."))?;
+    if !is_path_inside(&first, Path::new(&candidate.runtime_root)) {
+        return Err(format!(
+            "The first {command} on the saved user PATH does not belong to the selected runtime."
+        ));
+    }
+    for (name, expected) in runtime_environment_bindings(candidate) {
+        let actual = environment.get(&name).map(String::as_str).unwrap_or("");
+        if path_key(actual) != path_key(&expected) {
+            return Err(format!("{name} does not match the selected runtime root."));
+        }
+    }
+    Ok(())
 }
 
 fn runtime_plan_id(kind: &str, version: &str, path: Option<&str>) -> String {
@@ -13021,7 +14020,6 @@ pub fn run() {
             install_gradle,
             create_runtime_switch_plan,
             execute_runtime_switch_plan,
-            switch_runtime,
             uninstall_runtime,
             kill_process,
             scan_ports,
@@ -13433,6 +14431,9 @@ impl AppPaths {
     }
     fn installed_file(&self) -> PathBuf {
         self.config().join("installed.json")
+    }
+    fn runtime_selections_file(&self) -> PathBuf {
+        self.config().join("runtime_selections.json")
     }
     fn env_backup_file(&self) -> PathBuf {
         self.config().join("env_backup.json")
@@ -15351,6 +16352,7 @@ fn runtime_info(
     let mut hasher = Sha256::new();
     hasher.update(kind.as_bytes());
     hasher.update(path_key(&executable_text).as_bytes());
+    hasher.update(version.as_bytes());
     RuntimeInfo {
         id: format!("runtime-{:x}", hasher.finalize()),
         kind,
@@ -15361,9 +16363,311 @@ fn runtime_info(
         runtime_root,
         source,
         management: management.to_string(),
+        source_authority: if management == "managed" {
+            "devenv-managed-registry".to_string()
+        } else {
+            "external-discovery".to_string()
+        },
+        provider: None,
+        switch_modes: if management == "managed" {
+            vec!["managed".to_string()]
+        } else {
+            Vec::new()
+        },
+        switch_eligible: management == "managed",
+        switch_blockers: Vec::new(),
+        verification_fingerprint: String::new(),
         current,
         installed_at,
     }
+}
+
+fn populate_runtime_switch_capabilities(runtimes: &mut [RuntimeInfo]) {
+    for runtime in runtimes {
+        if runtime.management == "managed" {
+            runtime.source_authority = "devenv-managed-registry".to_string();
+            runtime.switch_modes = vec!["managed".to_string()];
+            runtime.switch_eligible = true;
+            runtime.verification_fingerprint = runtime_identity_fingerprint(runtime, &[]);
+            continue;
+        }
+
+        runtime.source_authority = external_runtime_authority(runtime);
+        let root = PathBuf::from(&runtime.runtime_root);
+        if let Some(reason) = unsafe_external_runtime_root(&root) {
+            runtime.switch_blockers = vec![reason];
+            runtime.switch_eligible = false;
+            continue;
+        }
+
+        runtime.verification_fingerprint = runtime_identity_fingerprint(runtime, &[]);
+
+        match runtime.kind.as_str() {
+            "jdk" | "python" | "node" | "go" | "maven" | "gradle" => {
+                runtime.switch_modes = vec!["external-user".to_string()];
+                runtime.switch_eligible = true;
+            }
+            "rustc" if rustup_toolchain_name(&root).is_some() => {
+                runtime.provider = Some("rustup".to_string());
+                runtime.source_authority = "rustup-toolchain".to_string();
+                runtime.switch_modes = vec!["provider".to_string()];
+                runtime.switch_eligible = true;
+            }
+            "dotnet" => {
+                runtime.provider = Some("dotnet-global-json".to_string());
+                runtime.switch_modes = vec!["project".to_string()];
+                runtime.switch_eligible = true;
+            }
+            _ => {
+                runtime.switch_blockers = vec![
+                    "No safe user-environment or provider switch adapter is available.".to_string(),
+                ];
+                runtime.switch_eligible = false;
+            }
+        }
+    }
+}
+
+fn load_runtime_selections(paths: &AppPaths) -> Result<RuntimeSelectionState, String> {
+    load_json_with_default(
+        &paths.runtime_selections_file(),
+        RuntimeSelectionState::default(),
+    )
+}
+
+fn save_runtime_selection(
+    paths: &AppPaths,
+    candidate: &RuntimeInfo,
+    switch_mode: &str,
+) -> Result<(), String> {
+    let mut state = load_runtime_selections(paths)?;
+    state.selections.insert(
+        candidate.ecosystem.clone(),
+        RuntimeSelectionRecord {
+            runtime_id: candidate.id.clone(),
+            ecosystem: candidate.ecosystem.clone(),
+            switch_mode: switch_mode.to_string(),
+            runtime_root: candidate.runtime_root.clone(),
+            version: candidate.version.clone(),
+            selected_at: current_timestamp(),
+        },
+    );
+    save_json(&paths.runtime_selections_file(), &state)
+}
+
+fn mark_persisted_runtime_selections(runtimes: &mut [RuntimeInfo]) {
+    let Ok(paths) = load_paths() else {
+        return;
+    };
+    let Ok(state) = load_runtime_selections(&paths) else {
+        return;
+    };
+    for selection in state.selections.values() {
+        let Some(target) = runtimes
+            .iter()
+            .find(|runtime| runtime.id == selection.runtime_id)
+            .cloned()
+        else {
+            continue;
+        };
+        if !persisted_runtime_selection_is_effective(&paths, &target, selection) {
+            continue;
+        }
+        for runtime in runtimes.iter_mut() {
+            if runtime.ecosystem == selection.ecosystem {
+                runtime.current = runtime.id == selection.runtime_id;
+            }
+        }
+    }
+}
+
+fn persisted_runtime_selection_is_effective(
+    paths: &AppPaths,
+    runtime: &RuntimeInfo,
+    selection: &RuntimeSelectionRecord,
+) -> bool {
+    match selection.switch_mode.as_str() {
+        "managed" => runtime.current,
+        "external-user" => verify_external_user_environment(paths, runtime).is_ok(),
+        "provider" => rustup_toolchain_name(Path::new(&runtime.runtime_root))
+            .zip(active_rustup_toolchain())
+            .is_some_and(|(expected, actual)| expected == actual),
+        _ => false,
+    }
+}
+
+fn runtime_identity_fingerprint(
+    runtime: &RuntimeInfo,
+    checks: &[runtime_verification::RuntimeVerificationCheck],
+) -> String {
+    let mut hasher = Sha256::new();
+    for value in [
+        runtime.id.as_str(),
+        runtime.kind.as_str(),
+        runtime.version.as_str(),
+        runtime.executable.as_str(),
+        runtime.runtime_root.as_str(),
+        runtime.source.as_str(),
+        runtime.management.as_str(),
+    ] {
+        hasher.update(value.as_bytes());
+        hasher.update([0]);
+    }
+    for check in checks {
+        hasher.update(check.id.as_bytes());
+        hasher.update(check.status.as_bytes());
+        hasher.update(check.actual.as_bytes());
+        hasher.update([check.required as u8]);
+    }
+    format!("{:x}", hasher.finalize())
+}
+
+fn external_runtime_authority(runtime: &RuntimeInfo) -> String {
+    let source = runtime.source.to_ascii_lowercase();
+    if source.contains("rustup") {
+        "rustup-provider"
+    } else if source.contains("dotnet --list-sdks") {
+        "dotnet-sdk-inventory"
+    } else if source.contains("scoop") {
+        "scoop-managed-discovery"
+    } else if source.contains("chocolatey") {
+        "chocolatey-managed-discovery"
+    } else if source.contains("registry") {
+        "windows-registry-discovery"
+    } else if source.contains("java_home") {
+        "user-environment-discovery"
+    } else if source.contains("system") {
+        "system-install-discovery"
+    } else if source.contains("path") {
+        "path-discovery"
+    } else {
+        "executable-discovery"
+    }
+    .to_string()
+}
+
+fn unsafe_external_runtime_root(root: &Path) -> Option<String> {
+    if !root.is_absolute() || !root.is_dir() {
+        return Some("Runtime root is missing or is not an absolute directory.".to_string());
+    }
+    let key = format!("\\{}\\", path_key(&display_path(root)).replace('/', "\\"));
+    if [
+        "\\temp\\",
+        "\\tmp\\",
+        "\\downloads\\",
+        "\\$recycle.bin\\",
+        "\\windowsapps\\",
+    ]
+    .iter()
+    .any(|fragment| key.contains(fragment))
+    {
+        return Some(
+            "Runtime root is in a temporary, download, recycle-bin, or app-alias directory."
+                .to_string(),
+        );
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
+        if fs::symlink_metadata(root)
+            .ok()
+            .is_some_and(|metadata| metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0)
+        {
+            return Some(
+                "External runtime roots that are symlinks or junctions are read-only.".to_string(),
+            );
+        }
+    }
+    None
+}
+
+fn rustup_toolchain_name(root: &Path) -> Option<String> {
+    let parts = root
+        .components()
+        .map(|part| part.as_os_str().to_string_lossy().to_string())
+        .collect::<Vec<_>>();
+    let index = parts
+        .iter()
+        .position(|part| part.eq_ignore_ascii_case("toolchains"))?;
+    parts.get(index + 1).cloned()
+}
+
+fn add_rustup_toolchain_discoveries(runtimes: &mut Vec<RuntimeInfo>) {
+    let rustup = find_all_on_path("rustup")
+        .into_iter()
+        .next()
+        .unwrap_or_else(|| PathBuf::from("rustup"));
+    let Ok(output) = run_command_output(rustup.clone(), &["toolchain", "list"], 30) else {
+        return;
+    };
+    for toolchain in output
+        .lines()
+        .filter_map(|line| line.split_whitespace().next())
+        .filter(|toolchain| !toolchain.is_empty())
+        .take(50)
+    {
+        let Ok(rustc_output) = run_command_output(
+            rustup.clone(),
+            &["which", "--toolchain", toolchain, "rustc"],
+            30,
+        ) else {
+            continue;
+        };
+        let rustc = PathBuf::from(rustc_output.lines().next().unwrap_or("").trim());
+        if !rustc.is_file() {
+            continue;
+        }
+        if let Some(runtime) = detect_runtime_at(
+            "Rust",
+            &rustc,
+            &["--version"],
+            Some(format!("rustup toolchain {toolchain}")),
+        ) {
+            push_runtime(runtimes, runtime);
+        }
+    }
+}
+
+fn add_dotnet_sdk_discoveries(runtimes: &mut Vec<RuntimeInfo>) {
+    let Some(dotnet) = find_all_on_path("dotnet").into_iter().next() else {
+        return;
+    };
+    let Ok(output) = run_command_output(dotnet.clone(), &["--list-sdks"], 30) else {
+        return;
+    };
+    let active = run_command_output(dotnet.clone(), &["--version"], 30)
+        .ok()
+        .and_then(|value| value.lines().next().map(str::trim).map(str::to_string));
+    let mut discovered = Vec::new();
+    for line in output.lines().take(100) {
+        let Some((version, location)) = line.split_once(' ') else {
+            continue;
+        };
+        let sdk_directory = location
+            .trim()
+            .trim_start_matches('[')
+            .trim_end_matches(']');
+        let root = PathBuf::from(sdk_directory)
+            .parent()
+            .map(Path::to_path_buf)
+            .unwrap_or_else(|| dotnet.parent().unwrap_or(&dotnet).to_path_buf());
+        discovered.push(runtime_info(
+            "dotnet",
+            version.trim().to_string(),
+            &dotnet,
+            Some(&root),
+            "dotnet --list-sdks".to_string(),
+            "external",
+            active.as_deref() == Some(version.trim()),
+            None,
+        ));
+    }
+    if discovered.is_empty() {
+        return;
+    }
+    runtimes.retain(|runtime| runtime.kind != "dotnet");
+    runtimes.extend(discovered);
 }
 
 fn runtime_identity_parts(label: &str) -> (String, String, String) {
@@ -15432,7 +16736,7 @@ fn mark_path_current_runtimes(runtimes: &mut [RuntimeInfo]) {
             "rustc" => "rustc",
             "cargo" => "cargo",
             "rustup" => "rustup",
-            "dotnet" => "dotnet",
+            "dotnet" => continue,
             _ => continue,
         };
         runtime.current = find_on_path(executable_name)
@@ -15473,17 +16777,31 @@ fn find_all_on_path(executable: &str) -> Vec<PathBuf> {
 
 fn push_runtime(runtimes: &mut Vec<RuntimeInfo>, info: RuntimeInfo) {
     let key = format!(
-        "{}|{}",
+        "{}|{}|{}",
         info.kind.to_ascii_lowercase(),
-        path_key(&info.executable)
+        path_key(&info.executable),
+        if info.kind == "dotnet" {
+            info.version.as_str()
+        } else {
+            ""
+        }
     );
-    if !runtimes.iter().any(|item| {
+    if let Some(index) = runtimes.iter().position(|item| {
         format!(
-            "{}|{}",
+            "{}|{}|{}",
             item.kind.to_ascii_lowercase(),
-            path_key(&item.executable)
+            path_key(&item.executable),
+            if item.kind == "dotnet" {
+                item.version.as_str()
+            } else {
+                ""
+            }
         ) == key
     }) {
+        if info.management == "managed" && runtimes[index].management != "managed" {
+            runtimes[index] = info;
+        }
+    } else {
         runtimes.push(info);
     }
 }
@@ -16978,7 +18296,20 @@ fn tool_registry() -> Vec<ToolDefinition> {
 }
 
 fn set_user_environment_variable(name: &str, value: Option<&str>) -> Result<(), String> {
-    if !["GOPROXY"].contains(&name) {
+    if ![
+        "DEVENV_HOME",
+        "JAVA_HOME",
+        "MAVEN_HOME",
+        "M2_HOME",
+        "GRADLE_HOME",
+        "GOROOT",
+        "DOTNET_ROOT",
+        "RUSTUP_TOOLCHAIN",
+        "GOPROXY",
+        "Path",
+    ]
+    .contains(&name)
+    {
         return Err("拒绝写入未授权的用户环境变量".to_string());
     }
     #[cfg(windows)]
@@ -19485,6 +20816,208 @@ mod tests {
                 "Windows Service Host (specific service unresolved)",
             ),
             "Windows Service Host (specific service unresolved)"
+        );
+    }
+
+    fn runtime_fixture(
+        id: &str,
+        kind: &str,
+        ecosystem: &str,
+        root: &str,
+        management: &str,
+    ) -> RuntimeInfo {
+        RuntimeInfo {
+            id: id.to_string(),
+            kind: kind.to_string(),
+            display_name: kind.to_string(),
+            ecosystem: ecosystem.to_string(),
+            version: "1.0.0".to_string(),
+            executable: format!(r"{root}\bin\{kind}.exe"),
+            runtime_root: root.to_string(),
+            source: "test fixture".to_string(),
+            management: management.to_string(),
+            source_authority: if management == "managed" {
+                "devenv-managed-registry"
+            } else {
+                "test-discovery"
+            }
+            .to_string(),
+            provider: None,
+            switch_modes: vec![if management == "managed" {
+                "managed"
+            } else {
+                "external-user"
+            }
+            .to_string()],
+            switch_eligible: true,
+            switch_blockers: Vec::new(),
+            verification_fingerprint: "fixture-verification".to_string(),
+            current: false,
+            installed_at: None,
+        }
+    }
+
+    #[test]
+    fn runtime_path_switch_replaces_only_same_ecosystem_entries() {
+        let old = runtime_fixture(
+            "old-python",
+            "python",
+            "python",
+            r"C:\Python312",
+            "external",
+        );
+        let target = runtime_fixture(
+            "new-python",
+            "python",
+            "python",
+            r"D:\Python313",
+            "external",
+        );
+        let existing = r"C:\Python312;C:\Python312\Scripts;C:\Program Files\Git\cmd;C:\Tools";
+        let updated = replace_runtime_path_entries(existing, &target, &[old, target.clone()]);
+        assert!(updated.starts_with(r"D:\Python313;D:\Python313\Scripts"));
+        assert!(!updated.contains(r"C:\Python312"));
+        assert!(updated.contains(r"C:\Program Files\Git\cmd"));
+        assert!(updated.contains(r"C:\Tools"));
+    }
+
+    #[test]
+    fn managed_runtime_discovery_replaces_same_path_external_probe() {
+        let mut runtimes = vec![runtime_fixture(
+            "external-jdk",
+            "jdk",
+            "java",
+            r"C:\DevEnvManager\jdks\jdk-21",
+            "external",
+        )];
+        let mut managed = runtime_fixture(
+            "managed-jdk",
+            "jdk",
+            "java",
+            r"C:\DevEnvManager\jdks\jdk-21",
+            "managed",
+        );
+        managed.executable = r"C:\DevEnvManager\jdks\jdk-21\bin\jdk.exe".to_string();
+        runtimes[0].executable = managed.executable.clone();
+        push_runtime(&mut runtimes, managed);
+        assert_eq!(runtimes.len(), 1);
+        assert_eq!(runtimes[0].management, "managed");
+        assert_eq!(runtimes[0].id, "managed-jdk");
+    }
+
+    #[test]
+    fn runtime_environment_bindings_are_ecosystem_specific() {
+        let jdk = runtime_fixture("jdk", "jdk", "java", r"C:\JDK21", "external");
+        assert_eq!(
+            runtime_environment_bindings(&jdk),
+            vec![("JAVA_HOME".to_string(), r"C:\JDK21".to_string())]
+        );
+        let maven = runtime_fixture("maven", "maven", "maven", r"C:\Maven", "external");
+        assert_eq!(
+            runtime_environment_bindings(&maven),
+            vec![
+                ("MAVEN_HOME".to_string(), r"C:\Maven".to_string()),
+                ("M2_HOME".to_string(), r"C:\Maven".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn runtime_environment_fingerprint_detects_path_and_binding_changes() {
+        let mut environment = HashMap::from([
+            ("JAVA_HOME".to_string(), r"C:\JDK17".to_string()),
+            ("Path".to_string(), r"C:\JDK17\bin;C:\Tools".to_string()),
+        ]);
+        let baseline = runtime_environment_fingerprint(&environment);
+        environment.insert("JAVA_HOME".to_string(), r"C:\JDK21".to_string());
+        assert_ne!(baseline, runtime_environment_fingerprint(&environment));
+        environment.insert("JAVA_HOME".to_string(), r"C:\JDK17".to_string());
+        environment.insert("Path".to_string(), r"C:\Tools;C:\JDK17\bin".to_string());
+        assert_ne!(baseline, runtime_environment_fingerprint(&environment));
+    }
+
+    #[test]
+    fn runtime_switch_plan_is_expiring_and_single_use() {
+        let plan_id = format!("runtime-switch-test-{}", unix_timestamp());
+        let plan = RuntimeSwitchPlan {
+            plan_id: plan_id.clone(),
+            created_at: "100".to_string(),
+            expires_at: 200,
+            runtime_id: "runtime-test".to_string(),
+            switch_mode: "managed".to_string(),
+            source_authority: "devenv-managed-registry".to_string(),
+            provider: None,
+            kind: "jdk".to_string(),
+            version: "21".to_string(),
+            target_root: r"C:\JDK21".to_string(),
+            previous_version: None,
+            previous_root: None,
+            environment_changes: Vec::new(),
+            path_diff: Vec::new(),
+            backup_name: "env-backup-test.json".to_string(),
+            state_fingerprint: "state-test".to_string(),
+            verification_steps: Vec::new(),
+            warnings: Vec::new(),
+            risk_level: "medium".to_string(),
+            plan_fingerprint: "plan-test".to_string(),
+        };
+        assert!(!runtime_switch_plan_is_expired(&plan, 200));
+        assert!(runtime_switch_plan_is_expired(&plan, 201));
+        runtime_switch_plans().lock().unwrap().insert(
+            plan_id.clone(),
+            PendingRuntimeSwitchPlan {
+                public: plan,
+                installed_fingerprint: String::new(),
+                candidate: Some(runtime_fixture(
+                    "runtime-test",
+                    "jdk",
+                    "java",
+                    r"C:\JDK21",
+                    "managed",
+                )),
+                project_root: None,
+            },
+        );
+        assert!(take_runtime_switch_plan(&plan_id).is_ok());
+        assert!(take_runtime_switch_plan(&plan_id).is_err());
+    }
+
+    #[test]
+    fn rustup_toolchain_is_derived_only_from_provider_owned_path() {
+        assert_eq!(
+            rustup_toolchain_name(Path::new(
+                r"C:\Users\Alice\.rustup\toolchains\stable-x86_64-pc-windows-msvc\bin"
+            ))
+            .as_deref(),
+            Some("stable-x86_64-pc-windows-msvc")
+        );
+        assert!(rustup_toolchain_name(Path::new(r"C:\Rust\bin")).is_none());
+    }
+
+    #[test]
+    fn dotnet_project_switch_preserves_unrelated_global_json_keys() {
+        let temp = tempfile::tempdir().unwrap();
+        let target = temp.path().join("global.json");
+        fs::write(
+            &target,
+            r#"{"sdk":{"version":"8.0.100","rollForward":"latestPatch"},"msbuild-sdks":{"Example":"1.0.0"}}"#,
+        )
+        .unwrap();
+        write_dotnet_global_json(temp.path(), "9.0.100").unwrap();
+        let updated: Value = serde_json::from_str(&fs::read_to_string(target).unwrap()).unwrap();
+        assert_eq!(
+            updated.pointer("/sdk/version").and_then(Value::as_str),
+            Some("9.0.100")
+        );
+        assert_eq!(
+            updated.pointer("/sdk/rollForward").and_then(Value::as_str),
+            Some("latestPatch")
+        );
+        assert_eq!(
+            updated
+                .pointer("/msbuild-sdks/Example")
+                .and_then(Value::as_str),
+            Some("1.0.0")
         );
     }
 }

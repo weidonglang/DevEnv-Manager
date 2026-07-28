@@ -59,12 +59,12 @@ function renderRuntimeGroup(group: RuntimeGroupViewModel, state: RuntimeWorkbenc
       <div class="runtime-section" data-testid="runtime-group-${escapeHtml(group.id)}-managed">
         <h3>${localize("Managed versions", "受管版本")}</h3>
         <p class="small-note">${localize("Only these versions can be switched or uninstalled by DevEnv Manager.", "只有这些版本可以由 DevEnv Manager 切换或卸载。")}</p>
-        <div class="runtime-list">${group.managed.map(renderRuntimeRow).join("") || `<div class="empty">${localize("No managed version installed.", "尚未安装受管版本。")}</div>`}</div>
+        <div class="runtime-list">${group.managed.map((runtime) => renderRuntimeRow(runtime, state)).join("") || `<div class="empty">${localize("No managed version installed.", "尚未安装受管版本。")}</div>`}</div>
       </div>
       <div class="runtime-section" data-testid="runtime-group-${escapeHtml(group.id)}-external">
         <h3>${localize("External discoveries", "外部发现版本")}</h3>
         <p class="small-note">${localize("External installations stay read-only. DevEnv Manager never deletes their directories.", "外部安装保持只读，DevEnv Manager 不会删除其目录。")}</p>
-        <div class="runtime-list">${group.external.map(renderRuntimeRow).join("") || `<div class="empty">${localize("No external runtime discovered.", "尚未发现外部运行时。")}</div>`}</div>
+        <div class="runtime-list">${group.external.map((runtime) => renderRuntimeRow(runtime, state)).join("") || `<div class="empty">${localize("No external runtime discovered.", "尚未发现外部运行时。")}</div>`}</div>
       </div>
     </div>
   </section>`;
@@ -142,10 +142,21 @@ function renderRuntimeOperationResult(state: RuntimeWorkbenchState): string {
 }
 
 function renderRuntimeSwitchWorkflow(state: RuntimeWorkbenchState): string {
-  return `<section class="panel" data-testid="runtime-switch-workflow">
+  const status = runtimeSwitchStatus(state);
+  return `<section class="panel" data-testid="runtime-switch-workflow" tabindex="-1">
     <div class="panel-head"><div><h2>${localize("Runtime switch plan", "运行时切换计划")}</h2><p>${localize("Select Switch on a managed version to create a backend-bound plan. Review the backup and environment diff here before execution.", "在受管版本上选择“切换”以创建后端绑定计划；执行前在此检查备份和环境差异。")}</p></div></div>
+    <div class="${state.switchPhase === "failed" ? "error-state" : "small-note"}" data-testid="runtime-switch-plan-status" aria-live="polite">
+      <strong data-testid="runtime-switch-target">${escapeHtml(state.switchTargetLabel || localize("No target selected", "尚未选择目标"))}</strong>
+      <span>${escapeHtml(status)}</span>
+    </div>
+    ${state.switchPhase === "planReady" ? `<div class="small-note" data-testid="runtime-switch-plan-created">${escapeHtml(state.switchInlineMessage)}</div>` : ""}
+    ${state.switchInlineError ? `<div class="error-state" data-testid="runtime-switch-plan-error">${escapeHtml(state.switchInlineError)}</div>` : ""}
+    ${state.switchTargetMode === "project" ? `<div class="form-grid" data-testid="runtime-project-switch-section">
+      <label>${localize(".NET project directory", ".NET 项目目录")}<input value="${escapeHtml(state.runtimeProjectRoot)}" data-testid="runtime-project-root" readonly placeholder="${localize("Choose the directory that owns global.json", "选择需要写入 global.json 的项目目录")}" /></label>
+      <button class="button button--secondary secondary" data-action="choose-runtime-project" data-testid="runtime-project-root-choose" type="button">${escapeHtml(localize("Choose project directory", "选择项目目录"))}</button>
+    </div>` : ""}
     <div data-testid="runtime-switch-plan-preview">
-      ${state.switchPlan ? `${renderObjectTable(state.switchPlan, ["kind", "version", "targetRoot", "previousVersion", "previousRoot", "environmentChanges", "pathDiff", "backupName", "warnings", "createdAt", "planId"])}<div class="toolbar">${renderActionButton("execute-runtime-switch-plan", localize("Execute reviewed switch plan", "执行已审阅的切换计划"), "danger")}</div>` : `<div class="empty">${localize("No runtime switch plan.", "尚未创建运行时切换计划。")}</div>`}
+      ${state.switchPlan ? `${renderObjectTable(state.switchPlan, ["runtimeId", "switchMode", "sourceAuthority", "provider", "kind", "version", "targetRoot", "previousVersion", "previousRoot", "environmentChanges", "pathDiff", "backupName", "verificationSteps", "warnings", "createdAt", "expiresAt", "planId"])}<div class="toolbar"><button class="button button--danger danger" data-action="execute-runtime-switch-plan" data-testid="runtime-switch-plan-execute" type="button" ${state.switchPhase === "executing" ? "disabled" : ""}>${escapeHtml(localize("Execute reviewed switch plan", "执行已审阅的切换计划"))}</button></div>` : `<div class="empty">${localize("No runtime switch plan.", "尚未创建运行时切换计划。")}</div>`}
     </div>
     <div data-testid="runtime-switch-result">
       ${state.switchResult ? `${renderObjectTable(state.switchResult, ["success", "message", "planId", "backupName"])}${renderVerificationChecks(state.switchResult.verification.checks)}` : `<div class="empty">${localize("No switch has been executed.", "尚未执行切换。")}</div>`}
@@ -153,24 +164,40 @@ function renderRuntimeSwitchWorkflow(state: RuntimeWorkbenchState): string {
   </section>`;
 }
 
-function renderRuntimeRow(runtime: RuntimeRowViewModel): string {
+function renderRuntimeRow(runtime: RuntimeRowViewModel, state: RuntimeWorkbenchState): string {
+  const isSwitchTarget = state.switchTargetRuntimeId === runtime.id;
   return `<article class="runtime ${runtime.current ? "runtime--current" : ""}" data-runtime-row="${escapeHtml(runtime.id)}" data-testid="runtime-row">
     <div><strong>${escapeHtml(runtime.kind)} ${escapeHtml(runtime.version)}</strong><span>${escapeHtml(runtime.currentLabel)}</span></div>
     <small>${escapeHtml(runtime.runtimeRoot)}<br>${t("feature.runtimes.source")}: ${escapeHtml(runtime.source)} - ${escapeHtml(runtime.status)}</small>
-    <div class="row-actions">${runtime.managed ? renderManagedActions(runtime) : renderExternalActions(runtime)}</div>
+    ${isSwitchTarget && (state.switchInlineMessage || state.switchInlineError) ? `<div class="${state.switchInlineError ? "error-state" : "small-note"}" data-testid="runtime-row-switch-status" aria-live="polite">${escapeHtml(state.switchInlineError || state.switchInlineMessage)}</div>` : ""}
+    <div class="row-actions">${runtime.managed ? renderManagedActions(runtime, state) : renderExternalActions(runtime, state)}</div>
   </article>`;
 }
 
-function renderManagedActions(runtime: RuntimeRowViewModel): string {
-  return `<span class="status-badge status-badge--success">${escapeHtml(runtime.readonlyLabel)}</span>${runtimeAction("details", runtime, t("feature.runtimes.details"))}${runtimeAction("health", runtime, t("feature.runtimes.healthCheck"))}${runtimeAction("open", runtime, t("feature.runtimes.openDir"))}${runtimeAction("copy", runtime, t("feature.runtimes.copyPath"))}${runtimeAction("switch", runtime, t("feature.runtimes.switch"))}${runtimeAction("uninstall", runtime, t("feature.runtimes.uninstall"), "danger")}`;
+function renderManagedActions(runtime: RuntimeRowViewModel, state: RuntimeWorkbenchState): string {
+  const busy = state.switchPhase === "planning" || state.switchPhase === "executing";
+  return `<span class="status-badge status-badge--success">${escapeHtml(runtime.readonlyLabel)}</span>${runtimeAction("details", runtime, t("feature.runtimes.details"))}${runtimeAction("health", runtime, t("feature.runtimes.healthCheck"))}${runtimeAction("open", runtime, t("feature.runtimes.openDir"))}${runtimeAction("copy", runtime, t("feature.runtimes.copyPath"))}${runtimeAction("switch", runtime, t("feature.runtimes.switch"), "secondary", busy || runtime.current)}${runtimeAction("uninstall", runtime, t("feature.runtimes.uninstall"), "danger")}`;
 }
 
-function renderExternalActions(runtime: RuntimeRowViewModel): string {
-  return `<span class="status-badge">${escapeHtml(runtime.readonlyLabel)}</span>${runtimeAction("details", runtime, t("feature.runtimes.details"))}${runtimeAction("open", runtime, t("feature.runtimes.openDir"))}${runtimeAction("copy", runtime, t("feature.runtimes.copyPath"))}${runtimeAction("system", runtime, t("feature.runtimes.systemUninstall"))}`;
+function renderExternalActions(runtime: RuntimeRowViewModel, state: RuntimeWorkbenchState): string {
+  const busy = state.switchPhase === "planning" || state.switchPhase === "executing";
+  const adopt = runtime.switchEligible && runtime.switchMode
+    ? runtimeAction("switch", runtime, localize("Use in current user environment", "用于当前用户环境"), "primary", busy || runtime.current)
+    : `<span class="small-note" data-testid="runtime-external-switch-blocker">${escapeHtml(runtime.switchReason || localize("Read-only discovery; this runtime cannot be adopted safely.", "只读发现；无法安全采用此运行时。"))}</span>`;
+  return `<span class="status-badge">${escapeHtml(runtime.readonlyLabel)}</span>${runtimeAction("details", runtime, t("feature.runtimes.details"))}${runtimeAction("health", runtime, t("feature.runtimes.healthCheck"))}${runtimeAction("open", runtime, t("feature.runtimes.openDir"))}${runtimeAction("copy", runtime, t("feature.runtimes.copyPath"))}${adopt}${runtimeAction("system", runtime, t("feature.runtimes.systemUninstall"))}`;
 }
 
-function runtimeAction(action: "copy" | "switch" | "uninstall" | "open" | "health" | "details" | "system", runtime: RuntimeRowViewModel, label: string, tone = "secondary"): string {
-  return `<button class="button button--${tone} ${tone}" data-runtime-action="${action}" data-runtime-id="${escapeHtml(runtime.id)}" data-runtime-kind="${escapeHtml(runtime.backendKind)}" data-runtime-label="${escapeHtml(runtime.kind)}" data-runtime-version="${escapeHtml(runtime.version)}" data-runtime-path="${escapeHtml(runtime.runtimeRoot)}" data-runtime-executable="${escapeHtml(runtime.executable)}" type="button">${escapeHtml(label)}</button>`;
+function runtimeAction(action: "copy" | "switch" | "uninstall" | "open" | "health" | "details" | "system", runtime: RuntimeRowViewModel, label: string, tone = "secondary", disabled = false): string {
+  return `<button class="button button--${tone} ${tone}" data-runtime-action="${action}" data-runtime-id="${escapeHtml(runtime.id)}" data-runtime-switch-mode="${escapeHtml(runtime.switchMode || "")}" data-runtime-kind="${escapeHtml(runtime.backendKind)}" data-runtime-label="${escapeHtml(runtime.kind)}" data-runtime-version="${escapeHtml(runtime.version)}" data-runtime-path="${escapeHtml(runtime.runtimeRoot)}" data-runtime-executable="${escapeHtml(runtime.executable)}" type="button" ${disabled ? "disabled" : ""}>${escapeHtml(label)}</button>`;
+}
+
+function runtimeSwitchStatus(state: RuntimeWorkbenchState): string {
+  if (state.switchPhase === "planning") return localize("Creating a trusted switch plan...", "正在创建可信切换计划...");
+  if (state.switchPhase === "planReady") return localize("Plan ready for review.", "计划已创建，等待审阅。");
+  if (state.switchPhase === "executing") return localize("Executing and verifying the selected runtime...", "正在执行并验证所选运行时...");
+  if (state.switchPhase === "succeeded") return localize("Switch completed and verified.", "切换已完成并通过验证。");
+  if (state.switchPhase === "failed") return localize("The switch workflow failed. Review the persistent error below.", "切换流程失败，请查看下方持久错误。");
+  return localize("Choose an eligible runtime to create a plan.", "请选择可采用的运行时来创建计划。");
 }
 
 function renderRuntimeDetails(runtime: RuntimeRowViewModel | null): string {
@@ -181,6 +208,9 @@ function renderRuntimeDetails(runtime: RuntimeRowViewModel | null): string {
       <div><dt>${t("feature.runtimes.kind")}</dt><dd>${escapeHtml(runtime.kind)}</dd></div>
       <div><dt>${t("feature.runtimes.version")}</dt><dd>${escapeHtml(runtime.version)}</dd></div>
       <div><dt>${t("feature.runtimes.source")}</dt><dd>${escapeHtml(runtime.source)}</dd></div>
+      <div><dt>${localize("Source authority", "来源权限")}</dt><dd>${escapeHtml(runtime.sourceAuthority)}</dd></div>
+      <div><dt>${localize("Provider", "提供方")}</dt><dd>${escapeHtml(runtime.provider || localize("Direct environment selection", "直接环境选择"))}</dd></div>
+      <div><dt>${localize("Adoption eligibility", "采用资格")}</dt><dd>${escapeHtml(runtime.switchEligible ? localize("Eligible after verification", "验证后可采用") : runtime.switchReason || localize("Read-only", "只读"))}</dd></div>
       <div><dt>${t("feature.runtimes.status")}</dt><dd>${escapeHtml(runtime.status)}</dd></div>
       <div><dt>${t("feature.runtimes.current")}</dt><dd>${escapeHtml(runtime.currentLabel)}</dd></div>
       <div><dt>${localize("Installed at", "安装时间")}</dt><dd>${escapeHtml(runtime.installedAt)}</dd></div>
