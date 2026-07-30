@@ -95,6 +95,7 @@ export function createMockInvokeClient(overrides: MockInvokeMap = {}): InvokeCli
     },
     set_port_scan_preferences: { success: true, message: "Fixture port scan preferences saved." },
     discover_runtimes: acceptanceFixtures.runtimes.runtimes,
+    list_runtime_switch_backups: [],
     inspect_system_platforms: acceptanceFixtures.toolchains.system,
     inspect_toolchains: acceptanceFixtures.toolchains.report,
     inspect_platform_toolchains: acceptanceFixtures.toolchains.platform,

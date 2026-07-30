@@ -21,11 +21,23 @@ const backendSource = fs.readFileSync(
 for (const selector of [
   "runtime-switch-plan-status",
   "runtime-switch-target",
+  "runtime-switch-target-root",
   "runtime-switch-plan-created",
   "runtime-switch-plan-error",
+  "runtime-switch-failure-stage",
+  "runtime-switch-next-step",
   "runtime-switch-plan-execute",
+  "runtime-switch-plan-cancel",
+  "runtime-switch-plan-recreate",
+  "runtime-switch-plan-export",
+  "runtime-switch-plan-view-diff",
+  "runtime-switch-backup-section",
+  "runtime-switch-backup-select",
+  "runtime-switch-backup-detail",
+  "runtime-switch-backup-restore",
   "runtime-row-switch-status",
   "runtime-external-switch-blocker",
+  "runtime-external-switch-disabled",
   "runtime-project-root-choose",
 ]) {
   assert.match(
@@ -64,10 +76,21 @@ assert.match(
 assert.match(eventSource, /requestId !== state\.switchRequestId/);
 assert.match(eventSource, /focusSwitchWorkflow\(context\)/);
 assert.match(eventSource, /state\.switchPhase = "failed"/);
+assert.match(eventSource, /state\.switchFailureStage = "planning"/);
+assert.match(eventSource, /state\.switchFailureStage = "execution"/);
 assert.match(eventSource, /state\.switchInlineError = errorMessage\(error\)/);
+assert.match(eventSource, /state\.switchNextStep = runtimeSwitchNextStep/);
 assert.match(eventSource, /open\(\{ directory: true, multiple: false \}\)/);
+assert.match(eventSource, /cancelRuntimeSwitchPlan\(previousPlanId\)/);
+assert.match(eventSource, /exportRuntimeSwitchPlan\(planId\)/);
+assert.match(eventSource, /restoreRuntimeSwitchBackup\(backupId, confirmationToken\)/);
+assert.match(eventSource, /listRuntimeSwitchBackups\(\)/);
 
 assert.match(apiSource, /\{ runtimeId, switchMode, projectRoot \}/);
+assert.match(apiSource, /"cancel_runtime_switch_plan", \{ planId \}/);
+assert.match(apiSource, /"export_runtime_switch_plan", \{ planId \}/);
+assert.match(apiSource, /"restore_runtime_switch_backup", \{ backupId, confirmationToken \}/);
+assert.match(apiSource, /"list_runtime_switch_backups"/);
 assert.doesNotMatch(
   apiSource,
   /create_runtime_switch_plan"[\s\S]{0,120}\{ kind, version, path \}/,
@@ -82,10 +105,15 @@ for (const contract of [
   "rollback_runtime_switch",
   "write_dotnet_global_json",
   "rustup_toolchain_name",
+  "provider_managed_node_runtime",
+  "cancel_runtime_switch_plan",
+  "export_runtime_switch_plan",
+  "create_runtime_switch_backup",
+  "load_runtime_switch_backup",
+  "list_runtime_switch_backups",
+  "restore_runtime_switch_backup",
 ]) {
   assert.match(backendSource, new RegExp(contract), `${contract} backend contract is required`);
 }
 
-console.log(
-  "Runtime switch acceptance passed (stable identity, immediate durable state, external boundary, project selector).",
-);
+console.log("Runtime switch acceptance passed (durable plan controls, trusted identity, provider boundary, recovery entry).");
