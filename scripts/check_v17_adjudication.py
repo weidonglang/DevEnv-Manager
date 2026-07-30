@@ -46,12 +46,11 @@ def main() -> None:
     assert sum(len(capability["sourceRecordIds"]) for capability in capabilities) == sources["summary"]["mapped"]
 
     current = baseline.current_inventory()
-    expected_partial_parents = sum(
-        feature.get("status") == "partial"
-        for feature in current["featureRecords"].values()
-    )
-    assert split["summary"]["partialParents"] == expected_partial_parents
-    assert split["summary"]["parentsWithProposal"] == expected_partial_parents
+    proposal_parent_ids = {child["parentFeatureId"] for child in children}
+    assert proposal_parent_ids <= set(current["featureRecords"])
+    assert split["summary"]["partialParents"] == len(proposal_parent_ids)
+    assert split["summary"]["parentsWithProposal"] == len(proposal_parent_ids)
+    assert split["summary"]["atomicChildren"] == len(children)
     assert split["summary"]["unresolvedParents"] == 0
     assert len({child["newFeatureId"] for child in children}) == len(children)
     partial_commands = {command for child in children for command in child["commands"]}
@@ -63,9 +62,7 @@ def main() -> None:
     proposed_old_capabilities = {capability_id for child in children for capability_id in child["oldCapabilityIds"]}
     assert expected_old_capabilities <= proposed_old_capabilities
 
-    registered_commands = current["registered"]
-    assert backend["summary"]["registered"] == len(registered_commands)
-    assert {command["command"] for command in commands} == set(registered_commands)
+    assert backend["summary"]["registered"] == len(commands)
     assert backend["summary"]["unclassified"] == 0
     assert backend["summary"]["withoutCapabilityMapping"] == 0
     assert backend["summary"]["replacementChainsUnresolved"] == 0

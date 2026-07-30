@@ -261,7 +261,11 @@
             "discover_runtimes",
             "inspect_runtime_strong_verification",
             "create_runtime_switch_plan",
+            "cancel_runtime_switch_plan",
+            "export_runtime_switch_plan",
             "execute_runtime_switch_plan",
+            "list_runtime_switch_backups",
+            "restore_runtime_switch_backup",
             "uninstall_runtime",
             "open_analysis_path",
             "open_apps_features"
@@ -403,7 +407,11 @@
             "inspect_runtime_strong_verification",
             "export_runtime_verification_report",
             "create_runtime_switch_plan",
-            "execute_runtime_switch_plan"
+            "cancel_runtime_switch_plan",
+            "export_runtime_switch_plan",
+            "execute_runtime_switch_plan",
+            "list_runtime_switch_backups",
+            "restore_runtime_switch_backup"
           ],
           "backendExists": true,
           "frontendWired": true,

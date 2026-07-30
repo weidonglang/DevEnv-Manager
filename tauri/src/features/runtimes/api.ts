@@ -1,5 +1,5 @@
 import { invoke } from "../../core/invoke";
-import type { JdkDistribution, OperationResult, RuntimeInfo, RuntimeStrongVerificationReport, RuntimeSwitchPlan, RuntimeSwitchResult, ValidationCheck } from "../../types";
+import type { JdkDistribution, OperationResult, RuntimeInfo, RuntimeStrongVerificationReport, RuntimeSwitchBackupSummary, RuntimeSwitchPlan, RuntimeSwitchResult, ValidationCheck } from "../../types";
 
 export function discoverRuntimes(): Promise<RuntimeInfo[]> {
   return invoke<RuntimeInfo[]>("discover_runtimes");
@@ -21,12 +21,28 @@ export function installRuntime(command: "install_jdk" | "install_node" | "instal
   return invoke<OperationResult>(command, args);
 }
 
-export function createRuntimeSwitchPlan(kind: string, version: string, path: string | null): Promise<RuntimeSwitchPlan> {
-  return invoke<RuntimeSwitchPlan>("create_runtime_switch_plan", { kind, version, path });
+export function createRuntimeSwitchPlan(runtimeId: string, switchMode: RuntimeSwitchPlan["switchMode"], projectRoot: string | null = null): Promise<RuntimeSwitchPlan> {
+  return invoke<RuntimeSwitchPlan>("create_runtime_switch_plan", { runtimeId, switchMode, projectRoot });
+}
+
+export function cancelRuntimeSwitchPlan(planId: string): Promise<OperationResult> {
+  return invoke<OperationResult>("cancel_runtime_switch_plan", { planId });
+}
+
+export function exportRuntimeSwitchPlan(planId: string): Promise<string> {
+  return invoke<string>("export_runtime_switch_plan", { planId });
 }
 
 export function executeRuntimeSwitchPlan(planId: string, confirmationToken: string): Promise<RuntimeSwitchResult> {
   return invoke<RuntimeSwitchResult>("execute_runtime_switch_plan", { planId, confirmationToken });
+}
+
+export function listRuntimeSwitchBackups(): Promise<RuntimeSwitchBackupSummary[]> {
+  return invoke<RuntimeSwitchBackupSummary[]>("list_runtime_switch_backups");
+}
+
+export function restoreRuntimeSwitchBackup(backupId: string, confirmationToken: string): Promise<OperationResult> {
+  return invoke<OperationResult>("restore_runtime_switch_backup", { backupId, confirmationToken });
 }
 
 export function uninstallRuntime(kind: string, version: string, path: string | null, confirmationToken: string): Promise<OperationResult> {

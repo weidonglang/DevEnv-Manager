@@ -81,7 +81,7 @@ export type EnvRepairPlan = {
   actions: EnvRepairAction[];
   expectedAfter: { javaHome?: string; devenvHome?: string; path?: string };
   warnings: string[];
-  riskLevel: string;
+  riskLevel: "medium";
   requiresTerminalRestart: boolean;
   backupName: string;
   disclaimer: string;
@@ -200,6 +200,11 @@ export type RuntimeVerificationCheck = {
 export type RuntimeSwitchPlan = {
   planId: string;
   createdAt: string;
+  expiresAt: number;
+  runtimeId: string;
+  switchMode: "managed" | "external-user" | "provider" | "project";
+  sourceAuthority: string;
+  provider?: string;
   kind: string;
   version: string;
   targetRoot: string;
@@ -208,9 +213,25 @@ export type RuntimeSwitchPlan = {
   environmentChanges: string[];
   pathDiff: string[];
   backupName: string;
+  backupId: string;
+  backupPath: string;
+  stateFingerprint: string;
+  verificationSteps: string[];
   warnings: string[];
   riskLevel: string;
   planFingerprint: string;
+};
+
+export type RuntimeSwitchBackupSummary = {
+  backupId: string;
+  createdAt: string;
+  targetKind: string;
+  targetVersion: string;
+  targetRoot: string;
+  switchMode: string;
+  backupPath: string;
+  restorable: boolean;
+  validationError: string | null;
 };
 
 export type RuntimeSwitchResult = {
@@ -218,6 +239,15 @@ export type RuntimeSwitchResult = {
   message: string;
   planId: string;
   backupName: string;
+  backupId: string;
+  backupPath: string;
+  userEnvironmentWritten: boolean;
+  currentProcessUnchanged: boolean;
+  newChildProcessVerified: boolean;
+  restartRequired: boolean;
+  selectionScope: string;
+  rollbackPerformed: boolean;
+  rollbackVerified: boolean;
   verification: RuntimeStrongVerificationReport["items"][number];
 };
 
@@ -269,6 +299,12 @@ export type RuntimeInfo = {
   runtimeRoot: string;
   source: string;
   management: "managed" | "external";
+  sourceAuthority: string;
+  provider?: string;
+  switchModes: Array<"managed" | "external-user" | "provider" | "project">;
+  switchEligible: boolean;
+  switchBlockers: string[];
+  verificationFingerprint: string;
   current: boolean;
   installedAt?: string;
 };

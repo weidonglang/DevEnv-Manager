@@ -86,7 +86,13 @@ def main() -> int:
 
     runtime_render = read("tauri/src/features/runtimes/render.ts")
     runtime_events = read("tauri/src/features/runtimes/events.ts")
-    if "runtime.managed ? renderManagedActions(runtime) : renderExternalActions(runtime)" not in runtime_render:
+    separate_runtime_actions = (
+        "runtime.managed ? renderManagedActions(runtime) : renderExternalActions(runtime)"
+        in runtime_render
+        or "runtime.managed ? renderManagedActions(runtime, state) : renderExternalActions(runtime, state)"
+        in runtime_render
+    )
+    if not separate_runtime_actions:
         return fail("Runtimes must render managed and external runtimes through separate action paths")
     for required in ["createRuntimeSwitchPlan", "executeRuntimeSwitchPlan", "uninstallRuntime(kind, version, path"]:
         if required not in runtime_events:

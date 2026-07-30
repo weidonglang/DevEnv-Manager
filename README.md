@@ -2,9 +2,9 @@
 
 [GitHub 主仓库](https://github.com/weidonglang/DevEnv-Manager) · [Gitee 国内镜像](https://gitee.com/weidonglang/DevEnv-Manager) · [GitHub Release](https://github.com/weidonglang/DevEnv-Manager/releases) · [Gitee Release](https://gitee.com/weidonglang/DevEnv-Manager/releases) · [完整操作手册](docs/user-guide.md) · [安全说明](docs/safety-and-disclaimer.md) · [问题反馈](https://github.com/weidonglang/DevEnv-Manager/issues)
 
-面向 Windows 的开发环境诊断器与安全操作面板。当前版本：**1.9.0 Stable**。
+面向 Windows 的开发环境诊断器与安全操作面板。当前版本：**1.9.1 Stable**。
 
-1.9.0 完成 Runtime 管理主线与 Profile 历史恢复：统一识别九类开发生态，明确受管、外部和当前运行时边界，安装后强校验但不擅自切换，并把切换与历史恢复绑定到可验证、可回滚、单次消费的后端计划。
+1.9.1 修复 Runtime 切换看似无响应的问题，并让经过强验证的外部 JDK、Python、Node.js、Go、Maven 和 Gradle 可以在不修改外部目录的前提下安全采用到用户环境。切换计划、差异、备份、验证、失败恢复和重启后的恢复入口现在都可见且可追踪。
 
 ## 下载与镜像
 
@@ -12,9 +12,9 @@
 - Gitee 国内镜像：https://gitee.com/weidonglang/DevEnv-Manager
 - GitHub Release：https://github.com/weidonglang/DevEnv-Manager/releases
 - Gitee Release：https://gitee.com/weidonglang/DevEnv-Manager/releases
-- v1.9.0 NSIS：https://github.com/weidonglang/DevEnv-Manager/releases/download/v1.9.0/DevEnv.Manager_1.9.0_x64-setup.exe
-- 国内下载：https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.9.0/DevEnv.Manager_1.9.0_x64-setup.exe
-- NSIS SHA256：`0e44e6f9c591858c8981139c581ee70f6e79344b0850525d3f83f2bd257664c1`
+- v1.9.1 NSIS：https://github.com/weidonglang/DevEnv-Manager/releases/download/v1.9.1/DevEnv.Manager_1.9.1_x64-setup.exe
+- 国内下载：https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.9.1/DevEnv.Manager_1.9.1_x64-setup.exe
+- NSIS SHA256：`ce4b9020d47258dd1668f0237a0b3fd0b061ddfc20c938fed56f5ddcf5cd0352`
 
 适合：
 
@@ -46,6 +46,25 @@ DevEnv Manager 解决的是 Windows 上多个开发生态互相影响的问题�
 - 适合希望用图形界面查看诊断证据，同时保留 CLI 自动化入口的用户。
 - 不适合希望软件自动接管整台机器、清理任意个人文件或替代专业包管理器的场景。
 - 熟练使用 mise/asdf/Scoop/Chocolatey 且环境已经稳定的用户，可以只使用诊断能力。
+
+## 1.9.1 Stable
+
+我们向在 v1.9.0 中点击“设为当前”却看不到可靠反馈、无法判断操作是否开始，以及不得不手工修改环境变量来采用外部 Runtime 的用户郑重道歉。一个涉及 PATH、`JAVA_HOME` 和项目 SDK 的操作不应该让用户猜测，也不应该依赖用户反复截图和重装才能暴露状态丢失。v1.9.1 将这条工作流重新收束为可见、可验证、可恢复的完整闭环。
+
+本次版本完成：
+
+- 受管 Runtime 的“设为当前”会持续显示准备、计划已创建、执行、验证、成功或失败状态；计划自动聚焦，错误和结果不会只停留在短暂 toast。
+- 前端不再把 `kind/version/path` 当作可信目标。后端只接收稳定 Runtime ID 和白名单切换模式，并重新解析发现来源、强验证结果、可执行文件与 provider 身份。
+- 强验证通过的外部 JDK、Python、Node.js、Go、Maven 和 Gradle 可以采用到当前用户环境；DevEnv Manager 不写入、不移动、不删除这些外部目录，也不提供直接卸载。
+- nvm、fnm、Volta、Scoop 和 rustup 使用各自 provider 语义；非 rustup Rust 保持只读；.NET SDK 使用项目级 `global.json`，不会伪装成全局 SDK 切换。
+- 每次切换都保存精确计划、环境差异、来源权威、状态指纹、备份路径、有效期和单次确认令牌。计划过期、目标变化、文件/provider 指纹变化、篡改或重复执行都会被拒绝。
+- 执行后使用新子进程验证真实版本、命令路径和必要组件；失败时执行受约束回滚，并把备份、验证证据、下一步和恢复入口保留在页面。
+- Runtime 备份列表跨应用重启持久化。修复了后端已经保存备份、但页面首次加载漏掉第四个返回值而不显示恢复选项的问题。
+- 保留 v1.9.0 的九类 Runtime 分组、强验证、安装不自动切换、Profile 历史恢复，以及 v1.8.3 的端口、归档、回收站、主题可读性和高风险计划保护。
+
+冻结产品源码提交 `4137fbe` 通过 230 项 Rust 测试、Clippy、113 模块前端生产构建、268 个前端 selector、30 项视觉验收和全部契约检查。聚合功能验收为 300 项：254 通过、0 失败、40 项危险动作按安全策略跳过、6 项人工或策略记录；P0/P1 失败、backend-only、ui-only、missing、partial 和 toast-only 均为 0。
+
+最终 Windows ReleaseLab 验证受管 Node 切换与恢复、外部 Node 采用与恢复、外部目录哈希不变、应用重启后备份列表恢复、NSIS/MSI 安装启动卸载，以及 v1.9.0 升级后设置和 Profile 哈希不变。正式资产、SHA256、验收边界和非阻塞限制记录在 [docs/release-v1.9.1.md](docs/release-v1.9.1.md)。安装器暂未进行 Authenticode 签名，Windows 可能显示常规信任提示。
 
 ## 1.9.0 Stable
 

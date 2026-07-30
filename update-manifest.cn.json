@@ -1,28 +1,28 @@
 {
   "schemaVersion": 2,
   "channel": "stable",
-  "version": "1.9.0",
-  "date": "2026-07-27",
+  "version": "1.9.1",
+  "date": "2026-07-30",
   "notes": [
-    "v1.9.0 以当前生效、DevEnv Manager 受管和外部安装三类边界重构 Runtime 发现与管理，加入安装后强验证且不自动切换、精确令牌保护的 Runtime 切换、持久 Profile 历史与安全恢复、完整双语操作结果和 Windows Store Alias 过滤，并保留 v1.8.3 的稳定性与安全修复。"
+    "v1.9.1 修复受管 Runtime 切换反馈，允许在不修改外部目录的前提下安全采用强验证通过的 JDK、Python、Node.js、Go、Maven 和 Gradle，并补齐 provider 与项目级适配、精确计划、备份、验证、回滚和重启恢复。"
   ],
   "assets": [
     {
       "platform": "windows-x64",
-      "fileName": "DevEnv.Manager_1.9.0_x64-setup.exe",
-      "size": 2887902,
-      "sha256": "0e44e6f9c591858c8981139c581ee70f6e79344b0850525d3f83f2bd257664c1",
-      "primaryUrl": "https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.9.0/DevEnv.Manager_1.9.0_x64-setup.exe",
+      "fileName": "DevEnv.Manager_1.9.1_x64-setup.exe",
+      "size": 2951926,
+      "sha256": "ce4b9020d47258dd1668f0237a0b3fd0b061ddfc20c938fed56f5ddcf5cd0352",
+      "primaryUrl": "https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.9.1/DevEnv.Manager_1.9.1_x64-setup.exe",
       "mirrors": [
         {
           "name": "Gitee Release",
           "region": "cn",
-          "url": "https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.9.0/DevEnv.Manager_1.9.0_x64-setup.exe"
+          "url": "https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.9.1/DevEnv.Manager_1.9.1_x64-setup.exe"
         },
         {
           "name": "GitHub Release",
           "region": "global",
-          "url": "https://github.com/weidonglang/DevEnv-Manager/releases/download/v1.9.0/DevEnv.Manager_1.9.0_x64-setup.exe"
+          "url": "https://github.com/weidonglang/DevEnv-Manager/releases/download/v1.9.1/DevEnv.Manager_1.9.1_x64-setup.exe"
         }
       ]
     }

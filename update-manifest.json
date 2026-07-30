@@ -1,28 +1,28 @@
 {
   "schemaVersion": 2,
   "channel": "stable",
-  "version": "1.9.0",
-  "date": "2026-07-27",
+  "version": "1.9.1",
+  "date": "2026-07-30",
   "notes": [
-    "v1.9.0 redesigns Runtime discovery and management around explicit current, managed, and external boundaries; adds verified no-auto-switch installs, exact token-gated Runtime switching, persistent Profile history and protected restore, bilingual operation results, and Windows Store Alias filtering while preserving the v1.8.3 stability and safety fixes."
+    "v1.9.1 fixes managed Runtime switching feedback, safely adopts strongly verified external JDK, Python, Node.js, Go, Maven, and Gradle installations without modifying their directories, adds provider-aware and project-scoped adapters, and persists exact plans, backups, verification, rollback, and restart recovery."
   ],
   "assets": [
     {
       "platform": "windows-x64",
-      "fileName": "DevEnv.Manager_1.9.0_x64-setup.exe",
-      "size": 2887902,
-      "sha256": "0e44e6f9c591858c8981139c581ee70f6e79344b0850525d3f83f2bd257664c1",
-      "primaryUrl": "https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.9.0/DevEnv.Manager_1.9.0_x64-setup.exe",
+      "fileName": "DevEnv.Manager_1.9.1_x64-setup.exe",
+      "size": 2951926,
+      "sha256": "ce4b9020d47258dd1668f0237a0b3fd0b061ddfc20c938fed56f5ddcf5cd0352",
+      "primaryUrl": "https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.9.1/DevEnv.Manager_1.9.1_x64-setup.exe",
       "mirrors": [
         {
           "name": "Gitee Release",
           "region": "cn",
-          "url": "https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.9.0/DevEnv.Manager_1.9.0_x64-setup.exe"
+          "url": "https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.9.1/DevEnv.Manager_1.9.1_x64-setup.exe"
         },
         {
           "name": "GitHub Release",
           "region": "global",
-          "url": "https://github.com/weidonglang/DevEnv-Manager/releases/download/v1.9.0/DevEnv.Manager_1.9.0_x64-setup.exe"
+          "url": "https://github.com/weidonglang/DevEnv-Manager/releases/download/v1.9.1/DevEnv.Manager_1.9.1_x64-setup.exe"
         }
       ]
     }

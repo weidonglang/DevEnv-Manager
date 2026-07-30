@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::ffi::OsStr;
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -240,6 +240,38 @@ pub fn run_probe_command_with_env(
     timeout_seconds: u64,
     environment: &[(&str, &str)],
 ) -> Result<NativeCommandResult, String> {
+    run_probe_command_with_env_and_optional_cwd(
+        executable,
+        args,
+        timeout_seconds,
+        environment,
+        None,
+    )
+}
+
+pub fn run_probe_command_with_env_and_cwd(
+    executable: impl AsRef<OsStr>,
+    args: &[&str],
+    timeout_seconds: u64,
+    environment: &[(&str, &str)],
+    cwd: &Path,
+) -> Result<NativeCommandResult, String> {
+    run_probe_command_with_env_and_optional_cwd(
+        executable,
+        args,
+        timeout_seconds,
+        environment,
+        Some(cwd),
+    )
+}
+
+fn run_probe_command_with_env_and_optional_cwd(
+    executable: impl AsRef<OsStr>,
+    args: &[&str],
+    timeout_seconds: u64,
+    environment: &[(&str, &str)],
+    cwd: Option<&Path>,
+) -> Result<NativeCommandResult, String> {
     let timeout_seconds = timeout_seconds.clamp(1, 300);
     let executable_ref = executable.as_ref();
     let executable_label = executable_ref.to_string_lossy().to_string();
@@ -250,6 +282,9 @@ pub fn run_probe_command_with_env(
         .envs(environment.iter().copied())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+    if let Some(cwd) = cwd {
+        command.current_dir(cwd);
+    }
     let start = Instant::now();
     let mut child = command
         .spawn()
