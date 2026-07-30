@@ -1449,6 +1449,13 @@ input[type="checkbox"] {
   overflow-wrap: anywhere;
 }
 
+.runtime-switch-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+}
+
 .managed-runtime {
   background: #fbfcfd;
 }

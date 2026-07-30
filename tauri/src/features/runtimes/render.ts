@@ -145,7 +145,7 @@ function renderRuntimeSwitchWorkflow(state: RuntimeWorkbenchState): string {
   const status = runtimeSwitchStatus(state);
   return `<section class="panel" data-testid="runtime-switch-workflow" tabindex="-1">
     <div class="panel-head"><div><h2>${localize("Runtime switch plan", "运行时切换计划")}</h2><p>${localize("Select Switch on a managed version to create a backend-bound plan. Review the backup and environment diff here before execution.", "在受管版本上选择“切换”以创建后端绑定计划；执行前在此检查备份和环境差异。")}</p></div></div>
-    <div class="${state.switchPhase === "failed" ? "error-state" : "small-note"}" data-testid="runtime-switch-plan-status" aria-live="polite">
+    <div class="runtime-switch-status ${state.switchPhase === "failed" ? "error-state" : "small-note"}" data-testid="runtime-switch-plan-status" aria-live="polite">
       <strong data-testid="runtime-switch-target">${escapeHtml(state.switchTargetLabel || localize("No target selected", "尚未选择目标"))}</strong>
       <span>${escapeHtml(status)}</span>
     </div>
