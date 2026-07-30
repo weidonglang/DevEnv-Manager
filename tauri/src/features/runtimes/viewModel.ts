@@ -81,6 +81,12 @@ function toRuntimeRow(runtime: RuntimeInfo, report: RuntimeStrongVerificationRep
     && item!.checks
       .filter((check) => check.required)
       .every((check) => check.status === "passed");
+  const providerBlocker = runtime.kind === "node" && runtime.provider && runtime.switchBlockers.length
+    ? localize(
+      `${runtime.provider} cannot be used until its provider CLI and required Node.js checks pass.`,
+      `${runtime.provider} 提供方命令或 Node.js 必需检查尚未通过，暂时不能切换。`,
+    )
+    : "";
   return {
     id: runtime.id,
     kind: runtime.displayName,
@@ -98,7 +104,8 @@ function toRuntimeRow(runtime: RuntimeInfo, report: RuntimeStrongVerificationRep
       : runtime.switchEligible && requiredChecksPassed,
     switchMode: runtime.switchModes[0] ?? null,
     switchReason: localizeBackendText(
-      runtime.switchBlockers.join(" - ")
+      providerBlocker
+      || runtime.switchBlockers.join(" - ")
       || (!managed && !requiredChecksPassed
         ? localize("Run the strong health check and resolve every required failure before adoption.", "采用前请运行强健康检查并解决所有必需项失败。")
         : ""),

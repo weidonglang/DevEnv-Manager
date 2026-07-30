@@ -1263,6 +1263,11 @@ th {
   box-shadow: inset 3px 0 0 var(--color-accent, #23745a);
 }
 
+.runtime--switch-target {
+  outline: 2px solid var(--color-warning, #b66a11);
+  outline-offset: 2px;
+}
+
 .runtime div {
   display: flex;
   align-items: center;
@@ -1454,6 +1459,16 @@ input[type="checkbox"] {
   flex-wrap: wrap;
   align-items: baseline;
   gap: 4px 10px;
+}
+
+.runtime-switch-status code {
+  max-width: 100%;
+  color: var(--color-text, #1d2a32);
+  overflow-wrap: anywhere;
+}
+
+.runtime-switch-toolbar {
+  flex-wrap: wrap;
 }
 
 .managed-runtime {

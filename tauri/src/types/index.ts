@@ -213,6 +213,8 @@ export type RuntimeSwitchPlan = {
   environmentChanges: string[];
   pathDiff: string[];
   backupName: string;
+  backupId: string;
+  backupPath: string;
   stateFingerprint: string;
   verificationSteps: string[];
   warnings: string[];
@@ -220,11 +222,30 @@ export type RuntimeSwitchPlan = {
   planFingerprint: string;
 };
 
+export type RuntimeSwitchBackupSummary = {
+  backupId: string;
+  createdAt: string;
+  targetKind: string;
+  targetVersion: string;
+  targetRoot: string;
+  switchMode: string;
+  backupPath: string;
+  restorable: boolean;
+  validationError: string | null;
+};
+
 export type RuntimeSwitchResult = {
   success: boolean;
   message: string;
   planId: string;
   backupName: string;
+  backupId: string;
+  backupPath: string;
+  userEnvironmentWritten: boolean;
+  currentProcessUnchanged: boolean;
+  newChildProcessVerified: boolean;
+  restartRequired: boolean;
+  selectionScope: string;
   rollbackPerformed: boolean;
   rollbackVerified: boolean;
   verification: RuntimeStrongVerificationReport["items"][number];
