@@ -1,8 +1,8 @@
 # DevEnv Manager v1.9.1 Stable Release Review
 
-Status: **Release candidate approved for publication**
+Status: **Published and verified on GitHub and Gitee**
 
-The v1.9.1 product source and reviewed assets are pinned to source commit `4137fbe75f50b46c7f4818c9bd29e1e4b38946f3` in PR #142. This document records the Runtime switching hotfix, exact assets, automated gates, Windows ReleaseLab evidence, and publication boundaries.
+The v1.9.1 product source and reviewed assets are pinned to source commit `4137fbe75f50b46c7f4818c9bd29e1e4b38946f3`. PR #142 was merged as release commit `a19b56526cf37cf90a5029220cae362dce43a11e`. This document records the Runtime switching hotfix, exact assets, automated gates, Windows ReleaseLab evidence, publication verification, and remaining boundaries.
 
 ## User Notice
 
@@ -76,6 +76,17 @@ Raw evidence is retained in the Git-ignored `artifacts/release-lab/v1.9.1/4137fb
 - External Runtime adoption changes only the verified user/provider/project selection. It does not add full external installation or uninstall lifecycle.
 - Issue #130 remains open for broader Runtime lifecycle work. Issue #133 remains open for the application-internal Acceptance Center. Tracking issues with remaining content must not be closed by this release.
 
+## Publication Verification
+
+- PR #142 CI run `30530164388` and target `main` CI run `30545796878` passed before publication.
+- Annotated tag `v1.9.1` was pushed to GitHub and Gitee from release commit `a19b565`.
+- [GitHub Release](https://github.com/weidonglang/DevEnv-Manager/releases/tag/v1.9.1) and [Gitee Release](https://gitee.com/weidonglang/DevEnv-Manager/releases/tag/v1.9.1) are public and contain the reviewed NSIS and MSI binary assets.
+- The NSIS and MSI were independently downloaded from both platforms. All four online files matched the reviewed sizes and SHA256 values in this document.
+- GitHub and Gitee `main` manifests independently returned version 1.9.1, channel `stable`, platform `windows-x64`, the reviewed NSIS file name, 2,951,926-byte size, expected SHA256, and two mirrors.
+- The long-lived `update` Release manifests used by installed applications were replaced on both platforms and independently returned the same v1.9.1 identity.
+- An online update-channel smoke compared current version 1.9.0 with all four public manifest sources. Every source returned `updateAvailable=true` with the expected x64 file name, size, SHA256, and Gitee/GitHub mirrors.
+- The publication proof is documentation-only. It does not alter the tagged source or reviewed binaries and therefore does not require another product build or ReleaseLab cycle.
+
 ## Release Decision
 
-The reviewed source, assets, CI, Runtime workflow, restart recovery, MSI lifecycle, and v1.9.0 upgrade path have no release blocker. The candidate may proceed through PR merge, target-branch CI, tag, GitHub Release, Gitee Release, online asset verification, and update-channel smoke in that order.
+v1.9.1 is released. No source, automated-test, CI, asset, installed-app, ReleaseLab, publication, or update-channel blocker remains. Broader Runtime lifecycle work and the application-internal Acceptance Center remain explicitly tracked in issues #130 and #133.
