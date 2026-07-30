@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.9.1
+
+- Fix managed Runtime switching that could appear unresponsive by adding durable row-level preparation, plan, execution, verification, error, and result states.
+- Resolve every switch target from a backend-trusted stable Runtime ID instead of accepting frontend-provided kind, version, or path identity.
+- Allow strongly verified external JDK, Python, Node.js, Go, Maven, and Gradle installations to be adopted into the user environment without modifying or uninstalling their directories.
+- Add provider-aware switching for nvm, fnm, Volta, Scoop, and rustup, plus project-scoped .NET SDK selection through `global.json`.
+- Persist exact switch plans, environment diffs, backups, fingerprints, expiring confirmation tokens, single-use state, verification evidence, rollback results, and recovery guidance.
+- Restore persistent Runtime backup choices on initial page load after the application restarts.
+- Add focused acceptance and isolated Windows ReleaseLab coverage for managed switching, external adoption, restart recovery, MSI lifecycle, and v1.9.0 upgrade preservation.
+
+Exact asset identities, test evidence, acceptance boundaries, and disclosures are recorded in [docs/release-v1.9.1.md](docs/release-v1.9.1.md).
+
 ## 1.9.0
 
 - Redesign Runtime discovery around nine ecosystem groups with explicit current, managed, and external authority boundaries.
