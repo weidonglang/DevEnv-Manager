@@ -91,6 +91,7 @@ pub(crate) fn verify_installed_runtime(
             ]);
         }
         "python" => {
+            let python_env = [("PYTHONDONTWRITEBYTECODE", "1")];
             checks.extend([
                 command_check(
                     "python-version",
@@ -100,7 +101,7 @@ pub(crate) fn verify_installed_runtime(
                     expected,
                     true,
                     30,
-                    &[],
+                    &python_env,
                     "Reinstall Python if the executable reports another version.",
                 ),
                 command_check(
@@ -111,7 +112,7 @@ pub(crate) fn verify_installed_runtime(
                     &path_text(executable),
                     true,
                     30,
-                    &[],
+                    &python_env,
                     "The interpreter must report the executable inside this runtime root.",
                 ),
                 command_check(
@@ -122,7 +123,7 @@ pub(crate) fn verify_installed_runtime(
                     "",
                     true,
                     60,
-                    &[],
+                    &python_env,
                     "Run the managed pip repair or reinstall Python.",
                 ),
                 command_check(
@@ -133,7 +134,7 @@ pub(crate) fn verify_installed_runtime(
                     "",
                     true,
                     60,
-                    &[],
+                    &python_env,
                     "Reinstall Python with the venv component.",
                 ),
                 command_check(
@@ -147,7 +148,7 @@ pub(crate) fn verify_installed_runtime(
                     "ok",
                     true,
                     30,
-                    &[],
+                    &python_env,
                     "The managed Python standard library is incomplete; reinstall it.",
                 ),
                 file_check(
@@ -165,7 +166,7 @@ pub(crate) fn verify_installed_runtime(
                     "ok",
                     false,
                     30,
-                    &[],
+                    &python_env,
                     "Install optional Tk support only if GUI Python tools need it.",
                 ),
             ]);
@@ -182,6 +183,17 @@ pub(crate) fn verify_installed_runtime(
                     30,
                     &[],
                     "Reinstall Node.js if the executable reports another major version.",
+                ),
+                command_check(
+                    "node-executable",
+                    "process.execPath",
+                    root.join("node.exe"),
+                    &["-p", "process.execPath"],
+                    &path_text(&root.join("node.exe")),
+                    true,
+                    30,
+                    &[],
+                    "Node must report the executable inside this runtime root.",
                 ),
                 command_check(
                     "npm-version",
