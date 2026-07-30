@@ -1,7 +1,7 @@
 import type { FeatureContext } from "../../app/featureContext";
 import { open } from "../../api/tauri";
 import { localize, t } from "../../core/i18n";
-import type { OperationResult, RuntimeSwitchResult } from "../../types";
+import type { OperationResult, RuntimeSwitchBackupSummary, RuntimeSwitchResult } from "../../types";
 import { bindAction } from "../sharedView";
 import { cancelRuntimeSwitchPlan, createRuntimeSwitchPlan, discoverRuntimes, executeRuntimeSwitchPlan, exportRuntimeSwitchPlan, exportRuntimeVerificationReport, getJdkDistributions, inspectRuntimeStrongVerification, installRuntime, listRuntimeSwitchBackups, openAppsFeatures, openRuntimeDirectory, restoreRuntimeSwitchBackup, uninstallRuntime, verifyExternalJdk } from "./api";
 import { renderRuntimeWorkbench } from "./render";
@@ -346,11 +346,12 @@ export function bindRuntimeEvents(context: FeatureContext, state: RuntimeWorkben
 }
 
 export async function refreshRuntimes(context: FeatureContext, state: RuntimeWorkbenchState): Promise<void> {
-  const [runtimes, distributions, strongVerification] = await loadRuntimeData();
+  const [runtimes, distributions, strongVerification, switchBackups] = await loadRuntimeData();
   if (!context.isCurrent()) return;
   state.runtimes = runtimes;
   state.distributions = distributions;
   state.strongVerification = strongVerification;
+  applyRuntimeSwitchBackups(state, switchBackups);
   context.root.innerHTML = renderRuntimeWorkbench(state);
   bindRuntimeEvents(context, state);
 }
@@ -544,6 +545,10 @@ async function reloadRuntimeData(state: RuntimeWorkbenchState): Promise<void> {
   state.runtimes = runtimes;
   state.distributions = distributions;
   state.strongVerification = strongVerification;
+  applyRuntimeSwitchBackups(state, switchBackups);
+}
+
+function applyRuntimeSwitchBackups(state: RuntimeWorkbenchState, switchBackups: RuntimeSwitchBackupSummary[]): void {
   state.switchBackups = switchBackups;
   const selectedBackup = switchBackups.find(
     (backup) => backup.backupId === state.switchBackupId && backup.restorable,

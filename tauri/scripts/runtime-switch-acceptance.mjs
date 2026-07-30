@@ -85,6 +85,16 @@ assert.match(eventSource, /cancelRuntimeSwitchPlan\(previousPlanId\)/);
 assert.match(eventSource, /exportRuntimeSwitchPlan\(planId\)/);
 assert.match(eventSource, /restoreRuntimeSwitchBackup\(backupId, confirmationToken\)/);
 assert.match(eventSource, /listRuntimeSwitchBackups\(\)/);
+assert.match(
+  eventSource,
+  /refreshRuntimes[\s\S]*const \[runtimes, distributions, strongVerification, switchBackups\] = await loadRuntimeData\(\);[\s\S]*applyRuntimeSwitchBackups\(state, switchBackups\)/,
+  "initial Runtime page load must retain persistent switch backups",
+);
+assert.match(
+  eventSource,
+  /function applyRuntimeSwitchBackups[\s\S]*state\.switchBackups = switchBackups[\s\S]*backup\.restorable/,
+  "initial and post-operation refreshes must share the verified backup selection adapter",
+);
 
 assert.match(apiSource, /\{ runtimeId, switchMode, projectRoot \}/);
 assert.match(apiSource, /"cancel_runtime_switch_plan", \{ planId \}/);
