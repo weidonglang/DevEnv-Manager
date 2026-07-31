@@ -142,7 +142,7 @@ export function filterDebugEntries(entries: DebugLogEntry[], filter: DebugFilter
       entry.view ?? "",
       entry.detail ?? "",
       entry.elapsedMs?.toString() ?? "",
-      debugSearchText(entry.data),
+      debugSearchText(entry.data ?? entry.sanitizedResult ?? entry.sanitizedArgs),
     ].join(" ").toLowerCase();
     return haystack.includes(query);
   });

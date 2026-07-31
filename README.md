@@ -2,9 +2,9 @@
 
 [GitHub 主仓库](https://github.com/weidonglang/DevEnv-Manager) · [Gitee 国内镜像](https://gitee.com/weidonglang/DevEnv-Manager) · [GitHub Release](https://github.com/weidonglang/DevEnv-Manager/releases) · [Gitee Release](https://gitee.com/weidonglang/DevEnv-Manager/releases) · [完整操作手册](docs/user-guide.md) · [安全说明](docs/safety-and-disclaimer.md) · [问题反馈](https://github.com/weidonglang/DevEnv-Manager/issues)
 
-面向 Windows 的开发环境诊断器与安全操作面板。当前版本：**1.9.1 Stable**。
+面向 Windows 的开发环境诊断器与安全操作面板。当前版本：**1.9.2 Stable**。
 
-1.9.1 修复 Runtime 切换看似无响应的问题，并让经过强验证的外部 JDK、Python、Node.js、Go、Maven 和 Gradle 可以在不修改外部目录的前提下安全采用到用户环境。切换计划、差异、备份、验证、失败恢复和重启后的恢复入口现在都可见且可追踪。
+1.9.2 修复 Debug 操作日志写满浏览器存储后拖慢运行时等页面、并把成功的后端读取误报为页面加载失败的问题。Debug 日志现在有严格容量上限，会自动压缩旧数据，并且任何存储异常都不会再中断产品功能。
 
 ## 下载与镜像
 
@@ -12,9 +12,9 @@
 - Gitee 国内镜像：https://gitee.com/weidonglang/DevEnv-Manager
 - GitHub Release：https://github.com/weidonglang/DevEnv-Manager/releases
 - Gitee Release：https://gitee.com/weidonglang/DevEnv-Manager/releases
-- v1.9.1 NSIS：https://github.com/weidonglang/DevEnv-Manager/releases/download/v1.9.1/DevEnv.Manager_1.9.1_x64-setup.exe
-- 国内下载：https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.9.1/DevEnv.Manager_1.9.1_x64-setup.exe
-- NSIS SHA256：`ce4b9020d47258dd1668f0237a0b3fd0b061ddfc20c938fed56f5ddcf5cd0352`
+- v1.9.2 NSIS：https://github.com/weidonglang/DevEnv-Manager/releases/download/v1.9.2/DevEnv.Manager_1.9.2_x64-setup.exe
+- 国内下载：https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.9.2/DevEnv.Manager_1.9.2_x64-setup.exe
+- NSIS SHA256：`b3a6101e0ff17c03e9d1b1e8a72fdcabc419a516bbee53113d65a5218c242602`
 
 适合：
 
@@ -46,6 +46,23 @@ DevEnv Manager 解决的是 Windows 上多个开发生态互相影响的问题�
 - 适合希望用图形界面查看诊断证据，同时保留 CLI 自动化入口的用户。
 - 不适合希望软件自动接管整台机器、清理任意个人文件或替代专业包管理器的场景。
 - 熟练使用 mise/asdf/Scoop/Chocolatey 且环境已经稳定的用户，可以只使用诊断能力。
+
+## 1.9.2 Stable
+
+我们向遇到运行时页面首次打开卡顿、页面显示“无法加载运行时”，或看到 `devenv.debug.entries exceeded the quota` 的用户道歉。诊断日志本来只应帮助定位问题，不应该反过来阻断运行时、环境或其他页面的真实后端结果。这个缺陷说明此前对长期累积的大型诊断结果缺少产品级容量边界。
+
+本次热修复完成：
+
+- Debug 日志最多保留 200 条且持久化内容最多占用 256 KiB；大型字符串、数组、对象键和嵌套深度都会在写入前压缩。
+- 启动时会读取并压缩旧版留下的大型日志；替换旧值遇到浏览器配额限制时，会清理旧 Debug 键并以更小批次重试。
+- Debug 日志的读取、写入、清理和通知全部改为尽力而为。存储被禁用、写满或暂时不可用时使用内存回退，不会再让成功的 Tauri `invoke` 变成失败 Promise。
+- 保留敏感字段脱敏、循环对象保护和调试导出能力，同时避免同时保存同一份完整参数或结果的多个副本。
+- 新增独立配额回归：覆盖超大旧日志、首次写入强制 `QuotaExceededError`、大型/循环结果、敏感值、存储不可用和最新生命周期保留。
+- 真实 Tauri 隔离 smoke 注入 2,446,461 字符的旧日志并重载应用；运行时、环境和再次返回运行时均正常，页面无配额错误或失败调用，持久化日志自动降至 256 KiB 以下。
+
+冻结产品源码提交 `bfa7b3c` 通过 230 项 Rust 测试、Clippy、113 模块前端生产构建、268 个前端 selector、Debug 配额专项回归和全部契约检查。聚合功能验收为 300 项：254 通过、0 失败、40 项危险动作按安全策略跳过、6 项人工或策略记录；P0/P1 失败、backend-only、ui-only、missing、partial、deferred 和 toast-only 均为 0。
+
+本次只修改前端诊断日志隔离和版本元数据，不触碰安装、升级、卸载、配置迁移或高风险系统操作，因此没有重复执行无关的 UAC/ReleaseLab 全生命周期。最终资产仍从精确冻结提交一次构建，并核对版本、架构、大小和 SHA256。完整证据和边界记录在 [docs/release-v1.9.2.md](docs/release-v1.9.2.md)。安装器暂未进行 Authenticode 签名，Windows 可能显示常规信任提示。
 
 ## 1.9.1 Stable
 

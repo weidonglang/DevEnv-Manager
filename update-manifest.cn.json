@@ -1,28 +1,28 @@
 {
   "schemaVersion": 2,
   "channel": "stable",
-  "version": "1.9.1",
-  "date": "2026-07-30",
+  "version": "1.9.2",
+  "date": "2026-07-31",
   "notes": [
-    "v1.9.1 修复受管 Runtime 切换反馈，允许在不修改外部目录的前提下安全采用强验证通过的 JDK、Python、Node.js、Go、Maven 和 Gradle，并补齐 provider 与项目级适配、精确计划、备份、验证、回滚和重启恢复。"
+    "v1.9.2 修复 Debug 历史过大和浏览器存储配额错误导致运行时、环境等页面卡顿或加载失败的问题。Debug 持久化现在有容量边界、自动压缩、脱敏和业务调用隔离。"
   ],
   "assets": [
     {
       "platform": "windows-x64",
-      "fileName": "DevEnv.Manager_1.9.1_x64-setup.exe",
-      "size": 2951926,
-      "sha256": "ce4b9020d47258dd1668f0237a0b3fd0b061ddfc20c938fed56f5ddcf5cd0352",
-      "primaryUrl": "https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.9.1/DevEnv.Manager_1.9.1_x64-setup.exe",
+      "fileName": "DevEnv.Manager_1.9.2_x64-setup.exe",
+      "size": 2954232,
+      "sha256": "b3a6101e0ff17c03e9d1b1e8a72fdcabc419a516bbee53113d65a5218c242602",
+      "primaryUrl": "https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.9.2/DevEnv.Manager_1.9.2_x64-setup.exe",
       "mirrors": [
         {
           "name": "Gitee Release",
           "region": "cn",
-          "url": "https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.9.1/DevEnv.Manager_1.9.1_x64-setup.exe"
+          "url": "https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.9.2/DevEnv.Manager_1.9.2_x64-setup.exe"
         },
         {
           "name": "GitHub Release",
           "region": "global",
-          "url": "https://github.com/weidonglang/DevEnv-Manager/releases/download/v1.9.1/DevEnv.Manager_1.9.1_x64-setup.exe"
+          "url": "https://github.com/weidonglang/DevEnv-Manager/releases/download/v1.9.2/DevEnv.Manager_1.9.2_x64-setup.exe"
         }
       ]
     }

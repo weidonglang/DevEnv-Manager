@@ -1,28 +1,28 @@
 {
   "schemaVersion": 2,
   "channel": "stable",
-  "version": "1.9.1",
-  "date": "2026-07-30",
+  "version": "1.9.2",
+  "date": "2026-07-31",
   "notes": [
-    "v1.9.1 fixes managed Runtime switching feedback, safely adopts strongly verified external JDK, Python, Node.js, Go, Maven, and Gradle installations without modifying their directories, adds provider-aware and project-scoped adapters, and persists exact plans, backups, verification, rollback, and restart recovery."
+    "v1.9.2 prevents oversized Debug history and browser storage quota failures from delaying or breaking Runtime, Environment, and other page loads. Debug persistence is now bounded, compacted, redacted, and isolated from product invokes."
   ],
   "assets": [
     {
       "platform": "windows-x64",
-      "fileName": "DevEnv.Manager_1.9.1_x64-setup.exe",
-      "size": 2951926,
-      "sha256": "ce4b9020d47258dd1668f0237a0b3fd0b061ddfc20c938fed56f5ddcf5cd0352",
-      "primaryUrl": "https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.9.1/DevEnv.Manager_1.9.1_x64-setup.exe",
+      "fileName": "DevEnv.Manager_1.9.2_x64-setup.exe",
+      "size": 2954232,
+      "sha256": "b3a6101e0ff17c03e9d1b1e8a72fdcabc419a516bbee53113d65a5218c242602",
+      "primaryUrl": "https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.9.2/DevEnv.Manager_1.9.2_x64-setup.exe",
       "mirrors": [
         {
           "name": "Gitee Release",
           "region": "cn",
-          "url": "https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.9.1/DevEnv.Manager_1.9.1_x64-setup.exe"
+          "url": "https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.9.2/DevEnv.Manager_1.9.2_x64-setup.exe"
         },
         {
           "name": "GitHub Release",
           "region": "global",
-          "url": "https://github.com/weidonglang/DevEnv-Manager/releases/download/v1.9.1/DevEnv.Manager_1.9.1_x64-setup.exe"
+          "url": "https://github.com/weidonglang/DevEnv-Manager/releases/download/v1.9.2/DevEnv.Manager_1.9.2_x64-setup.exe"
         }
       ]
     }
