@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.9.2
+
+- Prevent Debug log persistence failures from escaping into successful Tauri invokes or page navigation.
+- Bound persisted Debug history to 200 entries and 256 KiB, with text, collection, key-count, and depth compaction.
+- Compact oversized legacy history on first use and fall back to smaller batches or in-memory history when browser storage is full or unavailable.
+- Preserve redaction and circular-data handling while removing duplicate full argument and result payloads.
+- Add automated quota regression coverage and an isolated real-Tauri smoke that reloads a 2.4 MB legacy history before opening Runtime and Environment.
+
+Exact asset identities, test evidence, acceptance boundaries, and disclosures are recorded in [docs/release-v1.9.2.md](docs/release-v1.9.2.md).
+
 ## 1.9.1
 
 - Fix managed Runtime switching that could appear unresponsive by adding durable row-level preparation, plan, execution, verification, error, and result states.
