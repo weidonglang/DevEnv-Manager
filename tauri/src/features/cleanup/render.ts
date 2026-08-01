@@ -43,27 +43,16 @@ export function renderCleanupWorkbench(state: CleanupWorkbenchState): string {
         </div>
         <div class="toolbar">
           ${renderActionButton("scan-cleanup", t("feature.cleanup.scan"), "primary")}
-          ${renderActionButton("create-cleanup-plan", t("feature.cleanup.createPlan"))}
-          ${renderActionButton("execute-cleanup-plan", t("feature.cleanup.executePlan"), "danger")}
-          ${renderActionButton("clear-download-cache", t("feature.cleanup.clearDownloads"), "danger")}
-          ${renderActionButton("clean-dev-cache", t("feature.cleanup.cleanDev"), "danger")}
-          ${renderActionButton("create-move-plan", t("feature.cleanup.createMove"))}
-          ${renderActionButton("execute-move-plan", t("feature.cleanup.executeMove"), "danger")}
-          ${renderActionButton("rollback-move", t("feature.cleanup.rollbackMove"), "danger")}
+          ${renderActionButton("jump-cleanup-results", localize("View scan results", "查看扫描结果"))}
+          ${renderActionButton("jump-recycle-bin", localize("Recycle Bin", "回收站"))}
           ${renderActionButton("inspect-c-drive-rescue", t("feature.cleanup.cRescue"), "primary")}
           ${renderActionButton("scan-large-files-c", t("feature.cleanup.scanLargeFiles"))}
         </div>
         ${state.errors.createPlan ? `<div class="error-state" data-testid="cleanup-inline-error">${escapeHtml(state.errors.createPlan)}</div>` : ""}
-        <div class="form-grid environment-plan-input">
-          <input id="cleanup-move-source" value="${escapeHtml(state.moveSource)}" readonly placeholder="${t("feature.cleanup.moveSource")}" />
-          <input id="cleanup-move-target-drive" value="${escapeHtml(state.moveTargetDrive)}" placeholder="${t("feature.cleanup.moveTargetDrive")}" />
-          <select id="cleanup-move-mode">
-            <option value="archive" ${state.moveMode === "archive" ? "selected" : ""}>${t("feature.cleanup.moveModeArchive")}</option>
-            <option value="junction" ${state.moveMode === "junction" ? "selected" : ""}>${t("feature.cleanup.moveModeJunction")}</option>
-          </select>
-          ${renderActionButton("choose-cleanup-move-source", t("feature.cleanup.chooseMoveSource"))}
-        </div>
       </section>
+      ${renderCleanupReport(state)}
+      <section class="panel" data-testid="cleanup-plan-section"><div class="panel-head"><div><h2>${t("feature.cleanup.plans")}</h2><p>${localize("Select scan candidates, create a plan, then review it here before execution.", "选择扫描候选项并创建计划后，会自动定位到这里供执行前检查。")}</p></div></div><div class="toolbar">${renderActionButton("create-cleanup-plan", t("feature.cleanup.createPlan"), "primary")}${renderActionButton("execute-cleanup-plan", t("feature.cleanup.executePlan"), "danger", !state.plan)}</div>${renderCleanupPlan(state)}${state.errors.executeCleanupResult ? `<div class="error-state" data-testid="cleanup-execute-error">${escapeHtml(state.errors.executeCleanupResult)}</div>` : ""}${renderCleanupExecutionResult(state)}</section>
+      ${renderCleanupUtilities(state)}
       ${renderCDriveRescue(state)}
       ${renderPartitionExpansion(state)}
       ${renderApplicationUsage(state)}
@@ -72,11 +61,31 @@ export function renderCleanupWorkbench(state: CleanupWorkbenchState): string {
       ${renderDesktopArchiveSection(state)}
       ${renderRecycleBinManagement(state)}
       ${renderDownloadsArchiveSection(state)}
-      ${renderCleanupReport(state)}
       ${renderLargeFiles(state)}
-      <section class="panel"><h2>${t("feature.cleanup.plans")}</h2>${renderCleanupPlan(state)}${state.errors.executeCleanupResult ? `<div class="error-state" data-testid="cleanup-execute-error">${escapeHtml(state.errors.executeCleanupResult)}</div>` : ""}${renderCleanupExecutionResult(state)}${state.errors.utilityOperation ? `<div class="error-state" data-testid="cleanup-utility-operation-error">${escapeHtml(state.errors.utilityOperation)}</div>` : ""}${state.errors.moveOperation ? `<div class="error-state" data-testid="cleanup-move-operation-error">${escapeHtml(state.errors.moveOperation)}</div>` : ""}${state.moveOperationResult ? `<div class="small-note" data-testid="cleanup-move-operation-result">${escapeHtml(state.moveOperationResult)}</div>` : ""}${state.movePlan ? renderObjectTable(state.movePlan, ["planId", "source", "target", "mode", "warnings"]) : ""}</section>
     </div>
   `;
+}
+
+function renderCleanupUtilities(state: CleanupWorkbenchState): string {
+  return `<section class="panel"><div class="panel-head"><div><h2>${localize("Cache cleanup and folder move", "缓存清理与目录搬移")}</h2><p>${localize("These independent tools do not use the cleanup candidate selection above.", "这些独立工具不使用上方的清理候选选择。")}</p></div></div>
+    <div class="toolbar">
+      ${renderActionButton("clear-download-cache", t("feature.cleanup.clearDownloads"), "danger")}
+      ${renderActionButton("clean-dev-cache", t("feature.cleanup.cleanDev"), "danger")}
+      ${renderActionButton("create-move-plan", t("feature.cleanup.createMove"))}
+      ${renderActionButton("execute-move-plan", t("feature.cleanup.executeMove"), "danger")}
+      ${renderActionButton("rollback-move", t("feature.cleanup.rollbackMove"), "danger")}
+    </div>
+    <div class="form-grid environment-plan-input">
+      <input id="cleanup-move-source" value="${escapeHtml(state.moveSource)}" readonly placeholder="${t("feature.cleanup.moveSource")}" />
+      <input id="cleanup-move-target-drive" value="${escapeHtml(state.moveTargetDrive)}" placeholder="${t("feature.cleanup.moveTargetDrive")}" />
+      <select id="cleanup-move-mode"><option value="archive" ${state.moveMode === "archive" ? "selected" : ""}>${t("feature.cleanup.moveModeArchive")}</option><option value="junction" ${state.moveMode === "junction" ? "selected" : ""}>${t("feature.cleanup.moveModeJunction")}</option></select>
+      ${renderActionButton("choose-cleanup-move-source", t("feature.cleanup.chooseMoveSource"))}
+    </div>
+    ${state.errors.utilityOperation ? `<div class="error-state" data-testid="cleanup-utility-operation-error">${escapeHtml(state.errors.utilityOperation)}</div>` : ""}
+    ${state.errors.moveOperation ? `<div class="error-state" data-testid="cleanup-move-operation-error">${escapeHtml(state.errors.moveOperation)}</div>` : ""}
+    ${state.moveOperationResult ? `<div class="small-note" data-testid="cleanup-move-operation-result">${escapeHtml(state.moveOperationResult)}</div>` : ""}
+    ${state.movePlan ? renderObjectTable(state.movePlan, ["planId", "source", "target", "mode", "warnings"]) : ""}
+  </section>`;
 }
 
 function renderPartitionExpansion(state: CleanupWorkbenchState): string {
@@ -331,14 +340,22 @@ function renderRecycleBinManagement(state: CleanupWorkbenchState): string {
   const selected = new Set(state.recycleBinSelectedDrives);
   const plan = state.recycleBinPlan;
   const result = state.recycleBinResult;
+  const currentStep = result ? 5 : plan ? 4 : selected.size ? 3 : report ? 2 : 1;
   return `<section class="panel" data-testid="cleanup-recycle-bin-section">
     <div class="panel-head"><div><h2>${localize("Windows Recycle Bin", "Windows 回收站")}</h2><p>${localize("Read the current user's Recycle Bin, select source volumes, review a snapshot, then confirm permanent volume-scoped cleanup. Nothing is selected by default.", "读取当前用户的回收站，选择来源卷并检查快照后，再确认按卷永久清理；默认不选择任何卷。")}</p></div></div>
     <div class="toolbar">
       ${renderActionButton("refresh-recycle-bin", localize("Refresh preview", "刷新预览"), "primary")}
+      ${renderActionButton("select-nonempty-recycle-bin-volumes", localize("Select non-empty volumes", "选择非空卷"), "secondary", !report)}
       ${renderActionButton("create-recycle-bin-cleanup-plan", localize("Create cleanup plan", "创建清理计划"))}
       ${renderActionButton("execute-recycle-bin-cleanup-plan", localize("Permanently clean selected volumes", "永久清理所选卷"), "danger", !plan)}
       ${renderActionButton("open-managed-recycle-bin", localize("Open Windows Recycle Bin", "打开 Windows 回收站"))}
     </div>
+    <ol class="workflow-steps" data-testid="cleanup-recycle-bin-workflow">
+      ${recycleStep(1, localize("Refresh preview", "刷新预览"), currentStep)}
+      ${recycleStep(2, localize("Select source volumes", "选择来源卷"), currentStep)}
+      ${recycleStep(3, localize("Review cleanup plan", "检查清理计划"), currentStep)}
+      ${recycleStep(4, localize("Execute and rescan", "执行并重新扫描"), currentStep)}
+    </ol>
     ${state.errors.recycleBin ? `<div class="error-state" data-testid="cleanup-recycle-bin-error">${escapeHtml(state.errors.recycleBin)}</div>` : ""}
     ${state.recycleBinOperationMessage ? `<div class="small-note" data-testid="cleanup-recycle-bin-operation-status">${escapeHtml(state.recycleBinOperationMessage)}</div>` : ""}
     <div class="metrics" data-testid="cleanup-recycle-bin-summary">
@@ -374,6 +391,11 @@ function renderRecycleBinManagement(state: CleanupWorkbenchState): string {
     </div>
     <div class="small-note"><strong>${localize("Irreversible boundary", "不可逆边界")}</strong><p>${localize("After a final snapshot recheck, Windows empties each selected source volume as a whole. A detected change rejects the plan, but an item added in the brief interval before the Windows command completes could also be removed. No volume is selected automatically.", "最终重核快照后，Windows 会按卷整体清空所选来源卷。检测到变化时会拒绝计划，但在重核后到 Windows 命令完成前的短暂间隔内新增的项目也可能被移除。系统不会自动勾选任何卷。")}</p></div>
   </section>`;
+}
+
+function recycleStep(step: number, label: string, currentStep: number): string {
+  const state = currentStep > step ? localize("Completed", "已完成") : currentStep === step ? localize("Current", "当前") : localize("Pending", "待执行");
+  return `<li class="${currentStep >= step ? "is-active" : ""}"><span>${step}</span><strong>${escapeHtml(label)}</strong><small>${escapeHtml(state)}</small></li>`;
 }
 
 function renderRecycleBinVolumes(
@@ -527,12 +549,18 @@ function renderPartition(partition: CleanupWorkbenchState["partition"]): string 
 }
 
 function renderCleanupReport(state: CleanupWorkbenchState): string {
+  if (state.scanStatus === "loading") {
+    return `<section class="panel" data-testid="cleanup-scan-result" aria-live="polite"><h2>${t("feature.cleanup.report")}</h2><div class="loading-state" role="status">${localize("Scanning safe cleanup targets...", "正在扫描安全清理目标...")}</div></section>`;
+  }
+  if (state.scanStatus === "failed" && !state.scan) {
+    return `<section class="panel" data-testid="cleanup-scan-result" aria-live="polite"><h2>${t("feature.cleanup.report")}</h2><div class="error-state" role="alert">${escapeHtml(state.errors.scan || localize("Cleanup scan failed.", "清理扫描失败。"))}</div></section>`;
+  }
   if (!state.scan) {
-    return `<section class="panel"><h2>${t("feature.cleanup.report")}</h2>${renderEmptyState(t("feature.cleanup.noScan"), t("feature.cleanup.noScanDetail"))}</section>`;
+    return `<section class="panel" data-testid="cleanup-scan-result"><h2>${t("feature.cleanup.report")}</h2>${renderEmptyState(t("feature.cleanup.noScan"), t("feature.cleanup.noScanDetail"))}</section>`;
   }
   const candidates = state.scan.categories.flatMap((category) => category.items);
   const selected = selectedCleanableCandidates(state);
-  return `<section class="panel">
+  return `<section class="panel" data-testid="cleanup-scan-result" aria-live="polite">
     <h2>${t("feature.cleanup.report")}</h2>
     <div class="metrics">
       ${renderMetric(t("feature.cleanup.scanned"), state.scan.totalItems)}

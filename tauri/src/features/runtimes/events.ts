@@ -1,8 +1,8 @@
 import type { FeatureContext } from "../../app/featureContext";
 import { open } from "../../api/tauri";
 import { localize, t } from "../../core/i18n";
-import type { OperationResult, RuntimeSwitchBackupSummary, RuntimeSwitchResult } from "../../types";
-import { bindAction } from "../sharedView";
+import type { OperationResult, RuntimeStrongVerificationReport, RuntimeSwitchBackupSummary, RuntimeSwitchResult } from "../../types";
+import { bindAction, revealResult } from "../sharedView";
 import { cancelRuntimeSwitchPlan, createRuntimeSwitchPlan, discoverRuntimes, executeRuntimeSwitchPlan, exportRuntimeSwitchPlan, exportRuntimeVerificationReport, getJdkDistributions, inspectRuntimeStrongVerification, installRuntime, listRuntimeSwitchBackups, openAppsFeatures, openRuntimeDirectory, restoreRuntimeSwitchBackup, uninstallRuntime, verifyExternalJdk } from "./api";
 import { renderRuntimeWorkbench } from "./render";
 import type { RuntimeWorkbenchState } from "./state";
@@ -331,7 +331,7 @@ export function bindRuntimeEvents(context: FeatureContext, state: RuntimeWorkben
     state.operationError = "";
     try {
       state.strongVerification = await inspectRuntimeStrongVerification();
-      state.operationResult = t("feature.runtimes.healthCheckDone");
+      state.operationResult = runtimeHealthMessage(state.strongVerification);
       if (!context.isCurrent()) return;
       context.progress.done(t("feature.runtimes.healthCheckDone"));
     } catch (error) {
@@ -339,6 +339,7 @@ export function bindRuntimeEvents(context: FeatureContext, state: RuntimeWorkben
       context.progress.fail(state.operationError);
     }
     renderAndBind(context, state);
+    revealResult(context.root, "[data-testid='runtime-health-summary']");
   });
   context.root.querySelectorAll<HTMLButtonElement>("[data-runtime-action]").forEach((button) => {
     button.addEventListener("click", () => runRuntimeRowAction(context, state, button));
@@ -454,7 +455,8 @@ async function runRuntimeRowAction(context: FeatureContext, state: RuntimeWorkbe
       const report = await inspectRuntimeStrongVerification();
       if (!context.isCurrent()) return;
       state.strongVerification = report;
-      state.operationResult = t("feature.runtimes.healthCheckDone");
+      state.selectedRuntimeId = runtimeId;
+      state.operationResult = runtimeHealthMessage(report, runtimeId);
       state.operationError = "";
       context.progress.done(t("feature.runtimes.healthCheckDone"));
     } catch (error) {
@@ -463,6 +465,7 @@ async function runRuntimeRowAction(context: FeatureContext, state: RuntimeWorkbe
       context.progress.fail(state.operationError);
     }
     renderAndBind(context, state);
+    revealResult(context.root, "[data-testid='runtime-health-summary']");
     return;
   }
 
@@ -529,6 +532,23 @@ async function runRuntimeRowAction(context: FeatureContext, state: RuntimeWorkbe
     }
     renderAndBind(context, state);
   }
+}
+
+function runtimeHealthMessage(report: RuntimeStrongVerificationReport, runtimeId = ""): string {
+  const items = runtimeId ? report.items.filter((item) => item.runtimeId === runtimeId) : report.items;
+  const failed = items.filter((item) => item.checks.some((check) => check.required && check.status === "failed")).length;
+  const healthy = items.filter((item) => {
+    const required = item.checks.filter((check) => check.required);
+    return required.length > 0 && required.every((check) => check.status === "passed");
+  }).length;
+  if (!items.length) return localize("Health check completed, but no runtime was available to verify.", "健康检查已完成，但没有可验证的运行时。");
+  if (!failed && healthy === items.length) {
+    return localize(`Health check completed: ${healthy}/${items.length} healthy.`, `健康检查完成：${healthy}/${items.length} 个运行时健康。`);
+  }
+  return localize(
+    `Health check completed: ${healthy}/${items.length} healthy; ${failed} need attention.`,
+    `健康检查完成：${healthy}/${items.length} 个健康，${failed} 个需要处理。`,
+  );
 }
 
 async function loadRuntimeData() {

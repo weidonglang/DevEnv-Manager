@@ -1,6 +1,6 @@
 import type { FeatureContext } from "../../app/featureContext";
 import { open } from "../../api/tauri";
-import { bindAction, valueOf } from "../sharedView";
+import { bindAction, revealResult, valueOf } from "../sharedView";
 import { localize, t } from "../../core/i18n";
 import type { ArchivePlanItem, CleanupArchitecture, CleanupResult, CleanupScanReport, DiskVolumeInfo, DuplicateGroup, ExpansionResult, FolderUsageReport, GenericArchiveResult, LargeFileItem, MaintenanceOverview, MoveResult, OperationResult, PartitionLayoutReport, RecycleBinCleanupResult, RecycleBinReport, RollbackRecord } from "../../types";
 import { addArchivePlanItem, cleanDevCache, cleanSelectedTargets, clearDownloadCache, createCDriveExpansionPlan, createCleanupPlan, createDesktopArchivePlan, createDesktopCleanupPlan, createDownloadsArchivePlan, createGenericArchivePlan, createMovePlan, createRecycleBinCleanupPlan, executeCDriveExpansion, executeDesktopArchivePlan, executeDesktopCleanupPlan, executeDownloadsArchivePlan, executeGenericArchivePlan, executeMovePlan, executeRecycleBinCleanupPlan, inspectAppUsage, inspectDesktop, inspectDiskOverview, inspectDownloads, inspectInstalledSoftwareUsage, inspectMaintenanceOverview, inspectPartitionLayout, inspectRecycleBin, listArchivePlanItems, listRollbackRecords, openAnalysisPath, openRecycleBin, removeArchivePlanItem, rollbackMove, scanCleanupTargets, scanDuplicateLargeFiles, scanLargeFiles, storageCleanupArchitecture } from "./api";
@@ -108,7 +108,9 @@ export function bindCleanupEvents(context: FeatureContext, state: CleanupWorkben
     }
     renderAndBind(context, state);
   });
-  bindAction(context.root, "scan-cleanup", () => refreshCleanup(context, state));
+  bindAction(context.root, "scan-cleanup", () => refreshCleanup(context, state, true));
+  bindAction(context.root, "jump-cleanup-results", () => revealResult(context.root, "[data-testid='cleanup-scan-result']"));
+  bindAction(context.root, "jump-recycle-bin", () => revealResult(context.root, "[data-testid='cleanup-recycle-bin-section']"));
   bindAction(context.root, "create-cleanup-plan", async () => {
     const selectedIds = selectedCleanableIds(state);
     if (!selectedIds.length) {
@@ -127,10 +129,12 @@ export function bindCleanupEvents(context: FeatureContext, state: CleanupWorkben
       context.progress.done(t("toast.planReady"));
       context.root.innerHTML = renderCleanupWorkbench(state);
       bindCleanupEvents(context, state);
+      revealResult(context.root, "[data-testid='cleanup-plan-section']");
     } catch (error) {
       state.errors.createPlan = errorMessage(error);
       context.progress.fail(state.errors.createPlan);
       renderAndBind(context, state);
+      revealResult(context.root, "[data-testid='cleanup-plan-section']");
     }
   });
   bindAction(context.root, "execute-cleanup-plan", async () => {
@@ -168,6 +172,7 @@ export function bindCleanupEvents(context: FeatureContext, state: CleanupWorkben
     if (!context.isCurrent()) return;
     context.root.innerHTML = renderCleanupWorkbench(state);
     bindCleanupEvents(context, state);
+    revealResult(context.root, "[data-testid='cleanup-operation-result']");
   });
   bindAction(context.root, "clear-download-cache", async () => {
     state.moveOperationResult = "";
@@ -346,6 +351,18 @@ export function bindCleanupEvents(context: FeatureContext, state: CleanupWorkben
   });
   bindAction(context.root, "open-managed-recycle-bin", () => openRecycleBinWindow(context, state));
   bindAction(context.root, "refresh-recycle-bin", () => refreshRecycleBin(context, state));
+  bindAction(context.root, "select-nonempty-recycle-bin-volumes", () => {
+    state.recycleBinSelectedDrives = state.recycleBin?.volumes
+      .filter((volume) => volume.drive !== "unknown" && volume.itemCount > 0)
+      .map((volume) => volume.drive) ?? [];
+    state.recycleBinPlan = null;
+    state.recycleBinOperationMessage = state.recycleBinSelectedDrives.length
+      ? localize(`${state.recycleBinSelectedDrives.length} non-empty volume(s) selected. Review the scope, then create a plan.`, `已选择 ${state.recycleBinSelectedDrives.length} 个非空卷；请检查范围后创建计划。`)
+      : localize("No non-empty Recycle Bin volume is available.", "没有可选择的非空回收站卷。");
+    delete state.errors.recycleBin;
+    renderAndBind(context, state);
+    revealResult(context.root, "[data-testid='cleanup-recycle-bin-section']");
+  });
   bindAction(context.root, "create-recycle-bin-cleanup-plan", () => createRecycleBinPlan(context, state));
   bindAction(context.root, "execute-recycle-bin-cleanup-plan", () => executeRecycleBinPlan(context, state));
   bindAction(context.root, "rollback-desktop-archive", () => rollbackArchive(context, state, "desktop"));
@@ -455,7 +472,9 @@ async function refreshDesktop(context: FeatureContext, state: CleanupWorkbenchSt
   renderAndBind(context, state);
 }
 
-export async function refreshCleanup(context: FeatureContext, state: CleanupWorkbenchState): Promise<void> {
+export async function refreshCleanup(context: FeatureContext, state: CleanupWorkbenchState, reveal = false): Promise<void> {
+  state.scanStatus = "loading";
+  renderAndBind(context, state);
   const [architecture, overview, diskOverview, scan, rollbackRecords, archiveItems, recycleBin] = await Promise.allSettled([
     storageCleanupArchitecture(),
     inspectMaintenanceOverview(),
@@ -471,6 +490,9 @@ export async function refreshCleanup(context: FeatureContext, state: CleanupWork
   applySettled(state, "overview", overview);
   applySettled(state, "diskOverview", diskOverview);
   applySettled(state, "scan", scan);
+  state.scanStatus = scan.status === "fulfilled"
+    ? scan.value.totalItems > 0 ? "results" : "empty"
+    : "failed";
   applySettled(state, "rollbackRecords", rollbackRecords);
   applySettled(state, "archiveItems", archiveItems);
   applySettled(state, "recycleBin", recycleBin);
@@ -481,6 +503,7 @@ export async function refreshCleanup(context: FeatureContext, state: CleanupWork
   state.cleanupResult = null;
   context.root.innerHTML = renderCleanupWorkbench(state);
   bindCleanupEvents(context, state);
+  if (reveal) revealResult(context.root, "[data-testid='cleanup-scan-result']");
 }
 
 function syncArchiveInputs(context: FeatureContext, state: CleanupWorkbenchState): void {
@@ -853,6 +876,7 @@ async function refreshRecycleBin(context: FeatureContext, state: CleanupWorkbenc
     context.progress.fail(state.errors.recycleBin);
   }
   renderAndBind(context, state);
+  revealResult(context.root, "[data-testid='cleanup-recycle-bin-section']");
 }
 
 async function createRecycleBinPlan(context: FeatureContext, state: CleanupWorkbenchState): Promise<void> {
@@ -860,11 +884,13 @@ async function createRecycleBinPlan(context: FeatureContext, state: CleanupWorkb
   if (!state.recycleBin) {
     state.errors.recycleBin = localize("Refresh the Recycle Bin preview first.", "请先刷新回收站预览。");
     renderAndBind(context, state);
+    revealResult(context.root, "[data-testid='cleanup-recycle-bin-section']");
     return;
   }
   if (!state.recycleBinSelectedDrives.length) {
     state.errors.recycleBin = localize("Select at least one Recycle Bin source volume.", "请至少选择一个回收站来源卷。");
     renderAndBind(context, state);
+    revealResult(context.root, "[data-testid='cleanup-recycle-bin-section']");
     return;
   }
   context.progress.start(localize("Creating snapshot-based Recycle Bin cleanup plan", "正在创建基于快照的回收站清理计划"));
@@ -879,6 +905,7 @@ async function createRecycleBinPlan(context: FeatureContext, state: CleanupWorkb
     context.progress.fail(state.errors.recycleBin);
   }
   renderAndBind(context, state);
+  revealResult(context.root, "[data-testid='cleanup-recycle-bin-plan-preview']");
 }
 
 async function executeRecycleBinPlan(context: FeatureContext, state: CleanupWorkbenchState): Promise<void> {
@@ -886,6 +913,7 @@ async function executeRecycleBinPlan(context: FeatureContext, state: CleanupWork
   if (!plan) {
     state.errors.recycleBin = localize("Create and review a Recycle Bin cleanup plan first.", "请先创建并检查回收站清理计划。");
     renderAndBind(context, state);
+    revealResult(context.root, "[data-testid='cleanup-recycle-bin-section']");
     return;
   }
   state.recycleBinResult = null;
@@ -944,6 +972,7 @@ async function executeRecycleBinPlan(context: FeatureContext, state: CleanupWork
     state.errors.recycleBin = errorMessage(error);
   }
   renderAndBind(context, state);
+  revealResult(context.root, "[data-testid='cleanup-recycle-bin-result']");
 }
 
 function bindRecycleBinSelection(context: FeatureContext, state: CleanupWorkbenchState): void {

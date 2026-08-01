@@ -9,7 +9,7 @@ export function renderFileAssociations(state: FileAssociationUiState): string {
   const rollbackBackup = state.backups.find((item) => item.backupId === appliedBackupId) ?? state.backups[0];
   return `
     <div class="feature-layout">
-      <section class="panel">
+      <section class="panel" data-testid="file-associations-workflow">
         <div class="panel-head"><div><h2>${t("route.fileAssociations.label")}</h2><p>${t("feature.fileAssociations.description")}</p></div></div>
         ${renderFeatureGuide("fileAssociations")}
         <div class="metrics">
@@ -34,9 +34,10 @@ export function renderFileAssociations(state: FileAssociationUiState): string {
           ${renderActionButton("open-default-apps", t("feature.fileAssociations.defaultApps"))}
           ${renderActionButton("export-association-report", t("feature.fileAssociations.export"))}
         </div>
+        ${renderScanStatus(state)}
       </section>
       <section class="panel" data-testid="file-associations-app-search-result"><h2>${t("feature.fileAssociations.candidates")}</h2>${renderAppSearchState(state)}</section>
-      <section class="panel"><h2>${t("feature.fileAssociations.records")}</h2><div class="data-table" data-testid="file-associations-records-table">${records.slice(0, 40).map((record) => `<div class="data-row"><span>${escapeHtml(valueOf(record, "extension"))}</span><span>${escapeHtml(valueOf(record, "currentAppName"))}</span><span>${escapeHtml(valueOf(record, "risk"))}</span><span>${escapeHtml(valueOf(record, "source"))}</span><span><button data-assoc-extension="${escapeHtml(valueOf(record, "extension"))}" data-assoc-app="${escapeHtml(valueOf(record, "currentAppName", ""))}" type="button">${t("feature.fileAssociations.changeOpenWith")}</button></span></div>`).join("") || `<div class="empty">${t("feature.fileAssociations.noResults")}</div>`}</div></section>
+      <section class="panel" data-testid="file-associations-records-section"><h2>${t("feature.fileAssociations.records")}</h2>${renderAssociationRecords(state, records)}</section>
       <section class="panel"><h2>${t("feature.fileAssociations.plan")}</h2>${state.selectionResult ? `<div class="small-note" data-testid="file-associations-selection-result">${escapeHtml(state.selectionResult)}</div>` : ""}<div data-testid="file-associations-plan-preview">${state.plan ? renderAssociationPlan(state.plan) : `<div class="empty">${t("feature.fileAssociations.noPlan")}</div>`}</div><div data-testid="file-associations-rollback-info">${rollbackBackup ? renderObjectTable(rollbackBackup, ["backupId", "createdAt", "backupPath", "extensions", "rollbackAvailable"]) : `<div class="empty">${t("toast.noBackupAvailable")}</div>`}</div>${renderAssociationResults(state)}</section>
     </div>
   `;
@@ -75,6 +76,7 @@ function renderAssociationResults(state: FileAssociationUiState): string {
   const result = state.rollbackResult ?? state.applyResult;
   return `<div data-testid="file-associations-operation-result">
     ${state.operationError ? `<div class="error-state" data-testid="file-associations-operation-error">${escapeHtml(state.operationError)}</div>` : ""}
+    ${state.operationMessage ? `<div class="small-note" aria-live="polite">${escapeHtml(state.operationMessage)}</div>` : ""}
     ${result ? `<div class="execution-result ${result.success ? "ok" : "warn"}">
       <div class="metrics">
         ${renderMetric(localize("Status", "状态"), result.success ? t("state.yes") : t("state.no"))}
@@ -85,6 +87,21 @@ function renderAssociationResults(state: FileAssociationUiState): string {
       <div class="table-wrap"><table><thead><tr><th>${localize("Extension", "扩展名")}</th><th>${localize("Success", "成功")}</th><th>UserChoice</th><th>${localize("Message", "消息")}</th></tr></thead><tbody>${result.items.map((item) => `<tr><td>${escapeHtml(item.extension)}</td><td>${item.success ? t("state.yes") : t("state.no")}</td><td>${item.requiresSystemSettings ? t("state.yes") : t("state.no")}</td><td>${escapeHtml(item.message)}</td></tr>`).join("")}</tbody></table></div>
     </div>` : `<div class="empty">${state.applyResultMessage ? escapeHtml(state.applyResultMessage) : t("state.notChecked")}</div>`}
   </div>`;
+}
+
+function renderScanStatus(state: FileAssociationUiState): string {
+  if (state.scanStatus === "loading") return `<div class="loading-state" role="status">${localize("Scanning file associations...", "正在扫描文件关联...")}</div>`;
+  if (state.scanStatus === "failed") return `<div class="error-state" role="alert">${escapeHtml(state.operationError || localize("Association scan failed.", "关联扫描失败。"))}</div>`;
+  if (state.scanStatus === "results" || state.scanStatus === "empty") return `<div class="small-note" role="status">${escapeHtml(state.operationMessage)}</div>`;
+  return `<div class="small-note">${localize("Enter an extension such as .txt, txt, .md or .json. Scan once, then the filter updates immediately.", "可输入 .txt、txt、.md 或 .json 等扩展名；扫描一次后，筛选会立即生效。")}</div>`;
+}
+
+function renderAssociationRecords(state: FileAssociationUiState, records: unknown[]): string {
+  if (state.scanStatus === "loading") return `<div class="loading-state" role="status">${localize("Scanning...", "正在扫描...")}</div>`;
+  if (state.scanStatus === "failed" && !state.report) return `<div class="error-state" role="alert">${escapeHtml(state.operationError)}</div>`;
+  if (!state.report) return `<div class="empty">${localize("Associations have not been scanned yet.", "尚未扫描文件关联。")}</div>`;
+  if (!records.length) return `<div class="empty">${escapeHtml(state.filter.keyword ? localize(`No association matched ${state.filter.keyword}.`, `没有找到与 ${state.filter.keyword} 匹配的关联。`) : localize("The scan completed without association records.", "扫描完成，但没有关联记录。"))}</div>`;
+  return `<div class="data-table" data-testid="file-associations-records-table">${records.slice(0, 40).map((record) => `<div class="data-row"><span>${escapeHtml(valueOf(record, "extension"))}</span><span>${escapeHtml(valueOf(record, "currentAppName"))}</span><span>${escapeHtml(valueOf(record, "risk"))}</span><span>${escapeHtml(valueOf(record, "source"))}</span><span><button data-assoc-extension="${escapeHtml(valueOf(record, "extension"))}" data-assoc-app="${escapeHtml(valueOf(record, "currentAppName", ""))}" type="button">${t("feature.fileAssociations.changeOpenWith")}</button></span></div>`).join("")}</div>`;
 }
 
 function renderAppCandidates(state: FileAssociationUiState): string {

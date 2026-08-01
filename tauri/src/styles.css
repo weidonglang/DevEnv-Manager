@@ -3118,3 +3118,63 @@ tr.is-selected td {
     grid-template-columns: 1fr;
   }
 }
+
+[data-testid$="-result"]:focus,
+[data-testid$="-summary"]:focus,
+[data-testid$="-section"]:focus {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+[data-testid$="-result"],
+[data-testid$="-summary"],
+[data-testid$="-section"] {
+  scroll-margin-top: 18px;
+}
+
+.workflow-steps {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 12px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.workflow-steps li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 8px;
+  align-items: center;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-raised);
+}
+
+.workflow-steps li > span {
+  grid-row: 1 / span 2;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  font-weight: 700;
+}
+
+.workflow-steps li > strong,
+.workflow-steps li > small {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.workflow-steps li.is-active {
+  border-color: var(--color-accent);
+}
+
+@media (max-width: 760px) {
+  .workflow-steps {
+    grid-template-columns: 1fr 1fr;
+  }
+}

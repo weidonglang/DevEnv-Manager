@@ -40,6 +40,9 @@ export const acceptanceSelectors = {
     downloadsArchivePlan: "cleanup-downloads-archive-plan-action",
     downloadsArchiveResult: "cleanup-downloads-archive-execute-result",
     inlineError: "cleanup-inline-error",
+    scanResult: "cleanup-scan-result",
+    planSection: "cleanup-plan-section",
+    recycleBinWorkflow: "cleanup-recycle-bin-workflow",
     operationResult: "cleanup-operation-result",
   },
   ports: {
@@ -56,6 +59,7 @@ export const acceptanceSelectors = {
     inlineGuidance: "ports-inline-guidance",
     scanStatus: "ports-scan-status",
     scanScope: "ports-scan-scope",
+    selectedDetail: "ports-selected-detail",
   },
   runtime: {
     installJdkGroup: "runtime-install-jdk-group",
@@ -66,6 +70,7 @@ export const acceptanceSelectors = {
     installGradleGroup: "runtime-install-gradle-group",
     installedList: "runtime-installed-list",
     operationResult: "runtime-operation-result",
+    healthSummary: "runtime-health-summary",
     javaGroup: "runtime-group-java",
     pythonGroup: "runtime-group-python",
     nodeGroup: "runtime-group-node",
@@ -97,10 +102,21 @@ export const acceptanceSelectors = {
   },
   fileAssociations: {
     searchInput: "file-associations-search-input",
+    workflow: "file-associations-workflow",
+    recordsSection: "file-associations-records-section",
     recordsTable: "file-associations-records-table",
     createPlan: "file-associations-create-plan",
     planPreview: "file-associations-plan-preview",
     rollbackInfo: "file-associations-rollback-info",
+    operationResult: "file-associations-operation-result",
+  },
+  projects: {
+    analysisResult: "projects-result",
+    configPlan: "projects-config-plan",
+    applyResult: "projects-apply-result",
+    portResult: "projects-port-result",
+    ideaResult: "projects-idea-result",
+    javaConsumerResult: "projects-java-consumer-result",
   },
   toolchains: {
     ecosystems: "toolchains-ecosystems-result",

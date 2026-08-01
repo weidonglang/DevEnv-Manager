@@ -42,6 +42,7 @@ function renderPortExecutionResult(state: PortsWorkbenchState): string {
 
 function renderPortsShell(state: PortsWorkbenchState): string {
   const selected = selectedPortRecord(state.records, state.selectedKey);
+  const actionableCount = state.records.filter((record) => assessPortTreatability(record).treatable).length;
   return `<section class="panel">
     <div class="panel-head"><div><h2>${t("route.ports.label")}</h2><p>${t("feature.ports.description")}</p></div></div>
     ${renderFeatureGuide("ports")}
@@ -49,6 +50,7 @@ function renderPortsShell(state: PortsWorkbenchState): string {
       ${renderMetric(t("feature.ports.ports"), state.records.length)}
       ${renderMetric(t("feature.ports.services"), state.services.length)}
       ${renderMetric(t("feature.ports.history"), state.history.length)}
+      ${renderMetric(localize("Actionable listeners", "可处理监听端口"), actionableCount)}
       ${renderMetric(t("feature.ports.selected"), selected ? `${selected.localPort} / PID ${selected.pid}` : t("feature.ports.none"))}
     </div>
     ${renderScanStatus(state)}
@@ -56,6 +58,7 @@ function renderPortsShell(state: PortsWorkbenchState): string {
     <input id="port-filter" value="${escapeHtml(state.filter)}" placeholder="${t("feature.ports.filter")}" autocomplete="off" />
     <div class="toolbar">
       ${renderActionButton("scan-ports", t("dashboard.scanPorts"), "primary")}
+      ${renderActionButton("toggle-actionable-ports", state.actionableOnly ? localize("Show all connections", "显示全部连接") : localize("Show actionable listeners only", "只看可处理监听端口"))}
       <label class="inline-field">${localize("Scan scope", "扫描范围")}<select id="port-scan-scope" data-testid="ports-scan-scope"><option value="recommended" ${state.scanScope === "recommended" ? "selected" : ""}>${localize("Recommended", "推荐")}</option><option value="full" ${state.scanScope === "full" ? "selected" : ""}>${localize("All connections", "全部连接")}</option></select></label>
       ${renderActionButton("create-port-plan", t("feature.ports.createPlanForSelected"))}
       ${renderActionButton("execute-port-plan", t("feature.ports.executePlan"), "danger")}
@@ -88,15 +91,16 @@ function renderScanStatus(state: PortsWorkbenchState): string {
 }
 
 export function renderPortsTable(state: PortsWorkbenchState): string {
-  const rows = state.records.filter((record) =>
-    `${valueOf(record, "localPort")} ${valueOf(record, "processName")} ${valueOf(record, "friendlyNameEn")} ${valueOf(record, "friendlyNameZh")} ${valueOf(record, "identity")} ${record.serviceNames.join(" ")}`.toLowerCase().includes(state.filter.toLowerCase()),
-  );
+  const rows = state.records.filter((record) => {
+    if (state.actionableOnly && !assessPortTreatability(record).treatable) return false;
+    return `${valueOf(record, "localPort")} ${valueOf(record, "processName")} ${valueOf(record, "friendlyNameEn")} ${valueOf(record, "friendlyNameZh")} ${valueOf(record, "identity")} ${record.serviceNames.join(" ")}`.toLowerCase().includes(state.filter.toLowerCase());
+  });
   const page = pageItems(rows, state.page, 10);
   return `
         <h2>${t("feature.ports.table")}</h2>
         <div class="data-table port-table">
           <div class="data-row head"><span>${t("feature.ports.select")}</span><span>${t("feature.ports.port")}</span><span>${t("feature.ports.protocol")}</span><span>${t("feature.ports.state")}</span><span>PID</span><span>${localize("Friendly name", "友好程序名")}</span><span>${localize("Process", "真实进程")}</span><span>${localize("Bindings / connections", "绑定/连接")}</span><span>${t("feature.ports.services")}</span><span>${localize("Operation risk", "操作风险")}</span><span>${t("feature.ports.confidence")}</span><span>${t("feature.ports.recommendation")}</span></div>
-          ${page.items.map((record) => renderPortRow(record, state.selectedKey)).join("") || `<div class="empty">${t("feature.ports.noRecords")}</div>`}
+          ${page.items.map((record) => renderPortRow(record, state.selectedKey)).join("") || `<div class="empty">${escapeHtml(state.actionableOnly ? localize("No safely actionable listening port was found. Show all connections for read-only diagnostics.", "未发现可安全处理的监听端口；可切换到“显示全部连接”进行只读诊断。") : t("feature.ports.noRecords"))}</div>`}
         </div>
         ${renderPagination("ports", page.page, page.totalPages, page.total)}
   `;
@@ -114,7 +118,7 @@ function renderPortRow(record: PortRecord, selectedKey: string | null): string {
   const treatability = assessPortTreatability(record);
   const friendlyName = localize(record.friendlyNameEn, record.friendlyNameZh);
   return `<div class="data-row ${selected ? "is-selected" : ""}" data-testid="ports-row" data-port-group-id="${escapeHtml(record.groupId)}" data-port-visual-key="${escapeHtml(`${record.protocol}:${record.localPort}:${record.pid}:${record.state}`)}">
-    <span><button data-port-select="${escapeHtml(key)}" type="button" aria-pressed="${selected ? "true" : "false"}">${selected ? t("feature.ports.selectedRow") : t("feature.ports.select")}</button></span>
+    <span>${treatability.treatable ? `<button class="button button--primary" data-port-quick-plan="${escapeHtml(key)}" type="button">${localize("Release", "释放端口")}</button>` : `<button data-port-select="${escapeHtml(key)}" type="button" aria-pressed="${selected ? "true" : "false"}">${selected ? t("feature.ports.selectedRow") : localize("Details", "详情")}</button>`}</span>
     <span>${escapeHtml(String(record.localPort))}</span><span>${escapeHtml(record.protocol)}</span><span>${escapeHtml(record.state)}</span>
     <span>${escapeHtml(String(record.pid))}</span><span>${escapeHtml(friendlyName)}</span><span>${escapeHtml(record.processName || t("state.notAvailable"))}</span>
     <span data-testid="ports-row-binding-summary">${escapeHtml(bindingSummary(record))}</span><span>${escapeHtml(record.serviceDisplayNames.join(", ") || record.serviceNames.join(", ") || t("feature.ports.none"))}</span>
@@ -126,7 +130,7 @@ function renderSelectedPortDetail(state: PortsWorkbenchState): string {
   const selected = selectedPortRecord(state.records, state.selectedKey);
   if (!selected) return `<h2>${t("feature.ports.selectedDetail")}</h2><div class="empty" data-testid="ports-inline-guidance">${t("feature.ports.noSelectedDetail")}</div>${state.diagnosticsResult ? `<div class="small-note" data-testid="ports-diagnostics-result">${escapeHtml(state.diagnosticsResult)}</div>` : ""}`;
   const treatability = assessPortTreatability(selected);
-  return `<div class="panel-head"><div><h2>${t("feature.ports.selectedDetail")}</h2><p>${escapeHtml(t(treatability.reasonKey))}</p></div>${renderBadge(treatability.treatable ? t("feature.ports.canHandle") : t("feature.ports.cannotHandle"), treatability.treatable ? "success" : "danger")}</div>
+  return `<div data-testid="ports-selected-detail"><div class="panel-head"><div><h2>${t("feature.ports.selectedDetail")}</h2><p>${escapeHtml(t(treatability.reasonKey))}</p></div>${renderBadge(treatability.treatable ? t("feature.ports.canHandle") : t("feature.ports.cannotHandle"), treatability.treatable ? "success" : "danger")}</div>
     <dl class="kv-list">
       ${detailRow(t("feature.ports.port"), `${selected.localPort} / ${selected.protocol}`)}
       ${detailRow("PID", String(selected.pid))}
@@ -164,7 +168,7 @@ function renderSelectedPortDetail(state: PortsWorkbenchState): string {
       ${renderActionButton("scan-ports", t("dashboard.scanPorts"))}
       ${selected.serviceNames.length ? renderActionButton("inspect-local-services", t("feature.ports.inspectServices")) : ""}
     </div>
-    ${state.diagnosticsResult ? `<div class="small-note" data-testid="ports-diagnostics-result">${escapeHtml(state.diagnosticsResult)}</div>` : ""}`;
+    ${state.diagnosticsResult ? `<div class="small-note" data-testid="ports-diagnostics-result">${escapeHtml(state.diagnosticsResult)}</div>` : ""}</div>`;
 }
 
 function renderPortPlan(state: PortsWorkbenchState): string {
