@@ -45,46 +45,70 @@ export function renderCleanupWorkbench(state: CleanupWorkbenchState): string {
           ${renderActionButton("scan-cleanup", t("feature.cleanup.scan"), "primary")}
           ${renderActionButton("jump-cleanup-results", localize("View scan results", "查看扫描结果"))}
           ${renderActionButton("jump-recycle-bin", localize("Recycle Bin", "回收站"))}
-          ${renderActionButton("inspect-c-drive-rescue", t("feature.cleanup.cRescue"), "primary")}
-          ${renderActionButton("scan-large-files-c", t("feature.cleanup.scanLargeFiles"))}
         </div>
         ${state.errors.createPlan ? `<div class="error-state" data-testid="cleanup-inline-error">${escapeHtml(state.errors.createPlan)}</div>` : ""}
       </section>
-      ${renderCleanupReport(state)}
-      <section class="panel" data-testid="cleanup-plan-section"><div class="panel-head"><div><h2>${t("feature.cleanup.plans")}</h2><p>${localize("Select scan candidates, create a plan, then review it here before execution.", "选择扫描候选项并创建计划后，会自动定位到这里供执行前检查。")}</p></div></div><div class="toolbar">${renderActionButton("create-cleanup-plan", t("feature.cleanup.createPlan"), "primary")}${renderActionButton("execute-cleanup-plan", t("feature.cleanup.executePlan"), "danger", !state.plan)}</div>${renderCleanupPlan(state)}${state.errors.executeCleanupResult ? `<div class="error-state" data-testid="cleanup-execute-error">${escapeHtml(state.errors.executeCleanupResult)}</div>` : ""}${renderCleanupExecutionResult(state)}</section>
-      ${renderCleanupUtilities(state)}
-      ${renderCDriveRescue(state)}
-      ${renderPartitionExpansion(state)}
-      ${renderApplicationUsage(state)}
-      ${renderGenericArchive(state)}
-      ${renderDuplicateFiles(state)}
-      ${renderDesktopArchiveSection(state)}
-      ${renderRecycleBinManagement(state)}
-      ${renderDownloadsArchiveSection(state)}
-      ${renderLargeFiles(state)}
+      ${renderCleanupViewTabs(state)}
+      ${state.activeView === "quick" ? renderQuickCleanupView(state) : ""}
+      ${state.activeView === "space" ? renderSpaceManagementView(state) : ""}
+      ${state.activeView === "advanced" ? renderAdvancedCleanupView(state) : ""}
     </div>
   `;
 }
 
-function renderCleanupUtilities(state: CleanupWorkbenchState): string {
-  return `<section class="panel"><div class="panel-head"><div><h2>${localize("Cache cleanup and folder move", "缓存清理与目录搬移")}</h2><p>${localize("These independent tools do not use the cleanup candidate selection above.", "这些独立工具不使用上方的清理候选选择。")}</p></div></div>
+function renderCleanupViewTabs(state: CleanupWorkbenchState): string {
+  const tabs = [
+    { id: "quick", label: localize("Quick cleanup", "快速清理"), detail: localize("Scan, select and clean safely", "扫描、选择并安全清理") },
+    { id: "space", label: localize("Move and recover space", "搬移与释放空间"), detail: localize("Archive Desktop, Downloads and folders", "归档桌面、下载和目录") },
+    { id: "advanced", label: localize("Advanced tools", "高级工具"), detail: localize("Large files, duplicates and disk diagnostics", "大文件、重复文件和磁盘诊断") },
+  ] as const;
+  return `<nav class="cleanup-view-tabs" aria-label="${localize("Cleanup workflows", "清理工作流")}" data-testid="cleanup-view-tabs">${tabs.map((tab) => `<button type="button" data-cleanup-view="${tab.id}" class="cleanup-view-tab ${state.activeView === tab.id ? "is-active" : ""}" aria-pressed="${state.activeView === tab.id}"><strong>${tab.label}</strong><small>${tab.detail}</small></button>`).join("")}</nav>`;
+}
+
+function renderQuickCleanupView(state: CleanupWorkbenchState): string {
+  return `<div data-testid="cleanup-quick-view">
+    ${renderCleanupReport(state)}
+    <section class="panel" data-testid="cleanup-plan-section">
+      <div class="panel-head"><div><h2>${localize("Clean selected items", "清理所选项目")}</h2><p>${localize("One action creates the safety plan and opens the final confirmation.", "一次操作即可创建安全计划并打开最终确认。")}</p></div></div>
+      <div class="toolbar">${renderActionButton("run-selected-cleanup", localize("Review and clean selected", "检查并清理所选项"), "primary", !selectedCleanableCandidates(state).length)}</div>
+      <details class="advanced-actions" ${state.plan || state.cleanupResult || state.errors.executeCleanupResult ? "open" : ""}><summary>${localize("Plan details and manual controls", "计划详情与手动控制")}</summary><div class="toolbar">${renderActionButton("create-cleanup-plan", t("feature.cleanup.createPlan"))}${state.plan ? renderActionButton("execute-cleanup-plan", t("feature.cleanup.executePlan"), "danger") : ""}</div>${renderCleanupPlan(state)}${state.errors.executeCleanupResult ? `<div class="error-state" data-testid="cleanup-execute-error">${escapeHtml(state.errors.executeCleanupResult)}</div>` : ""}${renderCleanupExecutionResult(state)}</details>
+    </section>
+    ${renderCacheCleanup(state)}
+    ${renderRecycleBinManagement(state)}
+  </div>`;
+}
+
+function renderSpaceManagementView(state: CleanupWorkbenchState): string {
+  return `<div data-testid="cleanup-space-view">${renderCDriveRescue(state)}${renderDesktopArchiveSection(state)}${renderDownloadsArchiveSection(state)}${renderMoveDirectory(state)}${renderGenericArchive(state)}</div>`;
+}
+
+function renderAdvancedCleanupView(state: CleanupWorkbenchState): string {
+  return `<div data-testid="cleanup-advanced-view">${renderDuplicateFiles(state)}${renderLargeFiles(state)}${renderApplicationUsage(state)}${renderPartitionExpansion(state)}</div>`;
+}
+
+function renderCacheCleanup(state: CleanupWorkbenchState): string {
+  return `<section class="panel"><div class="panel-head"><div><h2>${localize("Managed caches", "受管缓存")}</h2><p>${localize("Clear only caches managed or safely recognized by DevEnv Manager.", "仅清理 DevEnv Manager 受管或可安全识别的缓存。")}</p></div></div>
     <div class="toolbar">
       ${renderActionButton("clear-download-cache", t("feature.cleanup.clearDownloads"), "danger")}
       ${renderActionButton("clean-dev-cache", t("feature.cleanup.cleanDev"), "danger")}
-      ${renderActionButton("create-move-plan", t("feature.cleanup.createMove"))}
-      ${renderActionButton("execute-move-plan", t("feature.cleanup.executeMove"), "danger")}
-      ${renderActionButton("rollback-move", t("feature.cleanup.rollbackMove"), "danger")}
     </div>
+    ${state.errors.utilityOperation ? `<div class="error-state" data-testid="cleanup-utility-operation-error">${escapeHtml(state.errors.utilityOperation)}</div>` : ""}
+    ${state.cacheOperationResult ? `<div class="small-note" data-testid="cleanup-cache-operation-result">${escapeHtml(state.cacheOperationResult)}</div>` : ""}
+  </section>`;
+}
+
+function renderMoveDirectory(state: CleanupWorkbenchState): string {
+  return `<section class="panel"><div class="panel-head"><div><h2>${localize("Move a folder", "搬移目录")}</h2><p>${localize("Choose the source and target, preview the plan, then execute or roll back.", "选择来源和目标，预览计划后再执行或回滚。")}</p></div></div>
     <div class="form-grid environment-plan-input">
       <input id="cleanup-move-source" value="${escapeHtml(state.moveSource)}" readonly placeholder="${t("feature.cleanup.moveSource")}" />
       <input id="cleanup-move-target-drive" value="${escapeHtml(state.moveTargetDrive)}" placeholder="${t("feature.cleanup.moveTargetDrive")}" />
       <select id="cleanup-move-mode"><option value="archive" ${state.moveMode === "archive" ? "selected" : ""}>${t("feature.cleanup.moveModeArchive")}</option><option value="junction" ${state.moveMode === "junction" ? "selected" : ""}>${t("feature.cleanup.moveModeJunction")}</option></select>
       ${renderActionButton("choose-cleanup-move-source", t("feature.cleanup.chooseMoveSource"))}
     </div>
-    ${state.errors.utilityOperation ? `<div class="error-state" data-testid="cleanup-utility-operation-error">${escapeHtml(state.errors.utilityOperation)}</div>` : ""}
+    <div class="toolbar">${renderActionButton("create-move-plan", t("feature.cleanup.createMove"))}${state.movePlan ? renderActionButton("execute-move-plan", t("feature.cleanup.executeMove"), "danger") : ""}${state.rollbackRecords.length ? renderActionButton("rollback-move", t("feature.cleanup.rollbackMove"), "danger") : ""}</div>
     ${state.errors.moveOperation ? `<div class="error-state" data-testid="cleanup-move-operation-error">${escapeHtml(state.errors.moveOperation)}</div>` : ""}
     ${state.moveOperationResult ? `<div class="small-note" data-testid="cleanup-move-operation-result">${escapeHtml(state.moveOperationResult)}</div>` : ""}
-    ${state.movePlan ? renderObjectTable(state.movePlan, ["planId", "source", "target", "mode", "warnings"]) : ""}
+    <div data-testid="cleanup-move-plan-result">${state.movePlan ? renderObjectTable(state.movePlan, ["planId", "source", "target", "mode", "warnings"]) : ""}</div>
   </section>`;
 }
 
@@ -193,7 +217,7 @@ function renderGenericArchive(state: CleanupWorkbenchState): string {
       ${renderActionButton("add-archive-plan-item", localize("Add to archive list", "添加到归档列表"))}
       ${renderActionButton("refresh-archive-plan-items", localize("Refresh list", "刷新列表"))}
       ${renderActionButton("create-generic-archive-plan", localize("Create execution preview", "创建执行预览"), "primary")}
-      ${renderActionButton("execute-generic-archive-plan", localize("Execute selected-file archive", "执行所选文件归档"), "danger")}
+      ${plan ? renderActionButton("execute-generic-archive-plan", localize("Execute selected-file archive", "执行所选文件归档"), "danger") : ""}
     </div>
     ${state.errors.archive ? `<div class="error-state" data-testid="cleanup-generic-archive-error">${escapeHtml(state.errors.archive)}</div>` : ""}
     <div data-testid="cleanup-generic-archive-items">${state.archiveItems.length ? `<div class="table-wrap"><table><thead><tr><th>${localize("Source", "来源")}</th><th>${localize("Size", "大小")}</th><th>${localize("Evidence", "证据")}</th><th>${localize("Added", "添加时间")}</th><th>${localize("Action", "操作")}</th></tr></thead><tbody>${state.archiveItems.map((item) => `<tr><td>${escapeHtml(item.path)}</td><td>${formatBytes(item.size)}</td><td>${escapeHtml(item.source)}</td><td>${escapeHtml(item.addedAt)}</td><td><button data-archive-remove="${escapeHtml(item.id)}" type="button">${localize("Remove", "移除")}</button></td></tr>`).join("")}</tbody></table></div>` : renderEmptyState(localize("Archive list is empty", "归档列表为空"), localize("Choose an allowed regular file and add it to the list.", "选择允许的普通文件并添加到列表。"))}</div>
@@ -310,7 +334,7 @@ function renderDesktopArchiveSection(state: CleanupWorkbenchState): string {
         ${renderArchiveTargetPicker(state, "desktop", "cleanup-desktop-target-drive", state.desktopTargetDrive)}
         <div class="toolbar">
           ${renderActionButton("create-desktop-archive-plan", localize("Create archive preview", "创建归档预览"))}
-          ${renderActionButton("execute-desktop-archive-plan", localize("Execute archive", "执行归档"), "danger")}
+          ${state.desktopArchivePlan ? renderActionButton("execute-desktop-archive-plan", localize("Execute archive", "执行归档"), "danger") : ""}
           ${state.desktopArchiveResult?.rollbackId ? renderActionButton("rollback-desktop-archive", localize("Restore archived files", "恢复已归档文件"), "danger") : ""}
         </div>
         <div data-testid="cleanup-desktop-archive-plan-result">${state.desktopArchivePlan ? renderArchivePlan(state.desktopArchivePlan) : renderEmptyState(localize("No archive preview", "尚无归档预览"), localize("Select files and create a preview before execution.", "勾选文件并在执行前创建预览。"))}</div>
@@ -322,7 +346,7 @@ function renderDesktopArchiveSection(state: CleanupWorkbenchState): string {
         <p>${localize("Alternative to archive: moves the currently selected Desktop files to Windows Recycle Bin. Files already archived do not need this step. Permanent deletion is not available here.", "这是归档的替代操作：把当前勾选的桌面文件移入 Windows 回收站。已成功归档的文件不需要再执行此步骤；这里不提供永久删除。")}</p>
         <div class="toolbar">
           ${renderActionButton("create-desktop-cleanup-plan", localize("Create Recycle Bin preview", "创建回收站预览"))}
-          ${renderActionButton("execute-desktop-cleanup-plan", localize("Move to Recycle Bin", "移入回收站"), "danger")}
+          ${state.desktopCleanupPlan ? renderActionButton("execute-desktop-cleanup-plan", localize("Move to Recycle Bin", "移入回收站"), "danger") : ""}
           ${renderActionButton("open-recycle-bin", localize("Open Recycle Bin", "打开回收站"))}
         </div>
         ${state.errors.desktopCleanup ? `<p class="error-text" data-testid="cleanup-desktop-recycle-error">${escapeHtml(state.errors.desktopCleanup)}</p>` : ""}
@@ -344,11 +368,15 @@ function renderRecycleBinManagement(state: CleanupWorkbenchState): string {
   return `<section class="panel" data-testid="cleanup-recycle-bin-section">
     <div class="panel-head"><div><h2>${localize("Windows Recycle Bin", "Windows 回收站")}</h2><p>${localize("Read the current user's Recycle Bin, select source volumes, review a snapshot, then confirm permanent volume-scoped cleanup. Nothing is selected by default.", "读取当前用户的回收站，选择来源卷并检查快照后，再确认按卷永久清理；默认不选择任何卷。")}</p></div></div>
     <div class="toolbar">
+      ${renderActionButton("quick-empty-recycle-bin", localize("Review and empty safely", "检查并安全清空"), "danger")}
       ${renderActionButton("refresh-recycle-bin", localize("Refresh preview", "刷新预览"), "primary")}
+      ${renderActionButton("open-managed-recycle-bin", localize("Open Windows Recycle Bin", "打开 Windows 回收站"))}
+    </div>
+    <details class="advanced-actions" ${plan || result || state.errors.recycleBin ? "open" : ""}><summary>${localize("Volume scope, plan details and manual controls", "卷范围、计划详情与手动控制")}</summary>
+    <div class="toolbar">
       ${renderActionButton("select-nonempty-recycle-bin-volumes", localize("Select non-empty volumes", "选择非空卷"), "secondary", !report)}
       ${renderActionButton("create-recycle-bin-cleanup-plan", localize("Create cleanup plan", "创建清理计划"))}
       ${renderActionButton("execute-recycle-bin-cleanup-plan", localize("Permanently clean selected volumes", "永久清理所选卷"), "danger", !plan)}
-      ${renderActionButton("open-managed-recycle-bin", localize("Open Windows Recycle Bin", "打开 Windows 回收站"))}
     </div>
     <ol class="workflow-steps" data-testid="cleanup-recycle-bin-workflow">
       ${recycleStep(1, localize("Refresh preview", "刷新预览"), currentStep)}
@@ -390,6 +418,7 @@ function renderRecycleBinManagement(state: CleanupWorkbenchState): string {
       </div>${result.failures.length ? renderStringList(localize("Failures", "失败原因"), result.failures) : `<p class="small-note">${localize("Cleanup was verified by a fresh Recycle Bin scan.", "已通过重新扫描回收站验证清理结果。")}</p>`}</div>` : renderEmptyState(localize("No cleanup result", "尚无清理结果"), localize("Execution and post-cleanup rescan results remain visible here.", "执行结果和清理后重扫结果会持续显示在这里。"))}
     </div>
     <div class="small-note"><strong>${localize("Irreversible boundary", "不可逆边界")}</strong><p>${localize("After a final snapshot recheck, Windows empties each selected source volume as a whole. A detected change rejects the plan, but an item added in the brief interval before the Windows command completes could also be removed. No volume is selected automatically.", "最终重核快照后，Windows 会按卷整体清空所选来源卷。检测到变化时会拒绝计划，但在重核后到 Windows 命令完成前的短暂间隔内新增的项目也可能被移除。系统不会自动勾选任何卷。")}</p></div>
+    </details>
   </section>`;
 }
 
@@ -485,7 +514,7 @@ function renderDownloadsArchiveSection(state: CleanupWorkbenchState): string {
     ${renderArchiveTargetPicker(state, "downloads", "cleanup-downloads-target-drive", state.downloadsTargetDrive)}
     <div class="toolbar">
       ${renderActionButton("create-downloads-archive-plan", localize("Create archive plan", "创建归档计划"))}
-      ${renderActionButton("execute-downloads-archive-plan", localize("Execute archive plan", "执行归档计划"), "danger")}
+      ${state.downloadsArchivePlan ? renderActionButton("execute-downloads-archive-plan", localize("Execute archive plan", "执行归档计划"), "danger") : ""}
       ${state.downloadsArchiveResult?.rollbackId ? renderActionButton("rollback-downloads-archive", localize("Restore archived files", "恢复已归档文件"), "danger") : ""}
     </div>
     ${state.errors.downloadsArchive ? `<p class="error-text" data-testid="cleanup-downloads-archive-error">${escapeHtml(state.errors.downloadsArchive)}</p>` : ""}

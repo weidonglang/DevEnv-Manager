@@ -15,7 +15,7 @@ export function renderPortsWorkbench(state: PortsWorkbenchState): string {
       <section class="panel">
         ${renderSelectedPortDetail(state)}
       </section>
-      <section class="panel" id="ports-plan-panel"><h2>${t("feature.ports.currentPlan")}</h2>${renderPortPlan(state)}${state.executionResult ? renderPortExecutionResult(state) : ""}</section>
+      ${state.plan || state.executionResult ? `<section class="panel" id="ports-plan-panel"><h2>${t("feature.ports.currentPlan")}</h2>${renderPortPlan(state)}${state.executionResult ? renderPortExecutionResult(state) : ""}</section>` : ""}
     </div>
   `;
 }
@@ -60,8 +60,6 @@ function renderPortsShell(state: PortsWorkbenchState): string {
       ${renderActionButton("scan-ports", t("dashboard.scanPorts"), "primary")}
       ${renderActionButton("toggle-actionable-ports", state.actionableOnly ? localize("Show all connections", "显示全部连接") : localize("Show actionable listeners only", "只看可处理监听端口"))}
       <label class="inline-field">${localize("Scan scope", "扫描范围")}<select id="port-scan-scope" data-testid="ports-scan-scope"><option value="recommended" ${state.scanScope === "recommended" ? "selected" : ""}>${localize("Recommended", "推荐")}</option><option value="full" ${state.scanScope === "full" ? "selected" : ""}>${localize("All connections", "全部连接")}</option></select></label>
-      ${renderActionButton("create-port-plan", t("feature.ports.createPlanForSelected"))}
-      ${renderActionButton("execute-port-plan", t("feature.ports.executePlan"), "danger")}
       ${renderActionButton("inspect-local-services", t("feature.ports.inspectServices"))}
       ${state.retryPlanRequest ? renderActionButton("retry-port-plan-after-scan", t("feature.ports.rescanAndRetry")) : ""}
     </div>
@@ -118,7 +116,7 @@ function renderPortRow(record: PortRecord, selectedKey: string | null): string {
   const treatability = assessPortTreatability(record);
   const friendlyName = localize(record.friendlyNameEn, record.friendlyNameZh);
   return `<div class="data-row ${selected ? "is-selected" : ""}" data-testid="ports-row" data-port-group-id="${escapeHtml(record.groupId)}" data-port-visual-key="${escapeHtml(`${record.protocol}:${record.localPort}:${record.pid}:${record.state}`)}">
-    <span>${treatability.treatable ? `<button class="button button--primary" data-port-quick-plan="${escapeHtml(key)}" type="button">${localize("Release", "释放端口")}</button>` : `<button data-port-select="${escapeHtml(key)}" type="button" aria-pressed="${selected ? "true" : "false"}">${selected ? t("feature.ports.selectedRow") : localize("Details", "详情")}</button>`}</span>
+    <span>${treatability.treatable ? `<button class="button button--primary" data-testid="ports-quick-release" data-port-quick-release="${escapeHtml(key)}" type="button">${localize("Release safely", "安全释放")}</button>` : `<button data-port-select="${escapeHtml(key)}" type="button" aria-pressed="${selected ? "true" : "false"}">${selected ? t("feature.ports.selectedRow") : localize("Details", "详情")}</button>`}</span>
     <span>${escapeHtml(String(record.localPort))}</span><span>${escapeHtml(record.protocol)}</span><span>${escapeHtml(record.state)}</span>
     <span>${escapeHtml(String(record.pid))}</span><span>${escapeHtml(friendlyName)}</span><span>${escapeHtml(record.processName || t("state.notAvailable"))}</span>
     <span data-testid="ports-row-binding-summary">${escapeHtml(bindingSummary(record))}</span><span>${escapeHtml(record.serviceDisplayNames.join(", ") || record.serviceNames.join(", ") || t("feature.ports.none"))}</span>
@@ -163,7 +161,7 @@ function renderSelectedPortDetail(state: PortsWorkbenchState): string {
     ${selected.evidence.length ? renderList(localize("Recognition evidence", "识别证据"), selected.evidence) : ""}
     ${selected.conflictEvidence.length ? renderList(localize("Recognition conflicts", "冲突证据"), selected.conflictEvidence) : ""}
     <div class="toolbar">
-      ${treatability.treatable ? renderActionButton("create-port-plan", t("feature.ports.createPlanForSelected")) : ""}
+      ${treatability.treatable ? renderActionButton("quick-release-selected-port", localize("Release this port safely", "安全释放此端口"), "primary") : ""}
       ${renderActionButton("copy-selected-port-diagnostics", t("feature.ports.copyDiagnostics"))}
       ${renderActionButton("scan-ports", t("dashboard.scanPorts"))}
       ${selected.serviceNames.length ? renderActionButton("inspect-local-services", t("feature.ports.inspectServices")) : ""}

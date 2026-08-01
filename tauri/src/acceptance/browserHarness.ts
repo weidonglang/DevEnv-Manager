@@ -25,7 +25,7 @@ import type { PortRecord } from "../types";
 import { dashboardVisualState, environmentVisualState, profilesVisualState, projectVisualState, settingsVisualState } from "./visualFixtures";
 
 type VisualPage = "dashboard" | "cleanup" | "environment" | "projects" | "ports" | "profiles" | "runtimes" | "fileAssociations" | "settings" | "toolchains";
-type VisualVariant = "default" | "planned" | "result" | "archive-folder";
+type VisualVariant = "default" | "planned" | "result" | "archive-folder" | "advanced";
 
 declare global {
   interface Window {
@@ -104,7 +104,12 @@ function renderPage(target: VisualPage, targetVariant: VisualVariant): string {
 
 function cleanupState(targetVariant: VisualVariant): CleanupWorkbenchState {
   const state = structuredClone(acceptanceFixtures.cleanup);
+  if (targetVariant === "advanced") {
+    state.activeView = "advanced";
+    return state;
+  }
   if (targetVariant === "archive-folder") {
+    state.activeView = "space";
     state.desktopTargetDrive = "D:\\ReleaseLab\\ArchiveTarget";
     state.desktopArchivePlan = {
       planId: "desktop-archive-i18n-fixture",
@@ -215,6 +220,6 @@ function readLocale(value: string | null): Exclude<LocaleMode, "auto"> {
 }
 
 function readVariant(value: string | null): VisualVariant {
-  if (value === "planned" || value === "result" || value === "archive-folder") return value;
+  if (value === "planned" || value === "result" || value === "archive-folder" || value === "advanced") return value;
   return "default";
 }

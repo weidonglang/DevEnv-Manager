@@ -2,8 +2,10 @@ import type { AppUsageReport, ArchivePlanItem, CleanupArchitecture, CleanupPlan,
 
 export type DuplicateScanStatus = "notStarted" | "running" | "completedWithResults" | "completedEmpty" | "failed";
 export type CleanupScanStatus = "idle" | "loading" | "results" | "empty" | "failed";
+export type CleanupView = "quick" | "space" | "advanced";
 
 export type CleanupWorkbenchState = {
+  activeView: CleanupView;
   scan: CleanupScanReport | null;
   scanStatus: CleanupScanStatus;
   architecture: CleanupArchitecture | null;
@@ -12,6 +14,7 @@ export type CleanupWorkbenchState = {
   partition: PartitionLayoutReport | null;
   plan: CleanupPlan | null;
   cleanupResult: CleanupResult | null;
+  cacheOperationResult: string;
   movePlan: MovePlan | null;
   moveOperationResult: string;
   moveSource: string;
@@ -61,6 +64,7 @@ export type CleanupWorkbenchState = {
 };
 
 export const cleanupWorkbenchInitialState: CleanupWorkbenchState = {
+  activeView: "quick",
   scan: null,
   scanStatus: "idle",
   architecture: null,
@@ -69,6 +73,7 @@ export const cleanupWorkbenchInitialState: CleanupWorkbenchState = {
   partition: null,
   plan: null,
   cleanupResult: null,
+  cacheOperationResult: "",
   movePlan: null,
   moveOperationResult: "",
   moveSource: "",

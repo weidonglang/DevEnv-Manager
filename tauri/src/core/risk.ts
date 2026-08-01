@@ -1,5 +1,5 @@
 import { invoke } from "./invoke";
-import { t } from "./i18n";
+import { localize, t } from "./i18n";
 import { finishDebug, logDebug } from "./debugLog";
 import type { ConfirmationTokenView } from "../types";
 import {
@@ -41,6 +41,8 @@ export type RiskOperationView = {
   before?: Array<{ label: string; value: string }>;
   after?: Array<{ label: string; value: string }>;
   warnings: string[];
+  presentation?: "standard" | "compact";
+  confirmLabel?: string;
   execute: (token: string) => Promise<unknown>;
 };
 
@@ -93,14 +95,10 @@ export async function runRiskOperation(operation: RiskOperationView): Promise<un
     <div class="risk-ux" role="dialog" aria-modal="true" aria-label="${operation.title}" data-testid="global-risk-dialog">
       <div class="risk-ux__panel">
         <header><h2>${operation.title}</h2><button data-risk-close type="button">${t("risk.close")}</button></header>
-        ${planPreview(operation)}
-        ${riskExplanation(operation)}
-        ${backupReceipt(operation)}
-        ${confirmationDialog(operation)}
-        ${tokenGate(operation)}
+        ${operation.presentation === "compact" ? compactConfirmation(operation) : `${planPreview(operation)}${riskExplanation(operation)}${backupReceipt(operation)}${confirmationDialog(operation)}${tokenGate(operation)}`}
         <footer>
           <button data-risk-close type="button">${t("risk.cancel")}</button>
-          <button data-risk-execute class="danger" type="button" data-testid="global-risk-result">${t("risk.createTokenAndExecute")}</button>
+          <button data-risk-execute class="danger" type="button" data-testid="global-risk-result">${operation.confirmLabel ?? t("risk.createTokenAndExecute")}</button>
         </footer>
       </div>
     </div>
@@ -131,8 +129,9 @@ export async function runRiskOperation(operation: RiskOperationView): Promise<un
         const started = Date.now();
         try {
           executeButton.disabled = true;
-          executeButton.textContent = t("risk.creatingToken");
-          updateRiskProgress(host, t("risk.creatingToken"), started);
+          const authorizingMessage = operation.presentation === "compact" ? localize("Verifying operation...", "正在验证操作...") : t("risk.creatingToken");
+          executeButton.textContent = authorizingMessage;
+          updateRiskProgress(host, authorizingMessage, started);
           const planFingerprint = operation.planFingerprint ?? await sha256Hex(`${operation.command}\0${operation.planId}\0${operation.riskLevel}`);
           const tokenLog = logDebug({
             type: "token",
@@ -212,7 +211,7 @@ export async function runRiskOperation(operation: RiskOperationView): Promise<un
         } catch (error) {
           window.clearInterval(heartbeat);
           executeButton.disabled = false;
-          executeButton.textContent = t("risk.createTokenAndExecute");
+          executeButton.textContent = operation.confirmLabel ?? t("risk.createTokenAndExecute");
           const rawMessage = error instanceof Error ? error.message : String(error);
           const message = normalizeRiskError(rawMessage, operation);
           const panel = host.querySelector<HTMLElement>(".risk-ux__panel");
@@ -228,6 +227,20 @@ export async function runRiskOperation(operation: RiskOperationView): Promise<un
       })();
     });
   });
+}
+
+function compactConfirmation(operation: RiskOperationView): string {
+  const before = operation.before?.map((item) => `<div><dt>${escapeRiskText(item.label)}</dt><dd>${escapeRiskText(item.value)}</dd></div>`).join("") ?? "";
+  const warnings = operation.warnings.filter(Boolean).map((warning) => `<li>${escapeRiskText(warning)}</li>`).join("");
+  return `<section class="risk-section risk-section--compact" data-testid="compact-risk-confirmation">
+    <p>${escapeRiskText(operation.summary)}</p>
+    ${before ? `<dl class="kv-list">${before}</dl>` : ""}
+    ${warnings ? `<div class="small-note"><strong>${localize("Warnings", "警告")}</strong><ul>${warnings}</ul></div>` : ""}
+  </section>`;
+}
+
+function escapeRiskText(value: string): string {
+  return value.replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character] ?? character);
 }
 
 function normalizeRiskError(message: string, operation: RiskOperationView): string {
