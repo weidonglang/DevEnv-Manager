@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.9.3
+
+- Add durable Runtime health summaries with per-runtime healthy/needs-attention status, required-check counts, and failure details.
+- Keep project analysis, preview, apply, port inspection, IDEA inspection, and Java verification states visible, and reject stale previews after the project path changes.
+- Preserve the complete port diagnostics view by default while adding an actionable-listener filter and a safe shortcut that creates, but never bypasses, the guarded stop plan.
+- Normalize extension searches and retain scan, app-search, plan, apply, rollback, settings, and export results on the File Associations page.
+- Move Cleanup scan results and plans next to their initiating controls, separate archive/cache workflows, and present Recycle Bin cleanup as an explicit four-step flow.
+- Automatically reveal newly created plans, durable errors, and operation results across the affected workbench pages.
+- Add focused workflow feedback acceptance and refresh the complete 30-case Edge visual baseline.
+
+Exact asset identities, real-Tauri smoke evidence, acceptance boundaries, and disclosures are recorded in [docs/release-v1.9.3.md](docs/release-v1.9.3.md).
+
 ## 1.9.2
 
 - Prevent Debug log persistence failures from escaping into successful Tauri invokes or page navigation.
