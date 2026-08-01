@@ -1,5 +1,8 @@
 import type { AgentTraceReport, IdeaProjectReport, JavaConsumerReport, OperationResult, ProjectAnalysis, ProjectConfigPreview, ProjectPortConfig } from "../../types";
 
+export type ProjectOperation = "analysis" | "preview" | "applyResult" | "ports" | "idea" | "javaConsumer" | "traces";
+export type ProjectOperationStatus = "idle" | "loading" | "success" | "empty" | "failed";
+
 export type ProjectWorkbenchState = {
   analysis: ProjectAnalysis | null;
   preview: ProjectConfigPreview | null;
@@ -10,7 +13,8 @@ export type ProjectWorkbenchState = {
   selectedPath: string;
   recentPaths: string[];
   applyResult: OperationResult | null;
-  errors: Partial<Record<"analysis" | "preview" | "ports" | "idea" | "javaConsumer" | "traces" | "applyResult", string>>;
+  status: Record<ProjectOperation, ProjectOperationStatus>;
+  errors: Partial<Record<ProjectOperation, string>>;
 };
 
 export const projectWorkbenchInitialState: ProjectWorkbenchState = {
@@ -23,5 +27,14 @@ export const projectWorkbenchInitialState: ProjectWorkbenchState = {
   selectedPath: "",
   recentPaths: [],
   applyResult: null,
+  status: {
+    analysis: "idle",
+    preview: "idle",
+    applyResult: "idle",
+    ports: "idle",
+    idea: "idle",
+    javaConsumer: "idle",
+    traces: "idle",
+  },
   errors: {},
 };

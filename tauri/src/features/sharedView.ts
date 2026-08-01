@@ -216,6 +216,16 @@ export function bindAction(root: ParentNode, id: string, handler: () => unknown 
   });
 }
 
+export function revealResult(root: ParentNode, selector: string): void {
+  window.requestAnimationFrame(() => {
+    const target = root.querySelector<HTMLElement>(selector);
+    if (!target) return;
+    if (!target.hasAttribute("tabindex")) target.setAttribute("tabindex", "-1");
+    target.scrollIntoView({ block: "start", behavior: "smooth" });
+    target.focus({ preventScroll: true });
+  });
+}
+
 export async function runLoad<T>(context: FeatureContext, label: string, loader: () => Promise<T>): Promise<T | null> {
   context.progress.start(label);
   try {

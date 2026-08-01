@@ -2,7 +2,7 @@ import type { FeatureContext } from "../../app/featureContext";
 import { logDebug } from "../../core/debugLog";
 import type { PortRecord } from "../../types";
 import { localize, t } from "../../core/i18n";
-import { bindAction } from "../sharedView";
+import { bindAction, revealResult } from "../sharedView";
 import { createPortResolutionPlan, enrichPortScan, executePortResolutionPlan, inspectLocalServices, portHistory, scanPorts } from "./api";
 import { assessPortTreatability, portRecordKey, selectedPortRecord } from "./portSafety";
 import {
@@ -17,6 +17,12 @@ import type { PortsWorkbenchState } from "./state";
 
 export function bindPortEvents(context: FeatureContext, state: PortsWorkbenchState): void {
   bindAction(context.root, "scan-ports", () => refreshPorts(context, state, true));
+  bindAction(context.root, "toggle-actionable-ports", () => {
+    state.actionableOnly = !state.actionableOnly;
+    state.page = 1;
+    renderAndBind(context, state);
+    revealResult(context.root, "[data-testid='ports-table-section']");
+  });
   context.root.querySelector<HTMLSelectElement>("#port-scan-scope")?.addEventListener("change", (event) => {
     state.scanScope = (event.target as HTMLSelectElement).value === "full" ? "full" : "recommended";
     void refreshPorts(context, state, true);
@@ -46,6 +52,7 @@ export function bindPortEvents(context: FeatureContext, state: PortsWorkbenchSta
     if (!selected) {
       state.planError = state.records.length ? t("feature.ports.selectPortFirst") : t("toast.portScanFirst");
       renderAndBind(context, state);
+      revealResult(context.root, "[data-testid='ports-inline-guidance']");
       return;
     }
     state.plan = null;
@@ -57,6 +64,7 @@ export function bindPortEvents(context: FeatureContext, state: PortsWorkbenchSta
     if (!state.plan) {
       state.planError = t("toast.createPortPlanFirst");
       renderAndBind(context, state);
+      revealResult(context.root, "#ports-plan-panel");
       context.toast(t("toast.createPortPlanFirst"), true);
       return;
     }
@@ -102,9 +110,7 @@ export function bindPortEvents(context: FeatureContext, state: PortsWorkbenchSta
       state.planError = errorMessage(error);
     }
     renderAndBind(context, state);
-    window.requestAnimationFrame(() => {
-      context.root.querySelector<HTMLElement>("[data-testid='ports-execute-result']")?.scrollIntoView({ block: "start", behavior: "smooth" });
-    });
+    revealResult(context.root, "[data-testid='ports-execute-result']");
   });
   bindAction(context.root, "inspect-local-services", async () => {
     state.servicesError = "";
@@ -183,6 +189,7 @@ export async function refreshPorts(context: FeatureContext, state: PortsWorkbenc
   }
   context.root.innerHTML = renderPortsWorkbench(state);
   bindPortEvents(context, state);
+  if (force) revealResult(context.root, "[data-testid='ports-table-section']");
 
   if (snapshot.status === "fulfilled" && snapshot.value.scanId && !snapshot.value.complete && snapshot.value.status !== "failed") {
     try {
@@ -307,6 +314,21 @@ function bindPortsTableEvents(context: FeatureContext, state: PortsWorkbenchStat
       state.executionResult = null;
       state.planError = "";
       renderAndBind(context, state);
+      revealResult(context.root, "[data-testid='ports-selected-detail']");
+    });
+  });
+  context.root.querySelectorAll<HTMLButtonElement>("[data-port-quick-plan]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const key = button.dataset.portQuickPlan || "";
+      const selected = state.records.find((record) => portRecordKey(record) === key);
+      if (!selected) return;
+      state.selectedKey = key;
+      state.selectedPort = selected.localPort;
+      state.plan = null;
+      state.executionResult = null;
+      state.planError = "";
+      renderAndBind(context, state);
+      await createPlanForPort(context, state, selected);
     });
   });
 }
@@ -347,9 +369,7 @@ function renderAndBind(context: FeatureContext, state: PortsWorkbenchState): voi
 }
 
 function scrollToPortPlan(context: FeatureContext): void {
-  window.requestAnimationFrame(() => {
-    context.root.querySelector<HTMLElement>("#ports-plan-panel")?.scrollIntoView({ block: "start", behavior: "smooth" });
-  });
+  revealResult(context.root, "#ports-plan-panel");
 }
 
 function normalizePlanError(error: unknown): string {

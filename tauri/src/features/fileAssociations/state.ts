@@ -1,9 +1,11 @@
 import type { FileAssociationAppSearchResult, FileAssociationApplyResult, FileAssociationBackupSummary, FileAssociationPlan, FileAssociationReport } from "../../types";
 
 export type AssociationAppSearchStatus = "idle" | "loading" | "results" | "empty" | "failed";
+export type AssociationScanStatus = "idle" | "loading" | "results" | "empty" | "failed";
 
 export type FileAssociationUiState = {
   report: FileAssociationReport | null;
+  scanStatus: AssociationScanStatus;
   backups: FileAssociationBackupSummary[];
   plan: FileAssociationPlan | null;
   activeTab: "overview" | "types" | "apps" | "backups" | "safety";
@@ -24,10 +26,12 @@ export type FileAssociationUiState = {
   selectionResult: string;
   applyResultMessage: string;
   operationError: string;
+  operationMessage: string;
 };
 
 export const fileAssociationInitialState: FileAssociationUiState = {
   report: null,
+  scanStatus: "idle",
   backups: [],
   plan: null,
   activeTab: "overview",
@@ -48,4 +52,5 @@ export const fileAssociationInitialState: FileAssociationUiState = {
   selectionResult: "",
   applyResultMessage: "",
   operationError: "",
+  operationMessage: "",
 };

@@ -190,6 +190,7 @@ export const portsAcceptanceFixture: PortsWorkbenchState = {
   selectedPort: 18765,
   selectedKey: portRecordKey(portsRecords[2]),
   filter: "",
+  actionableOnly: false,
   scanError: "",
   historyError: "",
   servicesError: "",
@@ -203,6 +204,7 @@ export const portsAcceptanceFixture: PortsWorkbenchState = {
 
 export const cleanupAcceptanceFixture: CleanupWorkbenchState = {
   scan: null,
+  scanStatus: "idle",
   architecture: null,
   overview: {
     cDrive: {
@@ -540,6 +542,7 @@ export const fileAssociationsAcceptanceFixture: FileAssociationUiState = {
       { extension: ".json", currentAppName: "VS Code", risk: "low", source: "registry" },
     ],
   } as unknown as FileAssociationUiState["report"],
+  scanStatus: "results",
   backups: [{ backupName: "assoc-backup-fixture", createdAt: "2026-07-09T00:00:00Z", path: "C:\\Temp\\assoc-backup.json" }] as unknown as FileAssociationUiState["backups"],
   plan: {
     planId: "assoc-plan-fixture",
@@ -565,6 +568,7 @@ export const fileAssociationsAcceptanceFixture: FileAssociationUiState = {
   selectionResult: "Executable selected.",
   applyResultMessage: "Fixture apply result.",
   operationError: "",
+  operationMessage: "Association scan completed: 3 records.",
 };
 
 export const acceptanceFixtures = {

@@ -12,6 +12,7 @@ export type PortsWorkbenchState = {
   selectedPort: number | null;
   selectedKey: string | null;
   filter: string;
+  actionableOnly: boolean;
   scanError: string;
   historyError: string;
   servicesError: string;
@@ -34,6 +35,7 @@ export const portsWorkbenchInitialState: PortsWorkbenchState = {
   selectedPort: null,
   selectedKey: null,
   filter: "",
+  actionableOnly: false,
   scanError: "",
   historyError: "",
   servicesError: "",

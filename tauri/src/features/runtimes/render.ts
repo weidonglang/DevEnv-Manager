@@ -34,6 +34,7 @@ export function renderRuntimeWorkbench(state: RuntimeWorkbenchState): string {
           ${renderActionButton("export-runtime-report", localize("Export verification report", "导出验证报告"))}
         </div>
         ${renderRuntimeOperationResult(state)}
+        ${renderRuntimeHealthSummary(state)}
       </section>
       ${renderRuntimeSwitchWorkflow(state)}
       <div class="runtime-groups" data-testid="runtime-installed-list">
@@ -139,6 +140,40 @@ function renderRuntimeOperationResult(state: RuntimeWorkbenchState): string {
     ${state.operationError ? `<div class="error-state" data-testid="runtime-operation-error">${escapeHtml(state.operationError)}</div>` : ""}
     ${state.operationResult ? `<div class="small-note">${escapeHtml(state.operationResult)}</div>` : `<div class="empty">${t("state.notChecked")}</div>`}
   </div>`;
+}
+
+function renderRuntimeHealthSummary(state: RuntimeWorkbenchState): string {
+  const report = state.strongVerification;
+  if (!report) return "";
+  const rows = report.items.map((item) => {
+    const required = item.checks.filter((check) => check.required);
+    const failed = required.filter((check) => check.status === "failed");
+    const skipped = required.filter((check) => check.status === "skipped");
+    const healthy = required.length > 0 && failed.length === 0 && skipped.length === 0;
+    const status = healthy
+      ? localize("Healthy", "健康")
+      : failed.length
+        ? localize("Needs attention", "需要处理")
+        : localize("Verification incomplete", "验证未完成");
+    return `<tr>
+      <td>${escapeHtml(`${item.kind} ${item.version}`)}</td>
+      <td>${renderStatus(status, healthy ? "success" : failed.length ? "danger" : "warning")}</td>
+      <td>${required.filter((check) => check.status === "passed").length}/${required.length}</td>
+      <td>${escapeHtml(failed.map((check) => check.label).join("; ") || skipped.map((check) => check.label).join("; ") || localize("All required checks passed", "所有必需检查均已通过"))}</td>
+    </tr>`;
+  });
+  const healthyCount = report.items.filter((item) => {
+    const required = item.checks.filter((check) => check.required);
+    return required.length > 0 && required.every((check) => check.status === "passed");
+  }).length;
+  return `<section class="operation-summary" data-testid="runtime-health-summary" aria-live="polite">
+    <div class="panel-head"><div><h3>${localize("Health check result", "健康检查结果")}</h3><p>${escapeHtml(localize(`${healthyCount}/${report.items.length} runtimes passed all required checks.`, `${healthyCount}/${report.items.length} 个运行时通过全部必需检查。`))}</p></div></div>
+    ${rows.length ? `<div class="table-wrap"><table><thead><tr><th>${localize("Runtime", "运行时")}</th><th>${localize("Result", "结果")}</th><th>${localize("Required checks", "必需检查")}</th><th>${localize("Details", "详情")}</th></tr></thead><tbody>${rows.join("")}</tbody></table></div>` : `<div class="empty">${localize("No runtime was available to verify.", "没有可验证的运行时。")}</div>`}
+  </section>`;
+}
+
+function renderStatus(label: string, tone: "success" | "warning" | "danger"): string {
+  return `<span class="status-badge status-badge--${tone}">${escapeHtml(label)}</span>`;
 }
 
 function renderRuntimeSwitchWorkflow(state: RuntimeWorkbenchState): string {
