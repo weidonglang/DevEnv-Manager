@@ -35,7 +35,7 @@ export const portsWorkbenchInitialState: PortsWorkbenchState = {
   selectedPort: null,
   selectedKey: null,
   filter: "",
-  actionableOnly: true,
+  actionableOnly: false,
   scanError: "",
   historyError: "",
   servicesError: "",

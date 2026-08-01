@@ -190,7 +190,7 @@ export const portsAcceptanceFixture: PortsWorkbenchState = {
   selectedPort: 18765,
   selectedKey: portRecordKey(portsRecords[2]),
   filter: "",
-  actionableOnly: true,
+  actionableOnly: false,
   scanError: "",
   historyError: "",
   servicesError: "",
