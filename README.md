@@ -2,9 +2,9 @@
 
 [GitHub 主仓库](https://github.com/weidonglang/DevEnv-Manager) · [Gitee 国内镜像](https://gitee.com/weidonglang/DevEnv-Manager) · [GitHub Release](https://github.com/weidonglang/DevEnv-Manager/releases) · [Gitee Release](https://gitee.com/weidonglang/DevEnv-Manager/releases) · [完整操作手册](docs/user-guide.md) · [安全说明](docs/safety-and-disclaimer.md) · [问题反馈](https://github.com/weidonglang/DevEnv-Manager/issues)
 
-面向 Windows 的开发环境诊断器与安全操作面板。当前版本：**1.9.2 Stable**。
+面向 Windows 的开发环境诊断器与安全操作面板。当前版本：**1.9.3 Stable**。
 
-1.9.2 修复 Debug 操作日志写满浏览器存储后拖慢运行时等页面、并把成功的后端读取误报为页面加载失败的问题。Debug 日志现在有严格容量上限，会自动压缩旧数据，并且任何存储异常都不会再中断产品功能。
+1.9.3 让运行时健康检查、项目配置、端口处理、文件关联和清理操作的状态与结果保持可见，并在创建计划或完成操作后自动定位到对应结果区。端口页同时保留完整诊断视图和可处理监听端口筛选，快捷操作仍严格使用计划与确认令牌。
 
 ## 下载与镜像
 
@@ -12,9 +12,9 @@
 - Gitee 国内镜像：https://gitee.com/weidonglang/DevEnv-Manager
 - GitHub Release：https://github.com/weidonglang/DevEnv-Manager/releases
 - Gitee Release：https://gitee.com/weidonglang/DevEnv-Manager/releases
-- v1.9.2 NSIS：https://github.com/weidonglang/DevEnv-Manager/releases/download/v1.9.2/DevEnv.Manager_1.9.2_x64-setup.exe
-- 国内下载：https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.9.2/DevEnv.Manager_1.9.2_x64-setup.exe
-- NSIS SHA256：`b3a6101e0ff17c03e9d1b1e8a72fdcabc419a516bbee53113d65a5218c242602`
+- v1.9.3 NSIS：https://github.com/weidonglang/DevEnv-Manager/releases/download/v1.9.3/DevEnv.Manager_1.9.3_x64-setup.exe
+- 国内下载：https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.9.3/DevEnv.Manager_1.9.3_x64-setup.exe
+- NSIS SHA256：`55674a8f6fae2b30ac1649f09066b29ae5c8822fbd77286c4e422f7892292118`
 
 适合：
 
@@ -46,6 +46,23 @@ DevEnv Manager 解决的是 Windows 上多个开发生态互相影响的问题�
 - 适合希望用图形界面查看诊断证据，同时保留 CLI 自动化入口的用户。
 - 不适合希望软件自动接管整台机器、清理任意个人文件或替代专业包管理器的场景。
 - 熟练使用 mise/asdf/Scoop/Chocolatey 且环境已经稳定的用户，可以只使用诊断能力。
+
+## 1.9.3 Stable
+
+我们向点击按钮后不知道结果在哪里、无法判断健康检查是否通过，或误以为项目、端口、文件关联和清理功能没有响应的用户道歉。操作反馈不应该依赖短暂 toast，也不应该要求用户在长页面中反复寻找刚生成的计划。v1.9.3 将这些工作流统一为可见、可定位、可持续查看的页面内状态。
+
+本次版本完成：
+
+- 运行时健康检查新增汇总和逐项结果表，明确显示健康、需要处理、必需检查数量和失败详情；行级健康检查会选中对应运行时并定位结果。
+- 项目分析、配置预览、配置应用、端口检查、IDEA 检查和 Java 消费端验证均显示加载、成功、空结果或失败状态；切换项目目录会清除旧预览，禁止把其他项目的预览误应用到当前项目。
+- 端口页默认保留全部连接和 UDP/TCP 诊断分组，同时提供“只看可处理监听端口”筛选；符合安全条件的监听端口可一键创建停止计划，但执行仍必须经过原有计划、令牌、所有者复核和释放验证。
+- 文件关联搜索会把 `txt` 规范化为 `.txt`，扫描、应用搜索、计划、应用、回滚、打开设置和导出均有持久结果；“修改打开方式”会明确选中扩展名并引导下一步。
+- 清理扫描结果和计划移动到主要操作旁，创建后自动定位；缓存/目录移动与普通清理分区展示，Windows 回收站以刷新、选择、创建计划、执行四步呈现，并提供非空卷快捷选择。
+- 新增统一结果定位辅助和专项验收，覆盖持久状态、结果聚焦、安全快捷入口和清理引导流程。
+
+冻结产品源码提交 `8161743` 通过 230 项 Rust 测试、Clippy、113 模块前端生产构建、278 个前端 selector、30 项 Edge 视觉验收和全部契约检查。聚合功能验收为 300 项：254 通过、0 失败、40 项危险动作按安全策略跳过、6 项人工或策略记录；P0/P1 失败、backend-only、ui-only、missing、partial、deferred 和 toast-only 均为 0。
+
+最终 release EXE 在无 UAC 的隔离 smoke 中正常启动，About 显示 1.9.3，Runtime 真实发现与健康检查显示 2 个受管、25 个外部运行时和 20/27 个完全通过必需检查的结果，并逐项展示“健康/需要处理”及失败检查。完整资产、SHA256、验收边界和非阻塞限制记录在 [docs/release-v1.9.3.md](docs/release-v1.9.3.md)。安装器暂未进行 Authenticode 签名，Windows 可能显示常规信任提示。
 
 ## 1.9.2 Stable
 

@@ -1,28 +1,28 @@
 {
   "schemaVersion": 2,
   "channel": "stable",
-  "version": "1.9.2",
-  "date": "2026-07-31",
+  "version": "1.9.3",
+  "date": "2026-08-01",
   "notes": [
-    "v1.9.2 修复 Debug 历史过大和浏览器存储配额错误导致运行时、环境等页面卡顿或加载失败的问题。Debug 持久化现在有容量边界、自动压缩、脱敏和业务调用隔离。"
+    "v1.9.3 让运行时健康、项目配置、端口处理、文件关联和清理操作持续显示状态，并在创建计划或完成操作后自动定位结果。端口完整诊断保持可见，快捷操作仍使用受保护计划和确认令牌。"
   ],
   "assets": [
     {
       "platform": "windows-x64",
-      "fileName": "DevEnv.Manager_1.9.2_x64-setup.exe",
-      "size": 2954232,
-      "sha256": "b3a6101e0ff17c03e9d1b1e8a72fdcabc419a516bbee53113d65a5218c242602",
-      "primaryUrl": "https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.9.2/DevEnv.Manager_1.9.2_x64-setup.exe",
+      "fileName": "DevEnv.Manager_1.9.3_x64-setup.exe",
+      "size": 2958792,
+      "sha256": "55674a8f6fae2b30ac1649f09066b29ae5c8822fbd77286c4e422f7892292118",
+      "primaryUrl": "https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.9.3/DevEnv.Manager_1.9.3_x64-setup.exe",
       "mirrors": [
         {
           "name": "Gitee Release",
           "region": "cn",
-          "url": "https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.9.2/DevEnv.Manager_1.9.2_x64-setup.exe"
+          "url": "https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.9.3/DevEnv.Manager_1.9.3_x64-setup.exe"
         },
         {
           "name": "GitHub Release",
           "region": "global",
-          "url": "https://github.com/weidonglang/DevEnv-Manager/releases/download/v1.9.2/DevEnv.Manager_1.9.2_x64-setup.exe"
+          "url": "https://github.com/weidonglang/DevEnv-Manager/releases/download/v1.9.3/DevEnv.Manager_1.9.3_x64-setup.exe"
         }
       ]
     }
