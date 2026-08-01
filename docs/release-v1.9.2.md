@@ -1,6 +1,6 @@
 # DevEnv Manager v1.9.2 Stable Release Review
 
-Status: **Candidate approved for publication**
+Status: **Published and verified on GitHub and Gitee**
 
 The v1.9.2 product source and reviewed assets are pinned to source commit `bfa7b3c`. This document records the Debug storage hotfix, exact assets, automated gates, isolated real-Tauri evidence, publication boundaries, and remaining follow-up work.
 
@@ -83,8 +83,17 @@ Accordingly, the unrelated UAC and full installer lifecycle matrix was not repea
 
 ## Publication Verification
 
-This section will be updated after PR CI, target-branch CI, GitHub Release, Gitee Release, online asset hash checks, and update-channel smoke all pass. Updating publication evidence is documentation-only and does not alter the tagged source or reviewed binaries.
+- PR #144 CI run `30601488888` passed before merge.
+- Target `main` CI run `30601878350` passed after merge, including Rust tests, formatting, Clippy, frontend build, static/safe/frontend acceptance, Edge visual acceptance, report generation, and repository hygiene.
+- Annotated tag `v1.9.2` points to merge commit `199c95c14de4f5d551350cd3e93139f7b51fdfe9` and was pushed to GitHub and Gitee.
+- [GitHub Release](https://github.com/weidonglang/DevEnv-Manager/releases/tag/v1.9.2) and [Gitee Release](https://gitee.com/weidonglang/DevEnv-Manager/releases/tag/v1.9.2) are public and contain the reviewed NSIS and MSI assets.
+- Both binaries were independently downloaded from both platforms. All four online files matched the exact sizes and SHA256 values in this document.
+- GitHub and Gitee `main` manifests independently returned version 1.9.2, channel `stable`, platform `windows-x64`, the reviewed NSIS identity, and two mirrors.
+- The long-lived `update` Release contains exactly one English and one Chinese manifest on each platform. All four returned the same v1.9.2 identity.
+- A real installed v1.9.1 executable ran the application-owned `check_for_updates` command with isolated app data. It returned `latestVersion=1.9.2`, `updateAvailable=true`, no failed sources, the reviewed file name, size and SHA256, and both Gitee and GitHub mirrors.
+- The online smoke was read-only. It did not install, execute a downloaded update, request UAC, or modify the user's real application settings.
+- This publication proof is documentation-only. It does not alter the tagged source or reviewed binaries and does not require another build or ReleaseLab cycle.
 
 ## Release Decision
 
-The v1.9.2 candidate is approved to enter PR, CI, merge, tag, and dual-platform publication. Publication is not complete until both platforms and the long-lived update manifests have been independently verified.
+v1.9.2 is released. No source, automated-test, CI, asset, publication, or update-channel blocker remains. Broader Runtime lifecycle work and the application-internal Acceptance Center remain explicitly tracked in issues #130 and #133.
