@@ -112,6 +112,11 @@ export function bindPortEvents(context: FeatureContext, state: PortsWorkbenchSta
     renderAndBind(context, state);
     revealResult(context.root, "[data-testid='ports-execute-result']");
   });
+  bindAction(context.root, "quick-release-selected-port", async () => {
+    const selected = selectedPortRecord(state.records, state.selectedKey);
+    if (!selected) return;
+    await quickReleasePort(context, state, selected);
+  });
   bindAction(context.root, "inspect-local-services", async () => {
     state.servicesError = "";
     try {
@@ -317,9 +322,9 @@ function bindPortsTableEvents(context: FeatureContext, state: PortsWorkbenchStat
       revealResult(context.root, "[data-testid='ports-selected-detail']");
     });
   });
-  context.root.querySelectorAll<HTMLButtonElement>("[data-port-quick-plan]").forEach((button) => {
+  context.root.querySelectorAll<HTMLButtonElement>("[data-port-quick-release]").forEach((button) => {
     button.addEventListener("click", async () => {
-      const key = button.dataset.portQuickPlan || "";
+      const key = button.dataset.portQuickRelease || "";
       const selected = state.records.find((record) => portRecordKey(record) === key);
       if (!selected) return;
       state.selectedKey = key;
@@ -328,12 +333,46 @@ function bindPortsTableEvents(context: FeatureContext, state: PortsWorkbenchStat
       state.executionResult = null;
       state.planError = "";
       renderAndBind(context, state);
-      await createPlanForPort(context, state, selected);
+      await quickReleasePort(context, state, selected);
     });
   });
 }
 
-async function createPlanForPort(context: FeatureContext, state: PortsWorkbenchState, selected: PortRecord): Promise<void> {
+async function quickReleasePort(context: FeatureContext, state: PortsWorkbenchState, selected: PortRecord): Promise<void> {
+  const plan = await createPlanForPort(context, state, selected, false);
+  if (!plan || !context.isCurrent()) return;
+  state.executionResult = null;
+  state.planError = "";
+  try {
+    state.executionResult = await context.risk.run({
+      command: "execute_port_resolution_plan",
+      planId: plan.planId,
+      riskLevel: "high",
+      presentation: "compact",
+      confirmLabel: localize("Confirm release", "确认释放"),
+      title: localize(`Release port ${plan.port}`, `释放端口 ${plan.port}`),
+      summary: localize("DevEnv Manager will recheck the owner, stop this user process and verify that the port is released.", "DevEnv Manager 将重新核对占用方，结束此普通用户进程并验证端口已经释放。"),
+      before: [
+        { label: t("feature.ports.port"), value: String(plan.port) },
+        { label: "PID", value: String(plan.pid) },
+        { label: t("feature.ports.process"), value: plan.processName },
+      ],
+      warnings: [t("feature.ports.executeRiskWarning"), ...plan.warnings],
+      execute: (confirmationToken) => executePortResolutionPlan(plan.planId, confirmationToken),
+    }) as PortsWorkbenchState["executionResult"];
+    state.plan = null;
+    const generation = ++state.scanGeneration;
+    const verification = await scanPorts(true, state.scanScope);
+    if (!context.isCurrent() || !acceptGeneration(state, generation, "verification")) return;
+    applySnapshot(state, verification, generation, "verification");
+  } catch (error) {
+    state.planError = errorMessage(error);
+  }
+  renderAndBind(context, state);
+  revealResult(context.root, "[data-testid='ports-execute-result']");
+}
+
+async function createPlanForPort(context: FeatureContext, state: PortsWorkbenchState, selected: PortRecord, reveal = true): Promise<PortsWorkbenchState["plan"]> {
   const treatability = assessPortTreatability(selected);
   if (!selected || !treatability.treatable) {
     state.plan = null;
@@ -341,7 +380,7 @@ async function createPlanForPort(context: FeatureContext, state: PortsWorkbenchS
     state.planError = t(treatability.reasonKey);
     context.toast(state.planError, true);
     renderAndBind(context, state);
-    return;
+    return null;
   }
   context.progress.start(t("feature.ports.createPlan"));
   try {
@@ -349,16 +388,18 @@ async function createPlanForPort(context: FeatureContext, state: PortsWorkbenchS
     state.executionResult = null;
     state.planError = "";
     state.retryPlanRequest = null;
-    if (!context.isCurrent()) return;
+    if (!context.isCurrent()) return null;
     context.progress.done(t("toast.planReady"));
     renderAndBind(context, state);
-    scrollToPortPlan(context);
+    if (reveal) scrollToPortPlan(context);
+    return state.plan;
   } catch (error) {
     const message = normalizePlanError(error);
     state.planError = message;
     state.retryPlanRequest = { groupId: selected.groupId, pid: selected.pid, port: selected.localPort };
     context.progress.fail(message);
     renderAndBind(context, state);
+    return null;
   }
 }
 

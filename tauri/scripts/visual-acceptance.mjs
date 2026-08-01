@@ -24,6 +24,7 @@ const allCases = [
   visualCase("cleanup-dark-folder-en", "cleanup", "dark", "en-US", "archive-folder", 1366, 768, 1),
   visualCase("cleanup-hc-plan-en", "cleanup", "high-contrast", "en-US", "planned", 1366, 768, 1),
   visualCase("cleanup-light-result-en", "cleanup", "light", "en-US", "result", 1366, 768, 1),
+  visualCase("cleanup-hc-advanced-zh", "cleanup", "high-contrast", "zh-CN", "advanced", 1180, 760, 1.25),
   visualCase("ports-light-wide-en", "ports", "light", "en-US", "default", 1366, 768, 1),
   visualCase("ports-dark-wide-zh", "ports", "dark", "zh-CN", "default", 1366, 768, 1),
   visualCase("ports-hc-wide-en", "ports", "high-contrast", "en-US", "default", 1366, 768, 1),
@@ -385,9 +386,11 @@ function browserAudit(testCase) {
 
   function auditCleanup(currentCase, targetFailures, targetObservations, needVisible, isVisible, selectOne, selectAll) {
     needVisible("[data-testid='cleanup-page']");
-    const diskGrid = needVisible("[data-testid='cleanup-disk-card-grid']");
+    needVisible("[data-testid='cleanup-view-tabs']");
+    const activeView = selectOne("[data-cleanup-view][aria-pressed='true']")?.getAttribute("data-cleanup-view") || "unknown";
+    const diskGrid = activeView === "space" ? needVisible("[data-testid='cleanup-disk-card-grid']") : null;
     const diskCards = selectAll("[data-testid='cleanup-disk-card']");
-    if (diskCards.length < 2) targetFailures.push(`expected at least 2 disk cards, found ${diskCards.length}`);
+    if (activeView === "space" && diskCards.length < 2) targetFailures.push(`expected at least 2 disk cards, found ${diskCards.length}`);
     if (diskGrid instanceof HTMLElement) {
       const gridRect = diskGrid.getBoundingClientRect();
       for (const card of diskCards) {
@@ -404,12 +407,13 @@ function browserAudit(testCase) {
       "[data-testid='cleanup-desktop-archive-target-picker']",
       "[data-testid='cleanup-downloads-archive-target-picker']",
     ];
-    for (const selector of pickerSelectors) needVisible(selector);
+    if (activeView === "space") for (const selector of pickerSelectors) needVisible(selector);
     for (const selector of [
       "[data-testid='cleanup-generic-archive-target-select']",
       "[data-testid='cleanup-desktop-archive-target-select']",
       "[data-testid='cleanup-downloads-archive-target-select']",
     ]) {
+      if (activeView !== "space") continue;
       const target = needVisible(selector);
       if (target instanceof HTMLSelectElement) {
         if (!target.options.length) targetFailures.push(`${selector} has no selectable target`);
@@ -420,15 +424,19 @@ function browserAudit(testCase) {
       }
     }
 
-    needVisible("[data-testid='cleanup-recycle-bin-section']");
-    needVisible("[data-testid='cleanup-recycle-bin-preview']");
-    needVisible("[data-testid='cleanup-recycle-bin-plan-preview']");
-    needVisible("[data-testid='cleanup-recycle-bin-result']");
+    if (activeView === "quick") needVisible("[data-testid='cleanup-recycle-bin-section']");
+    if (activeView === "quick" && (currentCase.variant === "planned" || currentCase.variant === "result")) {
+      needVisible("[data-testid='cleanup-recycle-bin-preview']");
+      needVisible("[data-testid='cleanup-recycle-bin-plan-preview']");
+      needVisible("[data-testid='cleanup-recycle-bin-result']");
+    }
     const checkboxes = selectAll("[data-recycle-bin-drive]");
     const checked = checkboxes.filter((element) => element instanceof HTMLInputElement && element.checked);
     const execute = selectOne("[data-action='execute-recycle-bin-cleanup-plan']");
-    if (!(execute instanceof HTMLButtonElement)) targetFailures.push("missing recycle bin execute button");
-    if (currentCase.variant === "default" || currentCase.variant === "archive-folder") {
+    if (activeView === "quick" && !(execute instanceof HTMLButtonElement)) targetFailures.push("missing recycle bin execute button");
+    if (activeView !== "quick") {
+      // Recycle Bin controls belong to the quick-cleanup task view.
+    } else if (currentCase.variant === "default" || currentCase.variant === "archive-folder") {
       if (checked.length !== 0) targetFailures.push("Recycle Bin selected a volume by default");
       if (execute instanceof HTMLButtonElement && !execute.disabled) targetFailures.push("Recycle Bin execute is enabled without a plan");
     } else if (currentCase.variant === "planned") {
@@ -451,7 +459,7 @@ function browserAudit(testCase) {
         }
       }
     }
-    targetObservations.push(`cleanup disk cards: ${diskCards.length}; recycle scopes: ${checkboxes.length}`);
+    targetObservations.push(`cleanup view: ${activeView}; disk cards: ${diskCards.length}; recycle scopes: ${checkboxes.length}`);
   }
 
   function auditPorts(targetFailures, targetObservations, needVisible, selectAll) {

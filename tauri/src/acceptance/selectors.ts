@@ -1,5 +1,9 @@
 export const acceptanceSelectors = {
   cleanup: {
+    viewTabs: "cleanup-view-tabs",
+    quickView: "cleanup-quick-view",
+    spaceView: "cleanup-space-view",
+    advancedView: "cleanup-advanced-view",
     diskOverviewSection: "cleanup-disk-overview-entry",
     diskOverviewRefresh: "cleanup-disk-overview-action",
     diskOverviewResult: "cleanup-disk-overview-result",

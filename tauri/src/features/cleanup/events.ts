@@ -11,6 +11,15 @@ import type { CleanupWorkbenchState } from "./state";
 type ArchiveTargetKind = "generic" | "desktop" | "downloads";
 
 export function bindCleanupEvents(context: FeatureContext, state: CleanupWorkbenchState): void {
+  context.root.querySelectorAll<HTMLButtonElement>("[data-cleanup-view]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const view = button.dataset.cleanupView;
+      if (view !== "quick" && view !== "space" && view !== "advanced") return;
+      state.activeView = view;
+      renderAndBind(context, state);
+      revealResult(context.root, `[data-testid='cleanup-${view}-view']`);
+    });
+  });
   bindCleanupCandidateSelection(context, state);
   bindDesktopSelection(context, state);
   bindRecycleBinSelection(context, state);
@@ -27,6 +36,7 @@ export function bindCleanupEvents(context: FeatureContext, state: CleanupWorkben
       context.progress.fail(state.errors.appUsage);
     }
     renderAndBind(context, state);
+    revealResult(context.root, "[data-testid='cleanup-application-usage-result']");
   });
   bindAction(context.root, "choose-archive-file", async () => {
     const selected = await open({ directory: false, multiple: false });
@@ -74,6 +84,7 @@ export function bindCleanupEvents(context: FeatureContext, state: CleanupWorkben
       state.errors.archive = errorMessage(error);
     }
     renderAndBind(context, state);
+    revealResult(context.root, "[data-testid='cleanup-generic-archive-plan-preview']");
   });
   bindAction(context.root, "execute-generic-archive-plan", async () => {
     state.archiveResult = null;
@@ -107,10 +118,14 @@ export function bindCleanupEvents(context: FeatureContext, state: CleanupWorkben
       state.errors.archive = errorMessage(error);
     }
     renderAndBind(context, state);
+    revealResult(context.root, "[data-testid='cleanup-generic-archive-result']");
   });
-  bindAction(context.root, "scan-cleanup", () => refreshCleanup(context, state, true));
-  bindAction(context.root, "jump-cleanup-results", () => revealResult(context.root, "[data-testid='cleanup-scan-result']"));
-  bindAction(context.root, "jump-recycle-bin", () => revealResult(context.root, "[data-testid='cleanup-recycle-bin-section']"));
+  bindAction(context.root, "scan-cleanup", () => {
+    state.activeView = "quick";
+    return refreshCleanup(context, state, true);
+  });
+  bindAction(context.root, "jump-cleanup-results", () => showCleanupTarget(context, state, "[data-testid='cleanup-scan-result']"));
+  bindAction(context.root, "jump-recycle-bin", () => showCleanupTarget(context, state, "[data-testid='cleanup-recycle-bin-section']"));
   bindAction(context.root, "create-cleanup-plan", async () => {
     const selectedIds = selectedCleanableIds(state);
     if (!selectedIds.length) {
@@ -137,45 +152,40 @@ export function bindCleanupEvents(context: FeatureContext, state: CleanupWorkben
       revealResult(context.root, "[data-testid='cleanup-plan-section']");
     }
   });
+  bindAction(context.root, "run-selected-cleanup", async () => {
+    const selectedIds = selectedCleanableIds(state);
+    if (!selectedIds.length) {
+      state.errors.createPlan = t("toast.selectCleanupCandidateFirst");
+      renderAndBind(context, state);
+      revealResult(context.root, "[data-testid='cleanup-scan-result']");
+      return;
+    }
+    state.selectedIds = selectedIds;
+    state.plan = null;
+    state.cleanupResult = null;
+    delete state.errors.createPlan;
+    context.progress.start(t("feature.cleanup.createPlan"));
+    try {
+      state.plan = await createCleanupPlan(selectedIds);
+      context.progress.done(t("toast.planReady"));
+      await executeCurrentCleanupPlan(context, state, true);
+    } catch (error) {
+      state.errors.createPlan = errorMessage(error);
+      context.progress.fail(state.errors.createPlan);
+      renderAndBind(context, state);
+      revealResult(context.root, "[data-testid='cleanup-plan-section']");
+    }
+  });
   bindAction(context.root, "execute-cleanup-plan", async () => {
     if (!state.plan) {
       state.errors.executeCleanupResult = t("toast.createCleanupPlanFirst");
       renderAndBind(context, state);
       return;
     }
-    state.cleanupResult = null;
-    state.errors.executeCleanupResult = "";
-    try {
-      const result = await context.risk.run({
-        command: "execute_cleanup_plan",
-        planId: state.plan.planId,
-        riskLevel: "medium",
-        title: t("feature.cleanup.executePlanTitle"),
-        summary: t("feature.cleanup.executePlanSummary"),
-        before: [
-          { label: t("feature.cleanup.selected"), value: String(state.plan.selectedItems.length) },
-          { label: t("feature.cleanup.bytes"), value: String(state.plan.estimatedBytes) },
-          { label: t("feature.cleanup.planExecutable"), value: String(state.plan.selectedItems.length) },
-        ],
-        after: [
-          { label: t("feature.cleanup.resultCleaned"), value: t("feature.cleanup.resultAvailableAfterExecute") },
-          { label: t("feature.cleanup.resultRecovery"), value: t("feature.cleanup.resultRecoveryDetail") },
-        ],
-        warnings: [t("feature.cleanup.executePlanWarning"), t("feature.cleanup.executePlanRecoveryWarning"), ...state.plan.warnings],
-        execute: (confirmationToken) => cleanSelectedTargets(state.plan!, confirmationToken),
-      }) as CleanupResult;
-      state.cleanupResult = result;
-      delete state.errors.executeCleanupResult;
-    } catch (error) {
-      state.errors.executeCleanupResult = errorMessage(error);
-    }
-    if (!context.isCurrent()) return;
-    context.root.innerHTML = renderCleanupWorkbench(state);
-    bindCleanupEvents(context, state);
-    revealResult(context.root, "[data-testid='cleanup-operation-result']");
+    await executeCurrentCleanupPlan(context, state, false);
   });
   bindAction(context.root, "clear-download-cache", async () => {
-    state.moveOperationResult = "";
+    state.cacheOperationResult = "";
     delete state.errors.utilityOperation;
     try {
       const result = await context.risk.run({
@@ -187,14 +197,15 @@ export function bindCleanupEvents(context: FeatureContext, state: CleanupWorkben
         warnings: [localize("Only managed cache entries should be removed.", "只应移除 DevEnv Manager 受管的缓存条目。")],
         execute: clearDownloadCache,
       }) as OperationResult;
-      state.moveOperationResult = result.message;
+      state.cacheOperationResult = result.message;
     } catch (error) {
       state.errors.utilityOperation = errorMessage(error);
     }
     renderAndBind(context, state);
+    revealResult(context.root, "[data-testid='cleanup-cache-operation-result']");
   });
   bindAction(context.root, "clean-dev-cache", async () => {
-    state.moveOperationResult = "";
+    state.cacheOperationResult = "";
     delete state.errors.utilityOperation;
     try {
       const result = await context.risk.run({
@@ -206,11 +217,12 @@ export function bindCleanupEvents(context: FeatureContext, state: CleanupWorkben
         warnings: [localize("Review tool-specific cache scope before executing.", "执行前请检查对应工具的缓存范围。")],
         execute: (confirmationToken) => cleanDevCache("npm", confirmationToken),
       }) as OperationResult;
-      state.moveOperationResult = result.message;
+      state.cacheOperationResult = result.message;
     } catch (error) {
       state.errors.utilityOperation = errorMessage(error);
     }
     renderAndBind(context, state);
+    revealResult(context.root, "[data-testid='cleanup-cache-operation-result']");
   });
   bindAction(context.root, "choose-cleanup-move-source", async () => {
     const selected = await open({ directory: true, multiple: false });
@@ -257,6 +269,7 @@ export function bindCleanupEvents(context: FeatureContext, state: CleanupWorkben
       context.progress.done(t("toast.planReady"));
       context.root.innerHTML = renderCleanupWorkbench(state);
       bindCleanupEvents(context, state);
+      revealResult(context.root, "[data-testid='cleanup-move-plan-result']");
     } catch (error) {
       state.errors.moveOperation = errorMessage(error);
       context.progress.fail(state.errors.moveOperation);
@@ -292,6 +305,7 @@ export function bindCleanupEvents(context: FeatureContext, state: CleanupWorkben
       state.errors.moveOperation = errorMessage(error);
     }
     renderAndBind(context, state);
+    revealResult(context.root, "[data-testid='cleanup-move-operation-result']");
   });
   bindAction(context.root, "rollback-move", async () => {
     const rollbackId = valueOf(state.rollbackRecords[0], "rollbackId", "");
@@ -365,6 +379,7 @@ export function bindCleanupEvents(context: FeatureContext, state: CleanupWorkben
   });
   bindAction(context.root, "create-recycle-bin-cleanup-plan", () => createRecycleBinPlan(context, state));
   bindAction(context.root, "execute-recycle-bin-cleanup-plan", () => executeRecycleBinPlan(context, state));
+  bindAction(context.root, "quick-empty-recycle-bin", () => quickEmptyRecycleBin(context, state));
   bindAction(context.root, "rollback-desktop-archive", () => rollbackArchive(context, state, "desktop"));
   bindAction(context.root, "create-downloads-archive-plan", () => createArchivePlan(context, state, "downloads"));
   bindAction(context.root, "execute-downloads-archive-plan", () => executeArchivePlan(context, state, "downloads"));
@@ -378,6 +393,7 @@ export function bindCleanupEvents(context: FeatureContext, state: CleanupWorkben
       context.progress.done(t("toast.planReady"));
       context.root.innerHTML = renderCleanupWorkbench(state);
       bindCleanupEvents(context, state);
+      revealResult(context.root, "[data-testid='cleanup-expansion-plan-preview']");
     } catch (error) {
       state.errors.expansionResult = errorMessage(error);
       context.progress.fail(state.errors.expansionResult);
@@ -424,6 +440,7 @@ export function bindCleanupEvents(context: FeatureContext, state: CleanupWorkben
     if (!context.isCurrent()) return;
     context.root.innerHTML = renderCleanupWorkbench(state);
     bindCleanupEvents(context, state);
+    revealResult(context.root, "[data-testid='cleanup-expansion-result']");
   });
   bindCleanupUtilityActions(context, state);
   bindCleanupPagination(context, state);
@@ -470,6 +487,7 @@ async function refreshDesktop(context: FeatureContext, state: CleanupWorkbenchSt
   }
   if (!context.isCurrent()) return;
   renderAndBind(context, state);
+  revealResult(context.root, "[data-testid='cleanup-desktop-candidate-result']");
 }
 
 export async function refreshCleanup(context: FeatureContext, state: CleanupWorkbenchState, reveal = false): Promise<void> {
@@ -616,6 +634,7 @@ async function refreshCDriveRescue(context: FeatureContext, state: CleanupWorkbe
   if (!state.errors.cRescue) delete state.errors.cRescue;
   context.root.innerHTML = renderCleanupWorkbench(state);
   bindCleanupEvents(context, state);
+  revealResult(context.root, "[data-testid='cleanup-disk-overview-result']");
 }
 
 async function refreshDiskOverview(context: FeatureContext, state: CleanupWorkbenchState): Promise<void> {
@@ -632,6 +651,7 @@ async function refreshDiskOverview(context: FeatureContext, state: CleanupWorkbe
   if (!context.isCurrent()) return;
   context.root.innerHTML = renderCleanupWorkbench(state);
   bindCleanupEvents(context, state);
+  revealResult(context.root, "[data-testid='cleanup-disk-overview-result']");
 }
 
 async function scanCLargeFiles(context: FeatureContext, state: CleanupWorkbenchState): Promise<void> {
@@ -648,6 +668,7 @@ async function scanCLargeFiles(context: FeatureContext, state: CleanupWorkbenchS
   if (!context.isCurrent()) return;
   context.root.innerHTML = renderCleanupWorkbench(state);
   bindCleanupEvents(context, state);
+  revealResult(context.root, "#cleanup-large-files");
 }
 
 async function scanDuplicateFiles(context: FeatureContext, state: CleanupWorkbenchState): Promise<void> {
@@ -683,6 +704,7 @@ async function scanDuplicateFiles(context: FeatureContext, state: CleanupWorkben
   if (!context.isCurrent()) return;
   context.root.innerHTML = renderCleanupWorkbench(state);
   bindCleanupEvents(context, state);
+  revealResult(context.root, "[data-testid='cleanup-duplicate-large-files-result']");
 }
 
 async function createArchivePlan(context: FeatureContext, state: CleanupWorkbenchState, kind: "desktop" | "downloads"): Promise<void> {
@@ -716,6 +738,7 @@ async function createArchivePlan(context: FeatureContext, state: CleanupWorkbenc
     context.progress.done(t("toast.planReady"));
     context.root.innerHTML = renderCleanupWorkbench(state);
     bindCleanupEvents(context, state);
+    revealResult(context.root, kind === "desktop" ? "[data-testid='cleanup-desktop-archive-plan-result']" : "[data-testid='cleanup-downloads-archive-plan-result']");
   } catch (error) {
     state.errors[errorKey] = errorMessage(error);
     context.progress.fail(state.errors[errorKey]);
@@ -785,6 +808,7 @@ async function executeArchivePlan(context: FeatureContext, state: CleanupWorkben
   if (!context.isCurrent()) return;
   context.root.innerHTML = renderCleanupWorkbench(state);
   bindCleanupEvents(context, state);
+  revealResult(context.root, kind === "desktop" ? "[data-testid='cleanup-desktop-archive-execute-result']" : "[data-testid='cleanup-downloads-archive-execute-result']");
 }
 
 async function createDesktopRecyclePlan(context: FeatureContext, state: CleanupWorkbenchState): Promise<void> {
@@ -806,6 +830,7 @@ async function createDesktopRecyclePlan(context: FeatureContext, state: CleanupW
   }
   if (!context.isCurrent()) return;
   renderAndBind(context, state);
+  revealResult(context.root, "[data-testid='cleanup-desktop-recycle-plan-result']");
 }
 
 async function executeDesktopRecyclePlan(context: FeatureContext, state: CleanupWorkbenchState): Promise<void> {
@@ -847,6 +872,7 @@ async function executeDesktopRecyclePlan(context: FeatureContext, state: Cleanup
   }
   if (!context.isCurrent()) return;
   renderAndBind(context, state);
+  revealResult(context.root, "[data-testid='cleanup-desktop-recycle-execute-result']");
 }
 
 async function openRecycleBinWindow(context: FeatureContext, state: CleanupWorkbenchState): Promise<void> {
@@ -908,7 +934,7 @@ async function createRecycleBinPlan(context: FeatureContext, state: CleanupWorkb
   revealResult(context.root, "[data-testid='cleanup-recycle-bin-plan-preview']");
 }
 
-async function executeRecycleBinPlan(context: FeatureContext, state: CleanupWorkbenchState): Promise<void> {
+async function executeRecycleBinPlan(context: FeatureContext, state: CleanupWorkbenchState, compact = false): Promise<void> {
   const plan = state.recycleBinPlan;
   if (!plan) {
     state.errors.recycleBin = localize("Create and review a Recycle Bin cleanup plan first.", "请先创建并检查回收站清理计划。");
@@ -924,6 +950,8 @@ async function executeRecycleBinPlan(context: FeatureContext, state: CleanupWork
       actionId: "execute_recycle_bin_cleanup_plan",
       planId: plan.planId,
       riskLevel: "critical",
+      presentation: compact ? "compact" : "standard",
+      confirmLabel: compact ? localize("Permanently empty selected volumes", "永久清空所选卷") : undefined,
       backupRequired: false,
       title: localize("Permanently clean selected Recycle Bin volumes", "永久清理所选回收站卷"),
       summary: localize("After a final snapshot recheck, Windows permanently empties each selected Recycle Bin source volume as a whole.", "最终重核快照后，Windows 会按卷整体永久清空所选回收站来源卷。"),
@@ -1207,6 +1235,84 @@ function renderAndBind(context: FeatureContext, state: CleanupWorkbenchState): v
   if (!context.isCurrent()) return;
   context.root.innerHTML = renderCleanupWorkbench(state);
   bindCleanupEvents(context, state);
+}
+
+function showCleanupTarget(context: FeatureContext, state: CleanupWorkbenchState, selector: string): void {
+  state.activeView = "quick";
+  renderAndBind(context, state);
+  revealResult(context.root, selector);
+}
+
+async function quickEmptyRecycleBin(context: FeatureContext, state: CleanupWorkbenchState): Promise<void> {
+  context.progress.start(localize("Preparing Recycle Bin safety review", "正在准备回收站安全检查"));
+  try {
+    state.recycleBin = await inspectRecycleBin();
+    state.recycleBinSelectedDrives = state.recycleBin.volumes
+      .filter((volume) => volume.drive !== "unknown" && volume.itemCount > 0)
+      .map((volume) => volume.drive)
+      .sort();
+    if (!state.recycleBinSelectedDrives.length) {
+      state.recycleBinOperationMessage = localize("Recycle Bin is already empty.", "回收站已经为空。");
+      state.recycleBinPlan = null;
+      delete state.errors.recycleBin;
+      context.progress.done(state.recycleBinOperationMessage);
+      renderAndBind(context, state);
+      revealResult(context.root, "[data-testid='cleanup-recycle-bin-section']");
+      return;
+    }
+    state.recycleBinPlan = await createRecycleBinCleanupPlan(state.recycleBinSelectedDrives);
+    state.recycleBinOperationMessage = localize("Safety snapshot ready. Confirm the selected volume scope to continue.", "安全快照已就绪，请确认所选卷范围后继续。");
+    delete state.errors.recycleBin;
+    context.progress.done(t("toast.planReady"));
+    await executeRecycleBinPlan(context, state, true);
+  } catch (error) {
+    state.errors.recycleBin = errorMessage(error);
+    context.progress.fail(state.errors.recycleBin);
+    renderAndBind(context, state);
+    revealResult(context.root, "[data-testid='cleanup-recycle-bin-section']");
+  }
+}
+
+async function executeCurrentCleanupPlan(context: FeatureContext, state: CleanupWorkbenchState, compact: boolean): Promise<void> {
+  const plan = state.plan;
+  if (!plan) return;
+  state.cleanupResult = null;
+  state.errors.executeCleanupResult = "";
+  try {
+    state.cleanupResult = await context.risk.run({
+      command: "execute_cleanup_plan",
+      planId: plan.planId,
+      riskLevel: "medium",
+      presentation: compact ? "compact" : "standard",
+      confirmLabel: compact ? localize("Confirm cleanup", "确认清理") : undefined,
+      title: t("feature.cleanup.executePlanTitle"),
+      summary: t("feature.cleanup.executePlanSummary"),
+      before: [
+        { label: t("feature.cleanup.selected"), value: String(plan.selectedItems.length) },
+        { label: t("feature.cleanup.bytes"), value: formatBytesForRisk(plan.estimatedBytes) },
+      ],
+      after: [
+        { label: t("feature.cleanup.resultCleaned"), value: t("feature.cleanup.resultAvailableAfterExecute") },
+        { label: t("feature.cleanup.resultRecovery"), value: t("feature.cleanup.resultRecoveryDetail") },
+      ],
+      warnings: [t("feature.cleanup.executePlanWarning"), t("feature.cleanup.executePlanRecoveryWarning"), ...plan.warnings],
+      execute: (confirmationToken) => cleanSelectedTargets(plan, confirmationToken),
+    }) as CleanupResult;
+    state.plan = null;
+    delete state.errors.executeCleanupResult;
+  } catch (error) {
+    state.errors.executeCleanupResult = errorMessage(error);
+  }
+  if (!context.isCurrent()) return;
+  renderAndBind(context, state);
+  revealResult(context.root, "[data-testid='cleanup-operation-result']");
+}
+
+function formatBytesForRisk(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }
 
 function recycleBinRiskWarning(value: string): string {

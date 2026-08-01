@@ -15,7 +15,9 @@ export type FrontendAcceptanceResult = {
 };
 
 const pageHtml = {
-  cleanup: () => renderCleanupWorkbench(acceptanceFixtures.cleanup),
+  cleanup: () => (["quick", "space", "advanced"] as const)
+    .map((activeView) => renderCleanupWorkbench({ ...acceptanceFixtures.cleanup, activeView }))
+    .join(""),
   ports: () => renderPortsWorkbench(acceptanceFixtures.ports),
   runtimes: () => renderRuntimeWorkbench(acceptanceFixtures.runtimes),
   fileAssociations: () => renderFileAssociations(acceptanceFixtures.fileAssociations),
@@ -51,6 +53,10 @@ export function runFrontendAcceptanceSnapshot(): FrontendAcceptanceResult[] {
   checks.push(hasSelector("fileAssociations.planPreview", fileAssocHtml, acceptanceSelectors.fileAssociations.planPreview));
 
   const cleanupHtml = renderAcceptancePage("cleanup");
+  checks.push(hasSelector("cleanup.views.tabs", cleanupHtml, acceptanceSelectors.cleanup.viewTabs));
+  checks.push(hasSelector("cleanup.views.quick", cleanupHtml, acceptanceSelectors.cleanup.quickView));
+  checks.push(hasSelector("cleanup.views.space", cleanupHtml, acceptanceSelectors.cleanup.spaceView));
+  checks.push(hasSelector("cleanup.views.advanced", cleanupHtml, acceptanceSelectors.cleanup.advancedView));
   checks.push(hasSelector("cleanup.diskOverview", cleanupHtml, acceptanceSelectors.cleanup.diskOverviewSection));
   checks.push(hasSelector("cleanup.operationResult", cleanupHtml, acceptanceSelectors.cleanup.operationResult));
   checks.push(hasSelector("cleanup.diskCardGrid", cleanupHtml, acceptanceSelectors.cleanup.diskCardGrid));

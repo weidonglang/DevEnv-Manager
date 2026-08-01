@@ -131,8 +131,50 @@ svg {
 }
 
 .cleanup-modes,
+.cleanup-view-tabs,
 .dev-cache-actions {
   margin: 12px 0;
+}
+
+.cleanup-view-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.cleanup-view-tab {
+  min-height: 72px;
+  display: grid;
+  gap: 4px;
+  align-content: center;
+  text-align: left;
+}
+
+.cleanup-view-tab small {
+  color: var(--muted);
+}
+
+.cleanup-view-tab.is-active {
+  border-color: var(--accent);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.advanced-actions {
+  margin-top: 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.advanced-actions > summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+@media (max-width: 760px) {
+  .cleanup-view-tabs {
+    grid-template-columns: 1fr;
+  }
 }
 
 .dev-cache-actions {

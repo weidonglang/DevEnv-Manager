@@ -203,6 +203,7 @@ export const portsAcceptanceFixture: PortsWorkbenchState = {
 };
 
 export const cleanupAcceptanceFixture: CleanupWorkbenchState = {
+  activeView: "quick",
   scan: null,
   scanStatus: "idle",
   architecture: null,
@@ -267,6 +268,7 @@ export const cleanupAcceptanceFixture: CleanupWorkbenchState = {
   partition: null,
   plan: null,
   cleanupResult: null,
+  cacheOperationResult: "",
   movePlan: null,
   moveOperationResult: "Fixture move source selected.",
   moveSource: "",
