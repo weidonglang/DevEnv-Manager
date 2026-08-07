@@ -142,6 +142,8 @@ struct Settings {
     safety_disclaimer_version: u32,
     #[serde(default)]
     safety_disclaimer_accepted_at: Option<String>,
+    #[serde(default)]
+    onboarding_completed: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -2821,6 +2823,17 @@ fn accept_safety_disclaimer() -> Result<OperationResult, String> {
     Ok(OperationResult {
         success: true,
         message: "已记录安全说明已读状态；不会上传任何数据。".to_string(),
+    })
+}
+
+#[tauri::command]
+fn complete_onboarding() -> Result<OperationResult, String> {
+    let mut settings = load_settings()?;
+    settings.onboarding_completed = true;
+    save_json(&settings_file(), &settings)?;
+    Ok(OperationResult {
+        success: true,
+        message: "新手引导完成状态已保存在本机。".to_string(),
     })
 }
 
@@ -15183,6 +15196,7 @@ pub fn run() {
             get_feature_risk,
             create_confirmation_token,
             accept_safety_disclaimer,
+            complete_onboarding,
             reset_ui_config,
             open_app_config_dir,
             create_move_plan,
@@ -15897,6 +15911,7 @@ fn default_settings() -> Settings {
         safety_disclaimer_accepted: false,
         safety_disclaimer_version: 0,
         safety_disclaimer_accepted_at: None,
+        onboarding_completed: false,
     }
 }
 
@@ -20845,6 +20860,15 @@ mod tests {
         settings.safety_disclaimer_version = SAFETY_DISCLAIMER_VERSION;
         settings.safety_disclaimer_accepted_at = Some("2026-07-13T00:00:00Z".to_string());
         assert!(!should_recover_unwritable_initial_root(&settings));
+    }
+
+    #[test]
+    fn legacy_settings_default_onboarding_to_incomplete() {
+        let settings = default_settings();
+        let mut value = serde_json::to_value(settings).unwrap();
+        value.as_object_mut().unwrap().remove("onboardingCompleted");
+        let migrated: Settings = serde_json::from_value(value).unwrap();
+        assert!(!migrated.onboarding_completed);
     }
 
     #[test]

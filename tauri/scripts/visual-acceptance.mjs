@@ -47,6 +47,9 @@ const allCases = [
   visualCase("settings-dark-wide-en", "settings", "dark", "en-US", "default", 1366, 768, 1),
   visualCase("settings-hc-compact-zh", "settings", "high-contrast", "zh-CN", "default", 980, 640, 1.5),
   visualCase("settings-system-large-en", "settings", "system", "en-US", "default", 1920, 1080, 1),
+  visualCase("onboarding-light-wide-en", "dashboard", "light", "en-US", "onboarding", 1366, 768, 1),
+  visualCase("onboarding-dark-wide-zh", "dashboard", "dark", "zh-CN", "onboarding", 1366, 768, 1),
+  visualCase("onboarding-hc-compact-zh", "dashboard", "high-contrast", "zh-CN", "onboarding", 980, 640, 1.25),
 ];
 const requestedCase = process.argv.find((argument) => argument.startsWith("--case="))?.slice("--case=".length);
 const cases = requestedCase ? allCases.filter((testCase) => testCase.id === requestedCase) : allCases;
@@ -315,7 +318,7 @@ function browserAudit(testCase) {
     if (count > 1) failures.push(`duplicate DOM id ${id} (${count})`);
   }
 
-  const rootText = $("#feature-root")?.innerText || "";
+  const rootText = testCase.variant === "onboarding" ? document.body.innerText : $("#feature-root")?.innerText || "";
   for (const artifact of ["undefined", "[object Object]"]) {
     if (rootText.includes(artifact)) failures.push(`user-visible serialization artifact: ${artifact}`);
   }
@@ -344,8 +347,21 @@ function browserAudit(testCase) {
     toolchains: ["[data-testid='toolchains-page']", "[data-testid='toolchains-result']"],
   };
   for (const selector of pageSelectors[testCase.page] || []) requireVisible(selector);
+  if (testCase.variant === "onboarding") {
+    requireVisible("[data-testid='onboarding-dialog']");
+    requireVisible("[data-testid='onboarding-step-1']");
+    requireVisible("[data-testid='onboarding-skip']");
+    requireVisible("[data-testid='onboarding-next']");
+    if ($$(".onboarding-progress span").length !== 4) failures.push("onboarding progress does not contain four steps");
+    $("[data-testid='onboarding-next']")?.click();
+    requireVisible("[data-testid='onboarding-step-2']");
+    $("[data-testid='onboarding-back']")?.click();
+    requireVisible("[data-testid='onboarding-step-1']");
+  }
 
-  const interactive = $$("#feature-root button, #feature-root input, #feature-root select, #feature-root textarea, #feature-root a[href]");
+  const interactive = $$(testCase.variant === "onboarding"
+    ? ".onboarding-dialog button, .onboarding-dialog input, .onboarding-dialog select, .onboarding-dialog textarea, .onboarding-dialog a[href]"
+    : "#feature-root button, #feature-root input, #feature-root select, #feature-root textarea, #feature-root a[href]");
   for (const element of interactive) {
     const style = getComputedStyle(element);
     if (!visible(element) && element.tabIndex >= 0 && style.display !== "none" && style.visibility !== "hidden") {
@@ -374,7 +390,9 @@ function browserAudit(testCase) {
   if (testCase.page === "cleanup") auditCleanup(testCase, failures, observations, requireVisible, visible, $, $$);
   if (testCase.page === "ports") auditPorts(failures, observations, requireVisible, $$);
 
-  const contrastScopes = testCase.page === "cleanup"
+  const contrastScopes = testCase.variant === "onboarding"
+    ? [".onboarding-dialog", ".onboarding-content article", ".onboarding-actions"]
+    : testCase.page === "cleanup"
     ? [".topbar", "#feature-root .panel", ".folder-overview", ".folder-usage-card", ".folder-usage-summary", ".disk-volume-card", ".archive-target-picker", ".recycle-bin-volume-card"]
     : [".topbar", "#feature-root .panel"];
   const contrast = auditContrast(contrastScopes, visible);

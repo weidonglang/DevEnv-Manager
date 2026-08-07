@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.9.4
+
+- Add a four-step bilingual getting-started guide after the safety notice on first launch.
+- Persist completion in the existing local settings file so the guide does not reopen automatically after it is completed or skipped.
+- Keep a Settings entry for reopening the guide without resetting the saved first-run state.
+- Separate Cleanup into Quick cleanup, space recovery, and advanced tools, with shorter guided actions and durable results beside the initiating control.
+- Add safe one-flow port release for eligible listeners while preserving backend plan, token, owner re-check, protected-process, and release-verification contracts.
+- Expand automated acceptance to 47 feature records, 293 frontend selectors, and 34 Edge visual scenarios including onboarding in Light, Dark, and High Contrast themes.
+
+Exact asset identities, release evidence, acceptance boundaries, and disclosures are recorded in [docs/release-v1.9.4.md](docs/release-v1.9.4.md).
+
 ## 1.9.3
 
 - Add durable Runtime health summaries with per-runtime healthy/needs-attention status, required-check counts, and failure details.

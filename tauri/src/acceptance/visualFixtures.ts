@@ -303,6 +303,7 @@ export function settingsVisualState(theme: SettingsWorkbenchState["theme"]): Set
       safetyDisclaimerAccepted: true,
       safetyDisclaimerVersion: 1,
       safetyDisclaimerAcceptedAt: "2026-07-22T08:00:00Z",
+      onboardingCompleted: true,
     },
     installed: { jdks: [], pythons: [], nodes: [], mavens: [], gradles: [], gos: [], current: { jdk: "21.0.4" } },
     paths: {

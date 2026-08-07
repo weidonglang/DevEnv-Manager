@@ -1,28 +1,28 @@
 {
   "schemaVersion": 2,
   "channel": "stable",
-  "version": "1.9.3",
-  "date": "2026-08-01",
+  "version": "1.9.4",
+  "date": "2026-08-07",
   "notes": [
-    "v1.9.3 让运行时健康、项目配置、端口处理、文件关联和清理操作持续显示状态，并在创建计划或完成操作后自动定位结果。端口完整诊断保持可见，快捷操作仍使用受保护计划和确认令牌。"
+    "v1.9.4 新增中英文首次启动指导，将清理页整理为按任务划分的视图，并为符合条件的监听端口提供单流程安全释放；后端计划、确认令牌、所有者复核和受保护进程边界保持不变。"
   ],
   "assets": [
     {
       "platform": "windows-x64",
-      "fileName": "DevEnv.Manager_1.9.3_x64-setup.exe",
-      "size": 2958792,
-      "sha256": "55674a8f6fae2b30ac1649f09066b29ae5c8822fbd77286c4e422f7892292118",
-      "primaryUrl": "https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.9.3/DevEnv.Manager_1.9.3_x64-setup.exe",
+      "fileName": "DevEnv.Manager_1.9.4_x64-setup.exe",
+      "size": 2962510,
+      "sha256": "ad0b569ace83dc7b224fe841b97baa3fd6e15215c384e92a1d98f33493f644c1",
+      "primaryUrl": "https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.9.4/DevEnv.Manager_1.9.4_x64-setup.exe",
       "mirrors": [
         {
           "name": "Gitee Release",
           "region": "cn",
-          "url": "https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.9.3/DevEnv.Manager_1.9.3_x64-setup.exe"
+          "url": "https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.9.4/DevEnv.Manager_1.9.4_x64-setup.exe"
         },
         {
           "name": "GitHub Release",
           "region": "global",
-          "url": "https://github.com/weidonglang/DevEnv-Manager/releases/download/v1.9.3/DevEnv.Manager_1.9.3_x64-setup.exe"
+          "url": "https://github.com/weidonglang/DevEnv-Manager/releases/download/v1.9.4/DevEnv.Manager_1.9.4_x64-setup.exe"
         }
       ]
     }
