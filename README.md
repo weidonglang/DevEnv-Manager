@@ -2,9 +2,9 @@
 
 [GitHub 主仓库](https://github.com/weidonglang/DevEnv-Manager) · [Gitee 国内镜像](https://gitee.com/weidonglang/DevEnv-Manager) · [GitHub Release](https://github.com/weidonglang/DevEnv-Manager/releases) · [Gitee Release](https://gitee.com/weidonglang/DevEnv-Manager/releases) · [完整操作手册](docs/user-guide.md) · [安全说明](docs/safety-and-disclaimer.md) · [问题反馈](https://github.com/weidonglang/DevEnv-Manager/issues)
 
-面向 Windows 的开发环境诊断器与安全操作面板。当前版本：**1.9.3 Stable**。
+面向 Windows 的开发环境诊断器与安全操作面板。当前版本：**1.9.4 Stable**。
 
-1.9.3 让运行时健康检查、项目配置、端口处理、文件关联和清理操作的状态与结果保持可见，并在创建计划或完成操作后自动定位到对应结果区。端口页同时保留完整诊断视图和可处理监听端口筛选，快捷操作仍严格使用计划与确认令牌。
+1.9.4 新增中英文首次启动指导，将清理页划分为快速清理、空间整理和高级工具，并为符合条件的监听端口提供单流程安全释放。快捷操作不再要求用户手工处理计划或令牌，但后端仍严格执行计划、单次令牌、所有者复核、受保护进程和结果验证契约。
 
 ## 下载与镜像
 
@@ -12,9 +12,9 @@
 - Gitee 国内镜像：https://gitee.com/weidonglang/DevEnv-Manager
 - GitHub Release：https://github.com/weidonglang/DevEnv-Manager/releases
 - Gitee Release：https://gitee.com/weidonglang/DevEnv-Manager/releases
-- v1.9.3 NSIS：https://github.com/weidonglang/DevEnv-Manager/releases/download/v1.9.3/DevEnv.Manager_1.9.3_x64-setup.exe
-- 国内下载：https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.9.3/DevEnv.Manager_1.9.3_x64-setup.exe
-- NSIS SHA256：`55674a8f6fae2b30ac1649f09066b29ae5c8822fbd77286c4e422f7892292118`
+- v1.9.4 NSIS：https://github.com/weidonglang/DevEnv-Manager/releases/download/v1.9.4/DevEnv.Manager_1.9.4_x64-setup.exe
+- 国内下载：https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.9.4/DevEnv.Manager_1.9.4_x64-setup.exe
+- NSIS SHA256：`ad0b569ace83dc7b224fe841b97baa3fd6e15215c384e92a1d98f33493f644c1`
 
 适合：
 
@@ -46,6 +46,19 @@ DevEnv Manager 解决的是 Windows 上多个开发生态互相影响的问题�
 - 适合希望用图形界面查看诊断证据，同时保留 CLI 自动化入口的用户。
 - 不适合希望软件自动接管整台机器、清理任意个人文件或替代专业包管理器的场景。
 - 熟练使用 mise/asdf/Scoop/Chocolatey 且环境已经稳定的用户，可以只使用诊断能力。
+
+## 1.9.4 Stable
+
+本版本重点降低首次使用、清理和端口处理的理解与操作成本：
+
+- 首次同意安全声明后显示四步中英文新手指导；完成或跳过后写入本机设置，不会在以后每次启动时重复出现。
+- 设置页保留“打开新手指导”，随时可以重新查看，不会重置首次启动状态。
+- 清理页分为“快速清理、空间整理、高级工具”，扫描、选择、确认和结果尽量靠近，执行后自动定位持久结果。
+- 主清理和 Windows 回收站增加短流程入口；危险操作仍保留计划、快照复核、备份或回执与确认边界。
+- 符合条件的用户/开发监听端口可点击“安全释放”完成计划、确认、执行和复扫；PID 4、系统进程、服务拥有端口和非监听连接继续受保护。
+- 功能 manifest 扩展到 47 个功能，自动验收覆盖 293 个前端 selector 和 34 个 Edge 视觉场景，包括新手指导的亮色、暗色和高对比主题。
+
+最终资产、SHA256、验收边界和未签名披露记录在 [docs/release-v1.9.4.md](docs/release-v1.9.4.md)。
 
 ## 1.9.3 Stable
 

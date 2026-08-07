@@ -1,28 +1,28 @@
 {
   "schemaVersion": 2,
   "channel": "stable",
-  "version": "1.9.3",
-  "date": "2026-08-01",
+  "version": "1.9.4",
+  "date": "2026-08-07",
   "notes": [
-    "v1.9.3 makes Runtime health, project configuration, port handling, file association, and cleanup operations keep durable status and automatically reveal their plans or results. Complete port diagnostics remain visible while safe shortcuts still use guarded plans and confirmation tokens."
+    "v1.9.4 adds a bilingual first-run guide, streamlines Cleanup into task-focused views, and provides one-flow safe release for eligible listening ports while preserving backend plans, tokens, owner re-checks, and protected-process boundaries."
   ],
   "assets": [
     {
       "platform": "windows-x64",
-      "fileName": "DevEnv.Manager_1.9.3_x64-setup.exe",
-      "size": 2958792,
-      "sha256": "55674a8f6fae2b30ac1649f09066b29ae5c8822fbd77286c4e422f7892292118",
-      "primaryUrl": "https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.9.3/DevEnv.Manager_1.9.3_x64-setup.exe",
+      "fileName": "DevEnv.Manager_1.9.4_x64-setup.exe",
+      "size": 2962510,
+      "sha256": "ad0b569ace83dc7b224fe841b97baa3fd6e15215c384e92a1d98f33493f644c1",
+      "primaryUrl": "https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.9.4/DevEnv.Manager_1.9.4_x64-setup.exe",
       "mirrors": [
         {
           "name": "Gitee Release",
           "region": "cn",
-          "url": "https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.9.3/DevEnv.Manager_1.9.3_x64-setup.exe"
+          "url": "https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.9.4/DevEnv.Manager_1.9.4_x64-setup.exe"
         },
         {
           "name": "GitHub Release",
           "region": "global",
-          "url": "https://github.com/weidonglang/DevEnv-Manager/releases/download/v1.9.3/DevEnv.Manager_1.9.3_x64-setup.exe"
+          "url": "https://github.com/weidonglang/DevEnv-Manager/releases/download/v1.9.4/DevEnv.Manager_1.9.4_x64-setup.exe"
         }
       ]
     }
