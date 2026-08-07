@@ -150,6 +150,13 @@ export const acceptanceSelectors = {
     persistentError: "global-persistent-error",
     persistentResult: "global-persistent-result",
   },
+  onboarding: {
+    dialog: "onboarding-dialog",
+    firstStep: "onboarding-step-1",
+    skip: "onboarding-skip",
+    back: "onboarding-back",
+    next: "onboarding-next",
+  },
 } as const;
 
 export type AcceptanceSelectors = typeof acceptanceSelectors;

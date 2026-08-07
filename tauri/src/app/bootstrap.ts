@@ -1,5 +1,6 @@
 import { invoke } from "../core/invoke";
 import { disclaimerPanel } from "../components/disclaimerPanel";
+import { showOnboardingGuide } from "../components/onboardingGuide";
 import { subscribeLocaleChange, t } from "../core/i18n";
 import { runRiskOperation } from "../core/risk";
 import type { ConfigView, OperationResult, PortScanSnapshot } from "../types";
@@ -28,6 +29,7 @@ let currentNavigationId = 0;
 let debugCaptureBound = false;
 let toastTimer: number | undefined;
 let startupPortScanStarted = false;
+let onboardingSessionShown = false;
 
 const modules: Record<WorkbenchView, FeatureModule> = {
   dashboard: mountDashboardFeature,
@@ -349,7 +351,10 @@ function startWorkbench(config?: ConfigView) {
   renderShell();
   bindShellEvents();
   void mount(readActiveView());
-  if (config) startBackgroundPortScan(config);
+  if (config) {
+    startBackgroundPortScan(config);
+    startOnboarding(config);
+  }
 }
 
 async function acceptSafetyGate() {
@@ -360,6 +365,18 @@ async function acceptSafetyGate() {
   } catch (error) {
     toast(error instanceof Error ? error.message : String(error), true);
   }
+}
+
+function startOnboarding(config: ConfigView): void {
+  if (config.settings.onboardingCompleted || onboardingSessionShown) return;
+  onboardingSessionShown = true;
+  window.setTimeout(() => {
+    showOnboardingGuide({
+      onDismiss: async () => {
+        await invoke<OperationResult>("complete_onboarding");
+      },
+    });
+  }, 0);
 }
 
 function startBackgroundPortScan(config: ConfigView): void {

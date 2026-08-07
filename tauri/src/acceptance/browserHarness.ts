@@ -5,6 +5,7 @@ import "../ui/theme/dark.css";
 import "../ui/theme/high-contrast.css";
 
 import { setLocale, t, type LocaleMode } from "../core/i18n";
+import { showOnboardingGuide } from "../components/onboardingGuide";
 import { workbenchRoutes, routeDescription, routeLabel } from "../app/router";
 import { renderDashboard } from "../features/dashboard/render";
 import { renderCleanupWorkbench } from "../features/cleanup/render";
@@ -25,7 +26,7 @@ import type { PortRecord } from "../types";
 import { dashboardVisualState, environmentVisualState, profilesVisualState, projectVisualState, settingsVisualState } from "./visualFixtures";
 
 type VisualPage = "dashboard" | "cleanup" | "environment" | "projects" | "ports" | "profiles" | "runtimes" | "fileAssociations" | "settings" | "toolchains";
-type VisualVariant = "default" | "planned" | "result" | "archive-folder" | "advanced";
+type VisualVariant = "default" | "planned" | "result" | "archive-folder" | "advanced" | "onboarding";
 
 declare global {
   interface Window {
@@ -57,6 +58,7 @@ app.innerHTML = renderShell(page, routeLabel(route), routeDescription(route));
 const featureRoot = document.querySelector<HTMLElement>("#feature-root");
 if (!featureRoot) throw new Error("Missing visual acceptance feature root");
 featureRoot.innerHTML = renderPage(page, variant);
+if (variant === "onboarding") showOnboardingGuide();
 
 window.__DEVENV_VISUAL_CONTEXT__ = { page, theme, locale, variant };
 window.__DEVENV_VISUAL_READY__ = true;
@@ -220,6 +222,6 @@ function readLocale(value: string | null): Exclude<LocaleMode, "auto"> {
 }
 
 function readVariant(value: string | null): VisualVariant {
-  if (value === "planned" || value === "result" || value === "archive-folder" || value === "advanced") return value;
+  if (value === "planned" || value === "result" || value === "archive-folder" || value === "advanced" || value === "onboarding") return value;
   return "default";
 }

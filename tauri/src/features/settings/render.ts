@@ -28,6 +28,7 @@ export function renderSettingsWorkbench(state: SettingsWorkbenchState): string {
           ${renderActionButton("toggle-auto-update", t("settings.toggleAutoUpdate"))}
           ${renderActionButton("open-config-dir", t("settings.openConfigDir"))}
           ${renderActionButton("show-safety-notice", t("settings.viewSafetyNotice"))}
+          ${renderActionButton("show-onboarding-guide", t("settings.viewOnboarding"))}
           ${renderActionButton("toggle-advanced-mode", isAdvancedMode() ? t("settings.advancedOff") : t("settings.advancedOn"))}
           ${renderActionButton("reset-ui-config", t("settings.resetUiConfig"), "danger")}
         </div>

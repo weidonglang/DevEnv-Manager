@@ -1,6 +1,7 @@
 import type { FeatureContext } from "../../app/featureContext";
 import { open } from "../../api/tauri";
 import { showSafetyNoticeDialog } from "../../components/disclaimerPanel";
+import { showOnboardingGuide } from "../../components/onboardingGuide";
 import { clearDebugEntries, debugEntriesAsMarkdown, getDebugEntries, isAdvancedMode, logDebug, setAdvancedMode } from "../../core/debugLog";
 import { localeModeLabel, localize, setLocale, t, type LocaleMode } from "../../core/i18n";
 import { applyTheme, readTheme, type ThemeMode } from "../../ui/theme/controller";
@@ -197,6 +198,7 @@ export function bindSettingsEvents(context: FeatureContext, state: SettingsWorkb
     bindSettingsEvents(context, state);
   });
   bindAction(context.root, "show-safety-notice", () => showSafetyNoticeDialog());
+  bindAction(context.root, "show-onboarding-guide", () => showOnboardingGuide());
   bindAction(context.root, "toggle-advanced-mode", () => {
     setAdvancedMode(!isAdvancedMode());
     context.root.innerHTML = renderSettingsWorkbench(state);

@@ -2720,7 +2720,7 @@
           "frontendEntry": {
             "route": "settings",
             "testIds": [
-              "settings-theme-section",
+            "settings-theme-section",
               "settings-debug-section"
             ]
           },
@@ -2769,6 +2769,70 @@
             "darkHighContrastManual",
             "resultPanelVisible",
             "debugContract"
+          ]
+        },
+        {
+          "featureId": "settings.firstRunOnboarding",
+          "id": "settings.firstRunOnboarding",
+          "domain": "Settings",
+          "userVisibleName": "First-run getting started guide",
+          "name": "First-run getting started guide",
+          "priority": "P1",
+          "targetVersion": "v1.9.4",
+          "status": "implemented",
+          "oldFeature": false,
+          "oldEntry": "Not available",
+          "currentEntry": "First launch and Settings",
+          "frontendComponent": "OnboardingGuide",
+          "frontendEntry": {
+            "route": "settings",
+            "testIds": [
+              "onboarding-dialog",
+              "onboarding-step-1",
+              "onboarding-skip",
+              "onboarding-next"
+            ]
+          },
+          "selectors": {
+            "entry": "onboarding-dialog",
+            "primaryAction": "onboarding-next",
+            "result": "onboarding-dialog",
+            "error": "onboarding-error"
+          },
+          "backendCommands": [
+            "complete_onboarding"
+          ],
+          "backendExists": true,
+          "frontendWired": true,
+          "riskLevel": "low",
+          "requiresTauri": true,
+          "requiresWindows": false,
+          "requiresLoading": false,
+          "requiresResultArea": false,
+          "requiresErrorArea": true,
+          "requiresDebug": false,
+          "requiresReport": false,
+          "requiresRiskPlan": false,
+          "requiresToken": false,
+          "requiresVerify": true,
+          "requiresRollback": false,
+          "requiresPagination": false,
+          "requiresI18n": true,
+          "requiresDarkReadable": true,
+          "safeSmokeMode": "dryRun",
+          "manualOnlyReason": null,
+          "deferredReason": null,
+          "testModes": [
+            "static",
+            "frontend",
+            "safe",
+            "manual"
+          ],
+          "manualAllowed": true,
+          "acceptanceChecks": [
+            "frontendEntryVisible",
+            "backendCommandRegistered",
+            "darkHighContrastManual"
           ]
         },
         {

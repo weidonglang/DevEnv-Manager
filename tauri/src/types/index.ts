@@ -32,6 +32,7 @@ export type ConfigView = {
     safetyDisclaimerAccepted: boolean;
     safetyDisclaimerVersion: number;
     safetyDisclaimerAcceptedAt?: string | null;
+    onboardingCompleted: boolean;
   };
   installed: {
     jdks: ManagedRuntime[];
