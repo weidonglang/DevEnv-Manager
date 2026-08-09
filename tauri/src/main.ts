@@ -3605,6 +3605,7 @@ document.querySelector("#inspect-python-integrity")?.addEventListener("click", a
   try {
     state.pythonIntegrity = await invoke<PythonIntegrityReport>("inspect_python_integrity", { pythonPath: null });
     renderPythonIntegrity();
+    focusResult("#python-integrity-result");
     showToast(state.pythonIntegrity.fullyUsable ? "Python 核心组件可用" : "Python 存在核心组件缺失", !state.pythonIntegrity.fullyUsable);
   } catch (error) {
     showToast(error instanceof Error ? error.message : String(error), true);
@@ -3615,6 +3616,7 @@ document.querySelector("#inspect-runtime-strong")?.addEventListener("click", asy
   try {
     state.runtimeStrong = await invoke<RuntimeStrongVerificationReport>("inspect_runtime_strong_verification");
     renderRuntimeStrongVerification();
+    focusResult("#runtime-strong-result");
     showToast(`运行时强验证完成：${state.runtimeStrong.items.length} 项`);
   } catch (error) {
     showToast(error instanceof Error ? error.message : String(error), true);
@@ -3629,6 +3631,7 @@ document.querySelector("#preview-python-repair")?.addEventListener("click", asyn
     state.pythonRepairPlan = await invoke<PythonRepairPlan>("preview_python_repair", { repairPip, repairPath });
     renderPythonAnalysis();
     renderPythonRepairPlan();
+    focusResult("#python-repair-preview");
     showToast("Python 修复计划已生成；确认命令和 PATH 差异后再执行");
   } catch (error) {
     showToast(error instanceof Error ? error.message : String(error), true);
@@ -3752,6 +3755,7 @@ document.querySelector("#create-java-stabilize-plan")?.addEventListener("click",
     state.envRepairPlan = await invoke<EnvRepairPlan>("create_java_stabilize_plan", { jdkPath });
     state.envRepairResult = null;
     renderEnvRepairPlan();
+    focusResult("#env-repair-plan-result");
     showToast("计划已生成；请检查 diff、备份名和风险说明");
   } catch (error) {
     showToast(error instanceof Error ? error.message : String(error), true);
@@ -3937,6 +3941,7 @@ document.querySelector("#preview-cleanup-plan")?.addEventListener("click", async
   try {
     state.cleanupPlan = await invoke<CleanupPlan>("create_cleanup_plan", { selectedItemIds: Array.from(state.cleanupSelection) });
     renderCleanupPlan();
+    focusResult("#cleanup-plan-preview");
     showToast(`计划已创建：${state.cleanupPlan.selectedItems.length} 项，预计 ${formatBytes(state.cleanupPlan.estimatedBytes)}`);
   } catch (error) {
     state.cleanupPlan = null;
@@ -3986,6 +3991,7 @@ document.querySelector("#execute-cleanup-plan")?.addEventListener("click", async
     state.cleanupPlan = null;
     state.cleanupSelection.clear();
     renderCleanupResult();
+    focusResult("#cleanup-plan-preview");
     showToast(`清理完成：释放 ${formatBytes(state.cleanupResult.cleanedBytes)}，失败 ${state.cleanupResult.failedItems} 项`, state.cleanupResult.failedItems > 0);
   } catch (error) {
     showToast(error instanceof Error ? error.message : String(error), true);
@@ -4081,6 +4087,7 @@ document.querySelector("#preview-move-plan")?.addEventListener("click", async ()
     state.movePlan = await invoke<MovePlan>("create_move_plan", { source, targetDrive, mode });
     state.moveResult = null;
     renderMovePlan();
+    focusResult("#move-plan-result");
     showToast(`搬家计划已生成：${formatBytes(state.movePlan.estimatedBytes)}`);
   } catch (error) {
     showToast(error instanceof Error ? error.message : String(error), true);
@@ -4093,6 +4100,7 @@ document.querySelector("#preview-desktop-archive")?.addEventListener("click", as
     state.movePlan = await invoke<MovePlan>("create_desktop_archive_plan", { targetDrive });
     state.moveResult = null;
     renderMovePlan();
+    focusResult("#move-plan-result");
     showToast("桌面归档计划已生成");
   } catch (error) {
     showToast(error instanceof Error ? error.message : String(error), true);
@@ -4105,6 +4113,7 @@ document.querySelector("#preview-downloads-archive")?.addEventListener("click", 
     state.movePlan = await invoke<MovePlan>("create_downloads_archive_plan", { targetDrive });
     state.moveResult = null;
     renderMovePlan();
+    focusResult("#move-plan-result");
     showToast("下载归档计划已生成");
   } catch (error) {
     showToast(error instanceof Error ? error.message : String(error), true);
@@ -4124,6 +4133,7 @@ document.querySelector("#execute-move-plan")?.addEventListener("click", async ()
     const token = await riskOperationToken("execute_move_plan", plan.planId, "high", false, "move-plan-preview");
     state.moveResult = await invoke<MoveResult>(command, { plan, confirmationToken: token.token });
     renderMovePlan();
+    focusResult("#move-plan-result");
     await loadRollbackRecords();
     showToast(`执行完成：${formatBytes(state.moveResult.movedBytes)}，失败 ${state.moveResult.failures.length} 项`, state.moveResult.failures.length > 0);
   } catch (error) {
@@ -4147,6 +4157,7 @@ document.querySelector("#create-expansion-plan")?.addEventListener("click", asyn
     state.expansionPlan = await invoke<ExpansionPlan>("create_c_drive_expansion_plan");
     state.expansionResult = null;
     renderExpansionPlan();
+    focusResult("#expansion-plan-result");
     showToast(state.expansionPlan.canExecute ? "扩容计划可执行，但仍需三次确认" : "当前只生成说明计划，不允许执行");
   } catch (error) {
     showToast(error instanceof Error ? error.message : String(error), true);
@@ -4171,6 +4182,7 @@ document.querySelector("#execute-expansion-plan")?.addEventListener("click", asy
     const token = await riskOperationToken("execute_expansion_plan", plan.planId, "critical", true, "manual-backup-confirmed");
     state.expansionResult = await invoke<ExpansionResult>("execute_c_drive_expansion", { plan, confirmationToken: token.token });
     renderExpansionPlan();
+    focusResult("#expansion-plan-result");
     showToast(state.expansionResult.success ? "扩容执行完成" : "扩容未成功，请查看报告", !state.expansionResult.success);
   } catch (error) {
     showToast(error instanceof Error ? error.message : String(error), true);
