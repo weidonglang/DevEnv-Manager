@@ -2232,6 +2232,7 @@ async function inspectProjectPorts(showProgress = true) {
   try {
     state.projectPorts = await invoke<ProjectPortConfig[]>("inspect_project_port_configs", { path });
     renderProjectPortConfigs();
+    focusResult("#project-port-configs");
     if (showProgress) showToast(`发现 ${state.projectPorts.length} 个端口配置`);
   } catch (error) {
     showToast(error instanceof Error ? error.message : String(error), true);
@@ -2337,7 +2338,10 @@ async function refreshAll(deep = false) {
   }
 }
 
-async function runOperation(action: () => Promise<OperationResult | KillResult | ConfigView>, pending: string) {
+async function runOperation(
+  action: () => Promise<OperationResult | KillResult | ConfigView>,
+  pending: string,
+): Promise<OperationResult | KillResult | ConfigView | null> {
   showToast(pending);
   try {
     const result = await action();
@@ -2347,8 +2351,10 @@ async function runOperation(action: () => Promise<OperationResult | KillResult |
       showToast("操作完成");
     }
     await refreshBase();
+    return result;
   } catch (error) {
     showToast(error instanceof Error ? error.message : String(error), true);
+    return null;
   }
 }
 
@@ -2422,6 +2428,12 @@ async function copyText(text: string) {
   } catch {
     showToast(text);
   }
+}
+
+function focusResult(selector: string) {
+  window.requestAnimationFrame(() => {
+    document.querySelector<HTMLElement>(selector)?.scrollIntoView({ block: "start" });
+  });
 }
 
 async function runDoctorAction(action: string) {
@@ -4265,6 +4277,7 @@ document.querySelector("#preview-project-config")?.addEventListener("click", asy
   try {
     state.projectConfigPreview = await invoke<ProjectConfigPreview>("preview_project_configuration", { projectPath: input.value });
     renderProjectConfigPreview();
+    focusResult("#project-config-preview");
     showToast("配置预览已生成；确认内容后再应用");
   } catch (error) {
     showToast(error instanceof Error ? error.message : String(error), true);
@@ -4277,6 +4290,7 @@ document.querySelector("#inspect-idea-project")?.addEventListener("click", async
   try {
     state.ideaProject = await invoke<IdeaProjectReport>("inspect_idea_project", { path });
     renderIdeaProject();
+    focusResult("#idea-project-result");
     showToast(state.ideaProject.detected ? "IDEA 配置分析完成" : "未发现 IDEA 配置");
   } catch (error) {
     showToast(error instanceof Error ? error.message : String(error), true);
@@ -4289,6 +4303,7 @@ document.querySelector("#verify-nacos-java")?.addEventListener("click", async ()
   try {
     state.javaConsumer = await invoke<JavaConsumerReport>("verify_java_consumer_environment", { consumer: "Nacos", root });
     renderJavaConsumer();
+    focusResult("#java-consumer-result");
     showToast(state.javaConsumer.usable ? "Nacos 可读取当前 Java 环境" : "Nacos Java 环境需要关注", !state.javaConsumer.usable);
   } catch (error) {
     showToast(error instanceof Error ? error.message : String(error), true);
@@ -4301,6 +4316,7 @@ document.querySelector("#verify-nexus-java")?.addEventListener("click", async ()
   try {
     state.javaConsumer = await invoke<JavaConsumerReport>("verify_nexus_java_environment", { root });
     renderJavaConsumer();
+    focusResult("#java-consumer-result");
     showToast(state.javaConsumer.usable ? "Nexus 可读取当前 Java 环境" : "Nexus Java 环境需要关注", !state.javaConsumer.usable);
   } catch (error) {
     showToast(error instanceof Error ? error.message : String(error), true);
@@ -4658,7 +4674,11 @@ document.addEventListener("click", async (event) => {
         return invoke<OperationResult>("apply_project_configuration", { request, confirmationToken: token.token });
       },
       "正在备份并应用项目配置",
-    );
+    ).then((result) => {
+      const output = document.querySelector<HTMLElement>("#project-output");
+      if (output && result && "message" in result) output.textContent = result.message;
+      focusResult("#project-output");
+    });
     return;
   }
   if (button.id === "apply-environment-preview") {
