@@ -9,7 +9,7 @@ mod safety;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::env;
 use std::ffi::OsStr;
 use std::fs;
@@ -96,6 +96,10 @@ struct AppPaths {
 struct Settings {
     root_dir: String,
     auto_check_update: bool,
+    #[serde(default = "default_true")]
+    auto_scan_ports_on_startup: bool,
+    #[serde(default = "default_port_scan_scope")]
+    port_scan_scope: String,
     download_timeout_seconds: u64,
     theme: String,
     last_page: String,
@@ -111,6 +115,10 @@ struct Settings {
     safety_disclaimer_version: u32,
     #[serde(default)]
     safety_disclaimer_accepted_at: Option<String>,
+    #[serde(default)]
+    onboarding_completed: bool,
+    #[serde(default, flatten)]
+    extra: BTreeMap<String, Value>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -9535,6 +9543,8 @@ fn default_settings() -> Settings {
     Settings {
         root_dir: display_path(default_root_dir()),
         auto_check_update: false,
+        auto_scan_ports_on_startup: true,
+        port_scan_scope: default_port_scan_scope(),
         download_timeout_seconds: 60,
         theme: "system".to_string(),
         last_page: "home".to_string(),
@@ -9547,7 +9557,17 @@ fn default_settings() -> Settings {
         safety_disclaimer_accepted: false,
         safety_disclaimer_version: 0,
         safety_disclaimer_accepted_at: None,
+        onboarding_completed: false,
+        extra: BTreeMap::new(),
     }
+}
+
+fn default_true() -> bool {
+    true
+}
+
+fn default_port_scan_scope() -> String {
+    "recommended".to_string()
 }
 
 fn default_stable_channel() -> String {
@@ -14030,6 +14050,51 @@ mod tests {
             validate_setting(Some("valid value"), "测试值").unwrap(),
             "valid value"
         );
+    }
+
+    #[test]
+    fn legacy_settings_gain_safe_v2_defaults() {
+        let settings: Settings = serde_json::from_value(json!({
+            "rootDir": "C:\\DevEnvManager",
+            "autoCheckUpdate": false,
+            "downloadTimeoutSeconds": 60,
+            "theme": "system",
+            "lastPage": "home",
+            "updateManifestUrl": "https://example.invalid/update.json",
+            "portProcessExclusions": []
+        }))
+        .unwrap();
+
+        assert!(settings.auto_scan_ports_on_startup);
+        assert_eq!(settings.port_scan_scope, "recommended");
+        assert!(!settings.onboarding_completed);
+        assert!(settings.extra.is_empty());
+    }
+
+    #[test]
+    fn newer_settings_fields_survive_a_v17_style_save() {
+        let mut settings: Settings = serde_json::from_value(json!({
+            "rootDir": "C:\\DevEnvManager",
+            "autoCheckUpdate": false,
+            "autoScanPortsOnStartup": false,
+            "portScanScope": "all",
+            "downloadTimeoutSeconds": 60,
+            "theme": "dark",
+            "lastPage": "runtimes",
+            "updateManifestUrl": "https://example.invalid/update.json",
+            "portProcessExclusions": [],
+            "onboardingCompleted": true,
+            "futurePolicy": { "enabled": true, "revision": 2 }
+        }))
+        .unwrap();
+        settings.auto_check_update = true;
+
+        let saved = serde_json::to_value(settings).unwrap();
+        assert_eq!(saved["autoCheckUpdate"], true);
+        assert_eq!(saved["autoScanPortsOnStartup"], false);
+        assert_eq!(saved["portScanScope"], "all");
+        assert_eq!(saved["onboardingCompleted"], true);
+        assert_eq!(saved["futurePolicy"]["revision"], 2);
     }
 
     #[test]
