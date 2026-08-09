@@ -49,6 +49,9 @@ jobs:
       - name: v1.7 frontend baseline
         run: python scripts/check_v17_frontend_baseline.py
 
+      - name: v2 migration manifest
+        run: python scripts/check_v2_migration_manifest.py
+
       - name: Safety wording
         run: python scripts/check_safety_wording.py
 

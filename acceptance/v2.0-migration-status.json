@@ -1,0 +1,125 @@
+{
+  "schemaVersion": 1,
+  "sourceVersion": "1.7.0",
+  "referenceVersion": "1.9.4",
+  "frontendPolicy": "preserve-v1.7-layout-content-and-styles",
+  "interactionPolicy": "keep-v1.7-single-confirmation-with-transparent-backend-validation",
+  "summary": {
+    "referenceOnlyCommands": 38,
+    "batches": 8
+  },
+  "completedBehaviorMigrations": [
+    "bounded-native-and-powershell-runner",
+    "windows-command-output-decoding",
+    "external-loader-error-dialog-suppression",
+    "forward-compatible-settings-preservation",
+    "unwritable-initial-root-recovery",
+    "backend-bound-single-use-move-and-expansion-plans",
+    "isolated-startup-data-loading",
+    "bounded-port-scan-with-read-only-fallback"
+  ],
+  "batches": [
+    {
+      "id": "ports",
+      "priority": "P0",
+      "status": "in-progress",
+      "strategy": "merge reliability and one-click release into the existing v1.7 ports page",
+      "commands": [
+        "cancel_port_scan",
+        "create_port_resolution_plan",
+        "enrich_port_scan",
+        "execute_port_resolution_plan",
+        "export_port_report",
+        "port_scan_status",
+        "set_port_scan_preferences"
+      ]
+    },
+    {
+      "id": "runtime",
+      "priority": "P0",
+      "status": "pending",
+      "strategy": "keep existing runtime cards and actions; perform plan validation transparently",
+      "commands": [
+        "cancel_runtime_switch_plan",
+        "create_runtime_switch_plan",
+        "execute_runtime_switch_plan",
+        "export_runtime_switch_plan",
+        "export_runtime_verification_report",
+        "install_gradle",
+        "install_maven",
+        "list_runtime_switch_backups",
+        "restore_runtime_switch_backup"
+      ]
+    },
+    {
+      "id": "cleanup",
+      "priority": "P0",
+      "status": "pending",
+      "strategy": "add useful actions to existing v1.7 cleanup sections without a second execution screen",
+      "commands": [
+        "create_desktop_cleanup_plan",
+        "create_generic_archive_plan",
+        "create_junction_bridge_plan",
+        "create_recycle_bin_cleanup_plan",
+        "execute_desktop_cleanup_plan",
+        "execute_generic_archive_plan",
+        "execute_recycle_bin_cleanup_plan",
+        "inspect_recycle_bin",
+        "open_recycle_bin"
+      ]
+    },
+    {
+      "id": "profiles",
+      "priority": "P1",
+      "status": "pending",
+      "strategy": "extend the existing profile list and preserve one-click apply behavior",
+      "commands": [
+        "config_profile_plan_id",
+        "copy_config_profile",
+        "create_profile_apply_plan",
+        "create_profile_history_restore_plan",
+        "execute_profile_apply_plan",
+        "execute_profile_history_restore_plan",
+        "list_config_profile_history",
+        "rename_config_profile"
+      ]
+    },
+    {
+      "id": "doctor",
+      "priority": "P1",
+      "status": "pending",
+      "strategy": "replace the legacy direct repair internally while retaining its existing button and result panel",
+      "commands": [
+        "create_doctor_repair_plan",
+        "execute_doctor_repair_plan"
+      ]
+    },
+    {
+      "id": "file-associations",
+      "priority": "P1",
+      "status": "pending",
+      "strategy": "wire application search into the existing file-association controls",
+      "commands": [
+        "search_file_association_app"
+      ]
+    },
+    {
+      "id": "reports",
+      "priority": "P1",
+      "status": "pending",
+      "strategy": "add durable export results to the existing project report area",
+      "commands": [
+        "export_project_report"
+      ]
+    },
+    {
+      "id": "onboarding",
+      "priority": "P2",
+      "status": "deferred",
+      "strategy": "do not add a new first-run overlay while the v1.7 frontend is frozen",
+      "commands": [
+        "complete_onboarding"
+      ]
+    }
+  ]
+}
