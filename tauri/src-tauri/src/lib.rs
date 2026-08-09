@@ -4066,12 +4066,36 @@ async fn scan_ports() -> Result<Vec<PortRecord>, String> {
 }
 
 fn scan_ports_blocking() -> Result<Vec<PortRecord>, String> {
-    let output = hidden_command("netstat")
-        .args(["-ano"])
-        .output()
-        .map_err(|err| format!("无法执行 netstat: {err}"))?;
-
-    let text = String::from_utf8_lossy(&output.stdout);
+    let netstat = powershell_runner::run_probe_command("netstat", &["-ano"], 8);
+    let text = match netstat {
+        Ok(output) if output.success => output.stdout,
+        netstat_result => {
+            let netstat_error = match netstat_result {
+                Ok(output) => powershell_runner::native_command_message(&output),
+                Err(error) => error,
+            };
+            let fallback = powershell_runner::run_powershell_script(
+                port_scan_fallback_script(),
+                Vec::new(),
+                10,
+            )
+            .map_err(|error| {
+                format!("Port scan failed: netstat {netstat_error}; PowerShell {error}")
+            })?;
+            if !fallback.success {
+                let detail = if fallback.stderr.trim().is_empty() {
+                    fallback.stdout.trim()
+                } else {
+                    fallback.stderr.trim()
+                };
+                return Err(format!(
+                    "Port scan failed: netstat {netstat_error}; PowerShell timedOut={} exit={:?} elapsed={}ms {}",
+                    fallback.timed_out, fallback.exit_code, fallback.elapsed_ms, detail
+                ));
+            }
+            fallback.stdout
+        }
+    };
     let system = sysinfo::System::new_all();
     let services = windows_service_map();
     let mut records = Vec::new();
@@ -4150,6 +4174,26 @@ fn scan_ports_blocking() -> Result<Vec<PortRecord>, String> {
     });
     let _ = update_port_history(&records);
     Ok(records)
+}
+
+fn port_scan_fallback_script() -> &'static str {
+    r#"$ErrorActionPreference = 'Stop'
+function Format-Endpoint([string]$Address, [int]$Port) {
+  if ([string]::IsNullOrWhiteSpace($Address)) { return '*:*' }
+  if ($Address.Contains(':')) { return "[$Address]:$Port" }
+  return "${Address}:$Port"
+}
+Get-NetTCPConnection -ErrorAction Stop | ForEach-Object {
+  $local = Format-Endpoint ([string]$_.LocalAddress) ([int]$_.LocalPort)
+  $remote = Format-Endpoint ([string]$_.RemoteAddress) ([int]$_.RemotePort)
+  $state = ([string]$_.State).ToUpperInvariant()
+  if ($state -eq 'LISTEN') { $state = 'LISTENING' }
+  "TCP $local $remote $state $([int]$_.OwningProcess)"
+}
+Get-NetUDPEndpoint -ErrorAction SilentlyContinue | ForEach-Object {
+  $local = Format-Endpoint ([string]$_.LocalAddress) ([int]$_.LocalPort)
+  "UDP $local *:* $([int]$_.OwningProcess)"
+}"#
 }
 
 #[tauri::command]
