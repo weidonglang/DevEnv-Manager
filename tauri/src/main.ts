@@ -1473,7 +1473,7 @@ function renderPortDetails() {
       <button data-action="copy-text" data-copy="${escapeHtml(portDiagnosticSummary(record))}">${icon(Clipboard)}<span>复制摘要</span></button>
       ${isHttpLike ? `<button data-action="copy-text" data-copy="curl -I http://127.0.0.1:${record.localPort}">${icon(Clipboard)}<span>复制 curl</span></button>` : ""}
       ${isDatabase ? `<button data-action="copy-text" data-copy="${escapeHtml(databaseCommandHint(record))}">${icon(Database)}<span>复制连接命令</span></button>` : ""}
-      ${canShowKillPortAction(record) ? `<button class="danger-button" data-action="kill-port" data-pid="${record.pid}">${icon(Trash2)}<span>安全结束</span></button>` : `<span class="small-note">系统关键或高风险进程不提供结束入口</span>`}
+      ${canQuickReleasePort(record) ? `<button class="danger-button" data-action="kill-port" data-port="${record.localPort}" data-pid="${record.pid}">${icon(Trash2)}<span>安全结束</span></button>` : `<span class="small-note">系统关键或高风险进程不提供结束入口</span>`}
     </div>
   `;
 }
@@ -2389,28 +2389,12 @@ async function runRuntimeOperation(
   }
 }
 
-async function terminatePortProcess(pid: number) {
-  const record = state.ports.find((item) => item.pid === pid);
+async function terminatePortProcess(port: number, pid: number) {
+  const record = state.ports.find((item) => item.localPort === port && item.pid === pid);
   const label = record ? `${record.processName} / PID ${pid}` : `PID ${pid}`;
-  if (!(await askForConfirmation(`将结束 ${label} 及其子进程。确定继续吗？`))) return;
+  if (!(await askForConfirmation(`将非强制结束 ${label} 及其子进程并验证端口 ${port} 已释放。确定继续吗？`))) return;
   try {
-    const planId = `pid-${pid}-force-false-allow-false`;
-    const fingerprint = await processActionFingerprint("kill_process", planId, "high");
-    const token = await createBackendConfirmation("kill_process", planId, "high", fingerprint, false);
-    let result = await invoke<KillResult>("kill_process", { pid, force: false, allowCaution: false, confirmationToken: token.token });
-    if (result.needsForce) {
-      const force = await askForConfirmation(`${result.message}\n\n是否改为强制结束？`);
-      if (!force) {
-        showToast("已取消强制结束");
-        return;
-      }
-      if (!(await askForConfirmation("强制结束是极高风险操作。第一次确认：我已保存相关工作。"))) return;
-      if (!(await askForConfirmation("第二次确认：我理解这可能导致数据未保存或服务中断。"))) return;
-      const forcePlanId = `pid-${pid}-force-true-allow-false`;
-      const forceFingerprint = await processActionFingerprint("kill_process", forcePlanId, "critical");
-      const forceToken = await createBackendConfirmation("kill_process", forcePlanId, "critical", forceFingerprint, true);
-      result = await invoke<KillResult>("kill_process", { pid, force: true, allowCaution: false, confirmationToken: forceToken.token });
-    }
+    const result = await invoke<KillResult>("release_user_port", { port, pid });
     showToast(result.message, !result.success);
     state.ports = await invoke<PortRecord[]>("scan_ports");
     state.portHistory = await invoke<PortHistorySummary[]>("port_history");
@@ -2428,6 +2412,16 @@ async function copyText(text: string) {
   } catch {
     showToast(text);
   }
+}
+
+function canQuickReleasePort(record: PortRecord) {
+  return (
+    canShowKillPortAction(record) &&
+    record.state.toLowerCase() === "listening" &&
+    record.serviceNames.length === 0 &&
+    record.riskLevel.toLowerCase() === "low" &&
+    record.confidence >= 40
+  );
 }
 
 function focusResult(selector: string) {
@@ -5168,8 +5162,9 @@ document.addEventListener("click", async (event) => {
     );
   }
   if (action === "kill-port") {
+    const port = Number(button.dataset.port || 0);
     const pid = Number(button.dataset.pid || 0);
-    void terminatePortProcess(pid);
+    void terminatePortProcess(port, pid);
   }
 });
 

@@ -4045,6 +4045,122 @@ fn kill_process(
     }
 }
 
+fn quick_port_release_guard(record: &PortRecord) -> Result<(), String> {
+    if BLOCKED_PIDS.contains(&record.pid) {
+        return Err(format!("PID {} is protected", record.pid));
+    }
+    let process_name = record.process_name.to_ascii_lowercase();
+    if BLOCKED_NAMES.contains(&process_name.as_str())
+        || CAUTION_NAMES.contains(&process_name.as_str())
+    {
+        return Err(format!("{} is a protected system process", record.process_name));
+    }
+    if !record.state.eq_ignore_ascii_case("LISTENING") {
+        return Err("This record is a connection, not a local listening port".to_string());
+    }
+    if !record.service_names.is_empty() {
+        return Err(format!(
+            "Windows service owns this port: {}",
+            record.service_names.join(", ")
+        ));
+    }
+    if !record.risk_level.eq_ignore_ascii_case("low") {
+        return Err(format!(
+            "Quick release is disabled for {} risk ports",
+            record.risk_level
+        ));
+    }
+    if record.confidence < 40 {
+        return Err("Process identity confidence is too low for quick release".to_string());
+    }
+
+    let identity = record.identity.to_ascii_lowercase();
+    let known_development_process = [
+        "node.exe",
+        "python.exe",
+        "python3.exe",
+        "py.exe",
+        "cargo.exe",
+        "go.exe",
+        "dotnet.exe",
+        "php.exe",
+        "ruby.exe",
+        "bun.exe",
+        "deno.exe",
+    ]
+    .contains(&process_name.as_str());
+    let known_development_identity = [
+        "spring boot",
+        "tomcat",
+        "vite",
+        "webpack",
+        "next.js",
+        "nuxt",
+        "react scripts",
+        "vue cli",
+        "angular",
+        "storybook",
+        "nestjs",
+        "fastapi",
+        "uvicorn",
+        "jupyter",
+        "streamlit",
+        "gradio",
+    ]
+    .iter()
+    .any(|marker| identity.contains(marker));
+    if !known_development_process && !known_development_identity {
+        return Err("Only recognized user development processes support quick release".to_string());
+    }
+    Ok(())
+}
+
+#[tauri::command]
+async fn release_user_port(port: u16, pid: u32) -> Result<KillResult, String> {
+    run_blocking(move || {
+        let records = scan_ports_blocking()?;
+        let record = records
+            .iter()
+            .find(|item| item.local_port == port && item.pid == pid)
+            .ok_or_else(|| "Port owner changed; rescan before releasing it".to_string())?;
+        quick_port_release_guard(record)?;
+
+        let pid_text = pid.to_string();
+        let result = powershell_runner::run_probe_command(
+            "taskkill",
+            &["/PID", pid_text.as_str(), "/T"],
+            8,
+        )?;
+        if !result.success {
+            return Ok(KillResult {
+                success: false,
+                message: format!(
+                    "Quick release failed without forcing the process: {}",
+                    powershell_runner::native_command_message(&result)
+                ),
+                needs_force: false,
+                blocked: false,
+            });
+        }
+
+        std::thread::sleep(std::time::Duration::from_millis(250));
+        let still_owned = scan_ports_blocking()?
+            .into_iter()
+            .any(|item| item.local_port == port && item.pid == pid);
+        Ok(KillResult {
+            success: !still_owned,
+            message: if still_owned {
+                format!("PID {pid} exited but port {port} is still reported; rescan before retrying")
+            } else {
+                format!("Released port {port} by ending PID {pid} without force")
+            },
+            needs_force: false,
+            blocked: false,
+        })
+    })
+    .await?
+}
+
 fn process_action_fingerprint(action_id: &str, plan_id: &str, risk_level: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(action_id.as_bytes());
@@ -9168,6 +9284,7 @@ pub fn run() {
             switch_runtime,
             uninstall_runtime,
             kill_process,
+            release_user_port,
             scan_ports,
             port_history,
             open_process_location,
@@ -13745,6 +13862,59 @@ mod tests {
         assert!(verify_expansion_plan(&plan).is_ok());
         assert_eq!(consume_expansion_plan(plan.clone()).unwrap(), plan);
         assert!(consume_expansion_plan(plan).is_err());
+    }
+
+    fn quick_release_port_record() -> PortRecord {
+        PortRecord {
+            protocol: "TCP".to_string(),
+            local_address: "127.0.0.1".to_string(),
+            local_port: 5173,
+            remote_address: "0.0.0.0:0".to_string(),
+            state: "LISTENING".to_string(),
+            pid: 4242,
+            process_name: "node.exe".to_string(),
+            process_path: r"C:\Tools\node.exe".to_string(),
+            command_line: "node vite".to_string(),
+            parent_pid: 4000,
+            parent_process_name: "cmd.exe".to_string(),
+            service_names: Vec::new(),
+            common_usage: "Vite".to_string(),
+            explanation: "test".to_string(),
+            risk: "普通".to_string(),
+            identity: "Vite".to_string(),
+            confidence: 90,
+            evidence_count: 2,
+            conflict_count: 0,
+            risk_level: "low".to_string(),
+            recommendation: "test".to_string(),
+            evidence: vec!["node.exe".to_string()],
+            conflict_evidence: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn quick_port_release_accepts_recognized_user_dev_listener() {
+        assert!(quick_port_release_guard(&quick_release_port_record()).is_ok());
+    }
+
+    #[test]
+    fn quick_port_release_rejects_connections_services_and_sensitive_ports() {
+        let mut record = quick_release_port_record();
+        record.state = "ESTABLISHED".to_string();
+        assert!(quick_port_release_guard(&record).is_err());
+
+        record = quick_release_port_record();
+        record.service_names.push("ExampleService".to_string());
+        assert!(quick_port_release_guard(&record).is_err());
+
+        record = quick_release_port_record();
+        record.risk_level = "high".to_string();
+        assert!(quick_port_release_guard(&record).is_err());
+
+        record = quick_release_port_record();
+        record.process_name = "desktop-app.exe".to_string();
+        record.identity = "桌面应用".to_string();
+        assert!(quick_port_release_guard(&record).is_err());
     }
 
     #[test]
