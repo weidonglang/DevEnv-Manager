@@ -1343,9 +1343,23 @@ fn app_snapshot() -> AppSnapshot {
 
 #[tauri::command]
 fn load_config() -> Result<ConfigView, String> {
-    let settings = load_settings()?;
-    let paths = AppPaths::new(PathBuf::from(&settings.root_dir));
-    paths.ensure().map_err(|err| err.to_string())?;
+    let mut settings = load_settings()?;
+    let mut paths = AppPaths::new(PathBuf::from(&settings.root_dir));
+    if let Err(error) = paths.ensure() {
+        if !should_recover_unwritable_initial_root(&settings) {
+            return Err(error.to_string());
+        }
+
+        let recovered_root = default_root_dir();
+        if path_key(&display_path(&recovered_root)) == path_key(&settings.root_dir) {
+            return Err(error.to_string());
+        }
+        let recovered_paths = AppPaths::new(recovered_root);
+        recovered_paths.ensure().map_err(|err| err.to_string())?;
+        settings.root_dir = display_path(&recovered_paths.root);
+        save_json(&settings_file(), &settings)?;
+        paths = recovered_paths;
+    }
     let installed = load_installed(&paths)?;
     Ok(ConfigView {
         settings,
@@ -1358,11 +1372,11 @@ fn load_config() -> Result<ConfigView, String> {
 fn set_root_dir(root: String) -> Result<ConfigView, String> {
     let root = normalize_root_dir(&root)?;
     let mut settings = load_settings()?;
-    settings.root_dir = display_path(&root);
-    save_json(&settings_file(), &settings)?;
     let paths = AppPaths::new(root);
     paths.ensure().map_err(|err| err.to_string())?;
     ensure_installed(&paths)?;
+    settings.root_dir = display_path(&paths.root);
+    save_json(&settings_file(), &settings)?;
     load_config()
 }
 
@@ -9450,13 +9464,64 @@ impl ExpandHome for Path {
 }
 
 fn default_root_dir() -> PathBuf {
-    if cfg!(windows) && Path::new("D:\\").exists() {
-        PathBuf::from("D:\\DevEnvManager")
-    } else {
-        dirs::home_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
-            .join(APP_NAME)
+    #[cfg(windows)]
+    {
+        for drive in [Path::new("D:\\"), Path::new("C:\\")] {
+            if let Some(root) = writable_managed_root(drive) {
+                return root;
+            }
+        }
     }
+
+    dirs::home_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join(APP_NAME)
+}
+
+fn writable_managed_root(base: &Path) -> Option<PathBuf> {
+    if !base.is_dir() {
+        return None;
+    }
+
+    let managed_root = base.join(APP_NAME);
+    if !managed_root.exists() {
+        return match fs::create_dir(&managed_root) {
+            Ok(()) => {
+                let _ = fs::remove_dir(&managed_root);
+                Some(managed_root)
+            }
+            Err(_) => None,
+        };
+    }
+    if !managed_root.is_dir() {
+        return None;
+    }
+
+    let probe = managed_root.join(format!(
+        ".devenv-manager-root-probe-{}-{}",
+        std::process::id(),
+        SAVE_JSON_COUNTER.fetch_add(1, Ordering::Relaxed)
+    ));
+    match fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&probe)
+    {
+        Ok(file) => {
+            drop(file);
+            let _ = fs::remove_file(probe);
+            Some(managed_root)
+        }
+        Err(_) => None,
+    }
+}
+
+fn should_recover_unwritable_initial_root(settings: &Settings) -> bool {
+    cfg!(windows)
+        && !settings.safety_disclaimer_accepted
+        && settings.safety_disclaimer_version == 0
+        && settings.safety_disclaimer_accepted_at.is_none()
+        && path_key(&settings.root_dir) == path_key(r"D:\DevEnvManager")
 }
 
 fn normalize_root_dir(input: &str) -> Result<PathBuf, String> {
@@ -13401,6 +13466,46 @@ fn display_path(path: impl AsRef<Path>) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn writable_managed_root_probes_new_and_existing_directories() {
+        let temp = tempfile::tempdir().unwrap();
+        let base = temp.path().join("drive");
+        fs::create_dir(&base).unwrap();
+
+        let managed = writable_managed_root(&base).unwrap();
+        assert_eq!(managed, base.join(APP_NAME));
+        assert!(!managed.exists());
+
+        fs::create_dir(&managed).unwrap();
+        assert_eq!(writable_managed_root(&base), Some(managed.clone()));
+        assert_eq!(fs::read_dir(&managed).unwrap().count(), 0);
+    }
+
+    #[test]
+    fn writable_managed_root_rejects_missing_base_and_file_collision() {
+        let temp = tempfile::tempdir().unwrap();
+        assert!(writable_managed_root(&temp.path().join("missing")).is_none());
+
+        let collision = temp.path().join(APP_NAME);
+        fs::write(&collision, "not a directory").unwrap();
+        assert!(writable_managed_root(temp.path()).is_none());
+    }
+
+    #[test]
+    fn initial_legacy_default_is_recoverable_only_before_user_setup() {
+        let mut settings = default_settings();
+        settings.root_dir = r"D:\DevEnvManager".to_string();
+        assert_eq!(
+            should_recover_unwritable_initial_root(&settings),
+            cfg!(windows)
+        );
+
+        settings.safety_disclaimer_accepted = true;
+        settings.safety_disclaimer_version = SAFETY_DISCLAIMER_VERSION;
+        settings.safety_disclaimer_accepted_at = Some("accepted".to_string());
+        assert!(!should_recover_unwritable_initial_root(&settings));
+    }
 
     #[test]
     fn merge_path_adds_managed_entries_once() {
