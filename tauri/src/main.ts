@@ -2239,27 +2239,29 @@ async function inspectProjectPorts(showProgress = true) {
 }
 
 async function refreshBase() {
-  const [snapshot, config, envSnapshot, profiles, jdkDistributions, cleanupArchitecture, environmentBackups, safetyDisclaimer, featureRisks] = await Promise.all([
+  const [snapshot, config, safetyDisclaimer, optional] = await Promise.all([
     invoke<AppSnapshot>("app_snapshot"),
     invoke<ConfigView>("load_config"),
-    invoke<EnvSnapshot>("env_snapshot"),
-    invoke<ConfigProfile[]>("list_config_profiles"),
-    invoke<JdkDistribution[]>("jdk_distributions"),
-    invoke<CleanupArchitecture>("storage_cleanup_architecture"),
-    invoke<EnvironmentBackupInfo[]>("list_environment_backups"),
     invoke<string>("safety_disclaimer"),
-    invoke<FeatureRiskInfo[]>("feature_risk_registry"),
+    Promise.allSettled([
+      invoke<EnvSnapshot>("env_snapshot"),
+      invoke<ConfigProfile[]>("list_config_profiles"),
+      invoke<JdkDistribution[]>("jdk_distributions"),
+      invoke<CleanupArchitecture>("storage_cleanup_architecture"),
+      invoke<EnvironmentBackupInfo[]>("list_environment_backups"),
+      invoke<FeatureRiskInfo[]>("feature_risk_registry"),
+    ]),
   ]);
 
   state.snapshot = snapshot;
   state.config = config;
-  state.env = envSnapshot;
-  state.profiles = profiles;
-  state.jdkDistributions = jdkDistributions;
-  state.cleanupArchitecture = cleanupArchitecture;
-  state.environmentBackups = environmentBackups;
   state.safetyDisclaimer = safetyDisclaimer;
-  state.featureRisks = featureRisks;
+  if (optional[0].status === "fulfilled") state.env = optional[0].value as EnvSnapshot;
+  if (optional[1].status === "fulfilled") state.profiles = optional[1].value as ConfigProfile[];
+  if (optional[2].status === "fulfilled") state.jdkDistributions = optional[2].value as JdkDistribution[];
+  if (optional[3].status === "fulfilled") state.cleanupArchitecture = optional[3].value as CleanupArchitecture;
+  if (optional[4].status === "fulfilled") state.environmentBackups = optional[4].value as EnvironmentBackupInfo[];
+  if (optional[5].status === "fulfilled") state.featureRisks = optional[5].value as FeatureRiskInfo[];
   renderSnapshot();
   renderEnv();
   renderEnvironmentPreview();
@@ -2303,19 +2305,27 @@ async function refreshBase() {
 }
 
 async function refreshRuntimeAndPorts(silent = false) {
-  try {
-    const [runtimes, ports] = await Promise.all([
-      invoke<RuntimeInfo[]>("discover_runtimes"),
-      invoke<PortRecord[]>("scan_ports"),
-    ]);
-    state.runtimes = runtimes;
-    state.ports = ports;
-    state.portHistory = await invoke<PortHistorySummary[]>("port_history");
+  const results = await Promise.allSettled([
+    invoke<RuntimeInfo[]>("discover_runtimes"),
+    invoke<PortRecord[]>("scan_ports"),
+    invoke<PortHistorySummary[]>("port_history"),
+  ]);
+  if (results[0].status === "fulfilled") {
+    state.runtimes = results[0].value as RuntimeInfo[];
     renderRuntimes();
+  }
+  if (results[1].status === "fulfilled") {
+    state.ports = results[1].value as PortRecord[];
     renderPorts();
-  } catch (error) {
-    if (!silent) {
-      showToast(error instanceof Error ? error.message : String(error), true);
+  }
+  if (results[2].status === "fulfilled") {
+    state.portHistory = results[2].value as PortHistorySummary[];
+    renderPorts();
+  }
+  if (!silent) {
+    const failures = results.filter((result): result is PromiseRejectedResult => result.status === "rejected");
+    if (failures.length) {
+      showToast(failures.map((result) => errorToText(result.reason)).join("\n"), true);
     }
   }
 }
@@ -5152,13 +5162,15 @@ void refreshAll(false).then(() => {
   window.setTimeout(() => void refreshRuntimeAndPorts(true), 350);
   window.setInterval(async () => {
     if (state.safeMode) return;
+    const activeView = document.querySelector<HTMLElement>(".nav-item.active")?.dataset.view;
+    if (activeView !== "runtimes") return;
     try {
       state.runtimes = await invoke<RuntimeInfo[]>("discover_runtimes");
       renderRuntimes();
     } catch {
       // 实时版本刷新保持静默。
     }
-  }, 30_000);
+  }, 5 * 60_000);
   if (state.config?.settings.autoCheckUpdate) {
     const lastCheck = Number(window.localStorage.getItem("devenv-last-update-check") || 0);
     if (Date.now() - lastCheck >= 24 * 60 * 60 * 1000) {
