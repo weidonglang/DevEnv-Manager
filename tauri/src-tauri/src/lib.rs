@@ -3,6 +3,7 @@ mod diagnostics;
 mod env_core;
 mod file_assoc;
 mod mysql_repair;
+mod powershell_runner;
 mod safety;
 
 use serde::{Deserialize, Serialize};
@@ -8855,7 +8856,20 @@ async fn export_file_association_report() -> Result<String, String> {
     run_blocking(file_assoc::export_file_association_report_blocking).await?
 }
 
+#[tauri::command]
+async fn powershell_runner_status() -> Result<powershell_runner::PowerShellResult, String> {
+    run_blocking(|| {
+        powershell_runner::run_powershell_script(
+            "$PSVersionTable.PSVersion.ToString()",
+            Vec::new(),
+            5,
+        )
+    })
+    .await?
+}
+
 pub fn run() {
+    suppress_system_error_dialogs();
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
@@ -9016,11 +9030,32 @@ pub fn run() {
             open_default_apps_settings,
             open_file_type_settings,
             open_file_association_backup_dir,
-            export_file_association_report
+            export_file_association_report,
+            powershell_runner_status
         ])
         .run(tauri::generate_context!())
         .expect("error while running DevEnv Manager");
 }
+
+#[cfg(windows)]
+fn suppress_system_error_dialogs() {
+    const SEM_FAILCRITICALERRORS: u32 = 0x0001;
+    const SEM_NOGPFAULTERRORBOX: u32 = 0x0002;
+
+    #[link(name = "kernel32")]
+    unsafe extern "system" {
+        fn SetErrorMode(mode: u32) -> u32;
+    }
+
+    // Runtime probes must report loader failures in the existing page instead
+    // of blocking navigation with a native Windows error dialog.
+    unsafe {
+        SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
+    }
+}
+
+#[cfg(not(windows))]
+fn suppress_system_error_dialogs() {}
 
 pub fn cli_main() -> i32 {
     match run_cli(std::env::args().skip(1).collect()) {
@@ -11329,15 +11364,15 @@ fn run_command_output(
     args: &[&str],
     timeout_seconds: u64,
 ) -> Result<String, String> {
-    let output = hidden_command(executable)
-        .args(args)
-        .output()
+    let output = powershell_runner::run_probe_command(executable, args, timeout_seconds)
         .map_err(|err| format!("执行命令失败：{err}"))?;
-    let _ = timeout_seconds;
-    if !output.status.success() {
-        return Err(command_text(&output.stdout, &output.stderr));
+    if !output.success {
+        return Err(powershell_runner::native_command_message(&output));
     }
-    Ok(command_text(&output.stdout, &output.stderr))
+    Ok(command_text(
+        output.stdout.as_bytes(),
+        output.stderr.as_bytes(),
+    ))
 }
 
 fn process_details(system: &sysinfo::System, pid: u32) -> (String, String, u32, String) {
@@ -11899,8 +11934,21 @@ fn apply_managed_environment(paths: &AppPaths, command: &mut Command) {
 }
 
 pub(crate) fn command_text(stdout: &[u8], stderr: &[u8]) -> String {
-    let stdout = decode_command_stream(stdout).trim().to_string();
-    let stderr = decode_command_stream(stderr).trim().to_string();
+    const MAX_COMMAND_OUTPUT_CHARS: usize = 32 * 1024;
+    let truncate = |value: String| {
+        let mut chars = value.trim().chars();
+        let text = chars
+            .by_ref()
+            .take(MAX_COMMAND_OUTPUT_CHARS)
+            .collect::<String>();
+        if chars.next().is_some() {
+            format!("{text}\n[output truncated by DevEnv Manager]")
+        } else {
+            text
+        }
+    };
+    let stdout = truncate(decode_command_stream(stdout));
+    let stderr = truncate(decode_command_stream(stderr));
     [stdout, stderr]
         .into_iter()
         .filter(|item| !item.is_empty())
@@ -11935,6 +11983,41 @@ pub(crate) fn decode_command_stream(bytes: &[u8]) -> String {
 
 #[cfg(windows)]
 fn decode_windows_ansi(bytes: &[u8]) -> Option<String> {
+    const CODE_PAGE_CANDIDATES: [(u32, i32); 7] = [
+        (0, 8),
+        (1, 6),
+        (936, 0),
+        (950, 0),
+        (932, 0),
+        (949, 0),
+        (1252, 0),
+    ];
+
+    if bytes.is_empty() {
+        return Some(String::new());
+    }
+
+    let mut best: Option<(i32, String)> = None;
+    for (code_page, preference) in CODE_PAGE_CANDIDATES {
+        let Some(value) = decode_windows_code_page(bytes, code_page, true) else {
+            continue;
+        };
+        let score = decoded_text_score(&value) + preference;
+        if best
+            .as_ref()
+            .map(|(best_score, _)| score > *best_score)
+            .unwrap_or(true)
+        {
+            best = Some((score, value));
+        }
+    }
+
+    best.map(|(_, value)| value)
+        .or_else(|| decode_windows_code_page(bytes, 0, false))
+}
+
+#[cfg(windows)]
+fn decode_windows_code_page(bytes: &[u8], code_page: u32, strict: bool) -> Option<String> {
     #[link(name = "kernel32")]
     extern "system" {
         fn MultiByteToWideChar(
@@ -11949,10 +12032,12 @@ fn decode_windows_ansi(bytes: &[u8]) -> Option<String> {
     if bytes.is_empty() || bytes.len() > i32::MAX as usize {
         return Some(String::new());
     }
+    const MB_ERR_INVALID_CHARS: u32 = 0x0000_0008;
+    let flags = if strict { MB_ERR_INVALID_CHARS } else { 0 };
     let required = unsafe {
         MultiByteToWideChar(
-            0,
-            0,
+            code_page,
+            flags,
             bytes.as_ptr(),
             bytes.len() as i32,
             std::ptr::null_mut(),
@@ -11965,8 +12050,8 @@ fn decode_windows_ansi(bytes: &[u8]) -> Option<String> {
     let mut words = vec![0_u16; required as usize];
     let written = unsafe {
         MultiByteToWideChar(
-            0,
-            0,
+            code_page,
+            flags,
             bytes.as_ptr(),
             bytes.len() as i32,
             words.as_mut_ptr(),
@@ -11974,6 +12059,34 @@ fn decode_windows_ansi(bytes: &[u8]) -> Option<String> {
         )
     };
     (written > 0).then(|| String::from_utf16_lossy(&words[..written as usize]))
+}
+
+#[cfg(windows)]
+fn decoded_text_score(value: &str) -> i32 {
+    value
+        .chars()
+        .map(|character| {
+            if character == '\u{fffd}' {
+                -20
+            } else if character.is_control() && !matches!(character, '\r' | '\n' | '\t') {
+                -10
+            } else if character.is_ascii() {
+                1
+            } else if matches!(
+                character,
+                '\u{4e00}'..='\u{9fff}'
+                    | '\u{3400}'..='\u{4dbf}'
+                    | '\u{3040}'..='\u{30ff}'
+                    | '\u{ac00}'..='\u{d7af}'
+            ) {
+                4
+            } else if character.is_alphabetic() {
+                3
+            } else {
+                0
+            }
+        })
+        .sum()
 }
 
 #[cfg(not(windows))]
@@ -12629,21 +12742,21 @@ fn probe_tool(name: &str, executable: Option<PathBuf>, args: &[&str]) -> ToolSta
             detail: "没有在受管目录、当前 PATH 或用户 PATH 中找到".to_string(),
         };
     };
-    let output = hidden_command(&executable).args(args).output();
+    let output = powershell_runner::run_probe_command(&executable, args, 30);
     match output {
         Ok(output) => {
-            let detail = command_text(&output.stdout, &output.stderr);
+            let detail = command_text(output.stdout.as_bytes(), output.stderr.as_bytes());
             let version =
                 first_meaningful_output_line(&detail).unwrap_or_else(|| "未返回版本".to_string());
             ToolState {
                 name: name.to_string(),
-                installed: output.status.success(),
+                installed: output.success,
                 version,
                 path: display_path(&executable),
-                detail: if output.status.success() {
+                detail: if output.success {
                     classify_source(&display_path(&executable))
                 } else {
-                    detail
+                    powershell_runner::native_command_message(&output)
                 },
             }
         }
@@ -14008,6 +14121,38 @@ mod tests {
             .flat_map(u16::to_le_bytes)
             .collect::<Vec<_>>();
         assert_eq!(decode_command_stream(&bytes), "WSL 正常");
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn command_stream_decodes_gbk_independently_of_system_locale() {
+        let bytes = [190, 220, 190, 248, 183, 195, 206, 202];
+        assert_eq!(decode_command_stream(&bytes), "拒绝访问");
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn command_stream_preserves_cp1252_text() {
+        let bytes = [
+            b'A', b'c', b'c', 0xe8, b's', b' ', b'r', b'e', b'f', b'u', b's', 0xe9,
+        ];
+        assert_eq!(decode_command_stream(&bytes), "Accès refusé");
+    }
+
+    #[test]
+    fn command_text_caps_each_output_stream() {
+        let oversized = vec![b'x'; 40 * 1024];
+        let text = command_text(&oversized, &oversized);
+        assert!(text.contains("[output truncated by DevEnv Manager]"));
+        assert!(text.len() < 70 * 1024);
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn command_stream_scoring_prefers_cp1252_letters_over_oem_glyphs() {
+        let cp1252_score = decoded_text_score("Accès refusé") + 8;
+        let oem_score = decoded_text_score("AccΦs refusΘ") + 6;
+        assert!(cp1252_score > oem_score);
     }
 
     #[test]

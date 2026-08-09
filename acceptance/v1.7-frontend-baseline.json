@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "baselineCommit": "55f4a6cfc2d91582f20566b813d4706af4ef8d4a",
+  "policy": "Keep the v1.7.0 navigation, styles, existing components, and existing feature modules unchanged. Add new UI only through new modules and minimal main.ts wiring that reuses the original design system.",
+  "navigationSha256": "50341ba35ae0462f9347e723a757e7f17102805518f5eb30ceb64f6f008e22e5",
+  "stylesSha256": "6bb5a95fe5a0e1bb789fb2cb0a3650a69b7f26e53088808ec88c7560a103edbe",
+  "requiredViewIds": [
+    "view-overview",
+    "view-doctor",
+    "view-ports",
+    "view-runtimes",
+    "view-environment",
+    "view-project",
+    "view-toolchains",
+    "view-platforms",
+    "view-learning",
+    "view-maintenance",
+    "view-toolbox"
+  ],
+  "requiredCoreIds": [
+    "refresh-all",
+    "toast",
+    "fatal-error",
+    "safety-gate",
+    "task-progress",
+    "view-guide",
+    "feature-help-slot"
+  ],
+  "immutableFiles": {
+    "tauri/src/components/confirmDialog.ts": "8d065ece3bd993eb0d16703e137fac933105d5c7f9265892f175019c22d1c49a",
+    "tauri/src/components/disclaimerPanel.ts": "56ac586176924a791ef619dfaf8bf682b6e12fb0cafe96036495e69261243fdf",
+    "tauri/src/components/featureHelpCard.ts": "6e95747350b2f172daafe5e17513caa9e3516fe236469f367b7cf24a92b71fd3",
+    "tauri/src/components/riskBadge.ts": "1b84ce1b58c50dc059cef6a6b75827c87f6e050280f392db4430c0c754e26bde",
+    "tauri/src/components/warningPanel.ts": "24a22bc73ab1f6a9135c9130eca447201c50fc89d5cee2ed35d030c1ad79ddcb",
+    "tauri/src/envReliability.ts": "50c682654bf740f1f8178370f7f7109715f5c2b06fcb89c8b8bf025da4818d9f",
+    "tauri/src/features/cleanup/index.ts": "dcfad2f5962fb65055fb8ddffcd63a7c2555b5a27323926d2202775f386bebf1",
+    "tauri/src/features/fileAssociations/index.ts": "39b0605c481c15a4d019e7677bc0e88c93c803cc7f05dbd76061b6db6c43ab88",
+    "tauri/src/features/help/index.ts": "45658f8f96b154339405d466b590408e02dac5745fd5dbdc946cca6d5be7c1bf",
+    "tauri/src/features/jdk/index.ts": "fb9a336ffca91ea0374847f9ad9aeb0719b6fe74ec03f6019fc85961930fc56a",
+    "tauri/src/features/mysql/index.ts": "b73eb21aa54b1d9a088174014c6e926a01b358df66139c5334b877a433838b0a",
+    "tauri/src/features/ports/index.ts": "06f6c5b5d45a1c22b7d4f0d2a63c844619a38aec70b2880e4abeb8d615ea1c5a",
+    "tauri/src/features/safeMode/index.ts": "9fd13f644c0d8d7d83af76b59674dbf3cf048830cf5352f404e58ca346909c0e",
+    "tauri/src/features/safety/index.ts": "91997b62c15748c4192d56fc18b4065364f41d7fb63173f6685970022b15b777",
+    "tauri/src/features/toast/index.ts": "6502bddbabef6d5a0230686c5f7530c74d8a63ddfdf1a2fbaa09181560d205e4",
+    "tauri/src/features/update/index.ts": "b3d21c491048df7fdbcb1446044842023dac1a031f4f3c60c37eb3d48f50b50c",
+    "tauri/src/safetyText.ts": "55bf2d598784dce4469e85ef4be998f245b92899fa747d56765766bcfc24008a"
+  }
+}

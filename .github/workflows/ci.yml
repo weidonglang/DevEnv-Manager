@@ -46,6 +46,9 @@ jobs:
         working-directory: tauri
         run: npm run build
 
+      - name: v1.7 frontend baseline
+        run: python scripts/check_v17_frontend_baseline.py
+
       - name: Safety wording
         run: python scripts/check_safety_wording.py
 
