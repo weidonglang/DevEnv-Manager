@@ -107,6 +107,9 @@ import type {
   CleanupResult,
   MovePlan,
   MoveResult,
+  RecycleBinReport,
+  RecycleBinCleanupPlan,
+  RecycleBinCleanupResult,
   RollbackRecord,
   PartitionInfo,
   PartitionLayoutReport,
@@ -709,6 +712,10 @@ app.innerHTML = `
             <summary>专家扫描（默认折叠）</summary>
             <p class="small-note">展示所有高风险与只读统计项。它们不会进入自动清理计划。</p>
             <div id="maintenance-expert-categories"><div class="empty">扫描后显示系统与高风险分类</div></div>
+            <section class="panel">
+              <div class="panel-head"><div class="panel-title">${icon(Trash2)}<h3>Windows 回收站</h3></div><div class="row-actions"><button id="inspect-recycle-bin">检查</button><button id="open-recycle-bin">打开</button></div></div>
+              <div id="recycle-bin-result"><div class="empty">先检查回收站，再按盘符创建一次性清空预览。</div></div>
+            </section>
           </details>
           <section id="cleanup-plan-preview" class="panel cleanup-plan-panel"><div class="empty">选择项目后点击“预览清理计划”</div></section>
           <button id="execute-cleanup-plan" class="danger-button" disabled>${icon(Trash2)}<span>确认执行清理</span></button>
@@ -755,7 +762,7 @@ app.innerHTML = `
           <div class="scan-only-banner">${icon(Shield)}<span>支持桌面/下载归档、白名单目录搬家和 Junction 桥接；执行前必须预览计划并二次确认。</span></div>
           <div class="form-row">
             <input id="move-source" placeholder="源目录，例如 C:\\Users\\你\\Downloads 或缓存目录" />
-            <input id="move-target-drive" value="D:" placeholder="目标盘或目标目录，例如 D:" />
+            <input id="move-target-drive" placeholder="自动选择非 C 盘，也可手动选择目标目录" />
             <button data-pick-directory="move-source">${icon(FolderSearch)}<span>源目录</span></button>
             <button data-pick-directory="move-target-drive">${icon(FolderSearch)}<span>目标目录</span></button>
             <select id="move-mode">
@@ -965,6 +972,10 @@ const state = {
   cleanupSelection: new Set<string>(),
   cleanupPlan: null as CleanupPlan | null,
   cleanupResult: null as CleanupResult | null,
+  recycleBinReport: null as RecycleBinReport | null,
+  recycleBinSelection: new Set<string>(),
+  recycleBinPlan: null as RecycleBinCleanupPlan | null,
+  recycleBinResult: null as RecycleBinCleanupResult | null,
   maintenanceOverview: null as MaintenanceOverview | null,
   desktopUsage: null as FolderUsageReport | null,
   downloadsUsage: null as FolderUsageReport | null,
@@ -2450,6 +2461,16 @@ function focusResult(selector: string) {
   });
 }
 
+function renderOperationError(selector: string, title: string, error: unknown) {
+  const element = document.querySelector<HTMLElement>(selector);
+  const message = error instanceof Error ? error.message : String(error);
+  if (element) {
+    element.innerHTML = `<article class="runtime warn"><div><strong>${escapeHtml(title)}</strong><span>已停止</span></div><small>${escapeHtml(message)}</small></article>`;
+    focusResult(selector);
+  }
+  showToast(message, true);
+}
+
 async function runDoctorAction(action: string) {
   if (action === "cleanup_path") {
     await runOperation(async () => {
@@ -3029,6 +3050,50 @@ function renderMaintenanceScan() {
   if (preview) preview.disabled = state.cleanupSelection.size === 0;
 }
 
+function renderRecycleBin() {
+  const element = document.querySelector<HTMLElement>("#recycle-bin-result");
+  if (!element) return;
+  const report = state.recycleBinReport;
+  const plan = state.recycleBinPlan;
+  const result = state.recycleBinResult;
+  if (!report) {
+    element.innerHTML = `<div class="empty">先检查回收站，再按盘符创建一次性清空预览。</div>`;
+    return;
+  }
+  const selectableVolumes = report.volumes.filter((volume) => /^[a-z]:$/i.test(volume.drive) && volume.itemCount > 0);
+  element.innerHTML = `
+    <div class="scan-summary"><strong>${formatBytes(report.totalBytes)}</strong><span>${report.itemCount} 项 · ${report.recoverableCount} 项可恢复</span></div>
+    <div class="runtime-list">
+      ${selectableVolumes.length ? selectableVolumes.map((volume) => `<article class="runtime"><div><label class="cleanup-check"><input type="checkbox" data-recycle-drive="${escapeHtml(volume.drive)}" ${state.recycleBinSelection.has(volume.drive) ? "checked" : ""} /><strong>${escapeHtml(volume.drive)} 回收站</strong></label><span>${formatBytes(volume.totalBytes)}</span></div><small>${volume.itemCount} 项 · ${volume.recoverableCount} 项当前可恢复</small></article>`).join("") : `<div class="empty">回收站为空，没有需要清理的项目。</div>`}
+    </div>
+    ${report.items.length ? `<details class="maintenance-category"><summary><span><strong>预览项目</strong><small>只显示前 10 项，执行范围以所选盘符的完整快照为准。</small></span></summary><div class="runtime-list">${report.items.slice(0, 10).map((item) => `<article class="runtime"><div><strong>${escapeHtml(item.name || "未命名项目")}</strong><span>${formatBytes(item.size)}</span></div><small>${escapeHtml(item.originalPath || item.recyclePath || "原路径不可用")}</small></article>`).join("")}</div></details>` : ""}
+    <div class="toolbar compact"><button id="create-recycle-bin-plan" ${state.recycleBinSelection.size ? "" : "disabled"}>创建清空预览</button></div>
+    ${plan ? `<article class="runtime warn"><div><strong>永久清理预览</strong><span>${escapeHtml(plan.selectedDrives.join("、"))}</span></div><small>${plan.itemCount} 项 · ${formatBytes(plan.estimatedBytes)} · 执行前将验证快照未变化</small><ul>${plan.warnings.map((warning) => `<li>${escapeHtml(warning)}</li>`).join("")}</ul><button id="execute-recycle-bin-plan" class="danger-button">确认并清空所选盘符</button></article>` : ""}
+    ${result ? `<article class="runtime ${result.success ? "" : "warn"}"><div><strong>${escapeHtml(result.message)}</strong><span>${result.cleanedItems}/${result.beforeItemCount}</span></div><small>释放 ${formatBytes(result.cleanedBytes)} · 复扫剩余 ${result.afterItemCount} 项 / ${formatBytes(result.afterBytes)}</small>${result.failures.length ? `<ul>${result.failures.map((failure) => `<li>${escapeHtml(failure)}</li>`).join("")}</ul>` : ""}</article>` : ""}
+    ${report.warnings.length ? `<ul>${report.warnings.map((warning) => `<li>${escapeHtml(warning)}</li>`).join("")}</ul>` : ""}`;
+}
+
+async function loadRecycleBin(resetResult = true) {
+  showToast("正在只读检查 Windows 回收站");
+  try {
+    state.recycleBinReport = await invoke<RecycleBinReport>("inspect_recycle_bin");
+    state.recycleBinSelection = new Set(
+      state.recycleBinReport.volumes
+        .filter((volume) => /^[a-z]:$/i.test(volume.drive) && volume.itemCount > 0)
+        .map((volume) => volume.drive),
+    );
+    state.recycleBinPlan = null;
+    if (resetResult) state.recycleBinResult = null;
+    renderRecycleBin();
+    focusResult("#recycle-bin-result");
+    showToast(`回收站检查完成：${state.recycleBinReport.itemCount} 项，共 ${formatBytes(state.recycleBinReport.totalBytes)}`);
+    return true;
+  } catch (error) {
+    renderOperationError("#recycle-bin-result", "回收站检查失败", error);
+    return false;
+  }
+}
+
 function renderEnvironmentPreview() {
   const element = document.querySelector<HTMLElement>("#env-config-preview");
   const preview = state.environmentPreview;
@@ -3394,22 +3459,30 @@ async function inspectMaintenance() {
   try {
     state.maintenanceOverview = await invoke<MaintenanceOverview>("inspect_maintenance_overview");
     renderMaintenanceOverview();
+    suggestedArchiveTarget(state.maintenanceOverview.volumes);
     showToast(`体检完成：C 盘${riskText(state.maintenanceOverview.riskLevel)}风险`);
   } catch (error) {
-    showToast(error instanceof Error ? error.message : String(error), true);
+    renderOperationError("#maintenance-overview", "空间体检失败", error);
   }
 }
 
 async function scanMaintenance() {
   showToast("正在执行安全扫描；此步骤不会删除任何文件");
+  const button = document.querySelector<HTMLButtonElement>("#scan-maintenance");
+  if (button) button.disabled = true;
   try {
     state.cleanupReport = await invoke<CleanupScanReport>("scan_cleanup_targets");
     state.cleanupSelection.clear();
     state.cleanupPlan = null;
     renderMaintenanceScan();
+    activateMaintenanceTab("cleanup");
+    focusResult("#maintenance-cleanup-categories");
     showToast(`扫描完成：${state.cleanupReport.totalItems} 项，共 ${formatBytes(state.cleanupReport.totalBytes)}`);
   } catch (error) {
-    showToast(error instanceof Error ? error.message : String(error), true);
+    activateMaintenanceTab("cleanup");
+    renderOperationError("#maintenance-cleanup-categories", "安全扫描失败", error);
+  } finally {
+    if (button) button.disabled = false;
   }
 }
 
@@ -3418,6 +3491,50 @@ function formatBytes(size: number) {
   if (size >= 1024 * 1024) return `${(size / 1024 / 1024).toFixed(2)} MB`;
   if (size >= 1024) return `${(size / 1024).toFixed(2)} KB`;
   return `${size} B`;
+}
+
+function activateMaintenanceTab(tab: string) {
+  document.querySelectorAll<HTMLElement>("[data-maintenance-tab]").forEach((item) => {
+    item.classList.toggle("active", item.dataset.maintenanceTab === tab);
+  });
+  document.querySelectorAll<HTMLElement>("[data-maintenance-panel]").forEach((panel) => {
+    panel.classList.toggle("active", panel.dataset.maintenancePanel === tab);
+  });
+  if (tab === "move") void loadArchivePlan();
+}
+
+function suggestedArchiveTarget(volumes: DiskVolumeInfo[]) {
+  const input = document.querySelector<HTMLInputElement>("#move-target-drive");
+  if (!input) return "";
+  const current = input.value.trim();
+  if (current && !/^[a-z]:[\\/]?$/i.test(current)) return current;
+  const available = volumes
+    .filter((volume) => !volume.drive.toUpperCase().startsWith("C:") && volume.totalBytes > 0 && volume.freeBytes > 0)
+    .sort((left, right) => right.freeBytes - left.freeBytes);
+  const currentVolume = available.find((volume) => volume.drive.toUpperCase() === current.replace(/[\\/]$/, "").toUpperCase());
+  if (currentVolume) {
+    input.value = currentVolume.drive;
+    return currentVolume.drive;
+  }
+  const suggested = available[0]?.drive || "";
+  input.value = suggested;
+  return suggested;
+}
+
+async function resolveArchiveTarget() {
+  const input = document.querySelector<HTMLInputElement>("#move-target-drive");
+  if (!input) throw new Error("归档目标输入框不可用");
+  const current = input.value.trim();
+  if (current && !/^[a-z]:[\\/]?$/i.test(current)) return current;
+  let volumes = state.maintenanceOverview?.volumes || [];
+  if (!volumes.length) {
+    volumes = await invoke<DiskVolumeInfo[]>("inspect_disk_overview");
+  }
+  const selected = suggestedArchiveTarget(volumes);
+  if (!selected) {
+    throw new Error("没有发现可用的非 C 盘。请点击“目标目录”选择一个实际存在的归档目录。");
+  }
+  return selected;
 }
 
 function activateView(view: string) {
@@ -3480,9 +3597,7 @@ document.querySelectorAll<HTMLButtonElement>(".nav-item").forEach((button) => {
 document.querySelectorAll<HTMLButtonElement>("[data-maintenance-tab]").forEach((button) => {
   button.addEventListener("click", () => {
     const tab = button.dataset.maintenanceTab || "overview";
-    document.querySelectorAll("[data-maintenance-tab]").forEach((item) => item.classList.toggle("active", item === button));
-    document.querySelectorAll<HTMLElement>("[data-maintenance-panel]").forEach((panel) => panel.classList.toggle("active", panel.dataset.maintenancePanel === tab));
-    if (tab === "move") void loadArchivePlan();
+    activateMaintenanceTab(tab);
   });
 });
 
@@ -3934,7 +4049,63 @@ document.querySelector("#clear-cache")?.addEventListener("click", async () => {
 });
 document.querySelector("#inspect-maintenance")?.addEventListener("click", () => void inspectMaintenance());
 document.querySelector("#scan-maintenance")?.addEventListener("click", () => void scanMaintenance());
-function selectCleanupMode(mode: "conservative" | "recommended" | "none") {
+document.querySelector("#inspect-recycle-bin")?.addEventListener("click", () => void loadRecycleBin());
+document.querySelector("#open-recycle-bin")?.addEventListener("click", () => {
+  void runOperation(() => invoke<OperationResult>("open_recycle_bin"), "正在打开 Windows 回收站");
+});
+document.addEventListener("click", async (event) => {
+  const create = (event.target as HTMLElement).closest<HTMLButtonElement>("#create-recycle-bin-plan");
+  if (create) {
+    if (!state.recycleBinReport && !(await loadRecycleBin())) return;
+    const selectedDrives = Array.from(state.recycleBinSelection);
+    if (!selectedDrives.length) {
+      renderOperationError("#recycle-bin-result", "无法创建清空预览", "请至少选择一个有内容的回收站盘符。");
+      return;
+    }
+    showToast("正在重新检查并创建回收站清空预览");
+    try {
+      state.recycleBinPlan = await invoke<RecycleBinCleanupPlan>("create_recycle_bin_cleanup_plan", { selectedDrives });
+      state.recycleBinResult = null;
+      renderRecycleBin();
+      focusResult("#recycle-bin-result");
+      showToast(`回收站清空预览已创建：${state.recycleBinPlan.itemCount} 项`);
+    } catch (error) {
+      renderOperationError("#recycle-bin-result", "回收站清空预览创建失败", error);
+    }
+    return;
+  }
+
+  const execute = (event.target as HTMLElement).closest<HTMLButtonElement>("#execute-recycle-bin-plan");
+  if (!execute || !state.recycleBinPlan) return;
+  const plan = state.recycleBinPlan;
+  if (!(await askForConfirmation(`将永久清空 ${plan.selectedDrives.join("、")} 回收站中的 ${plan.itemCount} 项（${formatBytes(plan.estimatedBytes)}）。此操作不能从回收站恢复，确定继续吗？`))) return;
+  showToast("正在验证快照、清空回收站并复扫");
+  try {
+    state.recycleBinResult = await invoke<RecycleBinCleanupResult>("execute_recycle_bin_cleanup_plan", { planId: plan.planId });
+    state.recycleBinPlan = null;
+    try {
+      state.recycleBinReport = await invoke<RecycleBinReport>("inspect_recycle_bin");
+      state.recycleBinSelection = new Set(
+        state.recycleBinReport.volumes
+          .filter((volume) => /^[a-z]:$/i.test(volume.drive) && volume.itemCount > 0)
+          .map((volume) => volume.drive),
+      );
+    } catch {
+      // Keep the verified execution result visible if the optional UI refresh fails.
+    }
+    renderRecycleBin();
+    focusResult("#recycle-bin-result");
+    showToast(state.recycleBinResult.message, !state.recycleBinResult.success);
+  } catch (error) {
+    state.recycleBinPlan = null;
+    renderOperationError("#recycle-bin-result", "回收站清理失败", error);
+  }
+});
+async function selectCleanupMode(mode: "conservative" | "recommended" | "none") {
+  if (mode !== "none" && !state.cleanupReport) {
+    await scanMaintenance();
+    if (!state.cleanupReport) return;
+  }
   state.cleanupSelection.clear();
   if (mode !== "none" && state.cleanupReport) {
     state.cleanupReport.categories.forEach((category) => {
@@ -3946,11 +4117,14 @@ function selectCleanupMode(mode: "conservative" | "recommended" | "none") {
   renderMaintenanceScan();
   renderCleanupPlan();
 }
-document.querySelector("#select-conservative")?.addEventListener("click", () => selectCleanupMode("conservative"));
-document.querySelector("#select-recommended")?.addEventListener("click", () => selectCleanupMode("recommended"));
-document.querySelector("#clear-cleanup-selection")?.addEventListener("click", () => selectCleanupMode("none"));
+document.querySelector("#select-conservative")?.addEventListener("click", () => void selectCleanupMode("conservative"));
+document.querySelector("#select-recommended")?.addEventListener("click", () => void selectCleanupMode("recommended"));
+document.querySelector("#clear-cleanup-selection")?.addEventListener("click", () => void selectCleanupMode("none"));
 document.querySelector("#preview-cleanup-plan")?.addEventListener("click", async () => {
-  if (!state.cleanupReport || !state.cleanupSelection.size) return;
+  if (!state.cleanupReport || !state.cleanupSelection.size) {
+    renderOperationError("#cleanup-plan-preview", "无法创建清理计划", "请先扫描并至少选择一个可清理项目。");
+    return;
+  }
   showToast("正在重新扫描并创建清理计划");
   try {
     state.cleanupPlan = await invoke<CleanupPlan>("create_cleanup_plan", { selectedItemIds: Array.from(state.cleanupSelection) });
@@ -3960,11 +4134,20 @@ document.querySelector("#preview-cleanup-plan")?.addEventListener("click", async
   } catch (error) {
     state.cleanupPlan = null;
     renderCleanupPlan();
-    showToast(error instanceof Error ? error.message : String(error), true);
+    renderOperationError("#cleanup-plan-preview", "清理计划创建失败", error);
   }
 });
 
 document.addEventListener("change", (event) => {
+  const recycleDrive = (event.target as HTMLElement).closest<HTMLInputElement>("input[data-recycle-drive]");
+  if (recycleDrive) {
+    const drive = recycleDrive.dataset.recycleDrive || "";
+    if (recycleDrive.checked) state.recycleBinSelection.add(drive);
+    else state.recycleBinSelection.delete(drive);
+    state.recycleBinPlan = null;
+    renderRecycleBin();
+    return;
+  }
   const fileAssociationSelect = (event.target as HTMLElement).closest<HTMLInputElement>("input[data-file-assoc-select]");
   if (fileAssociationSelect) {
     const extension = fileAssociationSelect.dataset.fileAssocSelect || "";
@@ -4004,11 +4187,17 @@ document.querySelector("#execute-cleanup-plan")?.addEventListener("click", async
     state.cleanupResult = await invoke<CleanupResult>("clean_selected_targets", { plan });
     state.cleanupPlan = null;
     state.cleanupSelection.clear();
+    try {
+      state.cleanupReport = await invoke<CleanupScanReport>("scan_cleanup_targets");
+      renderMaintenanceScan();
+    } catch {
+      // The durable execution result remains authoritative when a follow-up scan fails.
+    }
     renderCleanupResult();
     focusResult("#cleanup-plan-preview");
     showToast(`清理完成：释放 ${formatBytes(state.cleanupResult.cleanedBytes)}，失败 ${state.cleanupResult.failedItems} 项`, state.cleanupResult.failedItems > 0);
   } catch (error) {
-    showToast(error instanceof Error ? error.message : String(error), true);
+    renderOperationError("#cleanup-plan-preview", "清理执行失败", error);
   }
 });
 document.querySelector("#inspect-desktop")?.addEventListener("click", async () => {
@@ -4016,9 +4205,10 @@ document.querySelector("#inspect-desktop")?.addEventListener("click", async () =
   try {
     state.desktopUsage = await invoke<FolderUsageReport>("inspect_desktop");
     renderFolderUsage("#desktop-usage", state.desktopUsage, "desktop-usage");
+    focusResult("#desktop-usage");
     showToast(`桌面分析完成：${formatBytes(state.desktopUsage.totalBytes)}`);
   } catch (error) {
-    showToast(error instanceof Error ? error.message : String(error), true);
+    renderOperationError("#desktop-usage", "桌面分析失败", error);
   }
 });
 document.querySelector("#inspect-downloads")?.addEventListener("click", async () => {
@@ -4026,9 +4216,10 @@ document.querySelector("#inspect-downloads")?.addEventListener("click", async ()
   try {
     state.downloadsUsage = await invoke<FolderUsageReport>("inspect_downloads");
     renderFolderUsage("#downloads-usage", state.downloadsUsage, "downloads-usage");
+    focusResult("#downloads-usage");
     showToast(`下载目录分析完成：${formatBytes(state.downloadsUsage.totalBytes)}`);
   } catch (error) {
-    showToast(error instanceof Error ? error.message : String(error), true);
+    renderOperationError("#downloads-usage", "下载目录分析失败", error);
   }
 });
 
@@ -4090,47 +4281,47 @@ document.querySelector("#inspect-app-usage")?.addEventListener("click", async ()
 });
 document.querySelector("#preview-move-plan")?.addEventListener("click", async () => {
   const source = document.querySelector<HTMLInputElement>("#move-source")?.value.trim() || "";
-  const targetDrive = document.querySelector<HTMLInputElement>("#move-target-drive")?.value.trim() || "D:";
   const mode = document.querySelector<HTMLSelectElement>("#move-mode")?.value || "archive_only";
   if (!source) {
-    showToast("请先填写源目录", true);
+    renderOperationError("#move-plan-result", "无法创建搬家计划", "请先点击“源目录”选择要搬家或归档的文件夹。");
     return;
   }
   showToast("正在生成空间搬家计划");
   try {
+    const targetDrive = await resolveArchiveTarget();
     state.movePlan = await invoke<MovePlan>("create_move_plan", { source, targetDrive, mode });
     state.moveResult = null;
     renderMovePlan();
     focusResult("#move-plan-result");
     showToast(`搬家计划已生成：${formatBytes(state.movePlan.estimatedBytes)}`);
   } catch (error) {
-    showToast(error instanceof Error ? error.message : String(error), true);
+    renderOperationError("#move-plan-result", "搬家计划创建失败", error);
   }
 });
 document.querySelector("#preview-desktop-archive")?.addEventListener("click", async () => {
-  const targetDrive = document.querySelector<HTMLInputElement>("#move-target-drive")?.value.trim() || "D:";
   showToast("正在生成桌面归档计划");
   try {
+    const targetDrive = await resolveArchiveTarget();
     state.movePlan = await invoke<MovePlan>("create_desktop_archive_plan", { targetDrive });
     state.moveResult = null;
     renderMovePlan();
     focusResult("#move-plan-result");
     showToast("桌面归档计划已生成");
   } catch (error) {
-    showToast(error instanceof Error ? error.message : String(error), true);
+    renderOperationError("#move-plan-result", "桌面归档计划创建失败", error);
   }
 });
 document.querySelector("#preview-downloads-archive")?.addEventListener("click", async () => {
-  const targetDrive = document.querySelector<HTMLInputElement>("#move-target-drive")?.value.trim() || "D:";
   showToast("正在生成下载目录归档计划");
   try {
+    const targetDrive = await resolveArchiveTarget();
     state.movePlan = await invoke<MovePlan>("create_downloads_archive_plan", { targetDrive });
     state.moveResult = null;
     renderMovePlan();
     focusResult("#move-plan-result");
     showToast("下载归档计划已生成");
   } catch (error) {
-    showToast(error instanceof Error ? error.message : String(error), true);
+    renderOperationError("#move-plan-result", "下载归档计划创建失败", error);
   }
 });
 document.querySelector("#execute-move-plan")?.addEventListener("click", async () => {
@@ -4149,9 +4340,19 @@ document.querySelector("#execute-move-plan")?.addEventListener("click", async ()
     renderMovePlan();
     focusResult("#move-plan-result");
     await loadRollbackRecords();
+    if (plan.mode === "archive_only") {
+      const source = plan.source.toLowerCase();
+      if (source.includes("\\desktop")) {
+        state.desktopUsage = await invoke<FolderUsageReport>("inspect_desktop").catch(() => state.desktopUsage);
+        renderFolderUsage("#desktop-usage", state.desktopUsage, "desktop-usage");
+      } else if (source.includes("\\downloads")) {
+        state.downloadsUsage = await invoke<FolderUsageReport>("inspect_downloads").catch(() => state.downloadsUsage);
+        renderFolderUsage("#downloads-usage", state.downloadsUsage, "downloads-usage");
+      }
+    }
     showToast(`执行完成：${formatBytes(state.moveResult.movedBytes)}，失败 ${state.moveResult.failures.length} 项`, state.moveResult.failures.length > 0);
   } catch (error) {
-    showToast(error instanceof Error ? error.message : String(error), true);
+    renderOperationError("#move-plan-result", "搬家或归档执行失败", error);
   }
 });
 document.querySelector("#load-rollback-records")?.addEventListener("click", () => void loadRollbackRecords());

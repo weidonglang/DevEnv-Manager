@@ -1044,6 +1044,8 @@ struct RuntimeSwitchRollback<'a> {
 static CONFIRMATION_TOKENS: OnceLock<Mutex<HashMap<String, ConfirmationToken>>> = OnceLock::new();
 static MOVE_PLANS: OnceLock<Mutex<HashMap<String, cleanup::MovePlan>>> = OnceLock::new();
 static EXPANSION_PLANS: OnceLock<Mutex<HashMap<String, PendingExpansionPlan>>> = OnceLock::new();
+static RECYCLE_BIN_PLANS: OnceLock<Mutex<HashMap<String, cleanup::RecycleBinCleanupPlan>>> =
+    OnceLock::new();
 
 #[derive(Debug, Clone)]
 struct PendingExpansionPlan {
@@ -1066,6 +1068,10 @@ fn move_plans() -> &'static Mutex<HashMap<String, cleanup::MovePlan>> {
 
 fn expansion_plans() -> &'static Mutex<HashMap<String, PendingExpansionPlan>> {
     EXPANSION_PLANS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn recycle_bin_plans() -> &'static Mutex<HashMap<String, cleanup::RecycleBinCleanupPlan>> {
+    RECYCLE_BIN_PLANS.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
 const RISK_OPERATION_REGISTRY: &[RiskOperationSpec] = &[
@@ -2062,6 +2068,54 @@ fn open_app_config_dir() -> Result<OperationResult, String> {
     Ok(OperationResult {
         success: true,
         message: format!("已打开配置目录：{}", display_path(dir)),
+    })
+}
+
+#[tauri::command]
+async fn inspect_recycle_bin() -> Result<cleanup::RecycleBinReport, String> {
+    run_blocking(cleanup::inspect_recycle_bin).await?
+}
+
+#[tauri::command]
+async fn create_recycle_bin_cleanup_plan(
+    selected_drives: Vec<String>,
+) -> Result<cleanup::RecycleBinCleanupPlan, String> {
+    run_blocking(move || {
+        let plan = cleanup::create_recycle_bin_cleanup_plan(selected_drives)?;
+        let mut plans = recycle_bin_plans()
+            .lock()
+            .map_err(|_| "回收站计划存储暂时不可用".to_string())?;
+        plans.clear();
+        plans.insert(plan.plan_id.clone(), plan.clone());
+        Ok(plan)
+    })
+    .await?
+}
+
+#[tauri::command]
+async fn execute_recycle_bin_cleanup_plan(
+    plan_id: String,
+) -> Result<cleanup::RecycleBinCleanupResult, String> {
+    run_blocking(move || {
+        let plan = recycle_bin_plans()
+            .lock()
+            .map_err(|_| "回收站计划存储暂时不可用".to_string())?
+            .remove(&plan_id)
+            .ok_or_else(|| "回收站计划不存在、已被新预览替换或已经执行".to_string())?;
+        cleanup::execute_recycle_bin_cleanup_plan(plan)
+    })
+    .await?
+}
+
+#[tauri::command]
+fn open_recycle_bin() -> Result<OperationResult, String> {
+    hidden_command("explorer.exe")
+        .arg("shell:RecycleBinFolder")
+        .spawn()
+        .map_err(|error| format!("打开 Windows 回收站失败：{error}"))?;
+    Ok(OperationResult {
+        success: true,
+        message: "已打开 Windows 回收站".to_string(),
     })
 }
 
@@ -9298,6 +9352,10 @@ pub fn run() {
             create_cleanup_plan,
             clean_selected_targets,
             clean_managed_download_cache,
+            inspect_recycle_bin,
+            create_recycle_bin_cleanup_plan,
+            execute_recycle_bin_cleanup_plan,
+            open_recycle_bin,
             clean_dev_cache,
             export_cleanup_report,
             scan_large_files,

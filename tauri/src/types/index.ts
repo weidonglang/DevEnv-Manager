@@ -913,6 +913,56 @@ export type MoveResult = {
   reportMarkdown: string;
 };
 
+export type RecycleBinReport = {
+  generatedAt: string;
+  itemCount: number;
+  totalBytes: number;
+  recoverableCount: number;
+  items: Array<{
+    id: string;
+    name: string;
+    originalPath: string;
+    recyclePath: string;
+    sourceDrive: string;
+    size: number;
+    deletedAt: string;
+    recoverable: boolean;
+  }>;
+  volumes: Array<{
+    drive: string;
+    itemCount: number;
+    totalBytes: number;
+    recoverableCount: number;
+  }>;
+  warnings: string[];
+};
+
+export type RecycleBinCleanupPlan = {
+  planId: string;
+  createdAt: string;
+  selectedDrives: string[];
+  itemIds: string[];
+  itemCount: number;
+  estimatedBytes: number;
+  snapshotFingerprint: string;
+  riskLevel: string;
+  warnings: string[];
+};
+
+export type RecycleBinCleanupResult = {
+  planId: string;
+  success: boolean;
+  beforeItemCount: number;
+  beforeBytes: number;
+  afterItemCount: number;
+  afterBytes: number;
+  cleanedItems: number;
+  cleanedBytes: number;
+  selectedDrives: string[];
+  failures: string[];
+  message: string;
+};
+
 export type RollbackRecord = {
   rollbackId: string;
   createdAt: string;
