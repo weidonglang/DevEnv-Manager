@@ -143,7 +143,7 @@ struct InstalledData {
     current: CurrentVersions,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
 struct CurrentVersions {
     jdk: Option<String>,
     python: Option<String>,
@@ -197,6 +197,58 @@ struct ProfileRequirement {
     version: String,
     installed: bool,
     auto_install_supported: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct ConfigProfileHistoryEntry {
+    id: String,
+    created_at: String,
+    reason: String,
+    profile_count: usize,
+    fingerprint: String,
+    profiles: Vec<ConfigProfile>,
+}
+
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct ConfigProfileHistorySummary {
+    id: String,
+    created_at: String,
+    reason: String,
+    profile_count: usize,
+    fingerprint: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct ProfileHistoryRestorePlan {
+    plan_id: String,
+    history_id: String,
+    snapshot_created_at: String,
+    snapshot_reason: String,
+    profile_count: usize,
+    backup_history_id: String,
+    plan_fingerprint: String,
+}
+
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct ProfileHistoryRestoreResult {
+    success: bool,
+    message: String,
+    restored_history_id: String,
+    backup_history_id: String,
+    restored_profile_count: usize,
+}
+
+#[derive(Clone)]
+struct PendingProfileHistoryRestorePlan {
+    created_at: u64,
+    public: ProfileHistoryRestorePlan,
+    current_profiles_fingerprint: String,
+    target_profiles: Vec<ConfigProfile>,
+    target_profiles_fingerprint: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -1046,6 +1098,9 @@ static MOVE_PLANS: OnceLock<Mutex<HashMap<String, cleanup::MovePlan>>> = OnceLoc
 static EXPANSION_PLANS: OnceLock<Mutex<HashMap<String, PendingExpansionPlan>>> = OnceLock::new();
 static RECYCLE_BIN_PLANS: OnceLock<Mutex<HashMap<String, cleanup::RecycleBinCleanupPlan>>> =
     OnceLock::new();
+static PROFILE_HISTORY_RESTORE_PLANS: OnceLock<
+    Mutex<HashMap<String, PendingProfileHistoryRestorePlan>>,
+> = OnceLock::new();
 
 #[derive(Debug, Clone)]
 struct PendingExpansionPlan {
@@ -1057,6 +1112,8 @@ const MOVE_PLAN_TTL_SECONDS: u64 = 30 * 60;
 const MAX_PENDING_MOVE_PLANS: usize = 128;
 const EXPANSION_PLAN_TTL_SECONDS: u64 = 15 * 60;
 const MAX_PENDING_EXPANSION_PLANS: usize = 32;
+const PROFILE_HISTORY_PLAN_TTL_SECONDS: u64 = 15 * 60;
+const MAX_PENDING_PROFILE_HISTORY_PLANS: usize = 64;
 
 fn confirmation_tokens() -> &'static Mutex<HashMap<String, ConfirmationToken>> {
     CONFIRMATION_TOKENS.get_or_init(|| Mutex::new(HashMap::new()))
@@ -1072,6 +1129,11 @@ fn expansion_plans() -> &'static Mutex<HashMap<String, PendingExpansionPlan>> {
 
 fn recycle_bin_plans() -> &'static Mutex<HashMap<String, cleanup::RecycleBinCleanupPlan>> {
     RECYCLE_BIN_PLANS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn profile_history_restore_plans(
+) -> &'static Mutex<HashMap<String, PendingProfileHistoryRestorePlan>> {
+    PROFILE_HISTORY_RESTORE_PLANS.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
 const RISK_OPERATION_REGISTRY: &[RiskOperationSpec] = &[
@@ -8473,6 +8535,150 @@ fn list_config_profiles_blocking() -> Result<Vec<ConfigProfile>, String> {
 }
 
 #[tauri::command]
+async fn list_config_profile_history() -> Result<Vec<ConfigProfileHistorySummary>, String> {
+    run_blocking(|| {
+        let paths = load_paths()?;
+        load_profile_history(&paths).map(|history| {
+            history
+                .into_iter()
+                .map(|entry| ConfigProfileHistorySummary {
+                    id: entry.id,
+                    created_at: entry.created_at,
+                    reason: entry.reason,
+                    profile_count: entry.profile_count,
+                    fingerprint: entry.fingerprint,
+                })
+                .collect()
+        })
+    })
+    .await?
+}
+
+#[tauri::command]
+async fn create_profile_history_restore_plan(
+    history_id: String,
+) -> Result<ProfileHistoryRestorePlan, String> {
+    run_blocking(move || create_profile_history_restore_plan_blocking(history_id)).await?
+}
+
+fn create_profile_history_restore_plan_blocking(
+    history_id: String,
+) -> Result<ProfileHistoryRestorePlan, String> {
+    let paths = load_paths()?;
+    let target = load_profile_history(&paths)?
+        .into_iter()
+        .find(|entry| entry.id == history_id)
+        .ok_or_else(|| "没有找到配置档案历史快照".to_string())?;
+    if target.fingerprint != profile_collection_fingerprint(&target.profiles) {
+        return Err("配置档案历史快照指纹无效，已拒绝恢复".to_string());
+    }
+    let current = load_profiles(&paths)?;
+    let current_fingerprint = profile_collection_fingerprint(&current);
+    if current_fingerprint == target.fingerprint {
+        return Err("所选历史快照已经与当前配置档案一致".to_string());
+    }
+    let backup = create_profile_history_snapshot(
+        &paths,
+        format!("恢复历史快照 {} 前", target.id),
+        &current,
+    )?;
+    let mut hasher = Sha256::new();
+    hasher.update(target.id.as_bytes());
+    hasher.update(target.fingerprint.as_bytes());
+    hasher.update(current_fingerprint.as_bytes());
+    hasher.update(backup.id.as_bytes());
+    hasher.update(unix_timestamp().to_le_bytes());
+    let plan_fingerprint = format!("{:x}", hasher.finalize());
+    let plan = ProfileHistoryRestorePlan {
+        plan_id: format!("profile-history-restore-{}", &plan_fingerprint[..24]),
+        history_id: target.id,
+        snapshot_created_at: target.created_at,
+        snapshot_reason: target.reason,
+        profile_count: target.profile_count,
+        backup_history_id: backup.id,
+        plan_fingerprint,
+    };
+    let now = unix_timestamp();
+    let mut plans = profile_history_restore_plans()
+        .lock()
+        .map_err(|_| "配置档案历史恢复计划存储不可用".to_string())?;
+    plans.retain(|_, pending| {
+        now.saturating_sub(pending.created_at) <= PROFILE_HISTORY_PLAN_TTL_SECONDS
+    });
+    if plans.len() >= MAX_PENDING_PROFILE_HISTORY_PLANS {
+        if let Some(oldest) = plans
+            .iter()
+            .min_by_key(|(_, pending)| pending.created_at)
+            .map(|(id, _)| id.clone())
+        {
+            plans.remove(&oldest);
+        }
+    }
+    plans.insert(
+        plan.plan_id.clone(),
+        PendingProfileHistoryRestorePlan {
+            created_at: now,
+            public: plan.clone(),
+            current_profiles_fingerprint: current_fingerprint,
+            target_profiles: target.profiles,
+            target_profiles_fingerprint: target.fingerprint,
+        },
+    );
+    Ok(plan)
+}
+
+#[tauri::command]
+async fn execute_profile_history_restore_plan(
+    plan_id: String,
+) -> Result<ProfileHistoryRestoreResult, String> {
+    run_blocking(move || execute_profile_history_restore_plan_blocking(plan_id)).await?
+}
+
+fn execute_profile_history_restore_plan_blocking(
+    plan_id: String,
+) -> Result<ProfileHistoryRestoreResult, String> {
+    let now = unix_timestamp();
+    let pending = {
+        let mut plans = profile_history_restore_plans()
+            .lock()
+            .map_err(|_| "配置档案历史恢复计划存储不可用".to_string())?;
+        plans.retain(|_, pending| {
+            now.saturating_sub(pending.created_at) <= PROFILE_HISTORY_PLAN_TTL_SECONDS
+        });
+        plans
+            .remove(&plan_id)
+            .ok_or_else(|| "恢复计划不存在、已过期或已经使用".to_string())?
+    };
+    let paths = load_paths()?;
+    let current = load_profiles(&paths)?;
+    if profile_collection_fingerprint(&current) != pending.current_profiles_fingerprint {
+        return Err("创建恢复计划后配置档案发生变化，请重新执行恢复".to_string());
+    }
+    if profile_collection_fingerprint(&pending.target_profiles)
+        != pending.target_profiles_fingerprint
+    {
+        return Err("恢复计划中的历史快照指纹无效，已拒绝执行".to_string());
+    }
+    save_json(&paths.profiles_file(), &pending.target_profiles)?;
+    let restored = load_profiles(&paths)?;
+    if profile_collection_fingerprint(&restored) != pending.target_profiles_fingerprint {
+        save_json(&paths.profiles_file(), &current)
+            .map_err(|error| format!("恢复后校验失败，且回写原配置失败：{error}"))?;
+        return Err("恢复后校验失败，已回写原配置档案".to_string());
+    }
+    Ok(ProfileHistoryRestoreResult {
+        success: true,
+        message: format!(
+            "已从历史快照恢复 {} 个配置档案，并保留恢复前备份",
+            pending.public.profile_count
+        ),
+        restored_history_id: pending.public.history_id,
+        backup_history_id: pending.public.backup_history_id,
+        restored_profile_count: pending.public.profile_count,
+    })
+}
+
+#[tauri::command]
 async fn repair_doctor_safe() -> Result<DoctorRepairResult, String> {
     run_blocking(repair_doctor_safe_blocking).await?
 }
@@ -8535,7 +8741,9 @@ fn install_profile_missing_blocking(
         .into_iter()
         .find(|item| item.id == id)
         .ok_or_else(|| "没有找到配置模板".to_string())?;
+    validate_profile_environment(&profile)?;
     let before = load_installed(&paths)?.current;
+    let before_environment = user_environment()?;
     let requirements = profile_requirements(&profile, &load_installed(&paths)?)?;
     let missing = requirements
         .into_iter()
@@ -8552,6 +8760,10 @@ fn install_profile_missing_blocking(
                 .join("、")
         ));
     }
+    if missing.is_empty() {
+        return apply_config_profile_blocking(id);
+    }
+    create_environment_backup(&paths, &before_environment)?;
     for requirement in &missing {
         let result = match requirement.kind.as_str() {
             "jdk" => {
@@ -8572,42 +8784,151 @@ fn install_profile_missing_blocking(
             _ => Err(format!("不支持自动安装 {}", requirement.kind)),
         };
         if let Err(error) = result {
-            restore_current_versions(&before);
-            return Err(format!(
-                "补装 {} {} 失败：{error}",
-                requirement.kind, requirement.version
-            ));
+            let rollback = restore_profile_state(&paths, &before, &before_environment);
+            return Err(match rollback {
+                Ok(()) => format!(
+                    "补装 {} {} 失败，已恢复原配置：{error}",
+                    requirement.kind, requirement.version
+                ),
+                Err(rollback_error) => format!(
+                    "补装 {} {} 失败，且原配置恢复不完整：{error}；{rollback_error}",
+                    requirement.kind, requirement.version
+                ),
+            });
         }
     }
     match apply_config_profile_blocking(id) {
         Ok(result) => Ok(OperationResult {
             success: true,
-            message: if missing.is_empty() {
-                result.message
-            } else {
-                format!("已补装 {} 个缺失运行时并应用模板", missing.len())
-            },
+            message: format!("已补装 {} 个缺失运行时；{}", missing.len(), result.message),
         }),
         Err(error) => {
-            restore_current_versions(&before);
-            Err(format!("运行时已下载，但应用模板失败：{error}"))
+            let rollback = restore_profile_state(&paths, &before, &before_environment);
+            Err(match rollback {
+                Ok(()) => format!("运行时已下载，但应用模板失败；已恢复原配置：{error}"),
+                Err(rollback_error) => format!(
+                    "运行时已下载，但应用模板失败，且原配置恢复不完整：{error}；{rollback_error}"
+                ),
+            })
         }
     }
 }
 
-fn restore_current_versions(current: &CurrentVersions) {
-    for (kind, version) in [
+fn apply_profile_current_versions(
+    paths: &AppPaths,
+    current: &CurrentVersions,
+) -> Result<Vec<String>, String> {
+    let versions = [
         ("jdk", current.jdk.as_ref()),
         ("python", current.python.as_ref()),
         ("node", current.node.as_ref()),
         ("maven", current.maven.as_ref()),
         ("gradle", current.gradle.as_ref()),
         ("go", current.go.as_ref()),
-    ] {
+    ];
+    let mut applied = Vec::new();
+    for (kind, version) in versions {
         if let Some(version) = version {
-            let _ = switch_runtime_blocking(kind.to_string(), version.clone(), None);
+            switch_runtime_blocking(kind.to_string(), version.clone(), None)?;
+            applied.push(format!("{kind} {version}"));
         }
     }
+
+    let mut installed = load_installed(paths)?;
+    for (kind, version) in versions {
+        if version.is_none() {
+            let meta = runtime_meta(kind)?;
+            remove_junction(&paths.current().join(meta.link_name))?;
+            set_current(&mut installed, kind, None);
+        }
+    }
+    save_json(&paths.installed_file(), &installed)?;
+    Ok(applied)
+}
+
+fn restore_profile_state(
+    paths: &AppPaths,
+    current: &CurrentVersions,
+    environment: &std::collections::HashMap<String, String>,
+) -> Result<(), String> {
+    let mut failures = Vec::new();
+    if let Err(error) = apply_profile_current_versions(paths, current) {
+        failures.push(format!("恢复运行时失败：{error}"));
+    }
+    let previous_path = environment
+        .get("Path")
+        .or_else(|| environment.get("PATH"))
+        .cloned()
+        .unwrap_or_default();
+    if let Err(error) = restore_environment_values(
+        environment.get("DEVENV_HOME").map(String::as_str),
+        environment.get("JAVA_HOME").map(String::as_str),
+        &previous_path,
+    ) {
+        failures.push(format!("恢复环境变量失败：{error}"));
+    }
+    broadcast_environment_change();
+    if failures.is_empty() {
+        Ok(())
+    } else {
+        Err(failures.join("；"))
+    }
+}
+
+fn validate_profile_environment(profile: &ConfigProfile) -> Result<(), String> {
+    for (name, value, limit) in [
+        ("DEVENV_HOME", profile.devenv_home.as_deref(), 4096_usize),
+        ("JAVA_HOME", profile.java_home.as_deref(), 4096_usize),
+        ("Path", Some(profile.path.as_str()), 32_767_usize),
+    ] {
+        if let Some(value) = value {
+            if value.len() > limit || value.chars().any(char::is_control) {
+                return Err(format!("模板中的 {name} 内容无效或过长"));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn optional_profile_value_matches(
+    environment: &std::collections::HashMap<String, String>,
+    name: &str,
+    expected: Option<&str>,
+) -> bool {
+    let actual = environment.get(name).map(String::as_str);
+    match expected {
+        Some(expected) if name != "Path" => actual
+            .map(path_key)
+            .as_deref()
+            .is_some_and(|actual| actual == path_key(expected)),
+        Some(expected) => actual == Some(expected),
+        None => actual.is_none_or(str::is_empty),
+    }
+}
+
+fn verify_profile_state(paths: &AppPaths, profile: &ConfigProfile) -> Result<(), String> {
+    let installed = load_installed(paths)?;
+    if installed.current != profile.current {
+        return Err("应用后运行时 current 状态与模板不一致".to_string());
+    }
+    let environment = user_environment()?;
+    if !optional_profile_value_matches(
+        &environment,
+        "DEVENV_HOME",
+        profile.devenv_home.as_deref(),
+    ) || !optional_profile_value_matches(
+        &environment,
+        "JAVA_HOME",
+        profile.java_home.as_deref(),
+    ) || !optional_profile_value_matches(
+        &environment,
+        "Path",
+        Some(profile.path.as_str()),
+    )
+    {
+        return Err("应用后用户环境变量与模板不一致".to_string());
+    }
+    Ok(())
 }
 
 fn profile_requirements(
@@ -8634,7 +8955,7 @@ fn profile_requirements(
                 .any(|item| item.get("version").and_then(Value::as_str) == Some(version.as_str())),
             auto_install_supported: matches!(
                 kind,
-                "jdk" | "python" | "node" | "maven" | "gradle" | "go"
+                "jdk" | "python" | "node" | "go"
             ),
         })
     })
@@ -8647,10 +8968,7 @@ async fn save_config_profile(name: String) -> Result<OperationResult, String> {
 }
 
 fn save_config_profile_blocking(name: String) -> Result<OperationResult, String> {
-    let name = name.trim();
-    if name.is_empty() {
-        return Err("模板名称不能为空".to_string());
-    }
+    let name = validate_profile_name(&name)?.to_string();
     let paths = load_paths()?;
     let installed = load_installed(&paths)?;
     let environment = user_environment()?;
@@ -8672,7 +8990,9 @@ fn save_config_profile_blocking(name: String) -> Result<OperationResult, String>
         java_home: environment.get("JAVA_HOME").cloned(),
         path,
     };
+    validate_profile_environment(&profile)?;
     let mut profiles = load_profiles(&paths)?;
+    create_profile_history_snapshot(&paths, format!("保存配置模板 {name} 前"), &profiles)?;
     profiles.retain(|item| item.name != name);
     profiles.push(profile);
     save_json(&paths.profiles_file(), &profiles)?;
@@ -8694,25 +9014,12 @@ fn apply_config_profile_blocking(id: String) -> Result<OperationResult, String> 
         .into_iter()
         .find(|item| item.id == id)
         .ok_or_else(|| "没有找到配置模板".to_string())?;
-    let switches = [
-        ("jdk", profile.current.jdk.clone()),
-        ("python", profile.current.python.clone()),
-        ("node", profile.current.node.clone()),
-        ("maven", profile.current.maven.clone()),
-        ("gradle", profile.current.gradle.clone()),
-        ("go", profile.current.go.clone()),
-    ];
+    validate_profile_environment(&profile)?;
     let installed = load_installed(&paths)?;
-    let missing = switches
-        .iter()
-        .filter_map(|(kind, version)| {
-            let version = version.as_ref()?;
-            let meta = runtime_meta(kind).ok()?;
-            (!collection(&installed, meta.collection)
-                .iter()
-                .any(|item| item.get("version").and_then(Value::as_str) == Some(version.as_str())))
-            .then(|| format!("{kind} {version}"))
-        })
+    let missing = profile_requirements(&profile, &installed)?
+        .into_iter()
+        .filter(|requirement| !requirement.installed)
+        .map(|requirement| format!("{} {}", requirement.kind, requirement.version))
         .collect::<Vec<_>>();
     if !missing.is_empty() {
         return Err(format!(
@@ -8720,27 +9027,49 @@ fn apply_config_profile_blocking(id: String) -> Result<OperationResult, String> 
             missing.join("、")
         ));
     }
-    let mut applied = Vec::new();
-    for (kind, version) in switches {
-        if let Some(version) = version {
-            switch_runtime_blocking(kind.to_string(), version.clone(), None)?;
-            applied.push(format!("{kind} {version}"));
+
+    let before_current = installed.current;
+    let before_environment = user_environment()?;
+    let backup_name = create_environment_backup(&paths, &before_environment)?;
+    let apply_result = (|| {
+        let applied = apply_profile_current_versions(&paths, &profile.current)?;
+        restore_environment_values(
+            profile.devenv_home.as_deref(),
+            profile.java_home.as_deref(),
+            &profile.path,
+        )?;
+        broadcast_environment_change();
+        verify_profile_state(&paths, &profile)?;
+        Ok::<Vec<String>, String>(applied)
+    })();
+
+    match apply_result {
+        Ok(applied) => Ok(OperationResult {
+            success: true,
+            message: if applied.is_empty() {
+                format!(
+                    "已应用并验证环境变量模板：{}；备份：{}",
+                    profile.name, backup_name
+                )
+            } else {
+                format!(
+                    "已应用并验证模板 {}：{}；备份：{}",
+                    profile.name,
+                    applied.join("，"),
+                    backup_name
+                )
+            },
+        }),
+        Err(error) => {
+            let rollback = restore_profile_state(&paths, &before_current, &before_environment);
+            Err(match rollback {
+                Ok(()) => format!("应用模板失败，已恢复原配置：{error}"),
+                Err(rollback_error) => {
+                    format!("应用模板失败，且原配置恢复不完整：{error}；{rollback_error}")
+                }
+            })
         }
     }
-    restore_environment_values(
-        profile.devenv_home.as_deref(),
-        profile.java_home.as_deref(),
-        &profile.path,
-    )?;
-    broadcast_environment_change();
-    Ok(OperationResult {
-        success: true,
-        message: if applied.is_empty() {
-            format!("已恢复环境变量模板：{}", profile.name)
-        } else {
-            format!("已应用模板 {}：{}", profile.name, applied.join("，"))
-        },
-    })
 }
 
 #[tauri::command]
@@ -8752,6 +9081,16 @@ fn delete_config_profile_blocking(id: String) -> Result<OperationResult, String>
     let paths = load_paths()?;
     let mut profiles = load_profiles(&paths)?;
     let before = profiles.len();
+    let profile_name = profiles
+        .iter()
+        .find(|item| item.id == id)
+        .map(|item| item.name.clone())
+        .ok_or_else(|| "没有找到配置模板".to_string())?;
+    create_profile_history_snapshot(
+        &paths,
+        format!("删除配置模板 {profile_name} 前"),
+        &profiles,
+    )?;
     profiles.retain(|item| item.id != id);
     if profiles.len() == before {
         return Err("没有找到配置模板".to_string());
@@ -8760,6 +9099,91 @@ fn delete_config_profile_blocking(id: String) -> Result<OperationResult, String>
     Ok(OperationResult {
         success: true,
         message: "已删除配置模板".to_string(),
+    })
+}
+
+#[tauri::command]
+async fn rename_config_profile(id: String, name: String) -> Result<OperationResult, String> {
+    run_blocking(move || rename_config_profile_blocking(id, name)).await?
+}
+
+fn rename_config_profile_blocking(id: String, name: String) -> Result<OperationResult, String> {
+    let name = validate_profile_name(&name)?.to_string();
+    let paths = load_paths()?;
+    let mut profiles = load_profiles(&paths)?;
+    if profiles
+        .iter()
+        .any(|item| item.id != id && item.name == name)
+    {
+        return Err("已存在同名配置模板".to_string());
+    }
+    let previous_profiles = profiles.clone();
+    let profile = profiles
+        .iter_mut()
+        .find(|item| item.id == id)
+        .ok_or_else(|| "没有找到配置模板".to_string())?;
+    let old_name = profile.name.clone();
+    if old_name == name {
+        return Err("新名称与当前名称相同".to_string());
+    }
+    profile.name = name.clone();
+    create_profile_history_snapshot(
+        &paths,
+        format!("重命名配置模板 {old_name} 前"),
+        &previous_profiles,
+    )?;
+    save_json(&paths.profiles_file(), &profiles)?;
+    Ok(OperationResult {
+        success: true,
+        message: format!("已重命名配置模板：{name}"),
+    })
+}
+
+#[tauri::command]
+async fn copy_config_profile(id: String, name: String) -> Result<OperationResult, String> {
+    run_blocking(move || copy_config_profile_blocking(id, name)).await?
+}
+
+fn copy_config_profile_blocking(id: String, name: String) -> Result<OperationResult, String> {
+    let paths = load_paths()?;
+    let mut profiles = load_profiles(&paths)?;
+    let source = profiles
+        .iter()
+        .find(|item| item.id == id)
+        .cloned()
+        .ok_or_else(|| "没有找到配置模板".to_string())?;
+    let requested_name = name.trim();
+    let name = if requested_name.is_empty() {
+        let base = format!("{} 副本", source.name);
+        if !profiles.iter().any(|item| item.name == base) {
+            base
+        } else {
+            (2..=100)
+                .map(|index| format!("{} 副本 {index}", source.name))
+                .find(|candidate| !profiles.iter().any(|item| item.name == *candidate))
+                .ok_or_else(|| "无法生成不重复的副本名称".to_string())?
+        }
+    } else {
+        validate_profile_name(requested_name)?.to_string()
+    };
+    if profiles.iter().any(|item| item.name == name) {
+        return Err("已存在同名配置模板".to_string());
+    }
+    let previous_profiles = profiles.clone();
+    let mut profile = source;
+    profile.id = format!("profile-copy-{}", filename_timestamp());
+    profile.name = name.clone();
+    profile.created_at = current_timestamp();
+    profiles.push(profile);
+    create_profile_history_snapshot(
+        &paths,
+        format!("复制配置模板 {name} 前"),
+        &previous_profiles,
+    )?;
+    save_json(&paths.profiles_file(), &profiles)?;
+    Ok(OperationResult {
+        success: true,
+        message: format!("已复制配置模板：{name}"),
     })
 }
 
@@ -8820,15 +9244,16 @@ fn import_config_profiles(path: String) -> Result<OperationResult, String> {
     let bundle = read_profile_bundle(&source)?;
     let paths = load_paths()?;
     let mut profiles = load_profiles(&paths)?;
+    create_profile_history_snapshot(
+        &paths,
+        format!("导入 {} 个配置模板前", bundle.profiles.len()),
+        &profiles,
+    )?;
     let mut imported = 0_usize;
     for (index, mut profile) in bundle.profiles.into_iter().enumerate() {
-        profile.name = profile.name.trim().to_string();
-        if profile.name.is_empty()
-            || profile.name.len() > 100
-            || profile.name.chars().any(char::is_control)
-        {
-            return Err(format!("第 {} 个模板名称无效", index + 1));
-        }
+        profile.name = validate_profile_name(&profile.name)
+            .map_err(|error| format!("第 {} 个模板名称无效：{error}", index + 1))?
+            .to_string();
         profile.id = format!("imported-{}-{index}", filename_timestamp());
         profile.created_at = current_timestamp();
         profiles.retain(|item| item.name != profile.name);
@@ -8853,7 +9278,7 @@ fn read_profile_bundle(source: &Path) -> Result<ConfigProfileBundle, String> {
         return Err("模板文件超过 1 MB，已拒绝导入".to_string());
     }
     let text = fs::read_to_string(source).map_err(|err| format!("读取模板文件失败：{err}"))?;
-    let bundle: ConfigProfileBundle =
+    let mut bundle: ConfigProfileBundle =
         serde_json::from_str(&text).map_err(|err| format!("模板 JSON 格式不正确：{err}"))?;
     if bundle.schema_version != 1 {
         return Err(format!("不支持的模板版本：{}", bundle.schema_version));
@@ -8861,11 +9286,13 @@ fn read_profile_bundle(source: &Path) -> Result<ConfigProfileBundle, String> {
     if bundle.profiles.is_empty() || bundle.profiles.len() > 100 {
         return Err("模板数量必须在 1 到 100 之间".to_string());
     }
-    for (index, profile) in bundle.profiles.iter().enumerate() {
-        let name = profile.name.trim();
-        if name.is_empty() || name.len() > 100 || name.chars().any(char::is_control) {
-            return Err(format!("第 {} 个模板名称无效", index + 1));
-        }
+    bundle.exported_at = normalize_legacy_timestamp(&bundle.exported_at);
+    for (index, profile) in bundle.profiles.iter_mut().enumerate() {
+        profile.created_at = normalize_legacy_timestamp(&profile.created_at);
+        validate_profile_name(&profile.name)
+            .map_err(|error| format!("第 {} 个模板名称无效：{error}", index + 1))?;
+        validate_profile_environment(profile)
+            .map_err(|error| format!("第 {} 个模板环境无效：{error}", index + 1))?;
     }
     Ok(bundle)
 }
@@ -9482,11 +9909,16 @@ pub fn run() {
             run_learning_check,
             environment_health,
             list_config_profiles,
+            list_config_profile_history,
+            create_profile_history_restore_plan,
+            execute_profile_history_restore_plan,
             config_profile_requirements,
             install_profile_missing,
             save_config_profile,
             apply_config_profile,
             delete_config_profile,
+            rename_config_profile,
+            copy_config_profile,
             export_config_profiles,
             preview_config_profiles,
             import_config_profiles,
@@ -9835,6 +10267,9 @@ impl AppPaths {
     fn profiles_file(&self) -> PathBuf {
         self.config().join("profiles.json")
     }
+    fn profile_history_file(&self) -> PathBuf {
+        self.config().join("profile_history.json")
+    }
     fn port_history_file(&self) -> PathBuf {
         self.config().join("port_history.json")
     }
@@ -10149,7 +10584,98 @@ fn load_installed(paths: &AppPaths) -> Result<InstalledData, String> {
 }
 
 fn load_profiles(paths: &AppPaths) -> Result<Vec<ConfigProfile>, String> {
-    load_json_with_default(&paths.profiles_file(), default_profiles())
+    let mut profiles = load_json_with_default(&paths.profiles_file(), default_profiles())?;
+    let mut changed = false;
+    for profile in &mut profiles {
+        let normalized = normalize_legacy_timestamp(&profile.created_at);
+        if normalized != profile.created_at {
+            profile.created_at = normalized;
+            changed = true;
+        }
+    }
+    if changed {
+        save_json(&paths.profiles_file(), &profiles)?;
+    }
+    Ok(profiles)
+}
+
+fn load_profile_history(paths: &AppPaths) -> Result<Vec<ConfigProfileHistoryEntry>, String> {
+    let mut history: Vec<ConfigProfileHistoryEntry> =
+        load_json_with_default(&paths.profile_history_file(), Vec::new())?;
+    let mut changed = false;
+    for entry in &mut history {
+        let normalized = normalize_legacy_timestamp(&entry.created_at);
+        if normalized != entry.created_at {
+            entry.created_at = normalized;
+            changed = true;
+        }
+        for profile in &mut entry.profiles {
+            let normalized = normalize_legacy_timestamp(&profile.created_at);
+            if normalized != profile.created_at {
+                profile.created_at = normalized;
+                changed = true;
+            }
+        }
+    }
+    if changed {
+        save_json(&paths.profile_history_file(), &history)?;
+    }
+    Ok(history)
+}
+
+fn validate_profile_name(name: &str) -> Result<&str, String> {
+    let name = name.trim();
+    if name.is_empty() || name.len() > 100 || name.chars().any(char::is_control) {
+        return Err("配置模板名称不能为空、超过 100 个字符或包含控制字符".to_string());
+    }
+    Ok(name)
+}
+
+fn profile_collection_fingerprint(profiles: &[ConfigProfile]) -> String {
+    let mut ordered = profiles.to_vec();
+    ordered.sort_by(|left, right| left.id.cmp(&right.id));
+    let mut hasher = Sha256::new();
+    hasher.update(serde_json::to_vec(&ordered).unwrap_or_default());
+    format!("{:x}", hasher.finalize())
+}
+
+fn create_profile_history_snapshot(
+    paths: &AppPaths,
+    reason: impl Into<String>,
+    profiles: &[ConfigProfile],
+) -> Result<ConfigProfileHistoryEntry, String> {
+    let fingerprint = profile_collection_fingerprint(profiles);
+    let reason = reason.into();
+    let mut hasher = Sha256::new();
+    hasher.update(fingerprint.as_bytes());
+    hasher.update(reason.as_bytes());
+    hasher.update(unix_timestamp().to_le_bytes());
+    hasher.update(
+        SAVE_JSON_COUNTER
+            .fetch_add(1, Ordering::Relaxed)
+            .to_le_bytes(),
+    );
+    let digest = format!("{:x}", hasher.finalize());
+    let entry = ConfigProfileHistoryEntry {
+        id: format!("profile-history-{}", &digest[..24]),
+        created_at: current_timestamp(),
+        reason,
+        profile_count: profiles.len(),
+        fingerprint,
+        profiles: profiles.to_vec(),
+    };
+    let mut history = load_profile_history(paths)?;
+    history.insert(0, entry.clone());
+    history.truncate(50);
+    while history.len() > 1
+        && serde_json::to_vec(&history)
+            .map(|bytes| bytes.len() > 8 * 1024 * 1024)
+            .unwrap_or(true)
+    {
+        history.pop();
+    }
+    save_json(&paths.profile_history_file(), &history)?;
+    Ok(entry)
 }
 
 fn load_json_with_default<T>(path: &Path, default: T) -> Result<T, String>
@@ -13844,10 +14370,10 @@ fn redact_windows_user_paths(text: &str) -> String {
 }
 
 fn filename_timestamp() -> String {
-    format!("{:?}", std::time::SystemTime::now())
-        .chars()
-        .map(|ch| if ch.is_ascii_alphanumeric() { ch } else { '-' })
-        .collect()
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_millis().to_string())
+        .unwrap_or_else(|_| "0".to_string())
 }
 
 fn slug(value: &str) -> String {
@@ -14141,8 +14667,62 @@ where
 }
 
 fn current_timestamp() -> String {
-    // Keep dependencies lean; second precision is enough for audit records.
-    format!("{:?}", std::time::SystemTime::now())
+    format_unix_timestamp_utc(unix_timestamp())
+}
+
+fn normalize_legacy_timestamp(value: &str) -> String {
+    if let Some(tail) = value.split_once("intervals:").map(|(_, tail)| tail) {
+        let digits = tail
+            .trim_start()
+            .chars()
+            .take_while(char::is_ascii_digit)
+            .collect::<String>();
+        if let Ok(intervals) = digits.parse::<u64>() {
+            const WINDOWS_TO_UNIX_100NS: u64 = 116_444_736_000_000_000;
+            if intervals >= WINDOWS_TO_UNIX_100NS {
+                return format_unix_timestamp_utc(
+                    (intervals - WINDOWS_TO_UNIX_100NS) / 10_000_000,
+                );
+            }
+        }
+    }
+    if let Some(tail) = value.split_once("tv_sec:").map(|(_, tail)| tail) {
+        let digits = tail
+            .trim_start()
+            .chars()
+            .take_while(char::is_ascii_digit)
+            .collect::<String>();
+        if let Ok(seconds) = digits.parse::<u64>() {
+            return format_unix_timestamp_utc(seconds);
+        }
+    }
+    value.to_string()
+}
+
+fn format_unix_timestamp_utc(timestamp: u64) -> String {
+    let days = (timestamp / 86_400) as i64;
+    let seconds = timestamp % 86_400;
+    let shifted = days + 719_468;
+    let era = if shifted >= 0 {
+        shifted
+    } else {
+        shifted - 146_096
+    } / 146_097;
+    let day_of_era = shifted - era * 146_097;
+    let year_of_era = (day_of_era - day_of_era / 1_460 + day_of_era / 36_524
+        - day_of_era / 146_096)
+        / 365;
+    let mut year = year_of_era + era * 400;
+    let day_of_year =
+        day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
+    let month_prime = (5 * day_of_year + 2) / 153;
+    let day = day_of_year - (153 * month_prime + 2) / 5 + 1;
+    let month = month_prime + if month_prime < 10 { 3 } else { -9 };
+    year += i64::from(month <= 2);
+    let hour = seconds / 3_600;
+    let minute = (seconds % 3_600) / 60;
+    let second = seconds % 60;
+    format!("{year:04}-{month:02}-{day:02} {hour:02}:{minute:02}:{second:02} UTC")
 }
 
 fn unix_timestamp() -> u64 {
@@ -14202,6 +14782,112 @@ mod tests {
         settings.safety_disclaimer_version = SAFETY_DISCLAIMER_VERSION;
         settings.safety_disclaimer_accepted_at = Some("accepted".to_string());
         assert!(!should_recover_unwritable_initial_root(&settings));
+    }
+
+    fn config_profile_fixture() -> ConfigProfile {
+        ConfigProfile {
+            id: "profile-test".to_string(),
+            name: "test".to_string(),
+            created_at: "now".to_string(),
+            current: CurrentVersions::default(),
+            devenv_home: Some(r"C:\DevEnvManager".to_string()),
+            java_home: Some(r"C:\DevEnvManager\current\jdk".to_string()),
+            path: r"C:\DevEnvManager\current\jdk\bin;C:\Windows".to_string(),
+        }
+    }
+
+    #[test]
+    fn config_profile_environment_validation_rejects_control_chars_and_oversized_values() {
+        let mut profile = config_profile_fixture();
+        assert!(validate_profile_environment(&profile).is_ok());
+
+        profile.path.push('\n');
+        assert!(validate_profile_environment(&profile).is_err());
+
+        profile = config_profile_fixture();
+        profile.java_home = Some("x".repeat(4097));
+        assert!(validate_profile_environment(&profile).is_err());
+    }
+
+    #[test]
+    fn config_profile_environment_verification_handles_paths_and_missing_values() {
+        let mut environment = std::collections::HashMap::new();
+        environment.insert(
+            "DEVENV_HOME".to_string(),
+            r"c:\devenvmanager\".to_string(),
+        );
+        environment.insert("Path".to_string(), r"C:\Tools;C:\Windows".to_string());
+
+        assert!(optional_profile_value_matches(
+            &environment,
+            "DEVENV_HOME",
+            Some(r"C:\DevEnvManager")
+        ));
+        assert!(optional_profile_value_matches(
+            &environment,
+            "JAVA_HOME",
+            None
+        ));
+        assert!(optional_profile_value_matches(
+            &environment,
+            "Path",
+            Some(r"C:\Tools;C:\Windows")
+        ));
+        assert!(!optional_profile_value_matches(
+            &environment,
+            "Path",
+            Some(r"C:\Windows;C:\Tools")
+        ));
+    }
+
+    #[test]
+    fn config_profile_collection_fingerprint_is_order_independent() {
+        let mut first = config_profile_fixture();
+        first.id = "profile-a".to_string();
+        let mut second = config_profile_fixture();
+        second.id = "profile-b".to_string();
+        second.name = "second".to_string();
+        assert_eq!(
+            profile_collection_fingerprint(&[first.clone(), second.clone()]),
+            profile_collection_fingerprint(&[second.clone(), first.clone()])
+        );
+        second.name = "changed".to_string();
+        assert_ne!(
+            profile_collection_fingerprint(&[first.clone(), second]),
+            profile_collection_fingerprint(&[first])
+        );
+    }
+
+    #[test]
+    fn config_profile_name_validation_rejects_unsafe_names() {
+        assert_eq!(validate_profile_name("  Java 17  ").unwrap(), "Java 17");
+        assert!(validate_profile_name(" ").is_err());
+        assert!(validate_profile_name("bad\nname").is_err());
+        assert!(validate_profile_name(&"x".repeat(101)).is_err());
+    }
+
+    #[test]
+    fn timestamps_are_stable_utc_text_instead_of_systemtime_debug_output() {
+        assert_eq!(
+            format_unix_timestamp_utc(0),
+            "1970-01-01 00:00:00 UTC"
+        );
+        assert_eq!(
+            format_unix_timestamp_utc(1_704_067_200),
+            "2024-01-01 00:00:00 UTC"
+        );
+        assert_eq!(
+            normalize_legacy_timestamp(
+                "SystemTime { intervals: 116444736000000000 }"
+            ),
+            "1970-01-01 00:00:00 UTC"
+        );
+        assert_eq!(
+            normalize_legacy_timestamp("SystemTime { tv_sec: 1704067200, tv_nsec: 0 }"),
+            "2024-01-01 00:00:00 UTC"
+        );
+        assert_eq!(normalize_legacy_timestamp("already-readable"), "already-readable");
+        assert!(!current_timestamp().contains("SystemTime"));
     }
 
     #[test]

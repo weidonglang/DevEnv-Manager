@@ -73,6 +73,9 @@ import type {
   AgentTraceReport,
   EnvHealthCheck,
   ConfigProfile,
+  ConfigProfileHistoryEntry,
+  ProfileHistoryRestorePlan,
+  ProfileHistoryRestoreResult,
   DoctorReport,
   PythonAnalysis,
   PythonRepairPlan,
@@ -133,6 +136,7 @@ import type {
   FileAssociationReport,
 } from "./types";
 import "./styles.css";
+import "./v2-migrations.css";
 
 const app = document.querySelector<HTMLDivElement>("#app");
 const SAFETY_DISCLAIMER_VERSION = 1;
@@ -458,12 +462,16 @@ app.innerHTML = `
             </div>
             <div class="form-row profile-file-row">
               <input id="profile-file-path" placeholder="团队模板 JSON 文件路径" />
+              <button id="pick-profile-file">${icon(FolderOpen)}<span>选择文件</span></button>
               <button id="preview-profiles">${icon(Search)}<span>预览</span></button>
               <button id="import-profiles" disabled>${icon(Download)}<span>确认导入</span></button>
               <button id="export-profiles">${icon(FileText)}<span>导出全部</span></button>
             </div>
             <div id="profile-import-preview"></div>
+            <div id="profile-operation-result" class="runtime-list" aria-live="polite"><div class="empty">保存、导入、应用或删除配置模板后，结果会显示在这里。</div></div>
             <div id="profile-list" class="runtime-list profile-list"></div>
+            <div class="panel-head compact-title profile-history-head"><div class="panel-title">${icon(RotateCcw)}<h3>配置档案历史</h3></div><button id="refresh-profile-history">刷新历史</button></div>
+            <div id="profile-history-list" class="runtime-list"><div class="empty">修改配置档案后，会在这里保留可恢复的完整旧状态。</div></div>
           </section>
           <section class="panel">
             <div class="panel-title">${icon(Shield)}<h2>PATH 检查</h2></div>
@@ -945,6 +953,7 @@ const state = {
   cache: [] as CacheEntry[],
   health: [] as EnvHealthCheck[],
   profiles: [] as ConfigProfile[],
+  profileHistory: [] as ConfigProfileHistoryEntry[],
   profileImportPreview: null as ConfigProfileImportPreview | null,
   doctor: null as DoctorReport | null,
   python: null as PythonAnalysis | null,
@@ -1546,10 +1555,31 @@ function renderProfiles() {
                 <button data-action="install-apply-profile" data-id="${escapeHtml(profile.id)}">${icon(Download)}<span>补齐并应用</span></button>
                 <button data-action="delete-profile" data-id="${escapeHtml(profile.id)}">${icon(Trash2)}<span>删除</span></button>
               </div>
+              <div class="profile-edit-row">
+                <input data-profile-new-name value="" placeholder="新名称；复制时可留空" aria-label="${escapeHtml(profile.name)} 的新名称" />
+                <button data-action="rename-profile" data-id="${escapeHtml(profile.id)}">重命名</button>
+                <button data-action="copy-profile" data-id="${escapeHtml(profile.id)}">复制</button>
+              </div>
             </article>
           `;
         })
     : `<div class="empty">还没有保存配置模板</div>`;
+}
+
+function renderProfileHistory() {
+  const element = document.querySelector<HTMLElement>("#profile-history-list");
+  if (!element) return;
+  element.innerHTML = state.profileHistory.length
+    ? paginate("profile-history", state.profileHistory, (entry) => `
+        <article class="runtime">
+          <div><strong>${escapeHtml(entry.createdAt)}</strong><span>${entry.profileCount} 个模板</span></div>
+          <small>${escapeHtml(entry.reason)}</small>
+          <div class="row-actions">
+            <button data-action="restore-profile-history" data-history-id="${escapeHtml(entry.id)}">${icon(RotateCcw)}<span>恢复此状态</span></button>
+          </div>
+        </article>
+      `)
+    : `<div class="empty">修改配置档案后，会在这里保留可恢复的完整旧状态。</div>`;
 }
 
 function renderProfileImportPreview() {
@@ -1572,6 +1602,63 @@ function renderProfileImportPreview() {
         </div>
       </div>`
     : "";
+}
+
+function renderProfileOperationResult(
+  title: string,
+  message: string,
+  status: "pending" | "success" | "error" = "success",
+) {
+  const element = document.querySelector<HTMLElement>("#profile-operation-result");
+  if (!element) return;
+  element.innerHTML = `<article class="runtime ${status === "error" ? "warn" : status === "success" ? "ok" : ""}">
+    <div><strong>${escapeHtml(title)}</strong><span>${status === "pending" ? "进行中" : status === "error" ? "未完成" : "已完成"}</span></div>
+    <small>${escapeHtml(message)}</small>
+  </article>`;
+  focusResult("#profile-operation-result");
+}
+
+async function runProfileOperation(
+  action: () => Promise<OperationResult>,
+  pending: string,
+): Promise<OperationResult | null> {
+  renderProfileOperationResult("配置档案操作", pending, "pending");
+  showToast(pending);
+  try {
+    const result = await action();
+    await refreshBase();
+    renderProfileOperationResult("配置档案操作成功", result.message);
+    showToast(result.message);
+    return result;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    renderProfileOperationResult("配置档案操作失败", message, "error");
+    showToast(message, true);
+    return null;
+  }
+}
+
+async function pickProfileImportFile() {
+  try {
+    const selected = await open({
+      directory: false,
+      multiple: false,
+      title: "选择配置模板 JSON 文件",
+      filters: [{ name: "JSON 配置模板", extensions: ["json"] }],
+    });
+    if (!selected || Array.isArray(selected)) return;
+    const input = document.querySelector<HTMLInputElement>("#profile-file-path");
+    if (input) input.value = selected;
+    state.profileImportPreview = null;
+    renderProfileImportPreview();
+    renderProfileOperationResult("已选择配置模板", "请先预览并确认模板内容，再执行导入。");
+  } catch (error) {
+    renderProfileOperationResult(
+      "选择配置模板失败",
+      error instanceof Error ? error.message : String(error),
+      "error",
+    );
+  }
 }
 
 function renderDoctor() {
@@ -2262,6 +2349,7 @@ async function refreshBase() {
       invoke<CleanupArchitecture>("storage_cleanup_architecture"),
       invoke<EnvironmentBackupInfo[]>("list_environment_backups"),
       invoke<FeatureRiskInfo[]>("feature_risk_registry"),
+      invoke<ConfigProfileHistoryEntry[]>("list_config_profile_history"),
     ]),
   ]);
 
@@ -2274,6 +2362,7 @@ async function refreshBase() {
   if (optional[3].status === "fulfilled") state.cleanupArchitecture = optional[3].value as CleanupArchitecture;
   if (optional[4].status === "fulfilled") state.environmentBackups = optional[4].value as EnvironmentBackupInfo[];
   if (optional[5].status === "fulfilled") state.featureRisks = optional[5].value as FeatureRiskInfo[];
+  if (optional[6].status === "fulfilled") state.profileHistory = optional[6].value as ConfigProfileHistoryEntry[];
   renderSnapshot();
   renderEnv();
   renderEnvironmentPreview();
@@ -2284,6 +2373,7 @@ async function refreshBase() {
   renderEnvBackupRecords();
   renderHealth();
   renderProfiles();
+  renderProfileHistory();
   renderProfileImportPreview();
   renderDoctor();
   renderPythonAnalysis();
@@ -3962,13 +4052,30 @@ document.querySelector("#restore-env")?.addEventListener("click", async () => {
 document.querySelector("#save-profile")?.addEventListener("click", () => {
   const input = document.querySelector<HTMLInputElement>("#profile-name");
   const name = input?.value.trim() || "";
-  void runOperation(
-    () => invoke<OperationResult>("save_config_profile", { name }),
-    "正在保存配置模板",
-  );
+  void (async () => {
+    const result = await runProfileOperation(
+      () => invoke<OperationResult>("save_config_profile", { name }),
+      "正在保存配置模板",
+    );
+    if (result && input) input.value = "";
+  })();
 });
 document.querySelector("#export-profiles")?.addEventListener("click", () => {
-  void runOperation(() => invoke<OperationResult>("export_config_profiles"), "正在导出配置模板");
+  void runProfileOperation(
+    () => invoke<OperationResult>("export_config_profiles"),
+    "正在导出配置模板",
+  );
+});
+document.querySelector("#refresh-profile-history")?.addEventListener("click", async () => {
+  try {
+    state.profileHistory = await invoke<ConfigProfileHistoryEntry[]>("list_config_profile_history");
+    renderProfileHistory();
+    renderProfileOperationResult("配置档案历史已刷新", `读取到 ${state.profileHistory.length} 个历史快照。`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    renderProfileOperationResult("读取配置档案历史失败", message, "error");
+    showToast(message, true);
+  }
 });
 document.querySelector("#repair-doctor-safe")?.addEventListener("click", async () => {
   if (!(await askForConfirmation("将自动清理真实失效/重复 PATH，并修复 DevEnv 管理的用户级环境变量。不会安装软件、结束进程或修改系统级变量。确定继续吗？"))) return;
@@ -3996,35 +4103,51 @@ document.querySelector("#profile-file-path")?.addEventListener("input", () => {
   state.profileImportPreview = null;
   renderProfileImportPreview();
 });
+document.querySelector("#pick-profile-file")?.addEventListener("click", () => {
+  void pickProfileImportFile();
+});
 document.querySelector("#preview-profiles")?.addEventListener("click", async () => {
   const path = document.querySelector<HTMLInputElement>("#profile-file-path")?.value.trim() || "";
   if (!path) {
-    showToast("请输入团队模板 JSON 文件路径", true);
+    renderProfileOperationResult("无法预览配置模板", "请先选择团队模板 JSON 文件。", "error");
+    showToast("请先选择团队模板 JSON 文件", true);
     return;
   }
+  renderProfileOperationResult("正在预览配置模板", "正在校验文件格式、运行时要求和同名模板。", "pending");
   showToast("正在校验并预览配置模板");
   try {
     state.profileImportPreview = await invoke<ConfigProfileImportPreview>("preview_config_profiles", { path });
     renderProfileImportPreview();
+    renderProfileOperationResult(
+      "配置模板预览完成",
+      `已校验 ${state.profileImportPreview.profiles.length} 个模板；确认内容后可以导入。`,
+    );
     showToast(`模板预览完成，共 ${state.profileImportPreview.profiles.length} 个`);
   } catch (error) {
     state.profileImportPreview = null;
     renderProfileImportPreview();
-    showToast(error instanceof Error ? error.message : String(error), true);
+    const message = error instanceof Error ? error.message : String(error);
+    renderProfileOperationResult("配置模板预览失败", message, "error");
+    showToast(message, true);
   }
 });
 document.querySelector("#import-profiles")?.addEventListener("click", async () => {
   const path = document.querySelector<HTMLInputElement>("#profile-file-path")?.value.trim() || "";
   if (!path || !state.profileImportPreview) {
+    renderProfileOperationResult("无法导入配置模板", "请先预览并校验模板。", "error");
     showToast("请先预览并校验模板", true);
     return;
   }
   const replacements = state.profileImportPreview.profiles.filter((item) => item.willReplace).length;
   if (!(await askForConfirmation(`将导入 ${state.profileImportPreview.profiles.length} 个模板${replacements ? `，覆盖 ${replacements} 个同名模板` : ""}。确定继续吗？`))) return;
-  void runOperation(() => invoke<OperationResult>("import_config_profiles", { path }), "正在导入配置模板").then(() => {
+  const result = await runProfileOperation(
+    () => invoke<OperationResult>("import_config_profiles", { path }),
+    "正在导入配置模板",
+  );
+  if (result) {
     state.profileImportPreview = null;
     renderProfileImportPreview();
-  });
+  }
 });
 document.querySelector("#run-network")?.addEventListener("click", async () => {
   showToast("正在执行网络诊断");
@@ -5349,11 +5472,14 @@ document.addEventListener("click", async (event) => {
   }
   if (action === "apply-profile") {
     const id = button.dataset.id || "";
-    void runRuntimeOperation(
-      () => invoke<OperationResult>("apply_config_profile", { id }),
-      "正在应用配置模板",
-      "PATH",
-    );
+    const profile = state.profiles.find((item) => item.id === id);
+    void (async () => {
+      if (!(await askForConfirmation(`将切换到“${profile?.name || "所选"}”配置并更新用户环境变量；操作前会自动备份，失败时自动恢复。确定继续吗？`))) return;
+      await runProfileOperation(
+        () => invoke<OperationResult>("apply_config_profile", { id }),
+        "正在应用并验证配置模板",
+      );
+    })();
   }
   if (action === "install-apply-profile") {
     const id = button.dataset.id || "";
@@ -5361,26 +5487,76 @@ document.addEventListener("click", async (event) => {
       try {
         const requirements = await invoke<ProfileRequirement[]>("config_profile_requirements", { id });
         const missing = requirements.filter((item) => !item.installed);
+        const unsupported = missing.filter((item) => !item.autoInstallSupported);
+        if (unsupported.length) {
+          const message = `以下指定版本不能由当前安装器精确补齐：${unsupported.map((item) => `${item.kind} ${item.version}`).join("、")}。请先手动安装对应版本，再应用模板。`;
+          renderProfileOperationResult("无法自动补齐配置模板", message, "error");
+          showToast(message, true);
+          return;
+        }
         const message = missing.length
           ? `将联网安装：${missing.map((item) => `${item.kind} ${item.version}`).join("、")}，安装完成后应用模板。确定继续吗？`
           : "所需运行时均已安装，将直接应用模板。确定继续吗？";
         if (!(await askForConfirmation(message))) return;
-        await runRuntimeOperation(
+        await runProfileOperation(
           () => invoke<OperationResult>("install_profile_missing", { id }),
           missing.length ? "正在补齐模板所需运行时" : "正在应用配置模板",
-          "PATH",
         );
       } catch (error) {
-        showToast(error instanceof Error ? error.message : String(error), true);
+        const message = error instanceof Error ? error.message : String(error);
+        renderProfileOperationResult("配置档案操作失败", message, "error");
+        showToast(message, true);
       }
+    })();
+  }
+  if (action === "rename-profile") {
+    const id = button.dataset.id || "";
+    const input = button
+      .closest(".profile-item")
+      ?.querySelector<HTMLInputElement>("[data-profile-new-name]");
+    const name = input?.value.trim() || "";
+    if (!name) {
+      renderProfileOperationResult("无法重命名配置模板", "请先在当前模板卡片中输入新名称。", "error");
+      input?.focus();
+    } else {
+      void runProfileOperation(
+        () => invoke<OperationResult>("rename_config_profile", { id, name }),
+        "正在重命名配置模板",
+      );
+    }
+  }
+  if (action === "copy-profile") {
+    const id = button.dataset.id || "";
+    const input = button
+      .closest(".profile-item")
+      ?.querySelector<HTMLInputElement>("[data-profile-new-name]");
+    const name = input?.value.trim() || "";
+    void runProfileOperation(
+      () => invoke<OperationResult>("copy_config_profile", { id, name }),
+      "正在复制配置模板",
+    );
+  }
+  if (action === "restore-profile-history") {
+    const historyId = button.dataset.historyId || "";
+    const entry = state.profileHistory.find((item) => item.id === historyId);
+    void (async () => {
+      if (!(await askForConfirmation(`将把全部配置档案恢复到 ${entry?.createdAt || "所选历史时间"} 的状态（${entry?.profileCount ?? 0} 个模板）；恢复前会自动保留当前状态。确定继续吗？`))) return;
+      await runProfileOperation(async () => {
+        const plan = await invoke<ProfileHistoryRestorePlan>("create_profile_history_restore_plan", { historyId });
+        return invoke<ProfileHistoryRestoreResult>("execute_profile_history_restore_plan", { planId: plan.planId });
+      }, "正在校验并恢复配置档案历史");
     })();
   }
   if (action === "delete-profile") {
     const id = button.dataset.id || "";
-    void runOperation(
-      () => invoke<OperationResult>("delete_config_profile", { id }),
-      "正在删除配置模板",
-    );
+    const profile = state.profiles.find((item) => item.id === id);
+    void (async () => {
+      if (!(await askForConfirmation(`将删除配置模板“${profile?.name || "所选模板"}”；不会修改当前运行时或环境变量。确定继续吗？`))) return;
+      await runProfileOperation(
+        () => invoke<OperationResult>("delete_config_profile", { id }),
+        "正在删除配置模板",
+      );
+    })();
   }
   if (action === "kill-port") {
     const port = Number(button.dataset.port || 0);

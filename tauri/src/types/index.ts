@@ -345,6 +345,30 @@ export type ConfigProfile = {
   path: string;
 };
 
+export type ConfigProfileHistoryEntry = {
+  id: string;
+  createdAt: string;
+  reason: string;
+  profileCount: number;
+  fingerprint: string;
+};
+
+export type ProfileHistoryRestorePlan = {
+  planId: string;
+  historyId: string;
+  snapshotCreatedAt: string;
+  snapshotReason: string;
+  profileCount: number;
+  backupHistoryId: string;
+  planFingerprint: string;
+};
+
+export type ProfileHistoryRestoreResult = OperationResult & {
+  restoredHistoryId: string;
+  backupHistoryId: string;
+  restoredProfileCount: number;
+};
+
 export type DoctorReport = {
   score: number;
   summary: string;

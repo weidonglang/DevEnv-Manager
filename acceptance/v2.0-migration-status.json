@@ -21,7 +21,11 @@
     "bounded-managed-runtime-probes",
     "transactional-managed-runtime-switch-with-rollback-receipts",
     "cleanup-result-routing-and-automatic-archive-target",
-    "recycle-bin-preview-single-confirmation-and-verified-rescan"
+    "recycle-bin-preview-single-confirmation-and-verified-rescan",
+    "transactional-config-profile-apply-with-exact-rollback",
+    "profile-json-picker-and-durable-results",
+    "profile-copy-rename-and-single-confirmation-history-restore",
+    "stable-utc-audit-timestamps"
   ],
   "batches": [
     {
@@ -76,8 +80,13 @@
     {
       "id": "profiles",
       "priority": "P1",
-      "status": "pending",
-      "strategy": "extend the existing profile list and preserve one-click apply behavior",
+      "status": "completed",
+      "strategy": "extend the existing profile list and preserve one-confirmation apply and history restore behavior",
+      "equivalentImplementation": [
+        "apply_config_profile performs backend-bound validation, backup, exact apply, verification and rollback in one command",
+        "history restore creates and consumes an internal fingerprint-bound single-use plan without exposing token UX",
+        "copy, rename, import picker and durable result handling remain inside the v1.7 profile panel"
+      ],
       "commands": [
         "config_profile_plan_id",
         "copy_config_profile",
