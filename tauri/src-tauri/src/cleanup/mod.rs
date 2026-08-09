@@ -42,8 +42,8 @@ pub use model::{
     MaintenanceOverview, MovePlan, MoveResult, PartitionLayoutReport, RollbackRecord,
 };
 pub use move_plan::{
-    create_desktop_archive_plan, create_downloads_archive_plan, create_junction_bridge,
-    create_move_plan, execute_desktop_archive_plan, execute_downloads_archive_plan,
+    create_desktop_archive_plan, create_downloads_archive_plan, create_move_plan,
+    execute_desktop_archive_plan, execute_downloads_archive_plan,
 };
 pub use partition::inspect_partition_layout;
 #[allow(unused_imports)]

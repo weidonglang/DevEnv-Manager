@@ -50,17 +50,6 @@ pub fn create_move_plan(
     plan_for_source(&source, target, &mode)
 }
 
-pub fn create_junction_bridge(
-    managed_root: &Path,
-    source: String,
-    target: String,
-) -> Result<MoveResult, String> {
-    let source_path = PathBuf::from(source);
-    let target_path = PathBuf::from(target);
-    let plan = plan_for_source(&source_path, target_path, "junction_bridge")?;
-    Ok(execute_move_plan(managed_root, plan))
-}
-
 pub fn create_desktop_archive_plan(target_drive: String) -> Result<MovePlan, String> {
     let desktop = dirs::desktop_dir().ok_or_else(|| "无法识别桌面目录".to_string())?;
     let target = target_root_for_drive(&target_drive, "DesktopArchive")?;

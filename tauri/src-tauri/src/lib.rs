@@ -1009,9 +1009,30 @@ struct RuntimeMeta {
 }
 
 static CONFIRMATION_TOKENS: OnceLock<Mutex<HashMap<String, ConfirmationToken>>> = OnceLock::new();
+static MOVE_PLANS: OnceLock<Mutex<HashMap<String, cleanup::MovePlan>>> = OnceLock::new();
+static EXPANSION_PLANS: OnceLock<Mutex<HashMap<String, PendingExpansionPlan>>> = OnceLock::new();
+
+#[derive(Debug, Clone)]
+struct PendingExpansionPlan {
+    created_at: u64,
+    plan: cleanup::ExpansionPlan,
+}
+
+const MOVE_PLAN_TTL_SECONDS: u64 = 30 * 60;
+const MAX_PENDING_MOVE_PLANS: usize = 128;
+const EXPANSION_PLAN_TTL_SECONDS: u64 = 15 * 60;
+const MAX_PENDING_EXPANSION_PLANS: usize = 32;
 
 fn confirmation_tokens() -> &'static Mutex<HashMap<String, ConfirmationToken>> {
     CONFIRMATION_TOKENS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn move_plans() -> &'static Mutex<HashMap<String, cleanup::MovePlan>> {
+    MOVE_PLANS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn expansion_plans() -> &'static Mutex<HashMap<String, PendingExpansionPlan>> {
+    EXPANSION_PLANS.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
 const RISK_OPERATION_REGISTRY: &[RiskOperationSpec] = &[
@@ -2016,13 +2037,139 @@ fn open_app_config_dir() -> Result<OperationResult, String> {
     })
 }
 
+fn move_plan_expired(plan: &cleanup::MovePlan, now: u64) -> bool {
+    plan.created_at
+        .parse::<u64>()
+        .ok()
+        .is_none_or(|created| created.saturating_add(MOVE_PLAN_TTL_SECONDS) < now)
+}
+
+fn store_move_plan(plan: cleanup::MovePlan) -> Result<cleanup::MovePlan, String> {
+    let now = unix_timestamp();
+    let mut store = move_plans()
+        .lock()
+        .map_err(|_| "Move plan storage is unavailable".to_string())?;
+    store.retain(|_, pending| !move_plan_expired(pending, now));
+    if store.len() >= MAX_PENDING_MOVE_PLANS {
+        return Err(
+            "Too many pending move plans; complete an existing plan or wait for it to expire"
+                .to_string(),
+        );
+    }
+    store.insert(plan.plan_id.clone(), plan.clone());
+    Ok(plan)
+}
+
+fn verify_move_plan(plan: &cleanup::MovePlan) -> Result<(), String> {
+    let store = move_plans()
+        .lock()
+        .map_err(|_| "Move plan storage is unavailable".to_string())?;
+    let stored = store
+        .get(&plan.plan_id)
+        .ok_or_else(|| "Move plan does not exist, expired, or was already used".to_string())?;
+    if stored != plan {
+        return Err("Move plan content changed after preview; execution refused".to_string());
+    }
+    if move_plan_expired(stored, unix_timestamp()) {
+        return Err("Move plan expired; create a new preview before execution".to_string());
+    }
+    Ok(())
+}
+
+fn consume_move_plan(plan: cleanup::MovePlan) -> Result<cleanup::MovePlan, String> {
+    let mut store = move_plans()
+        .lock()
+        .map_err(|_| "Move plan storage is unavailable".to_string())?;
+    let stored = store
+        .remove(&plan.plan_id)
+        .ok_or_else(|| "Move plan does not exist, expired, or was already used".to_string())?;
+    if stored != plan {
+        store.insert(stored.plan_id.clone(), stored);
+        return Err("Move plan content changed after preview; execution refused".to_string());
+    }
+    if move_plan_expired(&stored, unix_timestamp()) {
+        return Err("Move plan expired; create a new preview before execution".to_string());
+    }
+    Ok(stored)
+}
+
+fn store_expansion_plan(
+    plan: cleanup::ExpansionPlan,
+) -> Result<cleanup::ExpansionPlan, String> {
+    let now = unix_timestamp();
+    let mut store = expansion_plans()
+        .lock()
+        .map_err(|_| "Expansion plan storage is unavailable".to_string())?;
+    store.retain(|_, pending| {
+        pending
+            .created_at
+            .saturating_add(EXPANSION_PLAN_TTL_SECONDS)
+            >= now
+    });
+    if store.len() >= MAX_PENDING_EXPANSION_PLANS {
+        return Err("Too many pending expansion plans; wait for an old plan to expire".to_string());
+    }
+    store.insert(
+        plan.plan_id.clone(),
+        PendingExpansionPlan {
+            created_at: now,
+            plan: plan.clone(),
+        },
+    );
+    Ok(plan)
+}
+
+fn verify_expansion_plan(plan: &cleanup::ExpansionPlan) -> Result<(), String> {
+    let store = expansion_plans()
+        .lock()
+        .map_err(|_| "Expansion plan storage is unavailable".to_string())?;
+    let pending = store
+        .get(&plan.plan_id)
+        .ok_or_else(|| "Expansion plan does not exist, expired, or was already used".to_string())?;
+    if pending.plan != *plan {
+        return Err("Expansion plan content changed after preview; execution refused".to_string());
+    }
+    if pending
+        .created_at
+        .saturating_add(EXPANSION_PLAN_TTL_SECONDS)
+        < unix_timestamp()
+    {
+        return Err("Expansion plan expired; create a new preview before execution".to_string());
+    }
+    Ok(())
+}
+
+fn consume_expansion_plan(
+    plan: cleanup::ExpansionPlan,
+) -> Result<cleanup::ExpansionPlan, String> {
+    let mut store = expansion_plans()
+        .lock()
+        .map_err(|_| "Expansion plan storage is unavailable".to_string())?;
+    let pending = store
+        .remove(&plan.plan_id)
+        .ok_or_else(|| "Expansion plan does not exist, expired, or was already used".to_string())?;
+    if pending.plan != plan {
+        store.insert(pending.plan.plan_id.clone(), pending);
+        return Err("Expansion plan content changed after preview; execution refused".to_string());
+    }
+    if pending
+        .created_at
+        .saturating_add(EXPANSION_PLAN_TTL_SECONDS)
+        < unix_timestamp()
+    {
+        return Err("Expansion plan expired; create a new preview before execution".to_string());
+    }
+    Ok(pending.plan)
+}
+
 #[tauri::command]
 async fn create_move_plan(
     source: String,
     target_drive: String,
     mode: String,
 ) -> Result<cleanup::MovePlan, String> {
-    run_blocking(move || cleanup::create_move_plan(source, target_drive, mode)).await?
+    run_blocking(move || store_move_plan(cleanup::create_move_plan(source, target_drive, mode)?))
+        .await?
 }
 
 #[tauri::command]
@@ -2031,7 +2178,9 @@ async fn execute_move_plan(
     confirmation_token: Option<String>,
 ) -> Result<cleanup::MoveResult, String> {
     run_blocking(move || {
+        verify_move_plan(&plan)?;
         require_risk_operation_token("execute_move_plan", &plan.plan_id, confirmation_token)?;
+        let plan = consume_move_plan(plan)?;
         let paths = load_paths()?;
         Ok(cleanup::execute_move_plan(&paths.root, plan))
     })
@@ -2065,20 +2214,9 @@ async fn rollback_move(
 }
 
 #[tauri::command]
-async fn create_junction_bridge(
-    source: String,
-    target: String,
-) -> Result<cleanup::MoveResult, String> {
-    run_blocking(move || {
-        let paths = load_paths()?;
-        cleanup::create_junction_bridge(&paths.root, source, target)
-    })
-    .await?
-}
-
-#[tauri::command]
 async fn create_desktop_archive_plan(target_drive: String) -> Result<cleanup::MovePlan, String> {
-    run_blocking(move || cleanup::create_desktop_archive_plan(target_drive)).await?
+    run_blocking(move || store_move_plan(cleanup::create_desktop_archive_plan(target_drive)?))
+        .await?
 }
 
 #[tauri::command]
@@ -2087,7 +2225,9 @@ async fn execute_desktop_archive_plan(
     confirmation_token: Option<String>,
 ) -> Result<cleanup::MoveResult, String> {
     run_blocking(move || {
+        verify_move_plan(&plan)?;
         require_risk_operation_token("execute_move_plan", &plan.plan_id, confirmation_token)?;
+        let plan = consume_move_plan(plan)?;
         let paths = load_paths()?;
         Ok(cleanup::execute_desktop_archive_plan(&paths.root, plan))
     })
@@ -2096,7 +2236,8 @@ async fn execute_desktop_archive_plan(
 
 #[tauri::command]
 async fn create_downloads_archive_plan(target_drive: String) -> Result<cleanup::MovePlan, String> {
-    run_blocking(move || cleanup::create_downloads_archive_plan(target_drive)).await?
+    run_blocking(move || store_move_plan(cleanup::create_downloads_archive_plan(target_drive)?))
+        .await?
 }
 
 #[tauri::command]
@@ -2105,7 +2246,9 @@ async fn execute_downloads_archive_plan(
     confirmation_token: Option<String>,
 ) -> Result<cleanup::MoveResult, String> {
     run_blocking(move || {
+        verify_move_plan(&plan)?;
         require_risk_operation_token("execute_move_plan", &plan.plan_id, confirmation_token)?;
+        let plan = consume_move_plan(plan)?;
         let paths = load_paths()?;
         Ok(cleanup::execute_downloads_archive_plan(&paths.root, plan))
     })
@@ -2119,7 +2262,7 @@ async fn inspect_partition_layout() -> Result<cleanup::PartitionLayoutReport, St
 
 #[tauri::command]
 async fn create_c_drive_expansion_plan() -> Result<cleanup::ExpansionPlan, String> {
-    run_blocking(cleanup::create_c_drive_expansion_plan).await?
+    run_blocking(|| store_expansion_plan(cleanup::create_c_drive_expansion_plan()?)).await?
 }
 
 #[tauri::command]
@@ -2128,7 +2271,9 @@ async fn execute_c_drive_expansion(
     confirmation_token: Option<String>,
 ) -> Result<cleanup::ExpansionResult, String> {
     run_blocking(move || {
+        verify_expansion_plan(&plan)?;
         require_risk_operation_token("execute_expansion_plan", &plan.plan_id, confirmation_token)?;
+        let plan = consume_expansion_plan(plan)?;
         Ok(cleanup::execute_c_drive_expansion(plan))
     })
     .await?
@@ -8948,7 +9093,6 @@ pub fn run() {
             execute_move_plan,
             list_rollback_records,
             rollback_move,
-            create_junction_bridge,
             create_desktop_archive_plan,
             execute_desktop_archive_plan,
             create_downloads_archive_plan,
@@ -13505,6 +13649,64 @@ mod tests {
         settings.safety_disclaimer_version = SAFETY_DISCLAIMER_VERSION;
         settings.safety_disclaimer_accepted_at = Some("accepted".to_string());
         assert!(!should_recover_unwritable_initial_root(&settings));
+    }
+
+    #[test]
+    fn move_plan_is_backend_bound_and_single_use() {
+        let plan = cleanup::MovePlan {
+            plan_id: format!(
+                "test-move-plan-{}",
+                SAVE_JSON_COUNTER.fetch_add(1, Ordering::Relaxed)
+            ),
+            created_at: unix_timestamp().to_string(),
+            source: r"C:\Users\test\Downloads".to_string(),
+            target: r"D:\DevEnvManager\Moved\Downloads".to_string(),
+            mode: "archive_only".to_string(),
+            estimated_bytes: 1024,
+            item_count: 1,
+            risk: "high".to_string(),
+            requires_admin: false,
+            reversible: true,
+            warnings: vec!["test".to_string()],
+        };
+
+        store_move_plan(plan.clone()).unwrap();
+        let mut tampered = plan.clone();
+        tampered.target = r"C:\Windows\System32".to_string();
+        assert!(verify_move_plan(&tampered).is_err());
+        assert!(consume_move_plan(tampered).is_err());
+
+        assert!(verify_move_plan(&plan).is_ok());
+        assert_eq!(consume_move_plan(plan.clone()).unwrap(), plan);
+        assert!(consume_move_plan(plan).is_err());
+    }
+
+    #[test]
+    fn expansion_plan_is_backend_bound_and_single_use() {
+        let plan = cleanup::ExpansionPlan {
+            plan_id: format!(
+                "test-expansion-plan-{}",
+                SAVE_JSON_COUNTER.fetch_add(1, Ordering::Relaxed)
+            ),
+            mode: "adjacent_unallocated".to_string(),
+            can_execute: true,
+            requires_admin: true,
+            estimated_added_bytes: 1024,
+            commands_preview: vec!["select volume C".to_string()],
+            risks: vec!["test".to_string()],
+            backup_required: true,
+            explanation: "test".to_string(),
+        };
+
+        store_expansion_plan(plan.clone()).unwrap();
+        let mut tampered = plan.clone();
+        tampered.estimated_added_bytes = u64::MAX;
+        assert!(verify_expansion_plan(&tampered).is_err());
+        assert!(consume_expansion_plan(tampered).is_err());
+
+        assert!(verify_expansion_plan(&plan).is_ok());
+        assert_eq!(consume_expansion_plan(plan.clone()).unwrap(), plan);
+        assert!(consume_expansion_plan(plan).is_err());
     }
 
     #[test]
