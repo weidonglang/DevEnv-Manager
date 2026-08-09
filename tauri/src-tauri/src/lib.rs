@@ -1440,11 +1440,6 @@ fn env_snapshot() -> EnvSnapshot {
 }
 
 #[tauri::command]
-async fn configure_user_environment() -> Result<OperationResult, String> {
-    run_blocking(configure_user_environment_blocking).await?
-}
-
-#[tauri::command]
 fn storage_cleanup_architecture() -> cleanup::CleanupArchitecture {
     cleanup::architecture()
 }
@@ -9157,7 +9152,6 @@ pub fn run() {
             env_snapshot,
             inspect_java_environment,
             inspect_agent_traces,
-            configure_user_environment,
             preview_user_environment_configuration,
             apply_user_environment_configuration,
             list_environment_backups,

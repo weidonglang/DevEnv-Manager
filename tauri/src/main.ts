@@ -2433,7 +2433,12 @@ async function runDoctorAction(action: string) {
     return;
   }
   if (action === "configure_env") {
-    await runOperation(() => invoke<OperationResult>("configure_user_environment"), "正在配置用户环境变量");
+    showToast("正在计算 DEVENV_HOME、JAVA_HOME 与 PATH 差异");
+    state.environmentPreview = await invoke<EnvironmentConfigPreview>("preview_user_environment_configuration");
+    renderEnvironmentPreview();
+    activateView("environment");
+    document.querySelector<HTMLElement>(".environment-preview")?.scrollIntoView({ block: "start" });
+    showToast("环境配置预览已生成；确认差异后再写入");
     return;
   }
   if (action === "discover_runtimes") {
