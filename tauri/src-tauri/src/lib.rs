@@ -1008,6 +1008,39 @@ struct RuntimeMeta {
     exe_key: &'static str,
 }
 
+#[derive(Debug, Clone, Copy)]
+struct RuntimeProbeSpec {
+    label: &'static str,
+    executable: &'static str,
+    args: &'static [&'static str],
+    timeout_seconds: u64,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct RuntimeSwitchBackup {
+    backup_id: String,
+    created_at: u64,
+    kind: String,
+    previous_version: Option<String>,
+    requested_version: String,
+    previous_target: Option<String>,
+    target: String,
+    previous_current: CurrentVersions,
+    environment_backup: Option<String>,
+    status: String,
+    detail: String,
+}
+
+#[derive(Clone, Copy)]
+struct RuntimeSwitchRollback<'a> {
+    paths: &'a AppPaths,
+    meta: RuntimeMeta,
+    previous_current: &'a CurrentVersions,
+    previous_target: Option<&'a Path>,
+    previous_environment: Option<&'a std::collections::HashMap<String, String>>,
+}
+
 static CONFIRMATION_TOKENS: OnceLock<Mutex<HashMap<String, ConfirmationToken>>> = OnceLock::new();
 static MOVE_PLANS: OnceLock<Mutex<HashMap<String, cleanup::MovePlan>>> = OnceLock::new();
 static EXPANSION_PLANS: OnceLock<Mutex<HashMap<String, PendingExpansionPlan>>> = OnceLock::new();
@@ -3807,6 +3840,7 @@ fn switch_runtime_blocking(
     path: Option<String>,
 ) -> Result<OperationResult, String> {
     let paths = load_paths()?;
+    paths.ensure().map_err(|err| err.to_string())?;
     let meta = runtime_meta(&kind)?;
     let mut installed = load_installed(&paths)?;
     let requested_path = path.as_deref().map(path_key);
@@ -3837,57 +3871,106 @@ fn switch_runtime_blocking(
         .unwrap_or(version.as_str())
         .to_string();
     let target = PathBuf::from(record.get("path").and_then(Value::as_str).unwrap_or(""));
-    if !target.exists() {
-        return Err(format!("版本目录不存在：{}", display_path(&target)));
-    }
+    let target = validate_managed_runtime_target(&paths, meta, &target)?;
+    let preflight = verify_runtime_root(&paths, meta, &target)?;
+
     let previous_current = installed.current.clone();
-    let previous_environment = (meta.kind == "jdk")
-        .then(user_environment)
-        .transpose()?
-        .unwrap_or_default();
-    if meta.kind == "jdk" {
-        create_environment_backup(&paths, &previous_environment)?;
+    let previous_version = current_version_for_kind(&installed, meta.kind).map(str::to_string);
+    let previous_target = previous_runtime_target(&installed, meta, previous_version.as_deref())
+        .and_then(|target| validate_managed_runtime_target(&paths, meta, &target).ok());
+    let previous_environment = if meta.kind == "jdk" {
+        Some(user_environment()?)
+    } else {
+        None
+    };
+    let environment_backup = previous_environment
+        .as_ref()
+        .map(|environment| create_environment_backup(&paths, environment))
+        .transpose()?;
+    let mut backup = RuntimeSwitchBackup {
+        backup_id: format!(
+            "runtime-switch-{}-{}",
+            unix_timestamp(),
+            SAVE_JSON_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ),
+        created_at: unix_timestamp(),
+        kind: meta.kind.to_string(),
+        previous_version,
+        requested_version: version,
+        previous_target: previous_target.as_ref().map(display_path),
+        target: display_path(&target),
+        previous_current: previous_current.clone(),
+        environment_backup,
+        status: "prepared".to_string(),
+        detail: format!("切换前验证通过：{}", preflight.join("；")),
+    };
+    save_runtime_switch_backup(&paths, &backup)?;
+    let rollback_context = RuntimeSwitchRollback {
+        paths: &paths,
+        meta,
+        previous_current: &previous_current,
+        previous_target: previous_target.as_deref(),
+        previous_environment: previous_environment.as_ref(),
+    };
+
+    let link = paths.current().join(meta.link_name);
+    if let Err(error) = switch_junction(&link, &target, &paths.root) {
+        return Err(runtime_switch_failure(
+            rollback_context,
+            &mut installed,
+            &mut backup,
+            error,
+        ));
     }
-    switch_junction(&paths.current().join(meta.link_name), &target, &paths.root)?;
     set_current(&mut installed, meta.kind, Some(selected_version.clone()));
-    save_json(&paths.installed_file(), &installed)?;
+    if let Err(error) = save_json(&paths.installed_file(), &installed) {
+        return Err(runtime_switch_failure(
+            rollback_context,
+            &mut installed,
+            &mut backup,
+            error,
+        ));
+    }
     if meta.kind == "jdk" {
         if let Err(error) = refresh_user_java_home(&paths) {
-            if let Some(previous_version) = previous_current.jdk.as_deref() {
-                if let Some(previous_record) = installed.jdks.iter().find(|item| {
-                    item.get("version").and_then(Value::as_str) == Some(previous_version)
-                }) {
-                    if let Some(previous_path) = previous_record.get("path").and_then(Value::as_str)
-                    {
-                        let _ = switch_junction(
-                            &paths.current().join(meta.link_name),
-                            Path::new(previous_path),
-                            &paths.root,
-                        );
-                    }
-                }
-            } else {
-                let _ = remove_junction(&paths.current().join(meta.link_name));
-            }
-            installed.current = previous_current;
-            let _ = save_json(&paths.installed_file(), &installed);
-            let previous_path = previous_environment
-                .get("Path")
-                .or_else(|| previous_environment.get("PATH"))
-                .cloned()
-                .unwrap_or_default();
-            let _ = restore_environment_values(
-                previous_environment.get("DEVENV_HOME").map(String::as_str),
-                previous_environment.get("JAVA_HOME").map(String::as_str),
-                &previous_path,
-            );
-            broadcast_environment_change();
-            return Err(format!("JDK 切换验证失败，已恢复上一个环境：{error}"));
+            return Err(runtime_switch_failure(
+                rollback_context,
+                &mut installed,
+                &mut backup,
+                error,
+            ));
         }
+    }
+
+    let verification = match verify_runtime_root(&paths, meta, &link) {
+        Ok(details) => details,
+        Err(error) => {
+            return Err(runtime_switch_failure(
+                rollback_context,
+                &mut installed,
+                &mut backup,
+                error,
+            ));
+        }
+    };
+    backup.status = "verified".to_string();
+    backup.detail = format!("切换后验证通过：{}", verification.join("；"));
+    if let Err(error) = save_runtime_switch_backup(&paths, &backup) {
+        return Err(runtime_switch_failure(
+            rollback_context,
+            &mut installed,
+            &mut backup,
+            format!("保存运行时切换回执失败：{error}"),
+        ));
     }
     Ok(OperationResult {
         success: true,
-        message: format!("已切换当前 {} 到 {}", meta.kind, selected_version),
+        message: format!(
+            "已切换当前 {} 到 {}，并通过验证：{}",
+            meta.kind,
+            selected_version,
+            verification.join("；")
+        ),
     })
 }
 
@@ -8127,7 +8210,15 @@ fn verify_java_consumer_environment_blocking(
     if !root.is_dir() {
         return Err("请选择项目根目录，而不是单个文件。".to_string());
     }
-    let paths = load_paths()?;
+    let (paths, config_warning) = match load_paths() {
+        Ok(paths) => (paths, None),
+        Err(error) => (
+            AppPaths::new(default_root_dir()),
+            Some(format!(
+                "读取 DevEnv Manager 配置失败，本次只读检查已使用默认根目录继续：{error}"
+            )),
+        ),
+    };
     let user = user_environment().unwrap_or_default();
     let process = env::vars().collect::<HashMap<_, _>>();
     let raw = user.get("JAVA_HOME").cloned();
@@ -8187,6 +8278,9 @@ fn verify_java_consumer_environment_blocking(
         format!("{consumer} 读取不到 Java 不一定是 JDK 没装。"),
         "常见原因包括 JAVA_HOME 间接引用、进程环境未刷新、服务仍使用旧环境、PATH 首个 java.exe 与 JAVA_HOME 不一致，或 JDK 缺少 javac.exe。".to_string(),
     ];
+    if let Some(warning) = config_warning {
+        explanation.push(warning);
+    }
     if indirect {
         explanation.push("当前 JAVA_HOME 是间接引用，建议写入真实绝对路径。".to_string());
     }
@@ -9685,6 +9779,9 @@ impl AppPaths {
     }
     fn port_history_file(&self) -> PathBuf {
         self.config().join("port_history.json")
+    }
+    fn runtime_switch_backups_file(&self) -> PathBuf {
+        self.config().join("runtime_switch_backups.json")
     }
 
     fn ensure(&self) -> io::Result<()> {
@@ -11254,6 +11351,243 @@ fn runtime_parent(paths: &AppPaths, collection: &str) -> Result<PathBuf, String>
     }
 }
 
+const JDK_RUNTIME_PROBES: &[RuntimeProbeSpec] = &[
+    RuntimeProbeSpec {
+        label: "java -version",
+        executable: "bin/java.exe",
+        args: &["-version"],
+        timeout_seconds: 30,
+    },
+    RuntimeProbeSpec {
+        label: "javac -version",
+        executable: "bin/javac.exe",
+        args: &["-version"],
+        timeout_seconds: 30,
+    },
+];
+const PYTHON_RUNTIME_PROBES: &[RuntimeProbeSpec] = &[
+    RuntimeProbeSpec {
+        label: "python --version",
+        executable: "python.exe",
+        args: &["--version"],
+        timeout_seconds: 30,
+    },
+    RuntimeProbeSpec {
+        label: "python -m pip --version",
+        executable: "python.exe",
+        args: &["-m", "pip", "--version"],
+        timeout_seconds: 60,
+    },
+];
+const NODE_RUNTIME_PROBES: &[RuntimeProbeSpec] = &[
+    RuntimeProbeSpec {
+        label: "node -v",
+        executable: "node.exe",
+        args: &["-v"],
+        timeout_seconds: 30,
+    },
+    RuntimeProbeSpec {
+        label: "npm -v",
+        executable: "npm.cmd",
+        args: &["-v"],
+        timeout_seconds: 30,
+    },
+];
+const MAVEN_RUNTIME_PROBES: &[RuntimeProbeSpec] = &[RuntimeProbeSpec {
+    label: "mvn -version",
+    executable: "bin/mvn.cmd",
+    args: &["-version"],
+    timeout_seconds: 60,
+}];
+const GRADLE_RUNTIME_PROBES: &[RuntimeProbeSpec] = &[RuntimeProbeSpec {
+    label: "gradle --version",
+    executable: "bin/gradle.bat",
+    args: &["--version"],
+    timeout_seconds: 60,
+}];
+const GO_RUNTIME_PROBES: &[RuntimeProbeSpec] = &[RuntimeProbeSpec {
+    label: "go version",
+    executable: "bin/go.exe",
+    args: &["version"],
+    timeout_seconds: 30,
+}];
+
+fn runtime_probe_specs(kind: &str) -> Result<&'static [RuntimeProbeSpec], String> {
+    match kind {
+        "jdk" => Ok(JDK_RUNTIME_PROBES),
+        "python" => Ok(PYTHON_RUNTIME_PROBES),
+        "node" => Ok(NODE_RUNTIME_PROBES),
+        "maven" => Ok(MAVEN_RUNTIME_PROBES),
+        "gradle" => Ok(GRADLE_RUNTIME_PROBES),
+        "go" => Ok(GO_RUNTIME_PROBES),
+        _ => Err(format!("未知运行时类型：{kind}")),
+    }
+}
+
+fn validate_managed_runtime_target(
+    paths: &AppPaths,
+    meta: RuntimeMeta,
+    target: &Path,
+) -> Result<PathBuf, String> {
+    let expected_parent = runtime_parent(paths, meta.collection)?;
+    let expected_parent = expected_parent
+        .canonicalize()
+        .map_err(|err| format!("解析受管运行时目录失败：{err}"))?;
+    let resolved = target
+        .canonicalize()
+        .map_err(|err| format!("解析版本目录失败：{err}"))?;
+    if !resolved.is_dir() || resolved.parent() != Some(expected_parent.as_path()) {
+        return Err(format!(
+            "拒绝切换到非标准受管目录：{}",
+            display_path(target)
+        ));
+    }
+    Ok(resolved)
+}
+
+fn verify_runtime_root(
+    paths: &AppPaths,
+    meta: RuntimeMeta,
+    root: &Path,
+) -> Result<Vec<String>, String> {
+    let mut details = Vec::new();
+    for probe in runtime_probe_specs(meta.kind)? {
+        let executable = root.join(probe.executable);
+        if !executable.is_file() {
+            return Err(format!(
+                "{} 缺少必需组件：{}",
+                meta.kind,
+                display_path(executable)
+            ));
+        }
+        let output = run_managed_command_output(
+            paths,
+            executable,
+            probe.args,
+            probe.timeout_seconds,
+        )
+        .map_err(|error| format!("{} 验证失败：{error}", probe.label))?;
+        let detail = first_meaningful_output_line(&output)
+            .unwrap_or_else(|| "验证通过".to_string());
+        details.push(format!("{}：{}", probe.label, detail));
+    }
+    Ok(details)
+}
+
+fn save_runtime_switch_backup(
+    paths: &AppPaths,
+    backup: &RuntimeSwitchBackup,
+) -> Result<(), String> {
+    let file = paths.runtime_switch_backups_file();
+    let mut backups = load_json_with_default(&file, Vec::<RuntimeSwitchBackup>::new())?;
+    if let Some(existing) = backups
+        .iter_mut()
+        .find(|item| item.backup_id == backup.backup_id)
+    {
+        *existing = backup.clone();
+    } else {
+        backups.push(backup.clone());
+    }
+    if backups.len() > 20 {
+        backups.drain(0..backups.len() - 20);
+    }
+    save_json(&file, &backups)
+}
+
+fn previous_runtime_target(
+    installed: &InstalledData,
+    meta: RuntimeMeta,
+    version: Option<&str>,
+) -> Option<PathBuf> {
+    let version = version?;
+    collection(installed, meta.collection)
+        .iter()
+        .find(|item| item.get("version").and_then(Value::as_str) == Some(version))
+        .and_then(|item| item.get("path").and_then(Value::as_str))
+        .map(PathBuf::from)
+}
+
+fn rollback_runtime_switch(
+    paths: &AppPaths,
+    meta: RuntimeMeta,
+    installed: &mut InstalledData,
+    previous_current: &CurrentVersions,
+    previous_target: Option<&Path>,
+    previous_environment: Option<&std::collections::HashMap<String, String>>,
+) -> Result<(), String> {
+    let mut failures = Vec::new();
+    let link = paths.current().join(meta.link_name);
+    let pointer_result = if let Some(target) = previous_target {
+        switch_junction(&link, target, &paths.root)
+    } else {
+        remove_junction(&link)
+    };
+    if let Err(error) = pointer_result {
+        failures.push(format!("恢复 current 指针失败：{error}"));
+    }
+
+    installed.current = previous_current.clone();
+    if let Err(error) = save_json(&paths.installed_file(), installed) {
+        failures.push(format!("恢复运行时登记失败：{error}"));
+    }
+
+    if meta.kind == "jdk" {
+        if let Some(environment) = previous_environment {
+            let previous_path = environment
+                .get("Path")
+                .or_else(|| environment.get("PATH"))
+                .cloned()
+                .unwrap_or_default();
+            if let Err(error) = restore_environment_values(
+                environment.get("DEVENV_HOME").map(String::as_str),
+                environment.get("JAVA_HOME").map(String::as_str),
+                &previous_path,
+            ) {
+                failures.push(format!("恢复用户环境失败：{error}"));
+            }
+            broadcast_environment_change();
+        }
+    }
+
+    if failures.is_empty() {
+        Ok(())
+    } else {
+        Err(failures.join("；"))
+    }
+}
+
+fn runtime_switch_failure(
+    rollback_context: RuntimeSwitchRollback<'_>,
+    installed: &mut InstalledData,
+    backup: &mut RuntimeSwitchBackup,
+    error: String,
+) -> String {
+    let rollback = rollback_runtime_switch(
+        rollback_context.paths,
+        rollback_context.meta,
+        installed,
+        rollback_context.previous_current,
+        rollback_context.previous_target,
+        rollback_context.previous_environment,
+    );
+    let message = match rollback {
+        Ok(()) => format!("运行时切换失败，已恢复上一个版本：{error}"),
+        Err(rollback_error) => {
+            format!("运行时切换失败，且自动恢复不完整：{error}；{rollback_error}")
+        }
+    };
+    backup.status = if message.contains("恢复不完整") {
+        "rollback_failed".to_string()
+    } else {
+        "rolled_back".to_string()
+    };
+    backup.detail = message.clone();
+    if let Err(save_error) = save_runtime_switch_backup(rollback_context.paths, backup) {
+        return format!("{message}；保存切换回执失败：{save_error}");
+    }
+    message
+}
+
 fn current_version(installed: &InstalledData, kind: &str) -> Option<String> {
     match kind {
         "jdk" => installed.current.jdk.clone(),
@@ -12243,17 +12577,23 @@ fn run_managed_command_output(
     args: &[&str],
     timeout_seconds: u64,
 ) -> Result<String, String> {
-    let mut command = hidden_command(executable);
+    let executable_label = display_path(&executable);
+    let mut command = hidden_command(&executable);
     command.args(args);
     apply_managed_environment(paths, &mut command);
-    let output = command
-        .output()
+    let output = powershell_runner::run_configured_command_with_timeout(
+        command,
+        executable_label,
+        timeout_seconds,
+    )
         .map_err(|err| format!("执行命令失败：{err}"))?;
-    let _ = timeout_seconds;
-    if !output.status.success() {
-        return Err(command_text(&output.stdout, &output.stderr));
+    if !output.success {
+        return Err(powershell_runner::native_command_message(&output));
     }
-    Ok(command_text(&output.stdout, &output.stderr))
+    Ok(command_text(
+        output.stdout.as_bytes(),
+        output.stderr.as_bytes(),
+    ))
 }
 
 fn apply_managed_environment(paths: &AppPaths, command: &mut Command) {
@@ -13946,6 +14286,69 @@ mod tests {
         assert!(paths.env_backup_file().is_file());
         assert!(paths.config().join("env_backups").join(file_name).is_file());
         assert_eq!(split_path_entries(&environment["Path"]).len(), 2);
+    }
+
+    #[test]
+    fn runtime_switch_target_must_be_a_direct_managed_child() {
+        let root = tempfile::tempdir().unwrap();
+        let paths = AppPaths::new(root.path().join("DevEnvManager"));
+        paths.ensure().unwrap();
+        let managed = paths.nodes().join("node-v22");
+        fs::create_dir(&managed).unwrap();
+        let resolved = validate_managed_runtime_target(
+            &paths,
+            runtime_meta("node").unwrap(),
+            &managed,
+        )
+        .unwrap();
+        assert_eq!(resolved, managed.canonicalize().unwrap());
+
+        let outside = paths.root.join("tools").join("node-v22");
+        fs::create_dir_all(&outside).unwrap();
+        assert!(validate_managed_runtime_target(
+            &paths,
+            runtime_meta("node").unwrap(),
+            &outside,
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn runtime_switch_backups_are_bounded_and_updatable() {
+        let root = tempfile::tempdir().unwrap();
+        let paths = AppPaths::new(root.path().join("DevEnvManager"));
+        paths.ensure().unwrap();
+        for index in 0..22 {
+            save_runtime_switch_backup(
+                &paths,
+                &RuntimeSwitchBackup {
+                    backup_id: format!("backup-{index}"),
+                    created_at: index,
+                    kind: "node".to_string(),
+                    previous_version: None,
+                    requested_version: index.to_string(),
+                    previous_target: None,
+                    target: display_path(paths.nodes().join(index.to_string())),
+                    previous_current: CurrentVersions::default(),
+                    environment_backup: None,
+                    status: "prepared".to_string(),
+                    detail: "test".to_string(),
+                },
+            )
+            .unwrap();
+        }
+        let mut backups: Vec<RuntimeSwitchBackup> =
+            read_json(&paths.runtime_switch_backups_file()).unwrap();
+        assert_eq!(backups.len(), 20);
+        assert_eq!(backups[0].backup_id, "backup-2");
+
+        let mut latest = backups.pop().unwrap();
+        latest.status = "verified".to_string();
+        save_runtime_switch_backup(&paths, &latest).unwrap();
+        let updated: Vec<RuntimeSwitchBackup> =
+            read_json(&paths.runtime_switch_backups_file()).unwrap();
+        assert_eq!(updated.len(), 20);
+        assert_eq!(updated.last().unwrap().status, "verified");
     }
 
     #[test]

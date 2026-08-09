@@ -181,15 +181,21 @@ pub fn run_native_command_with_timeout(
     args: &[&str],
     timeout_seconds: u64,
 ) -> Result<NativeCommandResult, String> {
-    let timeout_seconds = timeout_seconds.clamp(1, 300);
     let executable_ref = executable.as_ref();
     let executable_label = executable_ref.to_string_lossy().to_string();
     let mut command = Command::new(executable_ref);
+    command.args(args);
+    run_configured_command_with_timeout(command, executable_label, timeout_seconds)
+}
+
+pub fn run_configured_command_with_timeout(
+    mut command: Command,
+    executable_label: String,
+    timeout_seconds: u64,
+) -> Result<NativeCommandResult, String> {
+    let timeout_seconds = timeout_seconds.clamp(1, 300);
     hide_command_window(&mut command);
-    command
-        .args(args)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
+    command.stdout(Stdio::piped()).stderr(Stdio::piped());
     let start = Instant::now();
     let mut child = command
         .spawn()
@@ -311,6 +317,27 @@ mod tests {
     #[cfg(windows)]
     fn timeout_marks_result_and_kills_process() {
         let result = run_powershell_script("Start-Sleep -Seconds 3", Vec::new(), 1).unwrap();
+        assert!(result.timed_out);
+        assert!(!result.success);
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn configured_native_command_honors_timeout() {
+        let mut command = Command::new("powershell.exe");
+        command.args([
+            "-NoLogo",
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            "Start-Sleep -Seconds 3",
+        ]);
+        let result = run_configured_command_with_timeout(
+            command,
+            "powershell.exe".to_string(),
+            1,
+        )
+        .unwrap();
         assert!(result.timed_out);
         assert!(!result.success);
     }

@@ -16,7 +16,10 @@
     "unwritable-initial-root-recovery",
     "backend-bound-single-use-move-and-expansion-plans",
     "isolated-startup-data-loading",
-    "bounded-port-scan-with-read-only-fallback"
+    "bounded-port-scan-with-read-only-fallback",
+    "guarded-one-click-port-release",
+    "bounded-managed-runtime-probes",
+    "transactional-managed-runtime-switch-with-rollback-receipts"
   ],
   "batches": [
     {
@@ -37,7 +40,7 @@
     {
       "id": "runtime",
       "priority": "P0",
-      "status": "pending",
+      "status": "in-progress",
       "strategy": "keep existing runtime cards and actions; perform plan validation transparently",
       "commands": [
         "cancel_runtime_switch_plan",

@@ -2379,13 +2379,33 @@ async function runRuntimeOperation(
     renderRuntimes();
     if (focus === "JDK") await inspectJava(false);
     const check = health.find((item) => item.name.toLowerCase() === focus.toLowerCase());
+    const resultPanel = document.querySelector<HTMLElement>("#runtime-strong-result");
+    if (resultPanel && document.querySelector("#view-runtime")?.classList.contains("active")) {
+      resultPanel.innerHTML = `
+        <article class="runtime ${check && check.status !== "正常" ? "warn" : ""}">
+          <div><strong>${escapeHtml(focus)} 操作结果</strong><span>${check?.status || "已验证"}</span></div>
+          <small>${escapeHtml(message)}</small>
+          ${check ? `<small>${escapeHtml(check.detail || "环境健康检查完成")}</small>` : ""}
+        </article>`;
+      focusResult("#runtime-strong-result");
+    }
     if (check && check.status !== "正常") {
       showToast(`${message}；${focus} 验证结果：${check.status}，${check.detail}`, true);
     } else {
       showToast(`${message}；${focus} 验证通过`);
     }
   } catch (error) {
-    showToast(error instanceof Error ? error.message : String(error), true);
+    const message = error instanceof Error ? error.message : String(error);
+    const resultPanel = document.querySelector<HTMLElement>("#runtime-strong-result");
+    if (resultPanel && document.querySelector("#view-runtime")?.classList.contains("active")) {
+      resultPanel.innerHTML = `
+        <article class="runtime warn">
+          <div><strong>${escapeHtml(focus)} 操作失败</strong><span>已停止</span></div>
+          <small>${escapeHtml(message)}</small>
+        </article>`;
+      focusResult("#runtime-strong-result");
+    }
+    showToast(message, true);
   }
 }
 
