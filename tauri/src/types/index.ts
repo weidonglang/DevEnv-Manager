@@ -17,6 +17,8 @@ export type ConfigView = {
   settings: {
     rootDir: string;
     autoCheckUpdate: boolean;
+    autoScanPortsOnStartup: boolean;
+    portScanScope: "recommended" | "full";
     downloadTimeoutSeconds: number;
     theme: string;
     updateSourceMode?: string;
@@ -171,6 +173,19 @@ export type RuntimeStrongVerificationReport = {
     report: string[];
   }>;
   summary: string[];
+};
+
+export type RuntimeSwitchBackupSummary = {
+  backupId: string;
+  createdAt: number;
+  kind: string;
+  previousVersion?: string;
+  requestedVersion: string;
+  target: string;
+  status: string;
+  detail: string;
+  restorable: boolean;
+  validationError?: string;
 };
 
 export type IdeaProjectReport = {
@@ -665,14 +680,6 @@ export type MySqlRepairPlan = {
   requiresBackup: boolean;
   riskLevel: string;
   planFingerprint: string;
-};
-
-export type ConfirmationTokenView = {
-  token: string;
-  actionId: string;
-  planId: string;
-  riskLevel: string;
-  expiresAt: number;
 };
 
 export type MySqlExecutionGuard = {

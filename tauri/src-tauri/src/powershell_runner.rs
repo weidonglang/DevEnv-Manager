@@ -332,12 +332,8 @@ mod tests {
             "-Command",
             "Start-Sleep -Seconds 3",
         ]);
-        let result = run_configured_command_with_timeout(
-            command,
-            "powershell.exe".to_string(),
-            1,
-        )
-        .unwrap();
+        let result =
+            run_configured_command_with_timeout(command, "powershell.exe".to_string(), 1).unwrap();
         assert!(result.timed_out);
         assert!(!result.success);
     }

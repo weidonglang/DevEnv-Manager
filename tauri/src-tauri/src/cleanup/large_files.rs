@@ -21,7 +21,12 @@ fn normalized(path: &Path) -> String {
         .to_ascii_lowercase()
 }
 
-fn large_file_item(path: &Path, size: u64, modified_at: Option<String>, file_type: String) -> LargeFileItem {
+fn large_file_item(
+    path: &Path,
+    size: u64,
+    modified_at: Option<String>,
+    file_type: String,
+) -> LargeFileItem {
     let directory = path
         .parent()
         .map(|value| value.to_string_lossy().to_string())

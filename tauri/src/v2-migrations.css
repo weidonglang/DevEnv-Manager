@@ -34,6 +34,36 @@
   overflow-wrap: anywhere;
 }
 
+.operation-result {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border, #c8d2da);
+  border-left: 3px solid var(--accent, #2aa876);
+  border-radius: 6px;
+  color: var(--text, CanvasText);
+  background: var(--surface-soft, Canvas);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.operation-result.error {
+  border-left-color: var(--danger, #b42318);
+}
+
+.operation-result.hidden {
+  display: none;
+}
+
+.runtime-migration-tools {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border, #c8d2da);
+}
+
+.runtime-migration-tools .panel-head {
+  margin-bottom: 10px;
+}
+
 @media (max-width: 1050px) {
   .profile-file-row {
     grid-template-columns: minmax(0, 1fr) 1fr;

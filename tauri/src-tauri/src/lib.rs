@@ -292,6 +292,7 @@ struct KillResult {
     blocked: bool,
 }
 
+#[cfg(test)]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 struct ConfirmationToken {
@@ -308,6 +309,7 @@ struct ConfirmationToken {
     used: bool,
 }
 
+#[cfg(test)]
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ConfirmationTokenView {
@@ -406,7 +408,7 @@ struct JavaEnvironmentReport {
     candidates: Vec<RuntimeInfo>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 struct PortRecord {
     protocol: String,
@@ -1085,7 +1087,7 @@ struct RuntimeProbeSpec {
     timeout_seconds: u64,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 struct RuntimeSwitchBackup {
     backup_id: String,
@@ -1097,8 +1099,25 @@ struct RuntimeSwitchBackup {
     target: String,
     previous_current: CurrentVersions,
     environment_backup: Option<String>,
+    #[serde(default)]
+    environment_backup_fingerprint: Option<String>,
     status: String,
     detail: String,
+}
+
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct RuntimeSwitchBackupSummary {
+    backup_id: String,
+    created_at: u64,
+    kind: String,
+    previous_version: Option<String>,
+    requested_version: String,
+    target: String,
+    status: String,
+    detail: String,
+    restorable: bool,
+    validation_error: Option<String>,
 }
 
 #[derive(Clone, Copy)]
@@ -1110,6 +1129,7 @@ struct RuntimeSwitchRollback<'a> {
     previous_environment: Option<&'a std::collections::HashMap<String, String>>,
 }
 
+#[cfg(test)]
 static CONFIRMATION_TOKENS: OnceLock<Mutex<HashMap<String, ConfirmationToken>>> = OnceLock::new();
 static MOVE_PLANS: OnceLock<Mutex<HashMap<String, cleanup::MovePlan>>> = OnceLock::new();
 static EXPANSION_PLANS: OnceLock<Mutex<HashMap<String, PendingExpansionPlan>>> = OnceLock::new();
@@ -1136,6 +1156,7 @@ const MAX_PENDING_PROFILE_HISTORY_PLANS: usize = 64;
 const DOCTOR_REPAIR_PLAN_TTL_SECONDS: u64 = 10 * 60;
 const MAX_PENDING_DOCTOR_REPAIR_PLANS: usize = 32;
 
+#[cfg(test)]
 fn confirmation_tokens() -> &'static Mutex<HashMap<String, ConfirmationToken>> {
     CONFIRMATION_TOKENS.get_or_init(|| Mutex::new(HashMap::new()))
 }
@@ -1161,6 +1182,7 @@ fn doctor_repair_plans() -> &'static Mutex<HashMap<String, PendingDoctorRepairPl
     DOCTOR_REPAIR_PLANS.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
+#[cfg(test)]
 const RISK_OPERATION_REGISTRY: &[RiskOperationSpec] = &[
     RiskOperationSpec {
         command: "apply_env_repair_plan",
@@ -1239,7 +1261,7 @@ const RISK_OPERATION_REGISTRY: &[RiskOperationSpec] = &[
         action_id: "rollback_move",
         risk_level: "high",
         requires_backup: false,
-        requires_token: true,
+        requires_token: false,
         description: "回滚空间搬家或 Junction 操作",
     },
     RiskOperationSpec {
@@ -1247,7 +1269,7 @@ const RISK_OPERATION_REGISTRY: &[RiskOperationSpec] = &[
         action_id: "execute_move_plan",
         risk_level: "high",
         requires_backup: true,
-        requires_token: true,
+        requires_token: false,
         description: "执行空间搬家或归档计划",
     },
     RiskOperationSpec {
@@ -1292,6 +1314,7 @@ const RISK_OPERATION_REGISTRY: &[RiskOperationSpec] = &[
     },
 ];
 
+#[cfg(test)]
 fn risk_operation_spec(command: &str) -> Option<RiskOperationSpec> {
     RISK_OPERATION_REGISTRY
         .iter()
@@ -1299,6 +1322,7 @@ fn risk_operation_spec(command: &str) -> Option<RiskOperationSpec> {
         .find(|item| item.command == command)
 }
 
+#[cfg(test)]
 fn risk_operation_fingerprint(command: &str, plan_id: &str, risk_level: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(command.as_bytes());
@@ -1309,6 +1333,7 @@ fn risk_operation_fingerprint(command: &str, plan_id: &str, risk_level: &str) ->
     format!("{:x}", hasher.finalize())
 }
 
+#[cfg(test)]
 fn require_risk_operation_token(
     command: &str,
     plan_id: &str,
@@ -1331,7 +1356,7 @@ fn require_risk_operation_token(
     .map_err(|message| format!("{message}（操作：{}）", spec.description))
 }
 
-#[tauri::command]
+#[cfg(test)]
 fn create_confirmation_token(
     command: Option<String>,
     action_id: String,
@@ -1398,6 +1423,7 @@ fn create_confirmation_token(
     })
 }
 
+#[cfg(test)]
 fn validate_confirmation_field(value: String, label: &str) -> Result<String, String> {
     let value = value.trim().to_string();
     if value.is_empty() || value.len() > 512 || value.chars().any(char::is_control) {
@@ -1406,6 +1432,7 @@ fn validate_confirmation_field(value: String, label: &str) -> Result<String, Str
     Ok(value)
 }
 
+#[cfg(test)]
 fn require_confirmation_token(
     token: Option<String>,
     command: &str,
@@ -1515,6 +1542,15 @@ fn set_root_dir(root: String) -> Result<ConfigView, String> {
 fn set_auto_check_update(enabled: bool) -> Result<ConfigView, String> {
     let mut settings = load_settings()?;
     settings.auto_check_update = enabled;
+    save_json(&settings_file(), &settings)?;
+    load_config()
+}
+
+#[tauri::command]
+fn set_port_scan_preferences(enabled: bool, scope: String) -> Result<ConfigView, String> {
+    let mut settings = load_settings()?;
+    settings.auto_scan_ports_on_startup = enabled;
+    settings.port_scan_scope = normalize_port_scan_scope(&scope).to_string();
     save_json(&settings_file(), &settings)?;
     load_config()
 }
@@ -1638,13 +1674,8 @@ async fn clean_managed_download_cache() -> Result<cleanup::CleanupResult, String
 }
 
 #[tauri::command]
-async fn clean_dev_cache(
-    tool: String,
-    confirmation_token: Option<String>,
-) -> Result<OperationResult, String> {
+async fn clean_dev_cache(tool: String) -> Result<OperationResult, String> {
     run_blocking(move || {
-        let plan_id = format!("tool-{}", tool.trim().to_ascii_lowercase());
-        require_risk_operation_token("clean_dev_cache", &plan_id, confirmation_token)?;
         let paths = load_paths()?;
         let message = cleanup::clean_dev_cache(&tool, &paths.root)?;
         Ok(OperationResult {
@@ -1875,10 +1906,8 @@ async fn create_env_repair_plan(
 #[tauri::command]
 async fn apply_env_repair_plan(
     plan: env_core::EnvRepairPlan,
-    confirmation_token: Option<String>,
 ) -> Result<env_core::EnvRepairResult, String> {
     run_blocking(move || {
-        require_risk_operation_token("apply_env_repair_plan", &plan.plan_id, confirmation_token)?;
         let paths = load_paths()?;
         Ok(env_core::apply_env_repair_plan(&paths.root, plan))
     })
@@ -1919,6 +1948,7 @@ async fn create_java_stabilize_plan(jdk_path: String) -> Result<env_core::EnvRep
     .await?
 }
 
+#[cfg(test)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct RiskOperationSpec {
     command: &'static str,
@@ -1937,9 +1967,8 @@ async fn verify_external_jdk(jdk_path: String) -> Result<Vec<ValidationCheck>, S
 #[tauri::command]
 async fn apply_java_stabilize_plan(
     plan: env_core::EnvRepairPlan,
-    confirmation_token: Option<String>,
 ) -> Result<env_core::EnvRepairResult, String> {
-    apply_env_repair_plan(plan, confirmation_token).await
+    apply_env_repair_plan(plan).await
 }
 
 #[tauri::command]
@@ -2213,42 +2242,20 @@ fn store_move_plan(plan: cleanup::MovePlan) -> Result<cleanup::MovePlan, String>
     Ok(plan)
 }
 
-fn verify_move_plan(plan: &cleanup::MovePlan) -> Result<(), String> {
-    let store = move_plans()
-        .lock()
-        .map_err(|_| "Move plan storage is unavailable".to_string())?;
-    let stored = store
-        .get(&plan.plan_id)
-        .ok_or_else(|| "Move plan does not exist, expired, or was already used".to_string())?;
-    if stored != plan {
-        return Err("Move plan content changed after preview; execution refused".to_string());
-    }
-    if move_plan_expired(stored, unix_timestamp()) {
-        return Err("Move plan expired; create a new preview before execution".to_string());
-    }
-    Ok(())
-}
-
-fn consume_move_plan(plan: cleanup::MovePlan) -> Result<cleanup::MovePlan, String> {
+fn consume_move_plan(plan_id: &str) -> Result<cleanup::MovePlan, String> {
     let mut store = move_plans()
         .lock()
         .map_err(|_| "Move plan storage is unavailable".to_string())?;
     let stored = store
-        .remove(&plan.plan_id)
+        .remove(plan_id)
         .ok_or_else(|| "Move plan does not exist, expired, or was already used".to_string())?;
-    if stored != plan {
-        store.insert(stored.plan_id.clone(), stored);
-        return Err("Move plan content changed after preview; execution refused".to_string());
-    }
     if move_plan_expired(&stored, unix_timestamp()) {
         return Err("Move plan expired; create a new preview before execution".to_string());
     }
     Ok(stored)
 }
 
-fn store_expansion_plan(
-    plan: cleanup::ExpansionPlan,
-) -> Result<cleanup::ExpansionPlan, String> {
+fn store_expansion_plan(plan: cleanup::ExpansionPlan) -> Result<cleanup::ExpansionPlan, String> {
     let now = unix_timestamp();
     let mut store = expansion_plans()
         .lock()
@@ -2292,9 +2299,7 @@ fn verify_expansion_plan(plan: &cleanup::ExpansionPlan) -> Result<(), String> {
     Ok(())
 }
 
-fn consume_expansion_plan(
-    plan: cleanup::ExpansionPlan,
-) -> Result<cleanup::ExpansionPlan, String> {
+fn consume_expansion_plan(plan: cleanup::ExpansionPlan) -> Result<cleanup::ExpansionPlan, String> {
     let mut store = expansion_plans()
         .lock()
         .map_err(|_| "Expansion plan storage is unavailable".to_string())?;
@@ -2326,14 +2331,9 @@ async fn create_move_plan(
 }
 
 #[tauri::command]
-async fn execute_move_plan(
-    plan: cleanup::MovePlan,
-    confirmation_token: Option<String>,
-) -> Result<cleanup::MoveResult, String> {
+async fn execute_move_plan(plan_id: String) -> Result<cleanup::MoveResult, String> {
     run_blocking(move || {
-        verify_move_plan(&plan)?;
-        require_risk_operation_token("execute_move_plan", &plan.plan_id, confirmation_token)?;
-        let plan = consume_move_plan(plan)?;
+        let plan = consume_move_plan(&plan_id)?;
         let paths = load_paths()?;
         Ok(cleanup::execute_move_plan(&paths.root, plan))
     })
@@ -2350,12 +2350,8 @@ async fn list_rollback_records() -> Result<Vec<cleanup::RollbackRecord>, String>
 }
 
 #[tauri::command]
-async fn rollback_move(
-    rollback_id: String,
-    confirmation_token: Option<String>,
-) -> Result<OperationResult, String> {
+async fn rollback_move(rollback_id: String) -> Result<OperationResult, String> {
     run_blocking(move || {
-        require_risk_operation_token("rollback_move", &rollback_id, confirmation_token)?;
         let paths = load_paths()?;
         let message = cleanup::rollback_move(&paths.root, rollback_id)?;
         Ok(OperationResult {
@@ -2373,14 +2369,9 @@ async fn create_desktop_archive_plan(target_drive: String) -> Result<cleanup::Mo
 }
 
 #[tauri::command]
-async fn execute_desktop_archive_plan(
-    plan: cleanup::MovePlan,
-    confirmation_token: Option<String>,
-) -> Result<cleanup::MoveResult, String> {
+async fn execute_desktop_archive_plan(plan_id: String) -> Result<cleanup::MoveResult, String> {
     run_blocking(move || {
-        verify_move_plan(&plan)?;
-        require_risk_operation_token("execute_move_plan", &plan.plan_id, confirmation_token)?;
-        let plan = consume_move_plan(plan)?;
+        let plan = consume_move_plan(&plan_id)?;
         let paths = load_paths()?;
         Ok(cleanup::execute_desktop_archive_plan(&paths.root, plan))
     })
@@ -2394,14 +2385,9 @@ async fn create_downloads_archive_plan(target_drive: String) -> Result<cleanup::
 }
 
 #[tauri::command]
-async fn execute_downloads_archive_plan(
-    plan: cleanup::MovePlan,
-    confirmation_token: Option<String>,
-) -> Result<cleanup::MoveResult, String> {
+async fn execute_downloads_archive_plan(plan_id: String) -> Result<cleanup::MoveResult, String> {
     run_blocking(move || {
-        verify_move_plan(&plan)?;
-        require_risk_operation_token("execute_move_plan", &plan.plan_id, confirmation_token)?;
-        let plan = consume_move_plan(plan)?;
+        let plan = consume_move_plan(&plan_id)?;
         let paths = load_paths()?;
         Ok(cleanup::execute_downloads_archive_plan(&paths.root, plan))
     })
@@ -2421,11 +2407,9 @@ async fn create_c_drive_expansion_plan() -> Result<cleanup::ExpansionPlan, Strin
 #[tauri::command]
 async fn execute_c_drive_expansion(
     plan: cleanup::ExpansionPlan,
-    confirmation_token: Option<String>,
 ) -> Result<cleanup::ExpansionResult, String> {
     run_blocking(move || {
         verify_expansion_plan(&plan)?;
-        require_risk_operation_token("execute_expansion_plan", &plan.plan_id, confirmation_token)?;
         let plan = consume_expansion_plan(plan)?;
         Ok(cleanup::execute_c_drive_expansion(plan))
     })
@@ -2983,22 +2967,13 @@ fn preview_user_environment_configuration() -> Result<EnvironmentConfigPreview, 
 }
 
 #[tauri::command]
-fn apply_user_environment_configuration(
-    preview_id: String,
-    confirmation_token: Option<String>,
-) -> Result<OperationResult, String> {
-    apply_user_environment_configuration_with_token(preview_id, confirmation_token)
+fn apply_user_environment_configuration(preview_id: String) -> Result<OperationResult, String> {
+    apply_user_environment_configuration_preview(preview_id)
 }
 
-fn apply_user_environment_configuration_with_token(
+fn apply_user_environment_configuration_preview(
     preview_id: String,
-    confirmation_token: Option<String>,
 ) -> Result<OperationResult, String> {
-    require_risk_operation_token(
-        "apply_user_environment_configuration",
-        &preview_id,
-        confirmation_token,
-    )?;
     let pending = environment_preview_store()
         .lock()
         .map_err(|_| "环境配置预览暂时不可用".to_string())?
@@ -3101,18 +3076,8 @@ fn configure_user_environment_with_backup(create_backup: bool) -> Result<Operati
 }
 
 #[tauri::command]
-async fn cleanup_path_entries(
-    confirmation_token: Option<String>,
-) -> Result<OperationResult, String> {
-    run_blocking(move || {
-        require_risk_operation_token(
-            "cleanup_path_entries",
-            "cleanup-path-entries",
-            confirmation_token,
-        )?;
-        cleanup_path_entries_blocking()
-    })
-    .await?
+async fn cleanup_path_entries() -> Result<OperationResult, String> {
+    run_blocking(cleanup_path_entries_blocking).await?
 }
 
 fn cleanup_path_entries_blocking() -> Result<OperationResult, String> {
@@ -3174,18 +3139,8 @@ fn cleanup_path_entries_with_backup(create_backup: bool) -> Result<OperationResu
 }
 
 #[tauri::command]
-async fn restore_user_environment(
-    confirmation_token: Option<String>,
-) -> Result<OperationResult, String> {
-    run_blocking(move || {
-        require_risk_operation_token(
-            "restore_user_environment",
-            "restore-user-environment-latest",
-            confirmation_token,
-        )?;
-        restore_user_environment_blocking()
-    })
-    .await?
+async fn restore_user_environment() -> Result<OperationResult, String> {
+    run_blocking(restore_user_environment_blocking).await?
 }
 
 fn restore_user_environment_blocking() -> Result<OperationResult, String> {
@@ -3318,6 +3273,71 @@ fn inspect_runtime_strong_verification() -> Result<RuntimeStrongVerificationRepo
         items,
         summary,
     })
+}
+
+#[tauri::command]
+fn export_runtime_verification_report(format: String) -> Result<String, String> {
+    let report = inspect_runtime_strong_verification()?;
+    let paths = load_paths()?;
+    let reports = paths.root.join("reports");
+    fs::create_dir_all(&reports).map_err(|error| format!("创建报告目录失败：{error}"))?;
+    let (extension, content) = match format.trim().to_ascii_lowercase().as_str() {
+        "markdown" | "md" => ("md", runtime_verification_markdown(&report)),
+        "json" => {
+            let mut value = serde_json::to_value(&report)
+                .map_err(|error| format!("生成运行时 JSON 报告失败：{error}"))?;
+            redact_json_value(&mut value);
+            let content = serde_json::to_string_pretty(&value)
+                .map_err(|error| format!("生成运行时 JSON 报告失败：{error}"))?;
+            ("json", content)
+        }
+        _ => return Err("运行时报告仅支持 Markdown 或 JSON".to_string()),
+    };
+    let target = reports.join(format!(
+        "runtime-verification-{}.{}",
+        filename_timestamp(),
+        extension
+    ));
+    fs::write(&target, redact_report_text(&content))
+        .map_err(|error| format!("写入运行时报告失败：{error}"))?;
+    Ok(display_path(target))
+}
+
+fn runtime_verification_markdown(report: &RuntimeStrongVerificationReport) -> String {
+    let mut text = format!(
+        "# DevEnv Manager 运行时验证报告\n\n生成时间：{}\n\n",
+        report.generated_at
+    );
+    for item in &report.items {
+        text.push_str(&format!(
+            "## {} {}\n\n- 路径：`{}`\n- 当前版本：{}\n- 环境生效：{}\n- 状态：{}\n\n",
+            item.kind,
+            item.version,
+            item.path,
+            item.current,
+            item.environment_effective,
+            item.status
+        ));
+        text.push_str("| 检查 | 必需 | 结果 | 阶段 | 详情 |\n|---|---:|---|---|---|\n");
+        for check in &item.checks {
+            text.push_str(&format!(
+                "| {} | {} | {} | {} | {} |\n",
+                check.title.replace('|', "\\|"),
+                check.required,
+                if check.success { "通过" } else { "失败" },
+                check.stage.replace('|', "\\|"),
+                check
+                    .detail
+                    .replace('|', "\\|")
+                    .replace(['\r', '\n'], "<br>")
+            ));
+        }
+        text.push('\n');
+    }
+    if report.items.is_empty() {
+        text.push_str("尚未登记 DevEnv Manager 受管运行时。\n");
+    }
+    text
 }
 
 fn current_version_for_kind<'a>(installed: &'a InstalledData, kind: &str) -> Option<&'a str> {
@@ -3869,15 +3889,23 @@ fn install_python_blocking(
 
 #[tauri::command]
 async fn install_maven_latest(app: tauri::AppHandle) -> Result<OperationResult, String> {
-    run_blocking(move || install_maven_latest_blocking(app)).await?
+    run_blocking(move || install_maven_blocking(app, "latest".to_string())).await?
 }
 
-fn install_maven_latest_blocking(app: tauri::AppHandle) -> Result<OperationResult, String> {
-    let task = "Maven".to_string();
+#[tauri::command]
+async fn install_maven(app: tauri::AppHandle, version: String) -> Result<OperationResult, String> {
+    run_blocking(move || install_maven_blocking(app, version)).await?
+}
+
+fn install_maven_blocking(
+    app: tauri::AppHandle,
+    requested_version: String,
+) -> Result<OperationResult, String> {
+    let task = format!("Maven {}", requested_version.trim());
     emit_task_progress(&app, &task, 3, "正在查询 Maven 版本");
     let paths = load_paths()?;
     paths.ensure().map_err(|err| err.to_string())?;
-    let release = resolve_maven_release()?;
+    let release = resolve_maven_release_for(requested_version.trim())?;
     let archive = paths.downloads().join(&release.name);
     let target = paths.mavens().join(format!("maven-{}", release.tag));
     paths.assert_inside_root(&target)?;
@@ -3914,15 +3942,23 @@ fn install_maven_latest_blocking(app: tauri::AppHandle) -> Result<OperationResul
 
 #[tauri::command]
 async fn install_gradle_latest(app: tauri::AppHandle) -> Result<OperationResult, String> {
-    run_blocking(move || install_gradle_latest_blocking(app)).await?
+    run_blocking(move || install_gradle_blocking(app, "latest".to_string())).await?
 }
 
-fn install_gradle_latest_blocking(app: tauri::AppHandle) -> Result<OperationResult, String> {
-    let task = "Gradle".to_string();
+#[tauri::command]
+async fn install_gradle(app: tauri::AppHandle, version: String) -> Result<OperationResult, String> {
+    run_blocking(move || install_gradle_blocking(app, version)).await?
+}
+
+fn install_gradle_blocking(
+    app: tauri::AppHandle,
+    requested_version: String,
+) -> Result<OperationResult, String> {
+    let task = format!("Gradle {}", requested_version.trim());
     emit_task_progress(&app, &task, 3, "正在查询 Gradle 版本");
     let paths = load_paths()?;
     paths.ensure().map_err(|err| err.to_string())?;
-    let release = resolve_gradle_release()?;
+    let release = resolve_gradle_release_for(requested_version.trim())?;
     let archive = paths.downloads().join(&release.name);
     let target = paths.gradles().join(format!("gradle-{}", release.tag));
     paths.assert_inside_root(&target)?;
@@ -4013,8 +4049,13 @@ fn switch_runtime_blocking(
 
     let previous_current = installed.current.clone();
     let previous_version = current_version_for_kind(&installed, meta.kind).map(str::to_string);
-    let previous_target = previous_runtime_target(&installed, meta, previous_version.as_deref())
-        .and_then(|target| validate_managed_runtime_target(&paths, meta, &target).ok());
+    let previous_target = validated_runtime_rollback_target(
+        &paths,
+        &installed,
+        meta,
+        previous_version.as_deref(),
+        "安全回滚点",
+    )?;
     let previous_environment = if meta.kind == "jdk" {
         Some(user_environment()?)
     } else {
@@ -4023,6 +4064,10 @@ fn switch_runtime_blocking(
     let environment_backup = previous_environment
         .as_ref()
         .map(|environment| create_environment_backup(&paths, environment))
+        .transpose()?;
+    let environment_backup_fingerprint = environment_backup
+        .as_ref()
+        .map(|name| file_sha256(&paths.config().join("env_backups").join(name)))
         .transpose()?;
     let mut backup = RuntimeSwitchBackup {
         backup_id: format!(
@@ -4038,6 +4083,7 @@ fn switch_runtime_blocking(
         target: display_path(&target),
         previous_current: previous_current.clone(),
         environment_backup,
+        environment_backup_fingerprint,
         status: "prepared".to_string(),
         detail: format!("切换前验证通过：{}", preflight.join("；")),
     };
@@ -4174,12 +4220,7 @@ fn uninstall_runtime_blocking(
 }
 
 #[tauri::command]
-fn kill_process(
-    pid: u32,
-    force: bool,
-    allow_caution: bool,
-    confirmation_token: Option<String>,
-) -> KillResult {
+fn kill_process(pid: u32, force: bool, allow_caution: bool) -> KillResult {
     if BLOCKED_PIDS.contains(&pid) {
         return KillResult {
             success: false,
@@ -4207,26 +4248,6 @@ fn kill_process(
             blocked: true,
         };
     }
-    let risk_level = if force { "critical" } else { "high" };
-    let plan_id = format!("pid-{pid}-force-{force}-allow-{allow_caution}");
-    let fingerprint = process_action_fingerprint("kill_process", &plan_id, risk_level);
-    if let Err(message) = require_confirmation_token(
-        confirmation_token,
-        "kill_process",
-        "kill_process",
-        &plan_id,
-        risk_level,
-        &fingerprint,
-        false,
-    ) {
-        return KillResult {
-            success: false,
-            message,
-            needs_force: false,
-            blocked: true,
-        };
-    }
-
     let mut args = vec!["/PID".to_string(), pid.to_string(), "/T".to_string()];
     if force {
         args.push("/F".to_string());
@@ -4273,7 +4294,10 @@ fn quick_port_release_guard(record: &PortRecord) -> Result<(), String> {
     if BLOCKED_NAMES.contains(&process_name.as_str())
         || CAUTION_NAMES.contains(&process_name.as_str())
     {
-        return Err(format!("{} is a protected system process", record.process_name));
+        return Err(format!(
+            "{} is a protected system process",
+            record.process_name
+        ));
     }
     if !record.state.eq_ignore_ascii_case("LISTENING") {
         return Err("This record is a connection, not a local listening port".to_string());
@@ -4370,7 +4394,9 @@ async fn release_user_port(port: u16, pid: u32) -> Result<KillResult, String> {
         Ok(KillResult {
             success: !still_owned,
             message: if still_owned {
-                format!("PID {pid} exited but port {port} is still reported; rescan before retrying")
+                format!(
+                    "PID {pid} exited but port {port} is still reported; rescan before retrying"
+                )
             } else {
                 format!("Released port {port} by ending PID {pid} without force")
             },
@@ -4381,6 +4407,7 @@ async fn release_user_port(port: u16, pid: u32) -> Result<KillResult, String> {
     .await?
 }
 
+#[cfg(test)]
 fn process_action_fingerprint(action_id: &str, plan_id: &str, risk_level: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(action_id.as_bytes());
@@ -4392,8 +4419,44 @@ fn process_action_fingerprint(action_id: &str, plan_id: &str, risk_level: &str) 
 }
 
 #[tauri::command]
-async fn scan_ports() -> Result<Vec<PortRecord>, String> {
-    run_blocking(scan_ports_blocking).await?
+async fn scan_ports(scope: Option<String>) -> Result<Vec<PortRecord>, String> {
+    run_blocking(move || {
+        let configured = scope
+            .as_deref()
+            .map(normalize_port_scan_scope)
+            .map(str::to_string)
+            .unwrap_or_else(|| {
+                load_settings()
+                    .map(|settings| {
+                        normalize_port_scan_scope(&settings.port_scan_scope).to_string()
+                    })
+                    .unwrap_or_else(|_| default_port_scan_scope())
+            });
+        let records = scan_ports_blocking()?;
+        Ok(filter_port_records_for_scope(records, &configured))
+    })
+    .await?
+}
+
+fn normalize_port_scan_scope(scope: &str) -> &'static str {
+    if scope.trim().eq_ignore_ascii_case("full") {
+        "full"
+    } else {
+        "recommended"
+    }
+}
+
+fn filter_port_records_for_scope(records: Vec<PortRecord>, scope: &str) -> Vec<PortRecord> {
+    if normalize_port_scan_scope(scope) == "full" {
+        return records;
+    }
+    records
+        .into_iter()
+        .filter(|record| {
+            record.state.eq_ignore_ascii_case("LISTENING")
+                || record.state.eq_ignore_ascii_case("BOUND")
+        })
+        .collect()
 }
 
 fn scan_ports_blocking() -> Result<Vec<PortRecord>, String> {
@@ -4556,6 +4619,65 @@ fn port_history() -> Result<Vec<PortHistorySummary>, String> {
 }
 
 #[tauri::command]
+async fn export_port_report(format: String) -> Result<String, String> {
+    run_blocking(move || export_port_report_blocking(format)).await?
+}
+
+fn export_port_report_blocking(format: String) -> Result<String, String> {
+    let scan = scan_ports_blocking();
+    let scan_error = scan.as_ref().err().cloned();
+    let mut value = json!({
+        "generatedAt": current_timestamp(),
+        "scope": "full",
+        "scanError": scan_error,
+        "ports": scan.unwrap_or_default(),
+        "history": port_history().unwrap_or_default(),
+        "services": inspect_local_services_blocking().unwrap_or_default(),
+    });
+    redact_json_value(&mut value);
+    let (extension, content) = match format.trim().to_ascii_lowercase().as_str() {
+        "markdown" | "md" => ("md", port_report_markdown(&value)),
+        "json" => (
+            "json",
+            serde_json::to_string_pretty(&value)
+                .map_err(|error| format!("生成端口 JSON 报告失败：{error}"))?,
+        ),
+        _ => return Err("端口报告仅支持 Markdown 或 JSON".to_string()),
+    };
+    let paths = load_paths()?;
+    let reports = paths.root.join("reports");
+    fs::create_dir_all(&reports).map_err(|error| format!("创建报告目录失败：{error}"))?;
+    let target = reports.join(format!(
+        "port-report-{}.{}",
+        filename_timestamp(),
+        extension
+    ));
+    fs::write(&target, redact_report_text(&content))
+        .map_err(|error| format!("写入端口报告失败：{error}"))?;
+    Ok(display_path(target))
+}
+
+fn port_report_markdown(value: &Value) -> String {
+    let port_count = value["ports"].as_array().map(Vec::len).unwrap_or(0);
+    let history_count = value["history"].as_array().map(Vec::len).unwrap_or(0);
+    let service_count = value["services"].as_array().map(Vec::len).unwrap_or(0);
+    let mut text = format!(
+        "# DevEnv Manager 端口报告\n\n生成时间：{}\n\n- 端口记录：{}\n- 历史记录：{}\n- 本地服务：{}\n\n",
+        value["generatedAt"].as_str().unwrap_or(""),
+        port_count,
+        history_count,
+        service_count
+    );
+    if let Some(error) = value["scanError"].as_str() {
+        text.push_str(&format!("扫描错误：{error}\n\n"));
+    }
+    text.push_str("## 结构化数据\n\n```json\n");
+    text.push_str(&serde_json::to_string_pretty(value).unwrap_or_default());
+    text.push_str("\n```\n");
+    text
+}
+
+#[tauri::command]
 fn open_process_location(pid: u32) -> Result<OperationResult, String> {
     if pid == 0 {
         return Err("PID 无效".to_string());
@@ -4598,14 +4720,9 @@ async fn update_project_port(
     path: String,
     config_id: String,
     new_port: u16,
-    confirmation_token: Option<String>,
 ) -> Result<OperationResult, String> {
-    run_blocking(move || {
-        let plan_id = format!("{}:{config_id}:{new_port}", path.trim());
-        require_risk_operation_token("update_project_port", &plan_id, confirmation_token)?;
-        update_project_port_blocking(Path::new(path.trim()), &config_id, new_port)
-    })
-    .await?
+    run_blocking(move || update_project_port_blocking(Path::new(path.trim()), &config_id, new_port))
+        .await?
 }
 
 fn inspect_project_port_configs_blocking(root: &Path) -> Result<Vec<ProjectPortConfig>, String> {
@@ -4918,17 +5035,11 @@ fn project_health(path: String) -> Result<ProjectHealth, String> {
 }
 
 #[tauri::command]
-async fn export_project_report(
-    project_path: String,
-    format: String,
-) -> Result<String, String> {
+async fn export_project_report(project_path: String, format: String) -> Result<String, String> {
     run_blocking(move || export_project_report_blocking(project_path, format)).await?
 }
 
-fn export_project_report_blocking(
-    project_path: String,
-    format: String,
-) -> Result<String, String> {
+fn export_project_report_blocking(project_path: String, format: String) -> Result<String, String> {
     let root = PathBuf::from(project_path.trim());
     let mut value = collect_project_report_value(&root)?;
     redact_json_value(&mut value);
@@ -5235,12 +5346,7 @@ fn remove_archive_plan_item(id: String) -> Result<OperationResult, String> {
 }
 
 #[tauri::command]
-fn clear_download_cache(confirmation_token: Option<String>) -> Result<OperationResult, String> {
-    require_risk_operation_token(
-        "clear_download_cache",
-        "clear-download-cache",
-        confirmation_token,
-    )?;
+fn clear_download_cache() -> Result<OperationResult, String> {
     let paths = load_paths()?;
     let result = cleanup::clean_managed_download_cache(&paths.root);
     Ok(OperationResult {
@@ -7401,14 +7507,8 @@ async fn manage_system_platform(
     app: tauri::AppHandle,
     action: String,
     value: Option<String>,
-    confirmation_token: Option<String>,
 ) -> Result<OperationResult, String> {
-    run_blocking(move || {
-        let plan_id = format!("{}:{}", action.trim(), value.as_deref().unwrap_or(""));
-        require_risk_operation_token("manage_system_platform", &plan_id, confirmation_token)?;
-        manage_system_platform_blocking(app, action, value)
-    })
-    .await?
+    run_blocking(move || manage_system_platform_blocking(app, action, value)).await?
 }
 
 fn manage_system_platform_blocking(
@@ -7631,17 +7731,8 @@ fn inspect_local_services_blocking() -> Result<Vec<LocalServiceStatus>, String> 
 }
 
 #[tauri::command]
-async fn stop_local_service(
-    port: u16,
-    service_name: String,
-    confirmation_token: Option<String>,
-) -> Result<OperationResult, String> {
-    run_blocking(move || {
-        let plan_id = format!("{port}:{}", service_name.trim());
-        require_risk_operation_token("stop_local_service", &plan_id, confirmation_token)?;
-        stop_local_service_blocking(port, service_name)
-    })
-    .await?
+async fn stop_local_service(port: u16, service_name: String) -> Result<OperationResult, String> {
+    run_blocking(move || stop_local_service_blocking(port, service_name)).await?
 }
 
 fn stop_local_service_blocking(port: u16, service_name: String) -> Result<OperationResult, String> {
@@ -7732,14 +7823,8 @@ fn validated_database_service(name: &str) -> Result<(WindowsServiceInfo, u16), S
 async fn manage_local_service(
     service_name: String,
     action: String,
-    confirmation_token: Option<String>,
 ) -> Result<OperationResult, String> {
-    run_blocking(move || {
-        let plan_id = format!("{}:{}", service_name.trim(), action.trim());
-        require_risk_operation_token("manage_local_service", &plan_id, confirmation_token)?;
-        manage_local_service_blocking(service_name, action)
-    })
-    .await?
+    run_blocking(move || manage_local_service_blocking(service_name, action)).await?
 }
 
 fn manage_local_service_blocking(
@@ -7916,21 +8001,9 @@ fn mysql_pending_execution_guard(
 async fn execute_mysql_repair_plan(
     plan_id: String,
     backup_destination: Option<String>,
-    confirmation_token: Option<String>,
 ) -> Result<OperationResult, String> {
     run_blocking(move || {
-        let guard = mysql_repair::pending_execution_guard(&plan_id)?;
-        if guard.risk_level != "low" {
-            require_confirmation_token(
-                confirmation_token,
-                "execute_mysql_repair_plan",
-                &guard.action_id,
-                &guard.plan_id,
-                &guard.risk_level,
-                &guard.plan_fingerprint,
-                guard.backup_required,
-            )?;
-        }
+        mysql_repair::pending_execution_guard(&plan_id)?;
         mysql_repair::execute(plan_id, backup_destination).map(|message| OperationResult {
             success: true,
             message,
@@ -8936,9 +9009,7 @@ async fn execute_doctor_repair_plan(plan_id: String) -> Result<DoctorRepairResul
     run_blocking(move || execute_doctor_repair_plan_blocking(plan_id)).await?
 }
 
-fn execute_doctor_repair_plan_blocking(
-    plan_id: String,
-) -> Result<DoctorRepairResult, String> {
+fn execute_doctor_repair_plan_blocking(plan_id: String) -> Result<DoctorRepairResult, String> {
     let now = unix_timestamp();
     let pending = {
         let mut plans = doctor_repair_plans()
@@ -9080,8 +9151,8 @@ fn install_profile_missing_blocking(
             "python" => install_python_blocking(app.clone(), requirement.version.clone()),
             "node" => install_node_blocking(app.clone(), requirement.version.clone()),
             "go" => install_go_blocking(app.clone(), requirement.version.clone()),
-            "maven" => install_maven_latest_blocking(app.clone()),
-            "gradle" => install_gradle_latest_blocking(app.clone()),
+            "maven" => install_maven_blocking(app.clone(), "latest".to_string()),
+            "gradle" => install_gradle_blocking(app.clone(), "latest".to_string()),
             _ => Err(format!("不支持自动安装 {}", requirement.kind)),
         };
         if let Err(error) = result {
@@ -9220,19 +9291,9 @@ fn verify_profile_state(paths: &AppPaths, profile: &ConfigProfile) -> Result<(),
         return Err("应用后运行时 current 状态与模板不一致".to_string());
     }
     let environment = user_environment()?;
-    if !optional_profile_value_matches(
-        &environment,
-        "DEVENV_HOME",
-        profile.devenv_home.as_deref(),
-    ) || !optional_profile_value_matches(
-        &environment,
-        "JAVA_HOME",
-        profile.java_home.as_deref(),
-    ) || !optional_profile_value_matches(
-        &environment,
-        "Path",
-        Some(profile.path.as_str()),
-    )
+    if !optional_profile_value_matches(&environment, "DEVENV_HOME", profile.devenv_home.as_deref())
+        || !optional_profile_value_matches(&environment, "JAVA_HOME", profile.java_home.as_deref())
+        || !optional_profile_value_matches(&environment, "Path", Some(profile.path.as_str()))
     {
         return Err("应用后用户环境变量与模板不一致".to_string());
     }
@@ -9261,10 +9322,7 @@ fn profile_requirements(
             installed: collection(installed, meta.collection)
                 .iter()
                 .any(|item| item.get("version").and_then(Value::as_str) == Some(version.as_str())),
-            auto_install_supported: matches!(
-                kind,
-                "jdk" | "python" | "node" | "go"
-            ),
+            auto_install_supported: matches!(kind, "jdk" | "python" | "node" | "go"),
         })
     })
     .collect()
@@ -9394,11 +9452,7 @@ fn delete_config_profile_blocking(id: String) -> Result<OperationResult, String>
         .find(|item| item.id == id)
         .map(|item| item.name.clone())
         .ok_or_else(|| "没有找到配置模板".to_string())?;
-    create_profile_history_snapshot(
-        &paths,
-        format!("删除配置模板 {profile_name} 前"),
-        &profiles,
-    )?;
+    create_profile_history_snapshot(&paths, format!("删除配置模板 {profile_name} 前"), &profiles)?;
     profiles.retain(|item| item.id != id);
     if profiles.len() == before {
         return Err("没有找到配置模板".to_string());
@@ -9832,40 +9886,10 @@ fn restore_project_files(changes: &[(PathBuf, Option<PathBuf>)]) {
     }
 }
 
-fn project_configuration_plan_id(request: &ProjectConfigApplyRequest) -> String {
-    let enabled = request.files.iter().filter(|file| file.enabled).count();
-    let switch_count = [
-        &request.switches.jdk,
-        &request.switches.python,
-        &request.switches.node,
-        &request.switches.maven,
-        &request.switches.gradle,
-        &request.switches.go,
-    ]
-    .iter()
-    .filter(|value| value.is_some())
-    .count();
-    format!(
-        "{}:{enabled}:{switch_count}",
-        request
-            .project_path
-            .trim()
-            .replace('/', "\\")
-            .to_ascii_lowercase()
-    )
-}
-
 #[tauri::command]
 fn apply_project_configuration(
     request: ProjectConfigApplyRequest,
-    confirmation_token: Option<String>,
 ) -> Result<OperationResult, String> {
-    let project_plan_id = project_configuration_plan_id(&request);
-    require_risk_operation_token(
-        "apply_project_configuration",
-        &project_plan_id,
-        confirmation_token,
-    )?;
     let root = PathBuf::from(request.project_path.trim());
     analyze_project_blocking(&root)?;
     if request.files.len() > 4 {
@@ -10106,6 +10130,7 @@ pub fn run() {
             create_managed_python_pip_repair_plan,
             apply_managed_python_pip_repair,
             inspect_runtime_strong_verification,
+            export_runtime_verification_report,
             validate_directory_path,
             inspect_idea_project,
             repair_maven_gradle_registration,
@@ -10115,7 +10140,6 @@ pub fn run() {
             safety_disclaimer,
             feature_risk_registry,
             get_feature_risk,
-            create_confirmation_token,
             accept_safety_disclaimer,
             reset_ui_config,
             open_app_config_dir,
@@ -10140,6 +10164,7 @@ pub fn run() {
             load_config,
             set_root_dir,
             set_auto_check_update,
+            set_port_scan_preferences,
             env_snapshot,
             inspect_java_environment,
             inspect_agent_traces,
@@ -10156,12 +10181,17 @@ pub fn run() {
             install_python,
             install_maven_latest,
             install_gradle_latest,
+            install_maven,
+            install_gradle,
             switch_runtime,
+            list_runtime_switch_backups,
+            restore_runtime_switch_backup,
             uninstall_runtime,
             kill_process,
             release_user_port,
             scan_ports,
             port_history,
+            export_port_report,
             open_process_location,
             run_doctor,
             repair_doctor_safe,
@@ -11809,7 +11839,19 @@ fn resolve_python_release(version: &str) -> Result<ReleaseInfo, String> {
     })
 }
 
-fn resolve_maven_release() -> Result<ReleaseInfo, String> {
+fn resolve_maven_release_for(requested_version: &str) -> Result<ReleaseInfo, String> {
+    if requested_version != "latest" {
+        validate_runtime_version(requested_version, "Maven")?;
+        let name = format!("apache-maven-{requested_version}-bin.zip");
+        return Ok(ReleaseInfo {
+            name: name.clone(),
+            url: format!(
+                "https://archive.apache.org/dist/maven/maven-3/{requested_version}/binaries/{name}"
+            ),
+            sha256: None,
+            tag: requested_version.to_string(),
+        });
+    }
     let text = reqwest::blocking::get("https://downloads.apache.org/maven/maven-3/")
         .map_err(|err| format!("查询 Maven 失败：{err}"))?
         .error_for_status()
@@ -11832,7 +11874,10 @@ fn resolve_maven_release() -> Result<ReleaseInfo, String> {
     })
 }
 
-fn resolve_gradle_release() -> Result<ReleaseInfo, String> {
+fn resolve_gradle_release_for(requested_version: &str) -> Result<ReleaseInfo, String> {
+    if requested_version != "latest" {
+        validate_runtime_version(requested_version, "Gradle")?;
+    }
     let items: Value = reqwest::blocking::get("https://services.gradle.org/versions/all")
         .map_err(|err| format!("查询 Gradle 失败：{err}"))?
         .error_for_status()
@@ -11862,13 +11907,17 @@ fn resolve_gradle_release() -> Result<ReleaseInfo, String> {
                     .map(|version| !version.contains('-') && !version.contains('+'))
                     .unwrap_or(false)
         })
+        .filter(|item| {
+            requested_version == "latest"
+                || item.get("version").and_then(Value::as_str) == Some(requested_version)
+        })
         .max_by_key(|item| {
             item.get("version")
                 .and_then(Value::as_str)
                 .map(version_key)
                 .unwrap_or_default()
         })
-        .ok_or_else(|| "无法从 Gradle 获取稳定版本".to_string())?;
+        .ok_or_else(|| format!("无法从 Gradle 获取稳定版本 {requested_version}"))?;
     let version = item
         .get("version")
         .and_then(Value::as_str)
@@ -12235,6 +12284,20 @@ fn runtime_parent(paths: &AppPaths, collection: &str) -> Result<PathBuf, String>
     }
 }
 
+fn validate_runtime_version(version: &str, label: &str) -> Result<(), String> {
+    let valid = !version.is_empty()
+        && version.len() <= 32
+        && version.split('.').count() >= 2
+        && version
+            .chars()
+            .all(|character| character.is_ascii_digit() || character == '.');
+    if valid {
+        Ok(())
+    } else {
+        Err(format!("{label} 版本号无效：{version}"))
+    }
+}
+
 const JDK_RUNTIME_PROBES: &[RuntimeProbeSpec] = &[
     RuntimeProbeSpec {
         label: "java -version",
@@ -12344,15 +12407,11 @@ fn verify_runtime_root(
                 display_path(executable)
             ));
         }
-        let output = run_managed_command_output(
-            paths,
-            executable,
-            probe.args,
-            probe.timeout_seconds,
-        )
-        .map_err(|error| format!("{} 验证失败：{error}", probe.label))?;
-        let detail = first_meaningful_output_line(&output)
-            .unwrap_or_else(|| "验证通过".to_string());
+        let output =
+            run_managed_command_output(paths, executable, probe.args, probe.timeout_seconds)
+                .map_err(|error| format!("{} 验证失败：{error}", probe.label))?;
+        let detail =
+            first_meaningful_output_line(&output).unwrap_or_else(|| "验证通过".to_string());
         details.push(format!("{}：{}", probe.label, detail));
     }
     Ok(details)
@@ -12378,6 +12437,282 @@ fn save_runtime_switch_backup(
     save_json(&file, &backups)
 }
 
+fn load_runtime_switch_backups_at(paths: &AppPaths) -> Result<Vec<RuntimeSwitchBackup>, String> {
+    load_json_with_default(
+        &paths.runtime_switch_backups_file(),
+        Vec::<RuntimeSwitchBackup>::new(),
+    )
+}
+
+fn validate_runtime_switch_backup_id(backup_id: &str) -> Result<(), String> {
+    let valid = !backup_id.is_empty()
+        && backup_id.len() <= 128
+        && backup_id
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric() || matches!(character, '-' | '_'));
+    if valid {
+        Ok(())
+    } else {
+        Err("运行时切换备份 ID 无效".to_string())
+    }
+}
+
+fn load_runtime_switch_backup(
+    paths: &AppPaths,
+    backup_id: &str,
+) -> Result<RuntimeSwitchBackup, String> {
+    validate_runtime_switch_backup_id(backup_id)?;
+    load_runtime_switch_backups_at(paths)?
+        .into_iter()
+        .find(|backup| backup.backup_id == backup_id)
+        .ok_or_else(|| "运行时切换备份不存在或已被轮换".to_string())
+}
+
+fn runtime_switch_backup_environment(
+    paths: &AppPaths,
+    backup: &RuntimeSwitchBackup,
+) -> Result<Option<HashMap<String, String>>, String> {
+    if backup.kind != "jdk" {
+        return Ok(None);
+    }
+    let file_name = backup
+        .environment_backup
+        .as_deref()
+        .ok_or_else(|| "JDK 切换备份缺少环境变量备份".to_string())?;
+    if !file_name.starts_with("env-backup-")
+        || !file_name.ends_with(".json")
+        || file_name.chars().any(|character| {
+            !(character.is_ascii_alphanumeric() || matches!(character, '-' | '_' | '.'))
+        })
+    {
+        return Err("运行时环境备份文件名无效".to_string());
+    }
+    let source = paths.config().join("env_backups").join(file_name);
+    let metadata =
+        fs::metadata(&source).map_err(|error| format!("运行时环境备份不存在：{error}"))?;
+    if !metadata.is_file() || metadata.len() > 512 * 1024 {
+        return Err("运行时环境备份无效或超过 512 KiB".to_string());
+    }
+    let expected = backup
+        .environment_backup_fingerprint
+        .as_deref()
+        .ok_or_else(|| "旧版运行时切换回执缺少完整性指纹，不能自动恢复".to_string())?;
+    let actual = file_sha256(&source)?;
+    if !actual.eq_ignore_ascii_case(expected) {
+        return Err("运行时环境备份内容已变化，拒绝恢复".to_string());
+    }
+    let value: Value = read_json(&source)?;
+    let mut environment = HashMap::new();
+    for name in ["DEVENV_HOME", "JAVA_HOME", "Path"] {
+        if let Some(value) = value.get(name).and_then(Value::as_str) {
+            environment.insert(name.to_string(), value.to_string());
+        }
+    }
+    environment.entry("Path".to_string()).or_default();
+    Ok(Some(environment))
+}
+
+fn validate_runtime_switch_backup(
+    paths: &AppPaths,
+    backup: &RuntimeSwitchBackup,
+) -> Result<(), String> {
+    if backup.status != "verified" {
+        return Err(format!("回执状态为 {}，不允许恢复", backup.status));
+    }
+    let meta = runtime_meta(&backup.kind)?;
+    match (
+        backup.previous_version.as_deref(),
+        backup.previous_target.as_deref(),
+    ) {
+        (Some(_), Some(target)) => {
+            let target = validate_managed_runtime_target(paths, meta, Path::new(target))?;
+            verify_runtime_root(paths, meta, &target)?;
+        }
+        (None, None) => {}
+        _ => return Err("运行时回执中的上一个版本与目录不一致".to_string()),
+    }
+    let _ = runtime_switch_backup_environment(paths, backup)?;
+    Ok(())
+}
+
+#[tauri::command]
+fn list_runtime_switch_backups() -> Result<Vec<RuntimeSwitchBackupSummary>, String> {
+    let paths = load_paths()?;
+    let mut backups = load_runtime_switch_backups_at(&paths)?;
+    backups.sort_by(|left, right| {
+        right
+            .created_at
+            .cmp(&left.created_at)
+            .then_with(|| right.backup_id.cmp(&left.backup_id))
+    });
+    Ok(backups
+        .into_iter()
+        .map(|backup| {
+            let validation_error = validate_runtime_switch_backup(&paths, &backup).err();
+            RuntimeSwitchBackupSummary {
+                backup_id: backup.backup_id,
+                created_at: backup.created_at,
+                kind: backup.kind,
+                previous_version: backup.previous_version,
+                requested_version: backup.requested_version,
+                target: backup.target,
+                status: backup.status,
+                detail: backup.detail,
+                restorable: validation_error.is_none(),
+                validation_error,
+            }
+        })
+        .collect())
+}
+
+fn runtime_switch_restore_verified(
+    paths: &AppPaths,
+    meta: RuntimeMeta,
+    expected_version: Option<&str>,
+    expected_target: Option<&Path>,
+    expected_environment: Option<&HashMap<String, String>>,
+) -> bool {
+    let installed_matches = load_installed(paths)
+        .ok()
+        .and_then(|installed| current_version_for_kind(&installed, meta.kind).map(str::to_string))
+        == expected_version.map(str::to_string);
+    let link = paths.current().join(meta.link_name);
+    let pointer_matches = match expected_target {
+        Some(target) => link
+            .canonicalize()
+            .ok()
+            .zip(target.canonicalize().ok())
+            .is_some_and(|(actual, expected)| actual == expected),
+        None => !link.exists(),
+    };
+    let runtime_works = expected_target
+        .map(|target| verify_runtime_root(paths, meta, target).is_ok())
+        .unwrap_or(true);
+    let environment_matches = expected_environment
+        .map(|expected| {
+            user_environment()
+                .map(|actual| environment_fingerprint(&actual) == environment_fingerprint(expected))
+                .unwrap_or(false)
+        })
+        .unwrap_or(true);
+    installed_matches && pointer_matches && runtime_works && environment_matches
+}
+
+#[tauri::command]
+fn restore_runtime_switch_backup(backup_id: String) -> Result<OperationResult, String> {
+    let paths = load_paths()?;
+    let mut backup = load_runtime_switch_backup(&paths, &backup_id)?;
+    validate_runtime_switch_backup(&paths, &backup)?;
+    let meta = runtime_meta(&backup.kind)?;
+    let previous_target = backup.previous_target.as_deref().map(PathBuf::from);
+    let previous_environment = runtime_switch_backup_environment(&paths, &backup)?;
+
+    let mut installed = load_installed(&paths)?;
+    let safety_current = installed.current.clone();
+    let safety_version = current_version_for_kind(&installed, meta.kind).map(str::to_string);
+    let safety_target = validated_runtime_rollback_target(
+        &paths,
+        &installed,
+        meta,
+        safety_version.as_deref(),
+        "恢复前安全点",
+    )?;
+    let safety_environment = if meta.kind == "jdk" {
+        Some(user_environment()?)
+    } else {
+        None
+    };
+    let safety_environment_backup = safety_environment
+        .as_ref()
+        .map(|environment| create_environment_backup(&paths, environment))
+        .transpose()?;
+
+    let mut desired_current = installed.current.clone();
+    match meta.kind {
+        "jdk" => desired_current.jdk = backup.previous_version.clone(),
+        "python" => desired_current.python = backup.previous_version.clone(),
+        "node" => desired_current.node = backup.previous_version.clone(),
+        "maven" => desired_current.maven = backup.previous_version.clone(),
+        "gradle" => desired_current.gradle = backup.previous_version.clone(),
+        "go" => desired_current.go = backup.previous_version.clone(),
+        _ => unreachable!(),
+    }
+
+    let restore = rollback_runtime_switch(
+        &paths,
+        meta,
+        &mut installed,
+        &desired_current,
+        previous_target.as_deref(),
+        previous_environment.as_ref(),
+    );
+    let verified = restore.is_ok()
+        && runtime_switch_restore_verified(
+            &paths,
+            meta,
+            backup.previous_version.as_deref(),
+            previous_target.as_deref(),
+            previous_environment.as_ref(),
+        );
+    if !verified {
+        let reason = restore
+            .err()
+            .unwrap_or_else(|| "恢复后的指针、登记、环境或运行命令验证不一致".to_string());
+        let mut current_installed = load_installed(&paths).unwrap_or_else(|_| installed.clone());
+        let safety_restored = rollback_runtime_switch(
+            &paths,
+            meta,
+            &mut current_installed,
+            &safety_current,
+            safety_target.as_deref(),
+            safety_environment.as_ref(),
+        )
+        .is_ok()
+            && runtime_switch_restore_verified(
+                &paths,
+                meta,
+                safety_version.as_deref(),
+                safety_target.as_deref(),
+                safety_environment.as_ref(),
+            );
+        backup.status = "restore_failed".to_string();
+        backup.detail = format!(
+            "恢复失败：{reason}；恢复前状态{}",
+            if safety_restored {
+                "已自动还原"
+            } else {
+                "未能完整还原"
+            }
+        );
+        save_runtime_switch_backup(&paths, &backup)?;
+        return Err(format!(
+            "运行时备份恢复失败：{reason}；恢复前状态{}；环境安全备份：{}",
+            if safety_restored {
+                "已自动还原"
+            } else {
+                "未能完整还原"
+            },
+            safety_environment_backup.as_deref().unwrap_or("不适用")
+        ));
+    }
+
+    backup.status = "restored".to_string();
+    backup.detail = format!(
+        "已恢复 {} 到 {} 并完成验证",
+        backup.kind,
+        backup.previous_version.as_deref().unwrap_or("未选择状态")
+    );
+    save_runtime_switch_backup(&paths, &backup)?;
+    Ok(OperationResult {
+        success: true,
+        message: format!(
+            "{}；恢复前环境安全备份：{}",
+            backup.detail,
+            safety_environment_backup.as_deref().unwrap_or("不适用")
+        ),
+    })
+}
+
 fn previous_runtime_target(
     installed: &InstalledData,
     meta: RuntimeMeta,
@@ -12389,6 +12724,27 @@ fn previous_runtime_target(
         .find(|item| item.get("version").and_then(Value::as_str) == Some(version))
         .and_then(|item| item.get("path").and_then(Value::as_str))
         .map(PathBuf::from)
+}
+
+fn validated_runtime_rollback_target(
+    paths: &AppPaths,
+    installed: &InstalledData,
+    meta: RuntimeMeta,
+    version: Option<&str>,
+    context: &str,
+) -> Result<Option<PathBuf>, String> {
+    let Some(version) = version else {
+        return Ok(None);
+    };
+    let target = previous_runtime_target(installed, meta, Some(version)).ok_or_else(|| {
+        format!(
+            "当前 {} {} 缺少受管目录记录，无法建立{}",
+            meta.kind, version, context
+        )
+    })?;
+    validate_managed_runtime_target(paths, meta, &target)
+        .map(Some)
+        .map_err(|error| format!("当前 {} 无法建立{}：{error}", meta.kind, context))
 }
 
 fn rollback_runtime_switch(
@@ -13470,7 +13826,7 @@ fn run_managed_command_output(
         executable_label,
         timeout_seconds,
     )
-        .map_err(|err| format!("执行命令失败：{err}"))?;
+    .map_err(|err| format!("执行命令失败：{err}"))?;
     if !output.success {
         return Err(powershell_runner::native_command_message(&output));
     }
@@ -14980,9 +15336,7 @@ fn normalize_legacy_timestamp(value: &str) -> String {
         if let Ok(intervals) = digits.parse::<u64>() {
             const WINDOWS_TO_UNIX_100NS: u64 = 116_444_736_000_000_000;
             if intervals >= WINDOWS_TO_UNIX_100NS {
-                return format_unix_timestamp_utc(
-                    (intervals - WINDOWS_TO_UNIX_100NS) / 10_000_000,
-                );
+                return format_unix_timestamp_utc((intervals - WINDOWS_TO_UNIX_100NS) / 10_000_000);
             }
         }
     }
@@ -15009,12 +15363,10 @@ fn format_unix_timestamp_utc(timestamp: u64) -> String {
         shifted - 146_096
     } / 146_097;
     let day_of_era = shifted - era * 146_097;
-    let year_of_era = (day_of_era - day_of_era / 1_460 + day_of_era / 36_524
-        - day_of_era / 146_096)
-        / 365;
+    let year_of_era =
+        (day_of_era - day_of_era / 1_460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
     let mut year = year_of_era + era * 400;
-    let day_of_year =
-        day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
+    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
     let month_prime = (5 * day_of_year + 2) / 153;
     let day = day_of_year - (153 * month_prime + 2) / 5 + 1;
     let month = month_prime + if month_prime < 10 { 3 } else { -9 };
@@ -15112,10 +15464,7 @@ mod tests {
     #[test]
     fn config_profile_environment_verification_handles_paths_and_missing_values() {
         let mut environment = std::collections::HashMap::new();
-        environment.insert(
-            "DEVENV_HOME".to_string(),
-            r"c:\devenvmanager\".to_string(),
-        );
+        environment.insert("DEVENV_HOME".to_string(), r"c:\devenvmanager\".to_string());
         environment.insert("Path".to_string(), r"C:\Tools;C:\Windows".to_string());
 
         assert!(optional_profile_value_matches(
@@ -15168,25 +15517,23 @@ mod tests {
 
     #[test]
     fn timestamps_are_stable_utc_text_instead_of_systemtime_debug_output() {
-        assert_eq!(
-            format_unix_timestamp_utc(0),
-            "1970-01-01 00:00:00 UTC"
-        );
+        assert_eq!(format_unix_timestamp_utc(0), "1970-01-01 00:00:00 UTC");
         assert_eq!(
             format_unix_timestamp_utc(1_704_067_200),
             "2024-01-01 00:00:00 UTC"
         );
         assert_eq!(
-            normalize_legacy_timestamp(
-                "SystemTime { intervals: 116444736000000000 }"
-            ),
+            normalize_legacy_timestamp("SystemTime { intervals: 116444736000000000 }"),
             "1970-01-01 00:00:00 UTC"
         );
         assert_eq!(
             normalize_legacy_timestamp("SystemTime { tv_sec: 1704067200, tv_nsec: 0 }"),
             "2024-01-01 00:00:00 UTC"
         );
-        assert_eq!(normalize_legacy_timestamp("already-readable"), "already-readable");
+        assert_eq!(
+            normalize_legacy_timestamp("already-readable"),
+            "already-readable"
+        );
         assert!(!current_timestamp().contains("SystemTime"));
     }
 
@@ -15256,14 +15603,8 @@ mod tests {
         };
 
         store_move_plan(plan.clone()).unwrap();
-        let mut tampered = plan.clone();
-        tampered.target = r"C:\Windows\System32".to_string();
-        assert!(verify_move_plan(&tampered).is_err());
-        assert!(consume_move_plan(tampered).is_err());
-
-        assert!(verify_move_plan(&plan).is_ok());
-        assert_eq!(consume_move_plan(plan.clone()).unwrap(), plan);
-        assert!(consume_move_plan(plan).is_err());
+        assert_eq!(consume_move_plan(&plan.plan_id).unwrap(), plan);
+        assert!(consume_move_plan(&plan.plan_id).is_err());
     }
 
     #[test]
@@ -15385,22 +15726,53 @@ mod tests {
         paths.ensure().unwrap();
         let managed = paths.nodes().join("node-v22");
         fs::create_dir(&managed).unwrap();
-        let resolved = validate_managed_runtime_target(
-            &paths,
-            runtime_meta("node").unwrap(),
-            &managed,
-        )
-        .unwrap();
+        let resolved =
+            validate_managed_runtime_target(&paths, runtime_meta("node").unwrap(), &managed)
+                .unwrap();
         assert_eq!(resolved, managed.canonicalize().unwrap());
 
         let outside = paths.root.join("tools").join("node-v22");
         fs::create_dir_all(&outside).unwrap();
-        assert!(validate_managed_runtime_target(
+        assert!(
+            validate_managed_runtime_target(&paths, runtime_meta("node").unwrap(), &outside,)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn runtime_switch_requires_a_complete_rollback_baseline() {
+        let root = tempfile::tempdir().unwrap();
+        let paths = AppPaths::new(root.path().join("DevEnvManager"));
+        paths.ensure().unwrap();
+        let meta = runtime_meta("node").unwrap();
+        let mut installed = default_installed();
+        installed.current.node = Some("22.0.0".to_string());
+
+        assert!(validated_runtime_rollback_target(
             &paths,
-            runtime_meta("node").unwrap(),
-            &outside,
+            &installed,
+            meta,
+            installed.current.node.as_deref(),
+            "安全回滚点",
         )
         .is_err());
+
+        let managed = paths.nodes().join("node-v22.0.0");
+        fs::create_dir(&managed).unwrap();
+        installed.nodes.push(json!({
+            "version": "22.0.0",
+            "path": display_path(&managed),
+        }));
+        let target = validated_runtime_rollback_target(
+            &paths,
+            &installed,
+            meta,
+            installed.current.node.as_deref(),
+            "安全回滚点",
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(target, managed.canonicalize().unwrap());
     }
 
     #[test]
@@ -15421,6 +15793,7 @@ mod tests {
                     target: display_path(paths.nodes().join(index.to_string())),
                     previous_current: CurrentVersions::default(),
                     environment_backup: None,
+                    environment_backup_fingerprint: None,
                     status: "prepared".to_string(),
                     detail: "test".to_string(),
                 },
@@ -15439,6 +15812,110 @@ mod tests {
             read_json(&paths.runtime_switch_backups_file()).unwrap();
         assert_eq!(updated.len(), 20);
         assert_eq!(updated.last().unwrap().status, "verified");
+    }
+
+    #[test]
+    fn runtime_switch_backup_validation_rejects_unverified_and_legacy_jdk_receipts() {
+        let root = tempfile::tempdir().unwrap();
+        let paths = AppPaths::new(root.path().join("DevEnvManager"));
+        paths.ensure().unwrap();
+        let mut backup = RuntimeSwitchBackup {
+            backup_id: "runtime-switch-test".to_string(),
+            created_at: 1,
+            kind: "node".to_string(),
+            previous_version: None,
+            requested_version: "22.0.0".to_string(),
+            previous_target: None,
+            target: display_path(paths.nodes().join("node-v22")),
+            previous_current: CurrentVersions::default(),
+            environment_backup: None,
+            environment_backup_fingerprint: None,
+            status: "prepared".to_string(),
+            detail: "test".to_string(),
+        };
+        assert!(validate_runtime_switch_backup(&paths, &backup).is_err());
+
+        backup.kind = "jdk".to_string();
+        backup.status = "verified".to_string();
+        backup.environment_backup = Some("env-backup-test.json".to_string());
+        save_json(
+            &paths
+                .config()
+                .join("env_backups")
+                .join("env-backup-test.json"),
+            &json!({ "Path": "C:\\Windows" }),
+        )
+        .unwrap();
+        assert!(validate_runtime_switch_backup(&paths, &backup)
+            .unwrap_err()
+            .contains("完整性指纹"));
+    }
+
+    #[test]
+    fn move_plan_is_consumed_by_id_only_once() {
+        let plan = cleanup::MovePlan {
+            plan_id: format!(
+                "test-move-{}",
+                SAVE_JSON_COUNTER.fetch_add(1, Ordering::Relaxed)
+            ),
+            created_at: unix_timestamp().to_string(),
+            source: r"C:\Users\test\Downloads".to_string(),
+            target: r"D:\Archive".to_string(),
+            mode: "archive_only".to_string(),
+            estimated_bytes: 0,
+            item_count: 0,
+            risk: "medium".to_string(),
+            requires_admin: false,
+            reversible: false,
+            warnings: Vec::new(),
+        };
+        store_move_plan(plan.clone()).unwrap();
+        assert_eq!(consume_move_plan(&plan.plan_id).unwrap(), plan);
+        assert!(consume_move_plan(&plan.plan_id).is_err());
+    }
+
+    #[test]
+    fn port_scope_keeps_only_listening_and_bound_records_in_recommended_mode() {
+        let record = |state: &str, port: u16| PortRecord {
+            protocol: "TCP".to_string(),
+            local_address: "127.0.0.1".to_string(),
+            local_port: port,
+            remote_address: "0.0.0.0:0".to_string(),
+            state: state.to_string(),
+            pid: 100,
+            process_name: "node.exe".to_string(),
+            process_path: String::new(),
+            command_line: String::new(),
+            parent_pid: 0,
+            parent_process_name: String::new(),
+            service_names: Vec::new(),
+            common_usage: String::new(),
+            explanation: String::new(),
+            risk: "普通".to_string(),
+            identity: "开发服务".to_string(),
+            confidence: 90,
+            evidence_count: 1,
+            conflict_count: 0,
+            risk_level: "low".to_string(),
+            recommendation: String::new(),
+            evidence: Vec::new(),
+            conflict_evidence: Vec::new(),
+        };
+        let records = vec![record("LISTENING", 3000), record("ESTABLISHED", 443)];
+        assert_eq!(
+            filter_port_records_for_scope(records.clone(), "recommended").len(),
+            1
+        );
+        assert_eq!(filter_port_records_for_scope(records, "full").len(), 2);
+        assert_eq!(normalize_port_scan_scope("anything"), "recommended");
+    }
+
+    #[test]
+    fn runtime_version_validation_accepts_release_versions_only() {
+        assert!(validate_runtime_version("3.9.16", "Maven").is_ok());
+        assert!(validate_runtime_version("9.6.1", "Gradle").is_ok());
+        assert!(validate_runtime_version("../../bad", "Gradle").is_err());
+        assert!(validate_runtime_version("latest", "Gradle").is_err());
     }
 
     #[test]
@@ -15826,7 +16303,7 @@ mod tests {
         .unwrap();
 
         assert!(require_risk_operation_token(
-            "execute_move_plan",
+            "apply_project_configuration",
             plan_id,
             Some(token.token.clone())
         )
@@ -15871,8 +16348,6 @@ mod tests {
             "stop_local_service",
             "apply_project_configuration",
             "update_project_port",
-            "rollback_move",
-            "execute_move_plan",
             "execute_expansion_plan",
             "clear_download_cache",
             "clean_dev_cache",
@@ -15882,6 +16357,10 @@ mod tests {
             let spec = risk_operation_spec(command).unwrap_or_else(|| panic!("missing {command}"));
             assert!(spec.requires_token);
             assert!(matches!(spec.risk_level, "medium" | "high" | "critical"));
+        }
+        for command in ["rollback_move", "execute_move_plan"] {
+            let spec = risk_operation_spec(command).unwrap_or_else(|| panic!("missing {command}"));
+            assert!(!spec.requires_token);
         }
     }
 

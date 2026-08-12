@@ -68,7 +68,12 @@ fn source_label(desktop: bool, category: &str) -> String {
     }
 }
 
-fn file_item(path: &Path, size: u64, modified: Option<SystemTime>, source_category: &str) -> LargeFileItem {
+fn file_item(
+    path: &Path,
+    size: u64,
+    modified: Option<SystemTime>,
+    source_category: &str,
+) -> LargeFileItem {
     let exists = path.exists();
     let directory = path
         .parent()
@@ -103,7 +108,8 @@ fn file_item(path: &Path, size: u64, modified: Option<SystemTime>, source_catego
         } else {
             "所在目录不可访问，请检查权限、云盘同步或重新扫描".to_string()
         },
-        suggestion: if file_type == "安装包" || file_type == "压缩包" || file_type == "ISO/磁盘镜像" {
+        suggestion: if file_type == "安装包" || file_type == "压缩包" || file_type == "ISO/磁盘镜像"
+        {
             "确认不再需要后可加入归档计划；本页面不会自动删除或移动".to_string()
         } else {
             "先定位文件并确认用途；本页面只提供只读分析".to_string()
@@ -144,7 +150,9 @@ fn file_matches_category(
                 >= Duration::from_secs(30 * 24 * 60 * 60)
         }),
         "截图" => desktop && is_screenshot(path),
-        "重复文件候选" => desktop && size > 0 && same_size.get(&size).copied().unwrap_or(0) > 1,
+        "重复文件候选" => {
+            desktop && size > 0 && same_size.get(&size).copied().unwrap_or(0) > 1
+        }
         _ => classify_file_type(path) == name,
     }
 }
@@ -161,14 +169,22 @@ fn category_details(
         .filter(|(path, size, modified)| {
             file_matches_category(name, path, *size, *modified, desktop, now, same_size)
         })
-        .map(|(path, size, modified)| file_item(path, *size, *modified, &source_label(desktop, name)))
+        .map(|(path, size, modified)| {
+            file_item(path, *size, *modified, &source_label(desktop, name))
+        })
         .collect();
     details.sort_by_key(|item| std::cmp::Reverse(item.size));
     details.truncate(10);
     details
 }
 
-fn category_item(root: &Path, name: &str, size: u64, suggestion: &str, details: Vec<LargeFileItem>) -> FolderUsageItem {
+fn category_item(
+    root: &Path,
+    name: &str,
+    size: u64,
+    suggestion: &str,
+    details: Vec<LargeFileItem>,
+) -> FolderUsageItem {
     FolderUsageItem {
         name: name.to_string(),
         path: root.to_string_lossy().to_string(),
@@ -243,7 +259,11 @@ pub(crate) fn inspect_folder(root: &Path, desktop: bool) -> FolderUsageReport {
                 path,
                 *size,
                 *modified,
-                if desktop { "桌面 / Top 文件" } else { "下载 / Top 文件" },
+                if desktop {
+                    "桌面 / Top 文件"
+                } else {
+                    "下载 / Top 文件"
+                },
             )
         })
         .collect();

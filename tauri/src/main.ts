@@ -37,7 +37,12 @@ import {
   type MigratedFileAssociationUiState,
 } from "./fileAssociationMigration";
 import { enhanceProjectReportPanel } from "./projectReportMigration";
-import { projectConfigurationPlanId } from "./features/jdk";
+import {
+  enhanceBuildToolVersionSelectors,
+  enhancePortPanel,
+  enhanceRuntimePanel,
+  setMigrationResult,
+} from "./p0Migration";
 import { MYSQL_PERMISSION_UNKNOWN_HELP, mysqlPathValue } from "./features/mysql";
 import { canShowKillPortAction } from "./features/ports";
 import { SAFE_MODE_DESCRIPTION } from "./features/safeMode";
@@ -60,6 +65,7 @@ import type {
   ValidationCheck,
   PythonIntegrityReport,
   RuntimeStrongVerificationReport,
+  RuntimeSwitchBackupSummary,
   IdeaProjectReport,
   JavaConsumerReport,
   KillResult,
@@ -100,7 +106,6 @@ import type {
   MySqlBackupManifestStatus,
   MySqlRepairReport,
   MySqlRepairPlan,
-  ConfirmationTokenView,
   MySqlExecutionGuard,
   JdkDistribution,
   UpdateCheckResult,
@@ -967,6 +972,7 @@ const state = {
   pythonIntegrity: null as PythonIntegrityReport | null,
   pythonRepairPlan: null as PythonRepairPlan | null,
   runtimeStrong: null as RuntimeStrongVerificationReport | null,
+  runtimeSwitchBackups: [] as RuntimeSwitchBackupSummary[],
   project: null as ProjectAnalysis | null,
   ideaProject: null as IdeaProjectReport | null,
   javaConsumer: null as JavaConsumerReport | null,
@@ -1061,7 +1067,7 @@ let knownListeningPorts = new Set<string>();
 
 async function pollPortMonitor(initial = false) {
   try {
-    const records = await invoke<PortRecord[]>("scan_ports");
+    const records = await invoke<PortRecord[]>("scan_ports", { scope: state.config?.settings.portScanScope || "recommended" });
     const listening = records.filter((item) => item.state.toLowerCase() === "listening");
     const current = new Set(listening.map((item) => `${item.protocol}:${item.localPort}:${item.pid}`));
     if (!initial) {
@@ -1138,6 +1144,9 @@ function icon(node: IconNode) {
 }
 
 enhanceProjectReportPanel(document, icon(FileText));
+enhancePortPanel(document, icon(FileText));
+enhanceRuntimePanel(document, icon(FileText), icon(RotateCcw));
+enhanceBuildToolVersionSelectors(document);
 
 function setText(id: string, value: string | number) {
   const element = document.querySelector<HTMLElement>(`#${id}`);
@@ -1883,6 +1892,63 @@ function renderRuntimeStrongVerification() {
     : `<div class="empty">检查 JDK/Python/Node/Maven/Gradle/Go 的登记、组件、current 指针和环境生效状态。</div>`;
 }
 
+function renderRuntimeSwitchBackups() {
+  const element = document.querySelector<HTMLElement>("#runtime-switch-backups");
+  if (!element) return;
+  element.innerHTML = state.runtimeSwitchBackups.length
+    ? state.runtimeSwitchBackups.map((backup) => `
+        <article class="runtime ${backup.restorable ? "" : "warn"}">
+          <div>
+            <strong>${escapeHtml(backup.kind)} · ${escapeHtml(backup.previousVersion || "未选择状态")}</strong>
+            <span>${backup.restorable ? "可恢复" : escapeHtml(backup.status)}</span>
+          </div>
+          <small>${new Date(backup.createdAt * 1000).toLocaleString("zh-CN")} · 切换目标 ${escapeHtml(backup.requestedVersion)}</small>
+          <small>${escapeHtml(backup.validationError || backup.detail)}</small>
+          <div class="row-actions">
+            <button data-action="restore-runtime-switch" data-backup-id="${escapeHtml(backup.backupId)}" ${backup.restorable ? "" : "disabled"}>${icon(RotateCcw)}<span>恢复并验证</span></button>
+          </div>
+        </article>
+      `).join("")
+    : `<div class="empty">还没有可用的运行时切换恢复点。</div>`;
+}
+
+async function loadRuntimeSwitchBackups(showFeedback = false) {
+  try {
+    state.runtimeSwitchBackups = await invoke<RuntimeSwitchBackupSummary[]>("list_runtime_switch_backups");
+    renderRuntimeSwitchBackups();
+    if (showFeedback) {
+      setMigrationResult("#runtime-migration-result", `已读取 ${state.runtimeSwitchBackups.length} 个运行时切换回执。`);
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    setMigrationResult("#runtime-migration-result", `读取运行时恢复点失败：${message}`, true);
+  }
+}
+
+async function exportRuntimeReport(format: "markdown" | "json") {
+  setMigrationResult("#runtime-migration-result", "正在运行强验证并导出报告...");
+  try {
+    const path = await invoke<string>("export_runtime_verification_report", { format });
+    setMigrationResult("#runtime-migration-result", `运行时验证报告已导出：\n${path}`);
+    focusResult("#runtime-migration-result");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    setMigrationResult("#runtime-migration-result", `运行时报告导出失败：${message}`, true);
+  }
+}
+
+async function exportPortReport(format: "markdown" | "json") {
+  setMigrationResult("#port-operation-result", "正在扫描并导出端口报告...");
+  try {
+    const path = await invoke<string>("export_port_report", { format });
+    setMigrationResult("#port-operation-result", `端口报告已导出：\n${path}`);
+    focusResult("#port-operation-result");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    setMigrationResult("#port-operation-result", `端口报告导出失败：${message}`, true);
+  }
+}
+
 function renderToolStates(items: ToolState[]) {
   return items
     .map(
@@ -2419,12 +2485,14 @@ async function refreshBase() {
   clearFeatureHelp();
   const autoCheckUpdates = document.querySelector<HTMLInputElement>("#auto-check-updates");
   if (autoCheckUpdates) autoCheckUpdates.checked = config.settings.autoCheckUpdate;
+  const portMonitor = document.querySelector<HTMLInputElement>("#port-monitor-enabled");
+  if (portMonitor) portMonitor.checked = config.settings.autoScanPortsOnStartup;
 }
 
 async function refreshRuntimeAndPorts(silent = false) {
   const results = await Promise.allSettled([
     invoke<RuntimeInfo[]>("discover_runtimes"),
-    invoke<PortRecord[]>("scan_ports"),
+    invoke<PortRecord[]>("scan_ports", { scope: state.config?.settings.portScanScope || "recommended" }),
     invoke<PortHistorySummary[]>("port_history"),
   ]);
   if (results[0].status === "fulfilled") {
@@ -2533,6 +2601,7 @@ async function runRuntimeOperation(
     } else {
       showToast(`${message}；${focus} 验证通过`);
     }
+    await loadRuntimeSwitchBackups();
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const resultPanel = document.querySelector<HTMLElement>("#runtime-strong-result");
@@ -2555,7 +2624,7 @@ async function terminatePortProcess(port: number, pid: number) {
   try {
     const result = await invoke<KillResult>("release_user_port", { port, pid });
     showToast(result.message, !result.success);
-    state.ports = await invoke<PortRecord[]>("scan_ports");
+    state.ports = await invoke<PortRecord[]>("scan_ports", { scope: state.config?.settings.portScanScope || "recommended" });
     state.portHistory = await invoke<PortHistorySummary[]>("port_history");
     state.selectedPort = null;
     renderPorts();
@@ -2602,8 +2671,7 @@ function renderOperationError(selector: string, title: string, error: unknown) {
 async function runDoctorAction(action: string) {
   if (action === "cleanup_path") {
     await runOperation(async () => {
-      const token = await riskOperationToken("cleanup_path_entries", "cleanup-path-entries", "medium", false, "environment-backup");
-      return invoke<OperationResult>("cleanup_path_entries", { confirmationToken: token.token });
+      return invoke<OperationResult>("cleanup_path_entries");
     }, "正在清理 PATH");
     return;
   }
@@ -2650,7 +2718,7 @@ async function runDoctorAction(action: string) {
   }
   if (action === "ports") {
     activateView("ports");
-    state.ports = await invoke<PortRecord[]>("scan_ports");
+    state.ports = await invoke<PortRecord[]>("scan_ports", { scope: state.config?.settings.portScanScope || "recommended" });
     renderPorts();
     showToast("端口扫描完成");
     return;
@@ -3278,48 +3346,6 @@ function renderEnvironmentBackups() {
     : `<div class="empty">还没有环境备份；首次应用配置时会自动创建</div>`;
 }
 
-async function sha256Hex(text: string) {
-  const bytes = new TextEncoder().encode(text);
-  const digest = await crypto.subtle.digest("SHA-256", bytes);
-  return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
-}
-
-async function createBackendConfirmation(
-  actionId: string,
-  planId: string,
-  riskLevel: string,
-  planFingerprint: string,
-  tripleConfirmed: boolean,
-  backupReceipt?: string | null,
-  command?: string,
-) {
-  return invoke<ConfirmationTokenView>("create_confirmation_token", {
-    command: command || actionId,
-    actionId,
-    planId,
-    riskLevel,
-    planFingerprint,
-    tripleConfirmed,
-    backupReceipt: backupReceipt || null,
-  });
-}
-
-async function processActionFingerprint(actionId: string, planId: string, riskLevel: string) {
-  return sha256Hex(`${actionId}\0${planId}\0${riskLevel}`);
-}
-
-async function riskOperationToken(
-  command: string,
-  planId: string,
-  riskLevel: "medium" | "high" | "critical",
-  tripleConfirmed = false,
-  backupReceipt: string | null = null,
-  actionId = command,
-) {
-  const fingerprint = await sha256Hex(`${command}\0${planId}\0${riskLevel}`);
-  return createBackendConfirmation(actionId, planId, riskLevel, fingerprint, tripleConfirmed, backupReceipt, command);
-}
-
 function renderSafetyDisclaimer() {
   const slot = document.querySelector<HTMLElement>("#safety-disclaimer-slot");
   if (!slot) return;
@@ -3831,9 +3857,17 @@ document.querySelector("#save-root")?.addEventListener("click", () => {
   void runOperation(() => invoke<ConfigView>("set_root_dir", { root: input.value }), "正在保存根目录");
 });
 document.querySelector("#scan-ports")?.addEventListener("click", async () => {
-  state.ports = await invoke<PortRecord[]>("scan_ports");
-  state.portHistory = await invoke<PortHistorySummary[]>("port_history");
-  renderPorts();
+  setMigrationResult("#port-operation-result", "正在扫描端口...");
+  try {
+    state.ports = await invoke<PortRecord[]>("scan_ports", { scope: state.config?.settings.portScanScope || "recommended" });
+    state.portHistory = await invoke<PortHistorySummary[]>("port_history");
+    state.selectedPort = null;
+    renderPorts();
+    setMigrationResult("#port-operation-result", `端口扫描完成：${state.ports.length} 条记录。`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    setMigrationResult("#port-operation-result", `端口扫描失败：${message}`, true);
+  }
 });
 document.querySelector("#discover-runtimes")?.addEventListener("click", async () => {
   state.runtimes = await invoke<RuntimeInfo[]>("discover_runtimes");
@@ -3877,10 +3911,12 @@ document.querySelector("#install-python")?.addEventListener("click", () => {
   );
 });
 document.querySelector("#install-maven")?.addEventListener("click", () => {
-  void runRuntimeOperation(() => invoke<OperationResult>("install_maven_latest"), "正在安装 Maven 最新版", "Maven");
+  const version = document.querySelector<HTMLSelectElement>("#maven-version")?.value || "latest";
+  void runRuntimeOperation(() => invoke<OperationResult>("install_maven", { version }), `正在安装 Maven ${version === "latest" ? "最新版" : version}`, "Maven");
 });
 document.querySelector("#install-gradle")?.addEventListener("click", () => {
-  void runRuntimeOperation(() => invoke<OperationResult>("install_gradle_latest"), "正在安装 Gradle 最新版", "Gradle");
+  const version = document.querySelector<HTMLSelectElement>("#gradle-version")?.value || "latest";
+  void runRuntimeOperation(() => invoke<OperationResult>("install_gradle", { version }), `正在安装 Gradle ${version === "latest" ? "最新版" : version}`, "Gradle");
 });
 document.querySelector("#analyze-python")?.addEventListener("click", async () => {
   showToast("正在分析 Python 环境");
@@ -3914,6 +3950,11 @@ document.querySelector("#inspect-runtime-strong")?.addEventListener("click", asy
     showToast(error instanceof Error ? error.message : String(error), true);
   }
 });
+document.querySelector("#export-runtime-report-markdown")?.addEventListener("click", () => void exportRuntimeReport("markdown"));
+document.querySelector("#export-runtime-report-json")?.addEventListener("click", () => void exportRuntimeReport("json"));
+document.querySelector("#load-runtime-switch-backups")?.addEventListener("click", () => void loadRuntimeSwitchBackups(true));
+document.querySelector("#export-port-report-markdown")?.addEventListener("click", () => void exportPortReport("markdown"));
+document.querySelector("#export-port-report-json")?.addEventListener("click", () => void exportPortReport("json"));
 document.querySelector("#preview-python-repair")?.addEventListener("click", async () => {
   const repairPip = document.querySelector<HTMLInputElement>("#python-repair-pip")?.checked ?? false;
   const repairPath = document.querySelector<HTMLInputElement>("#python-repair-path")?.checked ?? false;
@@ -4059,8 +4100,7 @@ document.querySelector("#apply-env-repair-plan")?.addEventListener("click", asyn
   if (!(await confirmRisk(`将写入当前用户级环境变量，并创建备份：${plan.backupName}`, plan.riskLevel))) return;
   showToast("正在应用环境修复计划并验证");
   try {
-    const token = await riskOperationToken("apply_env_repair_plan", plan.planId, "high", false, plan.backupName);
-    state.envRepairResult = await invoke<EnvRepairResult>("apply_env_repair_plan", { plan, confirmationToken: token.token });
+    state.envRepairResult = await invoke<EnvRepairResult>("apply_env_repair_plan", { plan });
     state.envRepairPlan = null;
     state.envReliability = await invoke<EnvReliabilitySnapshot>("inspect_env_reliability");
     state.envBackupRecords = await invoke<EnvBackupRecord[]>("list_env_backups");
@@ -4110,17 +4150,11 @@ document.querySelector("#check-env-health")?.addEventListener("click", async () 
 });
 document.querySelector("#cleanup-path")?.addEventListener("click", async () => {
   if (!(await askForConfirmation("将删除当前用户 PATH 中真实失效或重复的条目，并先创建环境备份；受管待安装路径会保留。确定继续吗？"))) return;
-  void runOperation(async () => {
-    const token = await riskOperationToken("cleanup_path_entries", "cleanup-path-entries", "medium", false, "environment-backup");
-    return invoke<OperationResult>("cleanup_path_entries", { confirmationToken: token.token });
-  }, "正在清理真实失效和重复 PATH");
+  void runOperation(() => invoke<OperationResult>("cleanup_path_entries"), "正在清理真实失效和重复 PATH");
 });
 document.querySelector("#restore-env")?.addEventListener("click", async () => {
   if (!(await askForConfirmation("将恢复最近一次环境备份；已打开的终端和 IDE 不会自动刷新。确定继续吗？"))) return;
-  void runOperation(async () => {
-    const token = await riskOperationToken("restore_user_environment", "restore-user-environment-latest", "high", false, "environment-backup");
-    return invoke<OperationResult>("restore_user_environment", { confirmationToken: token.token });
-  }, "正在恢复用户环境变量");
+  void runOperation(() => invoke<OperationResult>("restore_user_environment"), "正在恢复用户环境变量");
 });
 document.querySelector("#save-profile")?.addEventListener("click", () => {
   const input = document.querySelector<HTMLInputElement>("#profile-name");
@@ -4240,10 +4274,7 @@ document.querySelector("#load-cache")?.addEventListener("click", async () => {
 });
 document.querySelector("#clear-cache")?.addEventListener("click", async () => {
   if (!(await askForConfirmation("下载缓存将逐项移入 Windows 回收站，不会删除受管运行时或配置。确定继续吗？"))) return;
-  void runOperation(async () => {
-    const token = await riskOperationToken("clear_download_cache", "clear-download-cache", "medium");
-    return invoke<OperationResult>("clear_download_cache", { confirmationToken: token.token });
-  }, "正在将下载缓存移入回收站");
+  void runOperation(() => invoke<OperationResult>("clear_download_cache"), "正在将下载缓存移入回收站");
 });
 document.querySelector("#inspect-maintenance")?.addEventListener("click", () => void inspectMaintenance());
 document.querySelector("#scan-maintenance")?.addEventListener("click", () => void scanMaintenance());
@@ -4562,8 +4593,7 @@ document.querySelector("#execute-move-plan")?.addEventListener("click", async ()
       : plan.source.toLowerCase().includes("\\downloads") && plan.mode === "archive_only"
         ? "execute_downloads_archive_plan"
         : "execute_move_plan";
-    const token = await riskOperationToken("execute_move_plan", plan.planId, "high", false, "move-plan-preview");
-    state.moveResult = await invoke<MoveResult>(command, { plan, confirmationToken: token.token });
+    state.moveResult = await invoke<MoveResult>(command, { planId: plan.planId });
     renderMovePlan();
     focusResult("#move-plan-result");
     await loadRollbackRecords();
@@ -4621,8 +4651,7 @@ document.querySelector("#execute-expansion-plan")?.addEventListener("click", asy
   }
   showToast("正在执行 C 盘扩容计划");
   try {
-    const token = await riskOperationToken("execute_expansion_plan", plan.planId, "critical", true, "manual-backup-confirmed");
-    state.expansionResult = await invoke<ExpansionResult>("execute_c_drive_expansion", { plan, confirmationToken: token.token });
+    state.expansionResult = await invoke<ExpansionResult>("execute_c_drive_expansion", { plan });
     renderExpansionPlan();
     focusResult("#expansion-plan-result");
     showToast(state.expansionResult.success ? "扩容执行完成" : "扩容未成功，请查看报告", !state.expansionResult.success);
@@ -4792,6 +4821,16 @@ document.querySelector("#port-monitor-enabled")?.addEventListener("change", (eve
     knownListeningPorts.clear();
     showToast("已关闭端口占用提醒");
   }
+  void invoke<ConfigView>("set_port_scan_preferences", {
+    enabled,
+    scope: state.config?.settings.portScanScope || "recommended",
+  }).then((config) => {
+    state.config = config;
+    setMigrationResult("#port-operation-result", enabled ? "端口占用提醒已保存，将在以后启动时自动开启。" : "端口占用提醒已关闭并保存。");
+  }).catch((error) => {
+    const message = error instanceof Error ? error.message : String(error);
+    setMigrationResult("#port-operation-result", `保存端口扫描偏好失败：${message}`, true);
+  });
 });
 
 document.querySelector("#port-search")?.addEventListener("input", (event) => {
@@ -4972,7 +5011,6 @@ document.addEventListener("click", async (event) => {
     void (async () => {
       showToast(guideOnly ? "正在生成安全向导" : "正在执行 MySQL 修复计划");
       try {
-        let confirmationToken: string | null = null;
         if (!guideOnly) {
           const guard = await invoke<MySqlExecutionGuard>("mysql_pending_execution_guard", { planId: plan.planId });
           if (guard.riskLevel === "critical") {
@@ -4984,18 +5022,8 @@ document.addEventListener("click", async (event) => {
               requiredText: "我已知晓 MySQL 修复风险并确认执行",
             }))) return;
           }
-          const token = await createBackendConfirmation(
-            guard.actionId,
-            guard.planId,
-            guard.riskLevel,
-            guard.planFingerprint,
-            guard.riskLevel === "critical",
-            guard.backupReceipt || null,
-            "execute_mysql_repair_plan",
-          );
-          confirmationToken = token.token;
         }
-        const result = await invoke<OperationResult>("execute_mysql_repair_plan", { planId: plan.planId, backupDestination, confirmationToken });
+        const result = await invoke<OperationResult>("execute_mysql_repair_plan", { planId: plan.planId, backupDestination });
         if (guideOnly) {
           const output = document.querySelector<HTMLElement>("#local-service-logs");
           if (output) output.textContent = result.message;
@@ -5044,10 +5072,7 @@ document.addEventListener("click", async (event) => {
   const devCache = button.dataset.devCache;
   if (devCache) {
     if (!(await askForConfirmation(`将调用 ${button.title || button.textContent || devCache}。该命令会清除可重新生成的开发缓存，确定继续吗？`))) return;
-    void runOperation(async () => {
-      const token = await riskOperationToken("clean_dev_cache", `tool-${devCache.trim().toLowerCase()}`, "medium");
-      return invoke<OperationResult>("clean_dev_cache", { tool: devCache, confirmationToken: token.token });
-    }, `正在使用 ${devCache} 官方命令清理缓存`).then(() => void scanMaintenance());
+    void runOperation(() => invoke<OperationResult>("clean_dev_cache", { tool: devCache }), `正在使用 ${devCache} 官方命令清理缓存`).then(() => void scanMaintenance());
     return;
   }
   const chsrcAction = button.dataset.chsrcAction;
@@ -5127,10 +5152,30 @@ document.addEventListener("click", async (event) => {
   if (button.dataset.action === "rollback-move") {
     const rollbackId = button.dataset.rollbackId || "";
     if (!(await askForConfirmation(`将执行回滚 ${rollbackId}：删除 Junction 并恢复备份目录（如存在）。确定继续吗？`))) return;
-    void runOperation(async () => {
-      const token = await riskOperationToken("rollback_move", rollbackId, "high");
-      return invoke<OperationResult>("rollback_move", { rollbackId, confirmationToken: token.token });
-    }, "正在执行空间搬家回滚").then(() => void loadRollbackRecords());
+    void runOperation(
+      () => invoke<OperationResult>("rollback_move", { rollbackId }),
+      "正在执行空间搬家回滚",
+    ).then(() => void loadRollbackRecords());
+    return;
+  }
+  if (button.dataset.action === "restore-runtime-switch") {
+    const backupId = button.dataset.backupId || "";
+    const backup = state.runtimeSwitchBackups.find((item) => item.backupId === backupId);
+    if (!backup?.restorable) return;
+    const target = backup.previousVersion || "未选择状态";
+    if (!(await askForConfirmation(`将把 ${backup.kind} 恢复到 ${target}，恢复前会保存当前状态，并在完成后验证 current 指针、登记和环境。确定继续吗？`))) return;
+    setMigrationResult("#runtime-migration-result", "正在恢复并验证运行时切换备份...");
+    void invoke<OperationResult>("restore_runtime_switch_backup", { backupId })
+      .then(async (result) => {
+        setMigrationResult("#runtime-migration-result", result.message, !result.success);
+        await refreshBase();
+        await loadRuntimeSwitchBackups();
+        focusResult("#runtime-migration-result");
+      })
+      .catch((error) => {
+        const message = error instanceof Error ? error.message : String(error);
+        setMigrationResult("#runtime-migration-result", `运行时恢复失败：${message}`, true);
+      });
     return;
   }
   if (button.id === "apply-project-config") {
@@ -5150,8 +5195,7 @@ document.addEventListener("click", async (event) => {
     void runOperation(
       async () => {
         const request = { projectPath: preview.projectPath, files: preview.files, switches };
-        const token = await riskOperationToken("apply_project_configuration", projectConfigurationPlanId(preview.projectPath, enabled, switchCount), "high", false, "project-backup");
-        return invoke<OperationResult>("apply_project_configuration", { request, confirmationToken: token.token });
+        return invoke<OperationResult>("apply_project_configuration", { request });
       },
       "正在备份并应用项目配置",
     ).then((result) => {
@@ -5166,10 +5210,7 @@ document.addEventListener("click", async (event) => {
     if (!preview) return;
     if (!(await askForConfirmation(`将按预览写入 ${preview.changes.length} 组当前用户环境配置，并先保存 ${preview.backupName}。确定继续吗？`))) return;
     void runOperation(
-      async () => {
-        const token = await riskOperationToken("apply_user_environment_configuration", preview.previewId, "high", false, preview.backupName);
-        return invoke<OperationResult>("apply_user_environment_configuration", { previewId: preview.previewId, confirmationToken: token.token });
-      },
+      () => invoke<OperationResult>("apply_user_environment_configuration", { previewId: preview.previewId }),
       "正在备份、写入并回读验证用户环境变量",
     ).then(async () => {
       state.environmentPreview = null;
@@ -5360,11 +5401,7 @@ document.addEventListener("click", async (event) => {
     };
     if (!(await askForConfirmation(`${labels[platformAction] || "执行平台操作"}。需要管理员权限时 Windows 会显示 UAC，确定继续吗？`))) return;
     void runOperation(
-      async () => {
-        const planId = `${platformAction}:${value || ""}`;
-        const token = await riskOperationToken("manage_system_platform", planId, "high");
-        return invoke<OperationResult>("manage_system_platform", { action: platformAction, value: value || null, confirmationToken: token.token });
-      },
+      () => invoke<OperationResult>("manage_system_platform", { action: platformAction, value: value || null }),
       `正在${labels[platformAction] || "执行平台操作"}`,
     ).then(async () => {
       state.systemPlatforms = await invoke<SystemPlatformReport>("inspect_system_platforms");
@@ -5409,10 +5446,7 @@ document.addEventListener("click", async (event) => {
     }
     if (!(await askForConfirmation(`将备份 ${config.file}，并把端口 ${config.currentPort} 修改为 ${newPort}。确定继续吗？`))) return;
     void runOperation(
-      async () => {
-        const token = await riskOperationToken("update_project_port", `${path}:${configId}:${newPort}`, "medium", false, "project-port-backup");
-        return invoke<OperationResult>("update_project_port", { path, configId, newPort, confirmationToken: token.token });
-      },
+      () => invoke<OperationResult>("update_project_port", { path, configId, newPort }),
       "正在备份并修改项目端口",
     ).then(() => void inspectProjectPorts(false));
   }
@@ -5432,10 +5466,7 @@ document.addEventListener("click", async (event) => {
     const actionLabel = serviceAction === "start" ? "启动" : serviceAction === "stop" ? "停止" : "重启";
     if (!(await askForConfirmation(`将${actionLabel} Windows 服务 ${serviceName}。数据库连接可能短暂中断，确定继续吗？`))) return;
     void runOperation(
-      async () => {
-        const token = await riskOperationToken("manage_local_service", `${serviceName}:${serviceAction}`, "high");
-        return invoke<OperationResult>("manage_local_service", { serviceName, action: serviceAction, confirmationToken: token.token });
-      },
+      () => invoke<OperationResult>("manage_local_service", { serviceName, action: serviceAction }),
       `正在${actionLabel}服务 ${serviceName}`,
     ).then(async () => {
       state.localServices = await invoke<LocalServiceStatus[]>("inspect_local_services");
@@ -5467,10 +5498,7 @@ document.addEventListener("click", async (event) => {
     const ok = await askForConfirmation(`将停止 Windows 服务 ${serviceName}（端口 ${port}）。这会中断当前数据库连接，确定继续吗？`);
     if (!ok) return;
     void runOperation(
-      async () => {
-        const token = await riskOperationToken("stop_local_service", `${port}:${serviceName}`, "high");
-        return invoke<OperationResult>("stop_local_service", { port, serviceName, confirmationToken: token.token });
-      },
+      () => invoke<OperationResult>("stop_local_service", { port, serviceName }),
       `正在停止服务 ${serviceName}`,
     ).then(async () => {
       state.localServices = await invoke<LocalServiceStatus[]>("inspect_local_services");
@@ -5718,7 +5746,26 @@ window.addEventListener(
 void listen<TaskProgress>("task-progress", (event) => renderProgress(event.payload));
 void refreshAll(false).then(() => {
   if (state.safeMode) return;
-  window.setTimeout(() => void refreshRuntimeAndPorts(true), 350);
+  void loadRuntimeSwitchBackups();
+  if (state.config?.settings.autoScanPortsOnStartup) {
+    const monitor = document.querySelector<HTMLInputElement>("#port-monitor-enabled");
+    if (monitor) monitor.checked = true;
+    window.setTimeout(() => {
+      void refreshRuntimeAndPorts(true);
+      void pollPortMonitor(true);
+      if (portMonitorTimer !== null) window.clearInterval(portMonitorTimer);
+      portMonitorTimer = window.setInterval(() => void pollPortMonitor(false), 5000);
+    }, 350);
+  } else {
+    window.setTimeout(async () => {
+      try {
+        state.runtimes = await invoke<RuntimeInfo[]>("discover_runtimes");
+        renderRuntimes();
+      } catch {
+        // 后台发现失败保持页面其他功能可用。
+      }
+    }, 350);
+  }
   window.setInterval(async () => {
     if (state.safeMode) return;
     const activeView = document.querySelector<HTMLElement>(".nav-item.active")?.dataset.view;

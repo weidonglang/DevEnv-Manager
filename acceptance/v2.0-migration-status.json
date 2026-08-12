@@ -31,14 +31,23 @@
     "file-association-app-discovery-and-durable-results",
     "backend-bound-single-use-file-association-plans",
     "exact-file-association-registry-backups",
-    "selected-project-report-export-with-redaction"
+    "selected-project-report-export-with-redaction",
+    "persisted-port-scan-preferences-and-redacted-reports",
+    "runtime-version-choice-verification-reports-and-recoverable-switch-receipts",
+    "plan-id-only-move-and-archive-execution",
+    "v17-single-confirmation-without-token-workflow"
   ],
   "batches": [
     {
       "id": "ports",
       "priority": "P0",
-      "status": "in-progress",
+      "status": "completed",
       "strategy": "merge reliability and one-click release into the existing v1.7 ports page",
+      "equivalentImplementation": [
+        "the bounded synchronous scan replaces separate scan status, enrichment and cancellation commands while preserving durable errors and native fallback",
+        "recommended or full scan scope and startup monitoring preferences are persisted by the backend",
+        "safe user-owned listeners retain one-click release, and Markdown or JSON reports are redacted before export"
+      ],
       "commands": [
         "cancel_port_scan",
         "create_port_resolution_plan",
@@ -52,8 +61,13 @@
     {
       "id": "runtime",
       "priority": "P0",
-      "status": "in-progress",
+      "status": "completed",
       "strategy": "keep existing runtime cards and actions; perform plan validation transparently",
+      "equivalentImplementation": [
+        "managed runtime switching performs preflight validation, backup, pointer and environment changes, post-verification and automatic rollback behind one ordinary confirmation",
+        "verified switch receipts can be listed and restored once without exposing plan or token controls",
+        "Maven and Gradle accept validated release versions, and strong verification reports export as redacted Markdown or JSON"
+      ],
       "commands": [
         "cancel_runtime_switch_plan",
         "create_runtime_switch_plan",
@@ -69,8 +83,13 @@
     {
       "id": "cleanup",
       "priority": "P0",
-      "status": "in-progress",
+      "status": "completed",
       "strategy": "add useful actions to existing v1.7 cleanup sections without a second execution screen",
+      "equivalentImplementation": [
+        "desktop, downloads and generic archive flows use the existing v1.7 move panel with automatic or selected targets",
+        "the frontend submits only an opaque plan ID; the backend consumes the immutable stored plan once and rejects reuse or expiry",
+        "recycle-bin preview, execution, verified rescan and rollback guidance remain durable in the existing cleanup result area"
+      ],
       "commands": [
         "create_desktop_cleanup_plan",
         "create_generic_archive_plan",

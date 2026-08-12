@@ -5,6 +5,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "acceptance" / "v2.0-migration-status.json"
+FRONTEND = ROOT / "tauri" / "src" / "main.ts"
+BACKEND = ROOT / "tauri" / "src-tauri" / "src" / "lib.rs"
 VALID_PRIORITIES = {"P0", "P1", "P2"}
 VALID_STATUSES = {"pending", "in-progress", "completed", "deferred"}
 
@@ -40,6 +42,16 @@ def main() -> int:
         raise SystemExit(f"expected {expected} reference-only commands, found {len(commands)}")
     if len(batch_ids) != data.get("summary", {}).get("batches"):
         raise SystemExit("batch summary does not match manifest")
+
+    frontend = FRONTEND.read_text(encoding="utf-8")
+    for forbidden in ("riskOperationToken", "create_confirmation_token", "confirmationToken"):
+        if forbidden in frontend:
+            raise SystemExit(f"v1.7 frontend must not expose token workflow: {forbidden}")
+
+    backend = BACKEND.read_text(encoding="utf-8")
+    handler = backend.split("tauri::generate_handler![", 1)[1].split("]", 1)[0]
+    if "create_confirmation_token" in handler:
+        raise SystemExit("production Tauri commands must not register confirmation tokens")
 
     print(f"v2 migration manifest passed ({len(commands)} commands, {len(batch_ids)} batches)")
     return 0
