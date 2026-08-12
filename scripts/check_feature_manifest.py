@@ -39,6 +39,12 @@ RUNTIME_DISCOVERY_GROUPS = (
     "Rust / Cargo / rustup",
     ".NET SDK",
 )
+RUST_PROVIDER_ACTIONS = (
+    "rust_install_toolchain",
+    "rust_set_default_toolchain",
+    "rust_update_toolchain",
+    "rust_uninstall_toolchain",
+)
 
 
 def fail(message: str) -> None:
@@ -173,6 +179,13 @@ def main() -> int:
     ]
     if missing_runtime_groups:
         fail(f"runtime discovery groups are missing: {missing_runtime_groups}")
+    missing_rust_actions = [
+        action
+        for action in RUST_PROVIDER_ACTIONS
+        if action not in backend_source or action not in frontend_source
+    ]
+    if missing_rust_actions:
+        fail(f"rustup provider actions are not fully wired: {missing_rust_actions}")
 
     print(
         "feature manifest passed "

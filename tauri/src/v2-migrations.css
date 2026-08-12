@@ -118,6 +118,19 @@
   padding: 12px;
 }
 
+.provider-controls {
+  display: grid;
+  grid-template-columns: auto minmax(130px, 1fr) repeat(4, auto);
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.provider-controls label {
+  color: var(--muted, GrayText);
+  font-size: 0.85rem;
+}
+
 .acceptance-center {
   margin-top: 16px;
 }
@@ -233,6 +246,14 @@
 @media (max-width: 1050px) {
   .runtime-source-groups {
     grid-template-columns: 1fr;
+  }
+
+  .provider-controls {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .provider-controls label {
+    grid-column: 1 / -1;
   }
 
   .acceptance-summary {

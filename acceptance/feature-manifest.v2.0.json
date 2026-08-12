@@ -114,14 +114,14 @@
           "userVisibleName": "Go、Rust 与 .NET Provider 状态和持久结果",
           "status": "implemented",
           "priority": "P1",
-          "frontendEntry": { "viewId": "view-platforms", "selectors": ["#managed-gos", "#rust-platform", "#dotnet-platform", "#platform-operation-result"] },
+          "frontendEntry": { "viewId": "view-platforms", "selectors": ["#managed-gos", "#rust-platform", "#rust-provider-controls", "#rust-toolchain-channel", "#rust-install-toolchain", "#rust-uninstall-toolchain", "#dotnet-platform", "#platform-operation-result"] },
           "backendCommands": ["inspect_platform_toolchains", "run_platform_action"],
-          "riskLevel": "medium",
+          "riskLevel": "high",
           "requiresTauri": true,
           "requiresWindows": true,
           "safeSmokeMode": "readOnly",
           "manualOnlyReason": null,
-          "acceptanceChecks": ["frontendEntryVisible", "backendCommandRegistered", "resultPanelVisible", "providerBoundary"]
+          "acceptanceChecks": ["frontendEntryVisible", "backendCommandRegistered", "resultPanelVisible", "providerBoundary", "rustupManagedOnly", "installDoesNotSetDefault"]
         }
       ]
     },

@@ -2095,6 +2095,7 @@ function renderPlatforms() {
     </div>
     <div class="chip-row">${paginate("rust-toolchains", report.rust.installedToolchains, (item) => `<span>${escapeHtml(item)}</span>`) || ""}</div>
   `;
+  renderRustToolchainOptions(report.rust.installedToolchains);
   dotnet.innerHTML = `
     <div class="tool-state-grid">${renderToolStates([report.dotnet.dotnet])}</div>
     <div class="platform-columns">
@@ -2112,6 +2113,21 @@ function renderPlatforms() {
       <div><span>Cargo config.toml</span><strong>${escapeHtml(report.mirrors.cargoConfigPath)} · ${report.mirrors.cargoConfigExists ? "已存在" : "未创建"}</strong></div>
     </div>
   `;
+}
+
+function renderRustToolchainOptions(installedToolchains: string[]) {
+  const select = document.querySelector<HTMLSelectElement>("#rust-toolchain-channel");
+  if (!select) return;
+  const selected = select.value;
+  const channels = ["stable", "beta", "nightly"];
+  for (const line of installedToolchains) {
+    const channel = line.trim().split(/\s+/)[0];
+    if (channel && !channels.includes(channel)) channels.push(channel);
+  }
+  select.innerHTML = channels
+    .map((channel) => `<option value="${escapeHtml(channel)}">${escapeHtml(channel)}</option>`)
+    .join("");
+  if (channels.includes(selected)) select.value = selected;
 }
 
 async function inspectPlatforms(message = "正在检查平台工具链") {
@@ -4034,6 +4050,29 @@ document.querySelector("#rust-stable")?.addEventListener("click", () => {
 document.querySelector("#rust-update")?.addEventListener("click", async () => {
   if (!(await askForConfirmation("rustup 将联网更新当前用户安装的 Rust 工具链，可能需要一些时间。确定继续吗？"))) return;
   void runPlatformAction("rust_update");
+});
+function selectedRustToolchain() {
+  return document.querySelector<HTMLSelectElement>("#rust-toolchain-channel")?.value || "stable";
+}
+document.querySelector("#rust-install-toolchain")?.addEventListener("click", async () => {
+  const channel = selectedRustToolchain();
+  if (!(await askForConfirmation(`将通过 rustup 安装 ${channel} 工具链。安装后不会自动设为默认。确定继续吗？`))) return;
+  void runPlatformAction("rust_install_toolchain", channel);
+});
+document.querySelector("#rust-set-default-toolchain")?.addEventListener("click", async () => {
+  const channel = selectedRustToolchain();
+  if (!(await askForConfirmation(`将通过 rustup 把 ${channel} 设为默认工具链。确定继续吗？`))) return;
+  void runPlatformAction("rust_set_default_toolchain", channel);
+});
+document.querySelector("#rust-update-toolchain")?.addEventListener("click", async () => {
+  const channel = selectedRustToolchain();
+  if (!(await askForConfirmation(`将只更新 rustup 管理的 ${channel} 工具链。确定继续吗？`))) return;
+  void runPlatformAction("rust_update_toolchain", channel);
+});
+document.querySelector("#rust-uninstall-toolchain")?.addEventListener("click", async () => {
+  const channel = selectedRustToolchain();
+  if (!(await askForConfirmation(`将卸载 rustup 管理的 ${channel} 工具链；当前默认工具链会被后端拒绝卸载。确定继续吗？`))) return;
+  void runPlatformAction("rust_uninstall_toolchain", channel);
 });
 document.querySelector("#copy-cargo-mirror")?.addEventListener("click", () => {
   void copyText(`[source.crates-io]\nreplace-with = "rsproxy-sparse"\n\n[source.rsproxy-sparse]\nregistry = "sparse+https://rsproxy.cn/index/"`);

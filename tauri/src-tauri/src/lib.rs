@@ -7422,6 +7422,87 @@ fn run_platform_action_blocking(
             run_action_command(&paths, required("rustup")?, &["update"])?;
             "rustup 工具链更新完成".to_string()
         }
+        "rust_install_toolchain" => {
+            let channel = validate_rust_toolchain_channel(value.as_deref())?;
+            let rustup = required("rustup")?;
+            run_command_output(
+                rustup.clone(),
+                &["toolchain", "install", &channel, "--profile", "default"],
+                900,
+            )?;
+            let rustc =
+                run_command_output(rustup.clone(), &["run", &channel, "rustc", "--version"], 60)?;
+            let cargo = run_command_output(rustup, &["run", &channel, "cargo", "--version"], 60)?;
+            format!(
+                "Rust 工具链 {channel} 已安装并验证，但未设为默认。{}；{}",
+                first_meaningful_output_line(&rustc).unwrap_or_else(|| "rustc 已验证".to_string()),
+                first_meaningful_output_line(&cargo).unwrap_or_else(|| "cargo 已验证".to_string())
+            )
+        }
+        "rust_set_default_toolchain" => {
+            let channel = validate_rust_toolchain_channel(value.as_deref())?;
+            let rustup = required("rustup")?;
+            run_command_output(rustup.clone(), &["default", &channel], 300)?;
+            let active = run_command_output(rustup.clone(), &["show", "active-toolchain"], 60)?;
+            if !rust_toolchain_matches(&active, &channel) {
+                return Err(format!("rustup 未将 {channel} 设为当前工具链：{active}"));
+            }
+            let rustc =
+                run_command_output(rustup.clone(), &["run", &channel, "rustc", "--version"], 60)?;
+            let cargo = run_command_output(rustup, &["run", &channel, "cargo", "--version"], 60)?;
+            format!(
+                "Rust 默认工具链已切换为 {channel} 并验证：{}；{}。请重新打开终端或 IDE",
+                first_meaningful_output_line(&rustc).unwrap_or_else(|| "rustc 已验证".to_string()),
+                first_meaningful_output_line(&cargo).unwrap_or_else(|| "cargo 已验证".to_string())
+            )
+        }
+        "rust_update_toolchain" => {
+            let channel = validate_rust_toolchain_channel(value.as_deref())?;
+            let rustup = required("rustup")?;
+            run_command_output(rustup.clone(), &["update", &channel], 900)?;
+            let rustc =
+                run_command_output(rustup.clone(), &["run", &channel, "rustc", "--version"], 60)?;
+            let cargo = run_command_output(rustup, &["run", &channel, "cargo", "--version"], 60)?;
+            format!(
+                "Rust 工具链 {channel} 已更新并验证：{}；{}",
+                first_meaningful_output_line(&rustc).unwrap_or_else(|| "rustc 已验证".to_string()),
+                first_meaningful_output_line(&cargo).unwrap_or_else(|| "cargo 已验证".to_string())
+            )
+        }
+        "rust_uninstall_toolchain" => {
+            let channel = validate_rust_toolchain_channel(value.as_deref())?;
+            let rustup = required("rustup")?;
+            let active = run_command_output(rustup.clone(), &["show", "active-toolchain"], 60)
+                .unwrap_or_default();
+            let default = run_command_output(rustup.clone(), &["default"], 60).unwrap_or_default();
+            if rust_toolchain_matches(&active, &channel)
+                || rust_toolchain_matches(&default, &channel)
+            {
+                return Err(format!(
+                    "不能卸载当前或默认 Rust 工具链 {channel}；请先将其他工具链设为默认"
+                ));
+            }
+            let installed = run_command_output(rustup.clone(), &["toolchain", "list"], 60)?;
+            if !installed
+                .lines()
+                .any(|line| rust_toolchain_matches(line, &channel))
+            {
+                return Err(format!(
+                    "rustup 没有管理工具链 {channel}，不会删除外部 Rust 目录"
+                ));
+            }
+            run_command_output(rustup.clone(), &["toolchain", "uninstall", &channel], 300)?;
+            let remaining = run_command_output(rustup, &["toolchain", "list"], 60)?;
+            if remaining
+                .lines()
+                .any(|line| rust_toolchain_matches(line, &channel))
+            {
+                return Err(format!(
+                    "rustup 报告卸载完成，但工具链 {channel} 仍在列表中"
+                ));
+            }
+            format!("rustup 管理的工具链 {channel} 已卸载；外部 Rust 目录未改动")
+        }
         "maven_mirror" => {
             let mirror = match value.as_deref() {
                 Some("official") => None,
@@ -7473,12 +7554,44 @@ fn platform_action_title(action: &str) -> &'static str {
         "go_proxy" => "切换 Go 代理",
         "rust_default_stable" => "切换 Rust stable",
         "rust_update" => "更新 Rust 工具链",
+        "rust_install_toolchain" => "安装 Rust 工具链",
+        "rust_set_default_toolchain" => "切换 Rust 默认工具链",
+        "rust_update_toolchain" => "更新 Rust 工具链",
+        "rust_uninstall_toolchain" => "卸载 Rust 工具链",
         "maven_mirror" => "配置 Maven 镜像",
         "gradle_mirror" => "配置 Gradle 镜像",
         "restore_maven_config" => "恢复 Maven 配置",
         "restore_gradle_config" => "恢复 Gradle 配置",
         _ => "平台工具链操作",
     }
+}
+
+fn validate_rust_toolchain_channel(value: Option<&str>) -> Result<String, String> {
+    let channel = value.unwrap_or_default().trim().to_ascii_lowercase();
+    let bounded = !channel.is_empty()
+        && channel.len() <= 80
+        && channel.chars().all(|character| {
+            character.is_ascii_alphanumeric() || matches!(character, '.' | '-' | '_')
+        })
+        && channel.split('-').all(|part| !part.is_empty());
+    let base = channel.split('-').next().unwrap_or_default();
+    let named = matches!(base, "stable" | "beta" | "nightly");
+    let versioned = base.contains('.')
+        && base.split('.').all(|part| {
+            !part.is_empty() && part.chars().all(|character| character.is_ascii_digit())
+        });
+    if bounded && (named || versioned) {
+        Ok(channel)
+    } else {
+        Err("Rust 工具链仅允许 rustup 官方通道、数字版本及可选目标三元组".to_string())
+    }
+}
+
+fn rust_toolchain_matches(output: &str, channel: &str) -> bool {
+    output.lines().any(|line| {
+        let name = line.split_whitespace().next().unwrap_or_default();
+        name == channel || name.starts_with(&format!("{channel}-"))
+    })
 }
 
 #[tauri::command]
@@ -15490,6 +15603,44 @@ mod tests {
         assert!(verify_runtime_version_output("Node.js", "v20.19.0", "22").is_err());
         assert_eq!(jdk_jar_verification_args("8-temurin"), &["-help"]);
         assert_eq!(jdk_jar_verification_args("21-temurin"), &["--help"]);
+    }
+
+    #[test]
+    fn rustup_provider_accepts_only_bounded_toolchain_channels() {
+        for channel in [
+            "stable",
+            "beta",
+            "nightly",
+            "nightly-2026-08-01",
+            "stable-x86_64-pc-windows-msvc",
+            "1.85",
+            "1.85.1",
+            "1.85.1-x86_64-pc-windows-msvc",
+        ] {
+            assert_eq!(
+                validate_rust_toolchain_channel(Some(channel)).unwrap(),
+                channel
+            );
+        }
+        for channel in [
+            "",
+            "stable;whoami",
+            "nightly x86",
+            "1",
+            "1..85",
+            "../stable",
+            "stable--msvc",
+        ] {
+            assert!(validate_rust_toolchain_channel(Some(channel)).is_err());
+        }
+        assert!(rust_toolchain_matches(
+            "stable-x86_64-pc-windows-msvc (active, default)",
+            "stable"
+        ));
+        assert!(!rust_toolchain_matches(
+            "nightly-x86_64-pc-windows-msvc (active)",
+            "stable"
+        ));
     }
 
     #[test]

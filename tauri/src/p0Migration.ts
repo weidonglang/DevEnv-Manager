@@ -117,6 +117,28 @@ export function enhancePlatformPanel(root: Document) {
   result.dataset.testid = "platform-operation-result";
   result.setAttribute("aria-live", "polite");
   firstPanel.insertAdjacentElement("afterend", result);
+
+  const rustPanel = root.querySelector<HTMLElement>("#rust-platform")?.closest<HTMLElement>(".platform-section");
+  if (rustPanel && !root.querySelector("#rust-provider-controls")) {
+    root.querySelector("#rust-stable")?.remove();
+    root.querySelector("#rust-update")?.remove();
+    const controls = document.createElement("div");
+    controls.id = "rust-provider-controls";
+    controls.className = "provider-controls";
+    controls.dataset.testid = "rust-provider-controls";
+    controls.innerHTML = `
+      <label for="rust-toolchain-channel">rustup 工具链</label>
+      <select id="rust-toolchain-channel" data-testid="rust-toolchain-channel">
+        <option value="stable">stable</option>
+        <option value="beta">beta</option>
+        <option value="nightly">nightly</option>
+      </select>
+      <button id="rust-install-toolchain" data-testid="rust-install-toolchain">安装</button>
+      <button id="rust-set-default-toolchain" data-testid="rust-set-default-toolchain">设为默认</button>
+      <button id="rust-update-toolchain" data-testid="rust-update-toolchain">更新所选</button>
+      <button id="rust-uninstall-toolchain" data-testid="rust-uninstall-toolchain">卸载所选</button>`;
+    root.querySelector("#rust-platform")?.insertAdjacentElement("afterend", controls);
+  }
 }
 
 export function enhanceBuildToolVersionSelectors(root: Document) {
