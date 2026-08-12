@@ -38,6 +38,7 @@
     "runtime-install-verification-without-automatic-switching",
     "durable-runtime-and-platform-operation-results",
     "rustup-provider-managed-toolchain-lifecycle",
+    "dotnet-winget-provider-lifecycle-with-last-sdk-guard",
     "plan-id-only-move-and-archive-execution",
     "v17-single-confirmation-without-token-workflow"
   ],

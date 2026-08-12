@@ -139,6 +139,25 @@ export function enhancePlatformPanel(root: Document) {
       <button id="rust-uninstall-toolchain" data-testid="rust-uninstall-toolchain">卸载所选</button>`;
     root.querySelector("#rust-platform")?.insertAdjacentElement("afterend", controls);
   }
+
+  const dotnetPanel = root.querySelector<HTMLElement>("#dotnet-platform")?.closest<HTMLElement>(".platform-section");
+  if (dotnetPanel && !root.querySelector("#dotnet-provider-controls")) {
+    const controls = document.createElement("div");
+    controls.id = "dotnet-provider-controls";
+    controls.className = "provider-controls";
+    controls.dataset.testid = "dotnet-provider-controls";
+    controls.innerHTML = `
+      <label for="dotnet-sdk-major">WinGet SDK</label>
+      <select id="dotnet-sdk-major" data-testid="dotnet-sdk-major">
+        <option value="8">.NET SDK 8</option>
+        <option value="9">.NET SDK 9</option>
+        <option value="10" selected>.NET SDK 10</option>
+      </select>
+      <button id="dotnet-install-sdk" data-testid="dotnet-install-sdk">安装</button>
+      <button id="dotnet-update-sdk" data-testid="dotnet-update-sdk">更新</button>
+      <button id="dotnet-uninstall-sdk" data-testid="dotnet-uninstall-sdk">卸载</button>`;
+    root.querySelector("#dotnet-platform")?.insertAdjacentElement("afterend", controls);
+  }
 }
 
 export function enhanceBuildToolVersionSelectors(root: Document) {

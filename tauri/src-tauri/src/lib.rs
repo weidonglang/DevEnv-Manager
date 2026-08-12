@@ -7221,7 +7221,7 @@ fn inspect_platform_toolchains_blocking() -> Result<PlatformReport, String> {
         .unwrap_or_default()
         .join(".cargo/config.toml");
 
-    let dotnet_executable = resolve_tool(&paths, "dotnet");
+    let dotnet_executable = resolve_dotnet_tool(&paths);
     let dotnet = probe_tool(".NET SDK", dotnet_executable.clone(), &["--version"]);
     let sdks = command_value(dotnet_executable.clone(), &["--list-sdks"])
         .lines()
@@ -7503,6 +7503,106 @@ fn run_platform_action_blocking(
             }
             format!("rustup 管理的工具链 {channel} 已卸载；外部 Rust 目录未改动")
         }
+        "dotnet_install_sdk" => {
+            let major = validate_dotnet_sdk_major(value.as_deref())?;
+            let package = dotnet_sdk_package_id(&major);
+            if winget_package_registered(&paths, &package)? {
+                return Err(format!(
+                    ".NET SDK {major} 已登记为 WinGet 软件包；请使用“更新”而不是重复安装"
+                ));
+            }
+            run_command_output(
+                resolve_winget(&paths)?,
+                &[
+                    "install",
+                    "--id",
+                    &package,
+                    "--exact",
+                    "--source",
+                    "winget",
+                    "--accept-package-agreements",
+                    "--accept-source-agreements",
+                    "--disable-interactivity",
+                ],
+                900,
+            )?;
+            broadcast_environment_change();
+            let version = verify_dotnet_sdk_major(&paths, &major)?;
+            format!(
+                "Microsoft .NET SDK {major} 已由 WinGet 安装并验证：{version}。它属于系统包，不是 DevEnv 受管目录"
+            )
+        }
+        "dotnet_update_sdk" => {
+            let major = validate_dotnet_sdk_major(value.as_deref())?;
+            let package = dotnet_sdk_package_id(&major);
+            if !winget_package_registered(&paths, &package)? {
+                return Err(format!(
+                    ".NET SDK {major} 尚未登记为 WinGet 软件包；请先安装，外部安装不会被应用接管"
+                ));
+            }
+            run_command_output(
+                resolve_winget(&paths)?,
+                &[
+                    "upgrade",
+                    "--id",
+                    &package,
+                    "--exact",
+                    "--source",
+                    "winget",
+                    "--accept-package-agreements",
+                    "--accept-source-agreements",
+                    "--disable-interactivity",
+                ],
+                900,
+            )?;
+            let version = verify_dotnet_sdk_major(&paths, &major)?;
+            format!("Microsoft .NET SDK {major} 已由 WinGet 更新并验证：{version}")
+        }
+        "dotnet_uninstall_sdk" => {
+            let major = validate_dotnet_sdk_major(value.as_deref())?;
+            let dotnet = resolve_dotnet_tool(&paths)
+                .ok_or_else(|| "没有找到 dotnet，无法验证卸载边界".to_string())?;
+            let before = run_command_output(dotnet, &["--list-sdks"], 60)?;
+            if !dotnet_sdk_output_has_major(&before, &major) {
+                return Err(format!("没有发现 .NET SDK {major}，不会执行系统卸载"));
+            }
+            if !dotnet_sdk_output_has_other_major(&before, &major) {
+                return Err(format!(
+                    ".NET SDK {major} 是当前发现的唯一 SDK；为避免中断开发工具，拒绝卸载"
+                ));
+            }
+            let package = dotnet_sdk_package_id(&major);
+            if !winget_package_registered(&paths, &package)? {
+                return Err(format!(
+                    ".NET SDK {major} 未登记为 WinGet 软件包；它可能由 Visual Studio 或独立安装器管理，请使用 Windows 已安装的应用卸载"
+                ));
+            }
+            run_command_output(
+                resolve_winget(&paths)?,
+                &[
+                    "uninstall",
+                    "--id",
+                    &package,
+                    "--exact",
+                    "--source",
+                    "winget",
+                    "--accept-source-agreements",
+                    "--disable-interactivity",
+                ],
+                600,
+            )?;
+            let dotnet = resolve_dotnet_tool(&paths)
+                .ok_or_else(|| "卸载后无法重新定位 dotnet，请检查剩余 SDK".to_string())?;
+            let after = run_command_output(dotnet, &["--list-sdks"], 60)?;
+            if dotnet_sdk_output_has_major(&after, &major) {
+                return Err(format!(
+                    "WinGet 报告卸载完成，但仍检测到 .NET SDK {major}；请打开系统应用列表检查并重新扫描"
+                ));
+            }
+            format!(
+                "Microsoft .NET SDK {major} 已由 WinGet 卸载并复验；其他 SDK 保留，未直接删除任何目录"
+            )
+        }
         "maven_mirror" => {
             let mirror = match value.as_deref() {
                 Some("official") => None,
@@ -7558,6 +7658,9 @@ fn platform_action_title(action: &str) -> &'static str {
         "rust_set_default_toolchain" => "切换 Rust 默认工具链",
         "rust_update_toolchain" => "更新 Rust 工具链",
         "rust_uninstall_toolchain" => "卸载 Rust 工具链",
+        "dotnet_install_sdk" => "安装 .NET SDK",
+        "dotnet_update_sdk" => "更新 .NET SDK",
+        "dotnet_uninstall_sdk" => "卸载 .NET SDK",
         "maven_mirror" => "配置 Maven 镜像",
         "gradle_mirror" => "配置 Gradle 镜像",
         "restore_maven_config" => "恢复 Maven 配置",
@@ -7592,6 +7695,80 @@ fn rust_toolchain_matches(output: &str, channel: &str) -> bool {
         let name = line.split_whitespace().next().unwrap_or_default();
         name == channel || name.starts_with(&format!("{channel}-"))
     })
+}
+
+fn validate_dotnet_sdk_major(value: Option<&str>) -> Result<String, String> {
+    match value.unwrap_or_default().trim() {
+        major @ ("8" | "9" | "10") => Ok(major.to_string()),
+        _ => Err(".NET SDK Provider 仅允许经过审核的 8、9、10 主版本".to_string()),
+    }
+}
+
+fn dotnet_sdk_package_id(major: &str) -> String {
+    format!("Microsoft.DotNet.SDK.{major}")
+}
+
+fn dotnet_sdk_output_has_major(output: &str, major: &str) -> bool {
+    output
+        .lines()
+        .map(str::trim)
+        .any(|line| line.starts_with(&format!("{major}.")))
+}
+
+fn dotnet_sdk_output_has_other_major(output: &str, selected_major: &str) -> bool {
+    output.lines().map(str::trim).any(|line| {
+        line.split_once('.').is_some_and(|(major, _)| {
+            major != selected_major && major.chars().all(|ch| ch.is_ascii_digit())
+        })
+    })
+}
+
+fn verify_dotnet_sdk_major(paths: &AppPaths, major: &str) -> Result<String, String> {
+    let dotnet = resolve_dotnet_tool(paths).ok_or_else(|| {
+        "WinGet 操作完成，但没有找到 dotnet.exe；请重开应用后重新检查".to_string()
+    })?;
+    let output = run_command_output(dotnet, &["--list-sdks"], 60)?;
+    output
+        .lines()
+        .map(str::trim)
+        .find(|line| line.starts_with(&format!("{major}.")))
+        .map(str::to_string)
+        .ok_or_else(|| format!("WinGet 操作完成，但 dotnet --list-sdks 未显示 {major}.x"))
+}
+
+fn resolve_winget(paths: &AppPaths) -> Result<PathBuf, String> {
+    resolve_tool(paths, "winget").ok_or_else(|| {
+        "没有找到 WinGet；请在 Microsoft Store 安装或修复“应用安装程序”后重试".to_string()
+    })
+}
+
+fn winget_package_registered(paths: &AppPaths, package: &str) -> Result<bool, String> {
+    let result = powershell_runner::run_probe_command(
+        resolve_winget(paths)?,
+        &[
+            "list",
+            "--id",
+            package,
+            "--exact",
+            "--source",
+            "winget",
+            "--accept-source-agreements",
+            "--disable-interactivity",
+        ],
+        60,
+    )
+    .map_err(|err| format!("检查 WinGet 软件包登记失败：{err}"))?;
+    if result.timed_out {
+        return Err("检查 WinGet 软件包登记超时；不会继续卸载".to_string());
+    }
+    let output = command_text(result.stdout.as_bytes(), result.stderr.as_bytes());
+    Ok(result.success && winget_output_has_package(&output, package))
+}
+
+fn winget_output_has_package(output: &str, package: &str) -> bool {
+    output
+        .to_ascii_lowercase()
+        .contains(&package.to_ascii_lowercase())
 }
 
 #[tauri::command]
@@ -14888,6 +15065,15 @@ fn resolve_tool(paths: &AppPaths, executable: &str) -> Option<PathBuf> {
         .or_else(|| find_on_user_path(paths, executable))
 }
 
+fn resolve_dotnet_tool(paths: &AppPaths) -> Option<PathBuf> {
+    resolve_tool(paths, "dotnet").or_else(|| {
+        env::var_os("ProgramFiles")
+            .map(PathBuf::from)
+            .map(|root| root.join("dotnet/dotnet.exe"))
+            .filter(|path| path.is_file())
+    })
+}
+
 fn find_on_user_path(paths: &AppPaths, executable: &str) -> Option<PathBuf> {
     let values = user_environment().ok()?;
     let path_value = values.get("Path").or_else(|| values.get("PATH"))?;
@@ -15666,6 +15852,37 @@ mod tests {
     fn acceptance_cli_rejects_missing_page_value() {
         let error = run_cli(vec!["acceptance".to_string(), "--page".to_string()]).unwrap_err();
         assert!(error.contains("--page"));
+    }
+
+    #[test]
+    fn dotnet_provider_uses_bounded_packages_and_preserves_another_sdk() {
+        for major in ["8", "9", "10"] {
+            assert_eq!(validate_dotnet_sdk_major(Some(major)).unwrap(), major);
+            assert_eq!(
+                dotnet_sdk_package_id(major),
+                format!("Microsoft.DotNet.SDK.{major}")
+            );
+        }
+        for major in ["", "7", "11", "10;whoami", "latest"] {
+            assert!(validate_dotnet_sdk_major(Some(major)).is_err());
+        }
+        let sdks =
+            "8.0.418 [C:\\Program Files\\dotnet\\sdk]\n10.0.102 [C:\\Program Files\\dotnet\\sdk]";
+        assert!(dotnet_sdk_output_has_major(sdks, "8"));
+        assert!(dotnet_sdk_output_has_other_major(sdks, "8"));
+        assert!(!dotnet_sdk_output_has_major(sdks, "9"));
+        assert!(!dotnet_sdk_output_has_other_major(
+            "10.0.102 [C:\\Program Files\\dotnet\\sdk]",
+            "10"
+        ));
+        assert!(winget_output_has_package(
+            "Microsoft .NET SDK 10 Microsoft.DotNet.SDK.10 10.0.102 winget",
+            "Microsoft.DotNet.SDK.10"
+        ));
+        assert!(!winget_output_has_package(
+            "No installed package found matching input criteria.",
+            "Microsoft.DotNet.SDK.10"
+        ));
     }
 
     #[test]

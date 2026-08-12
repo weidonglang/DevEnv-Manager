@@ -45,6 +45,11 @@ RUST_PROVIDER_ACTIONS = (
     "rust_update_toolchain",
     "rust_uninstall_toolchain",
 )
+DOTNET_PROVIDER_ACTIONS = (
+    "dotnet_install_sdk",
+    "dotnet_update_sdk",
+    "dotnet_uninstall_sdk",
+)
 
 
 def fail(message: str) -> None:
@@ -186,6 +191,13 @@ def main() -> int:
     ]
     if missing_rust_actions:
         fail(f"rustup provider actions are not fully wired: {missing_rust_actions}")
+    missing_dotnet_actions = [
+        action
+        for action in DOTNET_PROVIDER_ACTIONS
+        if action not in backend_source or action not in frontend_source
+    ]
+    if missing_dotnet_actions:
+        fail(f"dotnet provider actions are not fully wired: {missing_dotnet_actions}")
 
     print(
         "feature manifest passed "

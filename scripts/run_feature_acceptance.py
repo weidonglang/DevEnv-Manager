@@ -35,7 +35,9 @@ def run(command: list[str]) -> str:
     )
     if completed.returncode:
         detail = (completed.stdout + "\n" + completed.stderr).strip()
-        raise RuntimeError(f"command failed ({completed.returncode}): {' '.join(command)}\n{detail}")
+        raise RuntimeError(
+            f"command failed ({completed.returncode}): {' '.join(command)}\n{detail}"
+        )
     return completed.stdout
 
 
@@ -150,7 +152,7 @@ def write_reports(suite: dict) -> None:
         "",
         "自动验收完成后只需确认以下项目：",
         "",
-        "- [ ] 工具箱中的验收中心在宽屏下完整显示，操作区没有挤压或大片无效空白。",
+        "- [ ] 工具箱中的验收中心在宽屏下完整显示，操作区没有挤压或大块无效空白。",
         "- [ ] 深色和高对比主题下，验收摘要、状态、失败原因和按钮文字清晰可读。",
         "- [ ] 应用内运行安全验收后，统计与本报告一致且失败项可展开查看。",
     ]
@@ -183,7 +185,9 @@ def write_mode_result(mode: str, checks: list[dict]) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--mode", choices=("static", "safe", "frontend", "report"), required=True)
+    parser.add_argument(
+        "--mode", choices=("static", "safe", "frontend", "report"), required=True
+    )
     args = parser.parse_args()
     if args.mode == "static":
         run_static()

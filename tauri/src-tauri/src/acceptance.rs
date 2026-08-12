@@ -126,7 +126,7 @@ pub fn run_case(case_id: &str) -> Result<FeatureAcceptanceResult, String> {
             "manual".to_string(),
             reason.clone(),
             Vec::new(),
-            vec!["危险或依赖用户数据的操作未自动执行。".to_string()],
+            vec!["危险操作或依赖用户数据的操作不会自动执行。".to_string()],
         )
     } else {
         run_safe_feature(&case.feature_id)
@@ -178,11 +178,11 @@ pub fn export_report(
 ) -> Result<String, String> {
     let normalized_format = format.trim().to_ascii_lowercase();
     if normalized_format != "json" && normalized_format != "markdown" && normalized_format != "md" {
-        return Err("验收报告格式只支持 markdown 或 json".to_string());
+        return Err("验收报告格式仅支持 markdown 或 json".to_string());
     }
     let suite = suite.unwrap_or(run_suite(None)?);
     if suite.results.len() > 256 {
-        return Err("验收报告结果数量超出限制".to_string());
+        return Err("验收报告结果数量超过限制".to_string());
     }
     let paths = super::load_paths()?;
     let reports = paths.root.join("reports");
@@ -215,8 +215,7 @@ fn run_safe_feature(feature_id: &str) -> (String, String, Vec<String>, Vec<Strin
     let outcome: Result<(String, Vec<String>), String> = match feature_id {
         "overview.snapshot" => {
             let snapshot = super::app_snapshot();
-            let settings = super::load_settings();
-            settings.map(|_| {
+            super::load_settings().map(|_| {
                 (
                     format!("系统快照可用：{} / {}", snapshot.os, snapshot.arch),
                     vec!["app_snapshot".to_string(), "load_config".to_string()],
@@ -405,6 +404,7 @@ mod tests {
         );
         let report = markdown_report(&suite);
         assert!(report.contains("safe \\| result line"));
+        assert!(report.contains("功能验收报告"));
     }
 
     #[test]

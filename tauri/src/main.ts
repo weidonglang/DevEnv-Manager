@@ -4074,6 +4074,24 @@ document.querySelector("#rust-uninstall-toolchain")?.addEventListener("click", a
   if (!(await askForConfirmation(`将卸载 rustup 管理的 ${channel} 工具链；当前默认工具链会被后端拒绝卸载。确定继续吗？`))) return;
   void runPlatformAction("rust_uninstall_toolchain", channel);
 });
+function selectedDotnetSdkMajor() {
+  return document.querySelector<HTMLSelectElement>("#dotnet-sdk-major")?.value || "10";
+}
+document.querySelector("#dotnet-install-sdk")?.addEventListener("click", async () => {
+  const major = selectedDotnetSdkMajor();
+  if (!(await askForConfirmation(`将通过 WinGet 安装 Microsoft .NET SDK ${major}。这是系统级软件，Windows 可能显示 UAC；不会登记为 DevEnv 受管目录。确定继续吗？`))) return;
+  void runPlatformAction("dotnet_install_sdk", major);
+});
+document.querySelector("#dotnet-update-sdk")?.addEventListener("click", async () => {
+  const major = selectedDotnetSdkMajor();
+  if (!(await askForConfirmation(`将通过 WinGet 更新 Microsoft .NET SDK ${major}，Windows 可能显示 UAC。确定继续吗？`))) return;
+  void runPlatformAction("dotnet_update_sdk", major);
+});
+document.querySelector("#dotnet-uninstall-sdk")?.addEventListener("click", async () => {
+  const major = selectedDotnetSdkMajor();
+  if (!(await askForConfirmation(`将通过 WinGet 卸载 Microsoft .NET SDK ${major}。若它是机器上唯一 SDK，后端会拒绝；Windows 可能显示 UAC。确定继续吗？`))) return;
+  void runPlatformAction("dotnet_uninstall_sdk", major);
+});
 document.querySelector("#copy-cargo-mirror")?.addEventListener("click", () => {
   void copyText(`[source.crates-io]\nreplace-with = "rsproxy-sparse"\n\n[source.rsproxy-sparse]\nregistry = "sparse+https://rsproxy.cn/index/"`);
 });
