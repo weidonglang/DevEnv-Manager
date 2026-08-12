@@ -36,6 +36,7 @@ import {
   enhanceFileAssociationPanel,
   type MigratedFileAssociationUiState,
 } from "./fileAssociationMigration";
+import { enhanceProjectReportPanel } from "./projectReportMigration";
 import { projectConfigurationPlanId } from "./features/jdk";
 import { MYSQL_PERMISSION_UNKNOWN_HELP, mysqlPathValue } from "./features/mysql";
 import { canShowKillPortAction } from "./features/ports";
@@ -1135,6 +1136,8 @@ function icon(node: IconNode) {
     .join("");
   return `<svg ${attrsText}>${childText}</svg>`;
 }
+
+enhanceProjectReportPanel(document, icon(FileText));
 
 function setText(id: string, value: string | number) {
   const element = document.querySelector<HTMLElement>(`#${id}`);
@@ -2442,6 +2445,29 @@ async function refreshRuntimeAndPorts(silent = false) {
       showToast(failures.map((result) => errorToText(result.reason)).join("\n"), true);
     }
   }
+}
+
+async function exportProjectReport(format: "markdown" | "json") {
+  const projectPath = document.querySelector<HTMLInputElement>("#project-path")?.value.trim() || "";
+  if (!projectPath) {
+    setProjectOutput("项目报告导出失败：请先选择项目目录。", true);
+    return;
+  }
+  showToast("正在收集并脱敏项目报告");
+  try {
+    const path = await invoke<string>("export_project_report", { projectPath, format });
+    setProjectOutput(`项目报告已导出：\n${path}`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    setProjectOutput(`项目报告导出失败：${message}`, true);
+  }
+}
+
+function setProjectOutput(message: string, isError = false) {
+  const output = document.querySelector<HTMLElement>("#project-output");
+  if (output) output.textContent = message;
+  focusResult("#project-output");
+  showToast(message.split("\n")[0], isError);
 }
 
 async function refreshAll(deep = false) {
@@ -4806,9 +4832,17 @@ document.querySelectorAll<HTMLButtonElement>(".sort-head").forEach((button) => {
 
 document.addEventListener("click", async (event) => {
   const button = (event.target as HTMLElement).closest<HTMLButtonElement>(
-    "button[data-action], button[data-toolchain-action], button[data-python-tool], button[data-page-key], button[data-dev-cache], button[data-chsrc-action], button[data-cleanup-report-action], button[data-restore-env-backup], button[data-mysql-action], button[data-file-assoc-tab], button[data-file-assoc-plan-one], button[data-file-assoc-use-app], button[data-file-assoc-rollback], #scan-file-associations, #open-default-apps-settings, #export-file-association-report, #search-file-assoc-app, #pick-file-assoc-target, #create-file-assoc-plan, #apply-file-assoc-plan, #open-file-type-settings, #load-file-assoc-backups, #open-file-assoc-backup-dir, #apply-project-config, #apply-environment-preview, #apply-python-repair, #create-managed-python-pip-plan, #execute-mysql-plan, #accept-safety-disclaimer",
+    "button[data-action], button[data-toolchain-action], button[data-python-tool], button[data-page-key], button[data-dev-cache], button[data-chsrc-action], button[data-cleanup-report-action], button[data-restore-env-backup], button[data-mysql-action], button[data-file-assoc-tab], button[data-file-assoc-plan-one], button[data-file-assoc-use-app], button[data-file-assoc-rollback], #scan-file-associations, #open-default-apps-settings, #export-file-association-report, #search-file-assoc-app, #pick-file-assoc-target, #create-file-assoc-plan, #apply-file-assoc-plan, #open-file-type-settings, #load-file-assoc-backups, #open-file-assoc-backup-dir, #export-project-report-markdown, #export-project-report-json, #apply-project-config, #apply-environment-preview, #apply-python-repair, #create-managed-python-pip-plan, #execute-mysql-plan, #accept-safety-disclaimer",
   );
   if (!button) return;
+  if (button.id === "export-project-report-markdown") {
+    await exportProjectReport("markdown");
+    return;
+  }
+  if (button.id === "export-project-report-json") {
+    await exportProjectReport("json");
+    return;
+  }
   const fileAssocTab = button.dataset.fileAssocTab as FileAssociationUiState["activeTab"] | undefined;
   if (fileAssocTab) {
     state.fileAssociations.activeTab = fileAssocTab;

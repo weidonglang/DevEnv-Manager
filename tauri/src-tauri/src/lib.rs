@@ -4918,6 +4918,125 @@ fn project_health(path: String) -> Result<ProjectHealth, String> {
 }
 
 #[tauri::command]
+async fn export_project_report(
+    project_path: String,
+    format: String,
+) -> Result<String, String> {
+    run_blocking(move || export_project_report_blocking(project_path, format)).await?
+}
+
+fn export_project_report_blocking(
+    project_path: String,
+    format: String,
+) -> Result<String, String> {
+    let root = PathBuf::from(project_path.trim());
+    let mut value = collect_project_report_value(&root)?;
+    redact_json_value(&mut value);
+    let (extension, text) = match format.trim().to_ascii_lowercase().as_str() {
+        "markdown" | "md" => ("md", project_report_markdown(&value)),
+        "json" => (
+            "json",
+            serde_json::to_string_pretty(&value)
+                .map_err(|error| format!("生成项目 JSON 报告失败：{error}"))?,
+        ),
+        _ => return Err("仅支持导出 Markdown 或 JSON".to_string()),
+    };
+    let paths = load_paths()?;
+    let reports = paths.root.join("reports");
+    fs::create_dir_all(&reports).map_err(|error| format!("创建报告目录失败：{error}"))?;
+    let target = reports.join(format!(
+        "project-report-{}.{}",
+        filename_timestamp(),
+        extension
+    ));
+    fs::write(&target, redact_report_text(&text))
+        .map_err(|error| format!("写入项目报告失败：{error}"))?;
+    Ok(display_path(target))
+}
+
+fn collect_project_report_value(root: &Path) -> Result<Value, String> {
+    let analysis = analyze_project_blocking(root)?;
+    let preview = preview_project_configuration(display_path(root));
+    let preview_error = preview.as_ref().err().cloned();
+    let ports = inspect_project_port_configs_blocking(root);
+    let ports_error = ports.as_ref().err().cloned();
+    let idea = inspect_idea_project_blocking(root);
+    let idea_error = idea.as_ref().err().cloned();
+    Ok(json!({
+        "generatedAt": current_timestamp(),
+        "root": display_path(root),
+        "analysis": analysis,
+        "preview": preview.ok(),
+        "previewError": preview_error,
+        "ports": ports.unwrap_or_default(),
+        "portsError": ports_error,
+        "idea": idea.ok(),
+        "ideaError": idea_error,
+        "agentTraces": diagnostics::inspect_agent_traces(Some(root)),
+    }))
+}
+
+fn project_report_markdown(value: &Value) -> String {
+    let root = value["root"].as_str().unwrap_or("");
+    let project_types = value["analysis"]["projectTypes"]
+        .as_array()
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(Value::as_str)
+                .collect::<Vec<_>>()
+                .join(" / ")
+        })
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| "未识别".to_string());
+    let detected_files = value["analysis"]["detectedFiles"]
+        .as_array()
+        .map(Vec::len)
+        .unwrap_or(0);
+    let ports = value["ports"].as_array().map(Vec::len).unwrap_or(0);
+    let mut text = String::new();
+    text.push_str("# DevEnv Manager 项目报告\n\n");
+    text.push_str(&format!(
+        "生成时间：{}\n\n",
+        value["generatedAt"].as_str().unwrap_or("")
+    ));
+    text.push_str(&format!("项目根目录：{root}\n\n"));
+    text.push_str(&format!(
+        "- 项目类型：{project_types}\n- 检测文件：{detected_files}\n- 端口配置：{ports}\n"
+    ));
+    text.push_str(&format!(
+        "- 配置预览：{}\n- IDEA 信息：{}\n- Agent 痕迹：{}\n\n",
+        if value["preview"].is_null() {
+            "未生成"
+        } else {
+            "已生成"
+        },
+        if value["idea"].is_null() {
+            "未发现"
+        } else {
+            "已读取"
+        },
+        value["agentTraces"]["traces"]
+            .as_array()
+            .map(Vec::len)
+            .unwrap_or(0)
+    ));
+    for (label, key) in [
+        ("配置预览", "previewError"),
+        ("端口分析", "portsError"),
+        ("IDEA 分析", "ideaError"),
+    ] {
+        if let Some(error) = value[key].as_str() {
+            text.push_str(&format!("{label}错误：{error}\n\n"));
+        }
+    }
+    text.push_str("## 结构化数据\n\n```json\n");
+    text.push_str(&serde_json::to_string_pretty(value).unwrap_or_default());
+    text.push_str("\n```\n");
+    text
+}
+
+#[tauri::command]
 async fn network_diagnostics() -> NetworkDiagnostics {
     run_blocking(network_diagnostics_blocking)
         .await
@@ -10073,6 +10192,7 @@ pub fn run() {
             stop_local_service,
             open_docker_desktop,
             project_health,
+            export_project_report,
             inspect_project_port_configs,
             update_project_port,
             analyze_project,
@@ -15936,6 +16056,29 @@ mod tests {
             validate_setting(Some("valid value"), "测试值").unwrap(),
             "valid value"
         );
+    }
+
+    #[test]
+    fn project_report_uses_the_selected_project_root() {
+        let root = tempfile::tempdir().unwrap();
+        fs::write(
+            root.path().join("package.json"),
+            r#"{"scripts":{"test":"echo ok"}}"#,
+        )
+        .unwrap();
+
+        let mut value = collect_project_report_value(root.path()).unwrap();
+        let expected_root = display_path(root.path());
+        assert_eq!(value["root"].as_str(), Some(expected_root.as_str()));
+        assert!(value["analysis"]["projectTypes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|item| item == "Node.js"));
+        redact_json_value(&mut value);
+        let markdown = project_report_markdown(&value);
+        assert!(markdown.contains("项目报告"));
+        assert!(markdown.contains("Node.js"));
     }
 
     #[test]

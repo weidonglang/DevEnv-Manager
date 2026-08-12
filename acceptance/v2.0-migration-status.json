@@ -30,7 +30,8 @@
     "doctor-durable-success-and-error-results",
     "file-association-app-discovery-and-durable-results",
     "backend-bound-single-use-file-association-plans",
-    "exact-file-association-registry-backups"
+    "exact-file-association-registry-backups",
+    "selected-project-report-export-with-redaction"
   ],
   "batches": [
     {
@@ -135,8 +136,13 @@
     {
       "id": "reports",
       "priority": "P1",
-      "status": "pending",
-      "strategy": "add durable export results to the existing project report area",
+      "status": "completed",
+      "strategy": "add selected-project Markdown and JSON export with durable results to the existing project output area",
+      "equivalentImplementation": [
+        "the report uses the project directory currently selected in the v1.7 project page instead of the application default root",
+        "analysis, configuration preview, ports, IDEA and Agent trace summaries are collected read-only and redacted before writing",
+        "Markdown and JSON exports show their final path or error persistently in the existing project output"
+      ],
       "commands": [
         "export_project_report"
       ]
