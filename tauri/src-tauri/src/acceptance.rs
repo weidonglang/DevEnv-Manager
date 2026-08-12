@@ -152,8 +152,14 @@ pub fn run_suite(page_filter: Option<&str>) -> Result<FeatureAcceptanceSuite, St
     let normalized_filter = page_filter
         .map(str::trim)
         .filter(|value| !value.is_empty() && *value != "all");
+    let cases = list_cases()?;
+    if let Some(page) = normalized_filter {
+        if !cases.iter().any(|case| case.page == page) {
+            return Err(format!("未知验收页面：{page}"));
+        }
+    }
     let mut results = Vec::new();
-    for case in list_cases()? {
+    for case in cases {
         if normalized_filter.is_some_and(|page| page != case.page) {
             continue;
         }
@@ -326,7 +332,7 @@ fn summarize_suite(
     }
 }
 
-fn markdown_report(suite: &FeatureAcceptanceSuite) -> String {
+pub fn markdown_report(suite: &FeatureAcceptanceSuite) -> String {
     let mut output = format!(
         "# DevEnv Manager 功能验收报告\n\n- 产品版本：{}\n- 生成时间：{}\n- 总计：{}\n- 通过：{}\n- 失败：{}\n- 跳过：{}\n- 人工确认：{}\n\n| 优先级 | 页面 | 功能 | 状态 | 说明 |\n|---|---|---|---|---|\n",
         suite.product_version,
@@ -407,5 +413,10 @@ mod tests {
         assert_eq!(result.status, "manual");
         assert!(result.commands_called.is_empty());
         assert!(!result.reason.is_empty());
+    }
+
+    #[test]
+    fn unknown_page_filter_is_rejected() {
+        assert!(run_suite(Some("missing-page")).is_err());
     }
 }

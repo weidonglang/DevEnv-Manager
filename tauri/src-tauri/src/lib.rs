@@ -10710,13 +10710,32 @@ fn run_cli(args: Vec<String>) -> Result<String, String> {
                 .ok_or_else(|| "用法：devenv profile apply <id>".to_string())?;
             Ok(apply_config_profile_blocking(id.clone())?.message)
         }
+        "acceptance" => {
+            let page = if let Some(index) = args.iter().position(|item| item == "--page") {
+                Some(
+                    args.get(index + 1)
+                        .filter(|value| !value.starts_with('-'))
+                        .ok_or_else(|| "--page 需要页面 ID".to_string())?
+                        .as_str(),
+                )
+            } else {
+                None
+            };
+            let suite = acceptance::run_suite(page)?;
+            if args.iter().any(|item| item == "--json") {
+                serde_json::to_string_pretty(&suite)
+                    .map_err(|error| format!("生成验收 JSON 失败：{error}"))
+            } else {
+                Ok(acceptance::markdown_report(&suite))
+            }
+        }
         _ => Err(format!("未知命令：{command}\n\n{}", cli_help())),
     }
 }
 
 fn cli_help() -> String {
     format!(
-        "DevEnv Manager CLI {}\n\n用法：\n  devenv doctor [--json]\n  devenv env inspect [--json]\n  devenv env plan java --jdk <JDK根目录>\n  devenv env apply <plan-id> --confirm-risk\n  devenv env verify\n  devenv env backups\n  devenv env restore <backup-name> --confirm-risk\n  devenv java verify\n  devenv python verify\n  devenv nacos verify <nacos-root>\n  devenv safety disclaimer\n  devenv safety risks\n  devenv list [--json]\n  devenv use <kind> <version>\n  devenv project check [path] [--json]\n  devenv cleanup scan [--json]\n  devenv db doctor mysql --json\n  devenv db repair-plan mysql <candidate-id> <action>\n  devenv profile list\n  devenv profile apply <id>\n  devenv version",
+        "DevEnv Manager CLI {}\n\n用法：\n  devenv doctor [--json]\n  devenv env inspect [--json]\n  devenv env plan java --jdk <JDK根目录>\n  devenv env apply <plan-id> --confirm-risk\n  devenv env verify\n  devenv env backups\n  devenv env restore <backup-name> --confirm-risk\n  devenv java verify\n  devenv python verify\n  devenv nacos verify <nacos-root>\n  devenv safety disclaimer\n  devenv safety risks\n  devenv list [--json]\n  devenv use <kind> <version>\n  devenv project check [path] [--json]\n  devenv cleanup scan [--json]\n  devenv db doctor mysql --json\n  devenv db repair-plan mysql <candidate-id> <action>\n  devenv profile list\n  devenv profile apply <id>\n  devenv acceptance [--json] [--page <page>]\n  devenv version",
         env!("CARGO_PKG_VERSION")
     )
 }
@@ -15641,6 +15660,12 @@ mod tests {
             "nightly-x86_64-pc-windows-msvc (active)",
             "stable"
         ));
+    }
+
+    #[test]
+    fn acceptance_cli_rejects_missing_page_value() {
+        let error = run_cli(vec!["acceptance".to_string(), "--page".to_string()]).unwrap_err();
+        assert!(error.contains("--page"));
     }
 
     #[test]

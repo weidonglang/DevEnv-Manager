@@ -1,9 +1,10 @@
 use serde::{Deserialize, Serialize};
 use std::ffi::OsStr;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::thread;
+use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
 #[cfg(windows)]
@@ -44,6 +45,39 @@ pub struct NativeCommandResult {
     pub elapsed_ms: u128,
     pub timed_out: bool,
     pub executable: String,
+}
+
+const MAX_CAPTURE_BYTES: usize = 2 * 1024 * 1024;
+const TRUNCATION_MARKER: &[u8] = b"\n[output truncated by DevEnv Manager]\n";
+
+fn drain_pipe<R>(mut reader: R) -> JoinHandle<Vec<u8>>
+where
+    R: Read + Send + 'static,
+{
+    thread::spawn(move || {
+        let mut captured = Vec::new();
+        let mut chunk = [0_u8; 8192];
+        let mut truncated = false;
+        let capture_limit = MAX_CAPTURE_BYTES.saturating_sub(TRUNCATION_MARKER.len());
+        while let Ok(read) = reader.read(&mut chunk) {
+            if read == 0 {
+                break;
+            }
+            let remaining = capture_limit.saturating_sub(captured.len());
+            if remaining > 0 {
+                captured.extend_from_slice(&chunk[..read.min(remaining)]);
+            }
+            truncated |= read > remaining;
+        }
+        if truncated {
+            captured.extend_from_slice(TRUNCATION_MARKER);
+        }
+        captured
+    })
+}
+
+fn collected_output(handle: JoinHandle<Vec<u8>>) -> Vec<u8> {
+    handle.join().unwrap_or_default()
 }
 
 impl PowerShellRequest {
@@ -121,6 +155,16 @@ pub fn run_powershell(request: PowerShellRequest) -> Result<PowerShellResult, St
     let mut child = command
         .spawn()
         .map_err(|err| format!("启动 PowerShell 失败：{err}"))?;
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| "无法读取 PowerShell 标准输出".to_string())?;
+    let stderr = child
+        .stderr
+        .take()
+        .ok_or_else(|| "无法读取 PowerShell 错误输出".to_string())?;
+    let stdout_reader = drain_pipe(stdout);
+    let stderr_reader = drain_pipe(stderr);
     let mut timed_out = false;
     loop {
         if child
@@ -141,14 +185,16 @@ pub fn run_powershell(request: PowerShellRequest) -> Result<PowerShellResult, St
         killed_process_tree = kill_process_tree(child.id());
         let _ = child.kill();
     }
-    let output = child
-        .wait_with_output()
-        .map_err(|err| format!("读取 PowerShell 输出失败：{err}"))?;
+    let status = child
+        .wait()
+        .map_err(|err| format!("等待 PowerShell 结束失败：{err}"))?;
+    let stdout = collected_output(stdout_reader);
+    let stderr = collected_output(stderr_reader);
     Ok(PowerShellResult {
-        success: output.status.success() && !timed_out,
-        exit_code: output.status.code(),
-        stdout: decode_output(&output.stdout),
-        stderr: decode_output(&output.stderr),
+        success: status.success() && !timed_out,
+        exit_code: status.code(),
+        stdout: decode_output(&stdout),
+        stderr: decode_output(&stderr),
         elapsed_ms: start.elapsed().as_millis(),
         timed_out,
         executable,
@@ -200,6 +246,16 @@ pub fn run_configured_command_with_timeout(
     let mut child = command
         .spawn()
         .map_err(|err| format!("Failed to start {executable_label}: {err}"))?;
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| format!("Failed to capture {executable_label} stdout"))?;
+    let stderr = child
+        .stderr
+        .take()
+        .ok_or_else(|| format!("Failed to capture {executable_label} stderr"))?;
+    let stdout_reader = drain_pipe(stdout);
+    let stderr_reader = drain_pipe(stderr);
     let mut timed_out = false;
     loop {
         if child
@@ -216,14 +272,16 @@ pub fn run_configured_command_with_timeout(
         }
         thread::sleep(Duration::from_millis(50));
     }
-    let output = child
-        .wait_with_output()
-        .map_err(|err| format!("Failed to read {executable_label} output: {err}"))?;
+    let status = child
+        .wait()
+        .map_err(|err| format!("Failed to wait for {executable_label}: {err}"))?;
+    let stdout = collected_output(stdout_reader);
+    let stderr = collected_output(stderr_reader);
     Ok(NativeCommandResult {
-        success: output.status.success() && !timed_out,
-        exit_code: output.status.code(),
-        stdout: decode_output(&output.stdout),
-        stderr: decode_output(&output.stderr),
+        success: status.success() && !timed_out,
+        exit_code: status.code(),
+        stdout: decode_output(&stdout),
+        stderr: decode_output(&stderr),
         elapsed_ms: start.elapsed().as_millis(),
         timed_out,
         executable: executable_label,
@@ -336,5 +394,31 @@ mod tests {
             run_configured_command_with_timeout(command, "powershell.exe".to_string(), 1).unwrap();
         assert!(result.timed_out);
         assert!(!result.success);
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn configured_native_command_drains_large_output_while_running() {
+        let mut command = Command::new("powershell.exe");
+        command.args([
+            "-NoLogo",
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            "$value = 'x' * 200000; [Console]::Out.Write($value)",
+        ]);
+        let result =
+            run_configured_command_with_timeout(command, "powershell.exe".to_string(), 5).unwrap();
+        assert!(result.success);
+        assert!(!result.timed_out);
+        assert_eq!(result.stdout.len(), 200000);
+    }
+
+    #[test]
+    fn captured_output_is_bounded_and_marks_truncation() {
+        let reader = std::io::Cursor::new(vec![b'x'; MAX_CAPTURE_BYTES + 4096]);
+        let output = collected_output(drain_pipe(reader));
+        assert!(output.len() <= MAX_CAPTURE_BYTES);
+        assert!(output.ends_with(TRUNCATION_MARKER));
     }
 }

@@ -24,4 +24,5 @@ tauri/src-tauri/gen/
 
 # Local release upload staging
 release-assets-v*/
+artifacts/
 
