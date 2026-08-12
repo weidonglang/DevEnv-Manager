@@ -246,6 +246,12 @@ fn run_safe_feature(feature_id: &str) -> (String, String, Vec<String>, Vec<Strin
                 vec!["inspect_runtime_strong_verification".to_string()],
             )
         }),
+        "runtime.platformProviders" => super::inspect_platform_toolchains_blocking().map(|_| {
+            (
+                "Go、Rust/rustup 与 .NET Provider 状态读取完成".to_string(),
+                vec!["inspect_platform_toolchains".to_string()],
+            )
+        }),
         "environment.reliability" => super::load_paths().map(|paths| {
             let _snapshot = super::env_core::inspect_env_reliability(&paths.root);
             (

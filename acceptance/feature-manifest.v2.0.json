@@ -86,14 +86,14 @@
           "userVisibleName": "运行时分组与管理边界",
           "status": "implemented",
           "priority": "P0",
-          "frontendEntry": { "viewId": "view-runtimes", "selectors": ["#runtime-list", "#managed-jdks", "#runtime-migration-result"] },
-          "backendCommands": ["discover_runtimes", "list_runtime_switch_backups"],
-          "riskLevel": "readOnly",
+          "frontendEntry": { "viewId": "view-runtimes", "selectors": ["#runtime-list", "#runtime-discovery-groups", "#managed-jdks", "#runtime-migration-result"] },
+          "backendCommands": ["discover_runtimes", "install_jdk", "install_node", "install_python", "install_go", "install_maven", "install_gradle", "switch_runtime", "uninstall_runtime", "list_runtime_switch_backups"],
+          "riskLevel": "high",
           "requiresTauri": true,
           "requiresWindows": true,
           "safeSmokeMode": "readOnly",
           "manualOnlyReason": null,
-          "acceptanceChecks": ["frontendEntryVisible", "backendCommandRegistered", "managedExternalBoundary", "resultPanelVisible"]
+          "acceptanceChecks": ["frontendEntryVisible", "backendCommandRegistered", "managedExternalBoundary", "installDoesNotAutoSwitch", "resultPanelVisible"]
         },
         {
           "featureId": "runtime.verification",
@@ -108,6 +108,20 @@
           "safeSmokeMode": "readOnly",
           "manualOnlyReason": null,
           "acceptanceChecks": ["frontendEntryVisible", "backendCommandRegistered", "resultPanelVisible", "boundedProbe"]
+        },
+        {
+          "featureId": "runtime.platformProviders",
+          "userVisibleName": "Go、Rust 与 .NET Provider 状态和持久结果",
+          "status": "implemented",
+          "priority": "P1",
+          "frontendEntry": { "viewId": "view-platforms", "selectors": ["#managed-gos", "#rust-platform", "#dotnet-platform", "#platform-operation-result"] },
+          "backendCommands": ["inspect_platform_toolchains", "run_platform_action"],
+          "riskLevel": "medium",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "safeSmokeMode": "readOnly",
+          "manualOnlyReason": null,
+          "acceptanceChecks": ["frontendEntryVisible", "backendCommandRegistered", "resultPanelVisible", "providerBoundary"]
         }
       ]
     },

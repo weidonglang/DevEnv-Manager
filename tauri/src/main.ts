@@ -40,8 +40,10 @@ import { enhanceProjectReportPanel } from "./projectReportMigration";
 import { mountFeatureAcceptanceCenter } from "./acceptanceCenter";
 import {
   enhanceBuildToolVersionSelectors,
+  enhancePlatformPanel,
   enhancePortPanel,
   enhanceRuntimePanel,
+  renderGroupedRuntimeDiscovery,
   setMigrationResult,
 } from "./p0Migration";
 import { MYSQL_PERMISSION_UNKNOWN_HELP, mysqlPathValue } from "./features/mysql";
@@ -1148,6 +1150,7 @@ enhanceProjectReportPanel(document, icon(FileText));
 enhancePortPanel(document, icon(FileText));
 enhanceRuntimePanel(document, icon(FileText), icon(RotateCcw));
 enhanceBuildToolVersionSelectors(document);
+enhancePlatformPanel(document);
 mountFeatureAcceptanceCenter(document);
 
 function setText(id: string, value: string | number) {
@@ -1204,16 +1207,13 @@ function renderRuntimes() {
   renderEffectiveRuntimes();
   const element = document.querySelector<HTMLElement>("#runtime-list");
   if (!element) return;
-  element.innerHTML = state.runtimes.length
-    ? paginate("runtime-list", state.runtimes,
-          (runtime) => `
-            <article class="runtime">
-              <div><strong>${escapeHtml(runtime.kind)}</strong><span>${escapeHtml(runtime.version)}</span></div>
-              <small>${escapeHtml(runtime.source)} · ${escapeHtml(runtime.executable)}</small>
-              ${runtimeSafeActions(runtime)}
-            </article>
-          `)
-    : `<div class="empty">还没有发现开发工具</div>`;
+  renderGroupedRuntimeDiscovery(document, state.runtimes, (runtime) => `
+    <article class="runtime">
+      <div><strong>${escapeHtml(runtime.kind)}${isEffectiveRuntime(runtime) ? " · 当前生效" : ""}</strong><span>${escapeHtml(runtime.version)}</span></div>
+      <small>${escapeHtml(runtime.source)} · ${escapeHtml(runtime.executable)}</small>
+      ${runtimeSafeActions(runtime)}
+    </article>
+  `);
   renderManagedJdks();
   renderManagedNodes();
   renderManagedPythons();
@@ -1226,7 +1226,7 @@ function renderEffectiveRuntimes() {
   if (!element) return;
   const preferredKinds = ["Java", "Python", "Node.js", "Maven", "Gradle", "Go"];
   const effective = preferredKinds
-    .map((kind) => state.runtimes.find((runtime) => runtime.kind === kind))
+    .map((kind) => effectiveRuntimeForKind(kind))
     .filter((runtime): runtime is RuntimeInfo => Boolean(runtime));
   element.innerHTML = effective.length
     ? effective.map((runtime) => `
@@ -1237,6 +1237,31 @@ function renderEffectiveRuntimes() {
         </article>
       `).join("")
     : `<div class="empty">尚未发现当前可执行工具</div>`;
+}
+
+function effectiveRuntimeForKind(kind: string) {
+  const candidates = state.runtimes.filter((runtime) => runtime.kind === kind);
+  const ranked = candidates
+    .map((runtime) => ({ runtime, rank: runtimePathRank(runtime) }))
+    .filter((item) => Number.isFinite(item.rank))
+    .sort((left, right) => left.rank - right.rank);
+  return ranked[0]?.runtime;
+}
+
+function runtimePathRank(runtime: RuntimeInfo) {
+  const normalize = (value: string) => value
+    .trim()
+    .replace(/^"|"$/g, "")
+    .replace(/\//g, "\\")
+    .replace(/\\+$/, "")
+    .toLowerCase();
+  const executableDirectory = normalize(runtime.executable).replace(/\\[^\\]+$/, "");
+  const index = (state.env?.pathEntries || []).findIndex((entry) => normalize(entry) === executableDirectory);
+  return index < 0 ? Number.POSITIVE_INFINITY : index;
+}
+
+function isEffectiveRuntime(runtime: RuntimeInfo) {
+  return effectiveRuntimeForKind(runtime.kind)?.executable.toLowerCase() === runtime.executable.toLowerCase();
 }
 
 function renderJavaEnvironment() {
@@ -2116,13 +2141,20 @@ async function checkUpdates() {
 }
 
 async function runPlatformAction(action: string, value: string | null = null) {
+  setMigrationResult("#platform-operation-result", "正在执行平台工具链操作…");
   showToast("正在执行平台工具链操作");
   try {
     const result = await invoke<OperationResult>("run_platform_action", { action, value });
+    setMigrationResult("#platform-operation-result", `${result.message}\n正在重新检查平台状态…`);
     showToast(result.message);
     await inspectPlatforms("正在验证操作结果");
+    setMigrationResult("#platform-operation-result", `${result.message}\n平台状态已重新检查，详细结果保留在对应工具组。`);
+    focusResult("#platform-operation-result");
   } catch (error) {
-    showToast(error instanceof Error ? error.message : String(error), true);
+    const message = error instanceof Error ? error.message : String(error);
+    setMigrationResult("#platform-operation-result", `平台工具链操作失败：${message}`, true);
+    focusResult("#platform-operation-result");
+    showToast(message, true);
   }
 }
 
@@ -2588,15 +2620,18 @@ async function runRuntimeOperation(
     renderRuntimes();
     if (focus === "JDK") await inspectJava(false);
     const check = health.find((item) => item.name.toLowerCase() === focus.toLowerCase());
-    const resultPanel = document.querySelector<HTMLElement>("#runtime-strong-result");
-    if (resultPanel && document.querySelector("#view-runtime")?.classList.contains("active")) {
+    const panelSelector = focus === "Go" ? "#platform-operation-result" : "#runtime-strong-result";
+    const activeView = focus === "Go" ? "#view-platforms" : "#view-runtimes";
+    const resultPanel = document.querySelector<HTMLElement>(panelSelector);
+    if (resultPanel) {
+      resultPanel.classList.remove("hidden", "error");
       resultPanel.innerHTML = `
         <article class="runtime ${check && check.status !== "正常" ? "warn" : ""}">
           <div><strong>${escapeHtml(focus)} 操作结果</strong><span>${check?.status || "已验证"}</span></div>
           <small>${escapeHtml(message)}</small>
           ${check ? `<small>${escapeHtml(check.detail || "环境健康检查完成")}</small>` : ""}
         </article>`;
-      focusResult("#runtime-strong-result");
+      if (document.querySelector(activeView)?.classList.contains("active")) focusResult(panelSelector);
     }
     if (check && check.status !== "正常") {
       showToast(`${message}；${focus} 验证结果：${check.status}，${check.detail}`, true);
@@ -2606,14 +2641,18 @@ async function runRuntimeOperation(
     await loadRuntimeSwitchBackups();
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    const resultPanel = document.querySelector<HTMLElement>("#runtime-strong-result");
-    if (resultPanel && document.querySelector("#view-runtime")?.classList.contains("active")) {
+    const panelSelector = focus === "Go" ? "#platform-operation-result" : "#runtime-strong-result";
+    const activeView = focus === "Go" ? "#view-platforms" : "#view-runtimes";
+    const resultPanel = document.querySelector<HTMLElement>(panelSelector);
+    if (resultPanel) {
+      resultPanel.classList.remove("hidden");
+      resultPanel.classList.add("error");
       resultPanel.innerHTML = `
         <article class="runtime warn">
           <div><strong>${escapeHtml(focus)} 操作失败</strong><span>已停止</span></div>
           <small>${escapeHtml(message)}</small>
         </article>`;
-      focusResult("#runtime-strong-result");
+      if (document.querySelector(activeView)?.classList.contains("active")) focusResult(panelSelector);
     }
     showToast(message, true);
   }

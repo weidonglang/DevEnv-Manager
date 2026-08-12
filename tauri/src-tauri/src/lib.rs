@@ -3410,10 +3410,14 @@ fn verify_registered_runtime(
             ));
             checks.push(validation_check(
                 "jar",
-                "jar --help",
+                "jar help",
                 true,
                 "ComponentMissing",
-                run_command_output(root.join("bin/jar.exe"), &["--help"], 30),
+                run_command_output(
+                    root.join("bin/jar.exe"),
+                    jdk_jar_verification_args(&version),
+                    30,
+                ),
             ));
         }
         "python" => {
@@ -3496,6 +3500,13 @@ fn verify_registered_runtime(
                 false,
                 "PostInstallVerify",
                 run_command_output(root.join("bin/go.exe"), &["env", "GOPROXY"], 30),
+            ));
+            checks.push(validation_check(
+                "gomodcache",
+                "go env GOMODCACHE",
+                false,
+                "PostInstallVerify",
+                run_command_output(root.join("bin/go.exe"), &["env", "GOMODCACHE"], 30),
             ));
         }
         _ => {}
@@ -3624,8 +3635,13 @@ fn install_jdk_blocking(
     )?;
     emit_task_progress(&app, &task, 88, "正在验证 JDK");
     let output = run_command_output(target.join("bin/java.exe"), &["-version"], 30)?;
+    verify_runtime_version_output("JDK", &output, version)?;
     run_command_output(target.join("bin/javac.exe"), &["-version"], 30)?;
-    run_command_output(target.join("bin/jar.exe"), &["--help"], 30)?;
+    run_command_output(
+        target.join("bin/jar.exe"),
+        jdk_jar_verification_args(version),
+        30,
+    )?;
     record_install(
         &paths,
         runtime_meta("jdk")?,
@@ -3638,17 +3654,11 @@ fn install_jdk_blocking(
             "detail": output.lines().next().unwrap_or(""),
         }),
     )?;
-    switch_runtime_blocking(
-        "jdk".to_string(),
-        installed_version,
-        Some(display_path(&target)),
-    )?;
-    refresh_user_java_home(&paths)?;
     emit_task_progress(&app, &task, 100, "安装完成");
     Ok(OperationResult {
         success: true,
         message: format!(
-            "安装成功 {} JDK {version}",
+            "已安装并验证 {} JDK {version}，尚未切换；需要使用时请单独点击“切换”",
             jdk_distribution_name(distribution)
         ),
     })
@@ -3694,7 +3704,13 @@ fn install_node_blocking(
     install_zip_payload(&archive, &target, &["node.exe", "npm.cmd", "npx.cmd"])?;
     emit_task_progress(&app, &task, 88, "正在验证 Node.js");
     let output = run_command_output(target.join("node.exe"), &["-v"], 30)?;
+    verify_runtime_version_output("Node.js", &output, version)?;
     run_command_output(target.join("npm.cmd"), &["-v"], 30)?;
+    run_command_output(target.join("npx.cmd"), &["-v"], 30)?;
+    let corepack = target.join("corepack.cmd");
+    if corepack.is_file() {
+        run_command_output(corepack, &["--version"], 30)?;
+    }
     record_install(
         &paths,
         runtime_meta("node")?,
@@ -3706,11 +3722,10 @@ fn install_node_blocking(
             "tag": release.tag,
         }),
     )?;
-    switch_runtime_blocking("node".to_string(), version.to_string(), None)?;
     emit_task_progress(&app, &task, 100, "安装完成");
     Ok(OperationResult {
         success: true,
-        message: format!("安装成功 Node.js {version}"),
+        message: format!("已安装并验证 Node.js {version}，尚未切换；需要使用时请单独点击“切换”"),
     })
 }
 
@@ -3747,6 +3762,10 @@ fn install_go_blocking(app: tauri::AppHandle, version: String) -> Result<Operati
     install_zip_payload(&archive, &target, &["bin/go.exe"])?;
     emit_task_progress(&app, &task, 88, "正在验证 Go");
     let output = run_command_output(target.join("bin/go.exe"), &["version"], 30)?;
+    verify_runtime_version_output("Go", &output, version)?;
+    for variable in ["GOROOT", "GOPATH", "GOPROXY", "GOMODCACHE"] {
+        run_command_output(target.join("bin/go.exe"), &["env", variable], 30)?;
+    }
     record_install(
         &paths,
         runtime_meta("go")?,
@@ -3758,11 +3777,10 @@ fn install_go_blocking(app: tauri::AppHandle, version: String) -> Result<Operati
             "tag": release.tag,
         }),
     )?;
-    switch_runtime_blocking("go".to_string(), version.to_string(), None)?;
     emit_task_progress(&app, &task, 100, "安装完成");
     Ok(OperationResult {
         success: true,
-        message: format!("安装成功 Go {version}"),
+        message: format!("已安装并验证 Go {version}，尚未切换；需要使用时请单独点击“切换”"),
     })
 }
 
@@ -3860,6 +3878,7 @@ fn install_python_blocking(
         ));
     }
     let verify = run_command_output(python_exe.clone(), &["--version"], 30)?;
+    verify_runtime_version_output("Python", &verify, version)?;
     let pip_exe = python_home.join("Scripts").join("pip.exe");
     if !pip_exe.is_file() {
         return Err(format!(
@@ -3880,11 +3899,10 @@ fn install_python_blocking(
             "archive": display_path(&archive),
         }),
     )?;
-    switch_runtime_blocking("python".to_string(), version.to_string(), None)?;
     emit_task_progress(&app, &task, 100, "安装完成");
     Ok(OperationResult {
         success: true,
-        message: format!("安装成功 Python {version}"),
+        message: format!("已安装并验证 Python {version}，尚未切换；需要使用时请单独点击“切换”"),
     })
 }
 
@@ -3911,12 +3929,7 @@ fn install_maven_blocking(
     let target = paths.mavens().join(format!("maven-{}", release.tag));
     paths.assert_inside_root(&target)?;
     if target.exists() {
-        emit_task_progress(
-            &app,
-            &task,
-            18,
-            "检测到 Maven 已安装，正在修复登记与 current 指针",
-        );
+        emit_task_progress(&app, &task, 18, "检测到 Maven 已安装，正在修复受管登记");
     } else {
         emit_task_progress(&app, &task, 18, "正在下载 Maven");
         download_file_with_progress(&release.url, &archive, None, Some((&app, &task, 18, 70)))?;
@@ -3925,6 +3938,7 @@ fn install_maven_blocking(
     }
     emit_task_progress(&app, &task, 88, "正在验证 Maven");
     let output = run_managed_command_output(&paths, target.join("bin/mvn.cmd"), &["-v"], 60)?;
+    verify_runtime_version_output("Maven", &output, &release.tag)?;
     record_install(
         &paths,
         runtime_meta("maven")?,
@@ -3933,11 +3947,13 @@ fn install_maven_blocking(
         &target.join("bin/mvn.cmd"),
         json!({ "detail": output.lines().next().unwrap_or("") }),
     )?;
-    switch_runtime_blocking("maven".to_string(), release.tag.clone(), None)?;
     emit_task_progress(&app, &task, 100, "安装完成");
     Ok(OperationResult {
         success: true,
-        message: format!("Maven {} 已就绪并已切换到 current", release.tag),
+        message: format!(
+            "Maven {} 已安装并验证，尚未切换；需要使用时请单独点击“切换”",
+            release.tag
+        ),
     })
 }
 
@@ -3964,12 +3980,7 @@ fn install_gradle_blocking(
     let target = paths.gradles().join(format!("gradle-{}", release.tag));
     paths.assert_inside_root(&target)?;
     if target.exists() {
-        emit_task_progress(
-            &app,
-            &task,
-            18,
-            "检测到 Gradle 已安装，正在修复登记与 current 指针",
-        );
+        emit_task_progress(&app, &task, 18, "检测到 Gradle 已安装，正在修复受管登记");
     } else {
         emit_task_progress(&app, &task, 18, "正在下载 Gradle");
         download_file_with_progress(
@@ -3983,6 +3994,7 @@ fn install_gradle_blocking(
     }
     emit_task_progress(&app, &task, 88, "正在验证 Gradle");
     let output = run_managed_command_output(&paths, target.join("bin/gradle.bat"), &["-v"], 120)?;
+    verify_runtime_version_output("Gradle", &output, &release.tag)?;
     record_install(
         &paths,
         runtime_meta("gradle")?,
@@ -3991,12 +4003,48 @@ fn install_gradle_blocking(
         &target.join("bin/gradle.bat"),
         json!({ "detail": output.lines().next().unwrap_or("") }),
     )?;
-    switch_runtime_blocking("gradle".to_string(), release.tag.clone(), None)?;
     emit_task_progress(&app, &task, 100, "安装完成");
     Ok(OperationResult {
         success: true,
-        message: format!("Gradle {} 已就绪并已切换到 current", release.tag),
+        message: format!(
+            "Gradle {} 已安装并验证，尚未切换；需要使用时请单独点击“切换”",
+            release.tag
+        ),
     })
+}
+
+fn verify_runtime_version_output(kind: &str, output: &str, expected: &str) -> Result<(), String> {
+    let expected = expected.trim().trim_start_matches('v').to_ascii_lowercase();
+    let aliases = if kind == "JDK" && expected == "8" {
+        vec!["8".to_string(), "1.8".to_string()]
+    } else {
+        vec![expected.clone()]
+    };
+    let matches = output
+        .split(|character: char| !(character.is_ascii_digit() || character == '.'))
+        .filter(|token| !token.is_empty())
+        .any(|token| {
+            aliases
+                .iter()
+                .any(|alias| token == alias || token.starts_with(&format!("{alias}.")))
+        });
+    if matches {
+        Ok(())
+    } else {
+        Err(format!(
+            "{kind} 安装后的版本输出与请求版本 {expected} 不一致：{}",
+            first_meaningful_output_line(output).unwrap_or_else(|| "没有版本输出".to_string())
+        ))
+    }
+}
+
+fn jdk_jar_verification_args(version: &str) -> &'static [&'static str] {
+    let normalized = version.trim().to_ascii_lowercase();
+    if normalized == "8" || normalized.starts_with("8-") || normalized.starts_with("1.8") {
+        &["-help"]
+    } else {
+        &["--help"]
+    }
 }
 
 #[tauri::command]
@@ -15427,6 +15475,22 @@ fn display_path(path: impl AsRef<Path>) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn installed_runtime_version_output_must_match_request() {
+        assert!(verify_runtime_version_output("JDK", "openjdk version \"1.8.0_462\"", "8").is_ok());
+        assert!(verify_runtime_version_output("Node.js", "v22.18.0", "22").is_ok());
+        assert!(
+            verify_runtime_version_output("Go", "go version go1.26.1 windows/amd64", "1.26")
+                .is_ok()
+        );
+        assert!(verify_runtime_version_output("Python", "Python 3.12.8", "3.12").is_ok());
+        assert!(verify_runtime_version_output("Maven", "Apache Maven 3.9.16", "3.9.16").is_ok());
+        assert!(verify_runtime_version_output("Gradle", "Gradle 9.6.1", "9.6.1").is_ok());
+        assert!(verify_runtime_version_output("Node.js", "v20.19.0", "22").is_err());
+        assert_eq!(jdk_jar_verification_args("8-temurin"), &["-help"]);
+        assert_eq!(jdk_jar_verification_args("21-temurin"), &["--help"]);
+    }
 
     #[test]
     fn writable_managed_root_probes_new_and_existing_directories() {

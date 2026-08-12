@@ -1,3 +1,5 @@
+import type { RuntimeInfo } from "./types";
+
 export function enhancePortPanel(root: Document, fileIcon: string) {
   const head = root.querySelector<HTMLElement>("#view-ports .panel-head");
   if (head && !root.querySelector("#export-port-report-markdown")) {
@@ -22,6 +24,68 @@ export function enhancePortPanel(root: Document, fileIcon: string) {
   }
 }
 
+export function renderGroupedRuntimeDiscovery(
+  root: Document,
+  runtimes: RuntimeInfo[],
+  renderRuntime: (runtime: RuntimeInfo) => string,
+) {
+  const container = root.querySelector<HTMLElement>("#runtime-list");
+  if (!container) return;
+  const groups = [
+    { id: "java", label: "Java / JDK", kinds: ["java", "jdk"] },
+    { id: "python", label: "Python", kinds: ["python", "pip"] },
+    { id: "node", label: "Node.js", kinds: ["node", "npm", "npx", "pnpm", "yarn"] },
+    { id: "go", label: "Go", kinds: ["go"] },
+    { id: "maven", label: "Maven", kinds: ["maven"] },
+    { id: "gradle", label: "Gradle", kinds: ["gradle"] },
+    { id: "rust", label: "Rust / Cargo / rustup", kinds: ["rust", "cargo", "rustup"] },
+    { id: "dotnet", label: ".NET SDK", kinds: [".net", "dotnet"] },
+  ];
+  const assigned = new Set<RuntimeInfo>();
+  const sections = groups.map((group) => {
+    const items = runtimes.filter((runtime) => {
+      const kind = runtime.kind.toLowerCase();
+      const matches = group.kinds.some((candidate) => kind.includes(candidate));
+      if (matches) assigned.add(runtime);
+      return matches;
+    });
+    return runtimeDiscoveryGroup(group.id, group.label, items, renderRuntime);
+  });
+  const other = runtimes.filter((runtime) => !assigned.has(runtime));
+  if (other.length) sections.push(runtimeDiscoveryGroup("other", "其他工具", other, renderRuntime));
+  container.innerHTML = runtimes.length
+    ? `<div id="runtime-discovery-groups" class="runtime-discovery-groups">${sections.join("")}</div>`
+    : `<div class="empty">还没有发现开发工具</div>`;
+}
+
+function runtimeDiscoveryGroup(
+  id: string,
+  label: string,
+  items: RuntimeInfo[],
+  renderRuntime: (runtime: RuntimeInfo) => string,
+) {
+  const managed = items.filter((runtime) => runtime.source.toLowerCase().includes("devenv"));
+  const external = items.filter((runtime) => !runtime.source.toLowerCase().includes("devenv"));
+  return `
+    <section class="runtime-discovery-group" data-runtime-group="${id}">
+      <div class="runtime-discovery-heading">
+        <h3>${label}</h3>
+        <span>${items.length ? `${items.length} 个发现` : "未发现"}</span>
+      </div>
+      <div class="runtime-source-groups">
+        <div>
+          <h4>受管版本</h4>
+          ${managed.length ? managed.map(renderRuntime).join("") : `<div class="empty compact-empty">未发现受管版本</div>`}
+        </div>
+        <div>
+          <h4>外部发现版本</h4>
+          ${external.length ? external.map(renderRuntime).join("") : `<div class="empty compact-empty">未发现外部版本</div>`}
+        </div>
+      </div>
+    </section>
+  `;
+}
+
 export function enhanceRuntimePanel(root: Document, fileIcon: string, restoreIcon: string) {
   const strongResult = root.querySelector<HTMLElement>("#runtime-strong-result");
   if (!strongResult || root.querySelector("#runtime-migration-tools")) return;
@@ -42,6 +106,17 @@ export function enhanceRuntimePanel(root: Document, fileIcon: string, restoreIco
     <div id="runtime-switch-backups" class="runtime-list"><div class="empty">切换受管运行时后会在这里显示可验证恢复点。</div></div>
   `;
   strongResult.insertAdjacentElement("afterend", tools);
+}
+
+export function enhancePlatformPanel(root: Document) {
+  const firstPanel = root.querySelector<HTMLElement>("#view-platforms > .panel");
+  if (!firstPanel || root.querySelector("#platform-operation-result")) return;
+  const result = document.createElement("div");
+  result.id = "platform-operation-result";
+  result.className = "operation-result hidden";
+  result.dataset.testid = "platform-operation-result";
+  result.setAttribute("aria-live", "polite");
+  firstPanel.insertAdjacentElement("afterend", result);
 }
 
 export function enhanceBuildToolVersionSelectors(root: Document) {

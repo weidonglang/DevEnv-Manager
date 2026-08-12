@@ -28,6 +28,17 @@ ACCEPTANCE_COMMANDS = {
     "run_feature_acceptance_suite",
     "export_feature_acceptance_report",
 }
+MANAGED_RUNTIME_INSTALLERS = ("jdk", "node", "python", "go", "maven", "gradle")
+RUNTIME_DISCOVERY_GROUPS = (
+    "Java / JDK",
+    "Python",
+    "Node.js",
+    "Go",
+    "Maven",
+    "Gradle",
+    "Rust / Cargo / rustup",
+    ".NET SDK",
+)
 
 
 def fail(message: str) -> None:
@@ -46,6 +57,27 @@ def frontend_invokes(source: str) -> set[str]:
     return set(
         re.findall(r'\binvoke(?:<[^;()]+?>)?\(\s*["\']([a-z][a-z0-9_]*)["\']', source)
     )
+
+
+def function_body(source: str, function_name: str) -> str:
+    marker = f"fn {function_name}("
+    start = source.find(marker)
+    if start < 0:
+        fail(f"required function is missing: {function_name}")
+    body_start = source.find("{", start)
+    if body_start < 0:
+        fail(f"cannot parse function body: {function_name}")
+    depth = 0
+    for index in range(body_start, len(source)):
+        character = source[index]
+        if character == "{":
+            depth += 1
+        elif character == "}":
+            depth -= 1
+            if depth == 0:
+                return source[body_start + 1:index]
+    fail(f"unterminated function body: {function_name}")
+    return ""
 
 
 def main() -> int:
@@ -123,9 +155,24 @@ def main() -> int:
     frontend_only = sorted(invokes - registered)
     if frontend_only:
         fail(f"frontend invokes missing backend registration: {frontend_only}")
+    declared_views = set(re.findall(r'id="(view-[a-z-]+)"', frontend_source))
+    referenced_views = set(re.findall(r'#(view-[a-z-]+)', frontend_source))
+    missing_views = sorted(referenced_views - declared_views)
+    if missing_views:
+        fail(f"frontend references unknown view ids: {missing_views}")
     for forbidden in ("create_confirmation_token", "confirmationToken", "riskOperationToken"):
         if forbidden in frontend_source:
             fail(f"v1.7 frontend must not expose token workflow: {forbidden}")
+    for runtime in MANAGED_RUNTIME_INSTALLERS:
+        body = function_body(backend_source, f"install_{runtime}_blocking")
+        if "switch_runtime_blocking" in body or "refresh_user_java_home" in body:
+            fail(f"managed {runtime} install must not switch the active runtime")
+    migration_source = (FRONTEND_ROOT / "p0Migration.ts").read_text(encoding="utf-8")
+    missing_runtime_groups = [
+        group for group in RUNTIME_DISCOVERY_GROUPS if group not in migration_source
+    ]
+    if missing_runtime_groups:
+        fail(f"runtime discovery groups are missing: {missing_runtime_groups}")
 
     print(
         "feature manifest passed "
