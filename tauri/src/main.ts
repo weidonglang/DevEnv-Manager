@@ -32,6 +32,10 @@ import {
   renderFileAssociationPanel,
   type FileAssociationUiState,
 } from "./features/fileAssociations";
+import {
+  enhanceFileAssociationPanel,
+  type MigratedFileAssociationUiState,
+} from "./fileAssociationMigration";
 import { projectConfigurationPlanId } from "./features/jdk";
 import { MYSQL_PERMISSION_UNKNOWN_HELP, mysqlPathValue } from "./features/mysql";
 import { canShowKillPortAction } from "./features/ports";
@@ -101,6 +105,7 @@ import type {
   UpdateCheckResult,
   CleanupArchitecture,
   DoctorRepairResult,
+  DoctorRepairPlan,
   ConfigProfileImportPreview,
   ProfileRequirement,
   CleanupCandidate,
@@ -130,6 +135,7 @@ import type {
   EnvironmentConfigPreview,
   EnvironmentBackupInfo,
   FileAssociationApplyResult,
+  FileAssociationAppSearchResult,
   FileAssociationBackupSummary,
   FileAssociationPlan,
   FileAssociationPlanRequest,
@@ -1010,8 +1016,14 @@ const state = {
       onlyMissingApp: false,
     },
     selectedExtensions: new Set<string>(),
+    appQuery: "",
+    appSearchResult: null,
+    targetAppName: "",
+    targetExecutable: "",
+    extensionInput: "",
+    advancedHighRisk: false,
     applyResultMessage: "",
-  } as FileAssociationUiState,
+  } as MigratedFileAssociationUiState,
   safeMode: false,
   fatalError: "",
   safeModeNoticeCollapsed: false,
@@ -2916,6 +2928,7 @@ function renderFileAssociations() {
   const element = document.querySelector<HTMLElement>("#file-association-manager");
   if (!element) return;
   element.innerHTML = renderFileAssociationPanel(state.fileAssociations, { escapeHtml });
+  enhanceFileAssociationPanel(element, state.fileAssociations);
 }
 
 async function scanFileAssociations() {
@@ -2923,19 +2936,18 @@ async function scanFileAssociations() {
   try {
     state.fileAssociations.report = await invoke<FileAssociationReport>("scan_file_associations");
     state.fileAssociations.activeTab = "overview";
-    renderFileAssociations();
-    showToast(`文件关联扫描完成：${state.fileAssociations.report.totalExtensions} 个扩展名`);
+    setFileAssociationResult(`文件关联扫描完成：${state.fileAssociations.report.totalExtensions} 个扩展名`);
   } catch (error) {
-    showToast(error instanceof Error ? error.message : String(error), true);
+    setFileAssociationError("文件关联扫描失败", error);
   }
 }
 
 async function loadFileAssociationBackups() {
   try {
     state.fileAssociations.backups = await invoke<FileAssociationBackupSummary[]>("list_file_association_backups");
-    renderFileAssociations();
+    setFileAssociationResult(`已加载 ${state.fileAssociations.backups.length} 个文件关联备份`);
   } catch (error) {
-    showToast(error instanceof Error ? error.message : String(error), true);
+    setFileAssociationError("文件关联备份加载失败", error);
   }
 }
 
@@ -2948,18 +2960,51 @@ async function pickFileAssociationTarget() {
       filters: [{ name: "Windows 应用程序", extensions: ["exe"] }],
     });
     if (!selected || Array.isArray(selected)) return;
-    const input = document.querySelector<HTMLInputElement>("#file-assoc-target-exe");
-    if (input) input.value = selected;
+    state.fileAssociations.targetExecutable = selected;
+    if (!state.fileAssociations.targetAppName) {
+      state.fileAssociations.targetAppName =
+        selected.split(/[\\/]/).pop()?.replace(/\.exe$/i, "") || "目标应用";
+    }
+    state.fileAssociations.appSearchResult = null;
+    setFileAssociationResult(`已选择应用：${selected}`);
   } catch (error) {
-    showToast(error instanceof Error ? error.message : String(error), true);
+    setFileAssociationError("选择目标应用失败", error);
+  }
+}
+
+async function searchFileAssociationApp() {
+  const query = document.querySelector<HTMLInputElement>("#file-assoc-app-search")?.value.trim() || state.fileAssociations.appQuery.trim();
+  state.fileAssociations.appQuery = query;
+  if (!query) {
+    setFileAssociationError("无法搜索应用", "请输入应用名称，例如 VS Code、IDEA 或记事本。");
+    return;
+  }
+  const extension = state.fileAssociations.selectedExtensions.values().next().value || null;
+  showToast("正在查找已安装应用");
+  try {
+    const result = await invoke<FileAssociationAppSearchResult>("search_file_association_app", { query, extension });
+    state.fileAssociations.appSearchResult = result;
+    if (result.autoSelected?.exists) {
+      state.fileAssociations.targetAppName = result.autoSelected.displayName;
+      state.fileAssociations.targetExecutable = result.autoSelected.executablePath;
+    }
+    setFileAssociationResult(result.message);
+    focusResult("[data-testid='file-association-app-search-result']");
+  } catch (error) {
+    state.fileAssociations.appSearchResult = null;
+    setFileAssociationError("应用搜索失败", error);
   }
 }
 
 async function createFileAssociationPlan(extensionsOverride?: string[]) {
-  const targetAppName = document.querySelector<HTMLInputElement>("#file-assoc-target-name")?.value.trim() || "";
-  const targetExecutable = document.querySelector<HTMLInputElement>("#file-assoc-target-exe")?.value.trim() || "";
-  const extensionText = document.querySelector<HTMLInputElement>("#file-assoc-extension-input")?.value || "";
-  const advancedHighRisk = document.querySelector<HTMLInputElement>("#file-assoc-advanced-risk")?.checked || false;
+  const targetAppName = document.querySelector<HTMLInputElement>("#file-assoc-target-name")?.value.trim() || state.fileAssociations.targetAppName;
+  const targetExecutable = document.querySelector<HTMLInputElement>("#file-assoc-target-exe")?.value.trim() || state.fileAssociations.targetExecutable;
+  const extensionText = document.querySelector<HTMLInputElement>("#file-assoc-extension-input")?.value || state.fileAssociations.extensionInput;
+  const advancedHighRisk = document.querySelector<HTMLInputElement>("#file-assoc-advanced-risk")?.checked || state.fileAssociations.advancedHighRisk;
+  state.fileAssociations.targetAppName = targetAppName;
+  state.fileAssociations.targetExecutable = targetExecutable;
+  state.fileAssociations.extensionInput = extensionText;
+  state.fileAssociations.advancedHighRisk = advancedHighRisk;
   const extensions = extensionsOverride?.length
     ? extensionsOverride
     : extensionText
@@ -2976,64 +3021,66 @@ async function createFileAssociationPlan(extensionsOverride?: string[]) {
   try {
     state.fileAssociations.plan = await invoke<FileAssociationPlan>("create_file_association_plan", { request });
     state.fileAssociations.activeTab = "apps";
-    state.fileAssociations.applyResultMessage = "";
-    renderFileAssociations();
-    showToast("文件关联计划已生成，请核对 before / after 和备份路径");
+    setFileAssociationResult(`文件关联计划已生成：${state.fileAssociations.plan.changes.length} 项。请核对修改前后和备份路径。`);
+    focusResult("#file-assoc-plan-preview");
   } catch (error) {
-    showToast(error instanceof Error ? error.message : String(error), true);
+    state.fileAssociations.plan = null;
+    setFileAssociationError("文件关联计划创建失败", error);
   }
 }
 
 async function applyFileAssociationPlan() {
   const plan = state.fileAssociations.plan;
-  if (!plan) return;
-  if (!(await askForConfirmation(`将处理 ${plan.changes.length} 项文件关联，并在执行前写入备份。受保护项只会提示进入 Windows 设置。确定继续吗？`))) return;
-  let confirmationToken: string | null = null;
-  if (plan.requiresConfirmationToken) {
-    for (const prompt of [
-      "第一次确认：我理解高风险扩展名可能影响脚本、安装包或可执行文件启动。",
-      "第二次确认：我已经核对目标应用路径和计划预览。",
-      "第三次确认：输入指定文本后继续。",
-    ]) {
-      if (
-        !(await askForConfirmation(prompt, {
-          title: "确认文件关联高风险计划",
-          danger: true,
-          requiredText: prompt.startsWith("第三次") ? "确认修改文件关联" : undefined,
-        }))
-      ) {
-        return;
-      }
-    }
-    const token = await riskOperationToken("apply_file_association_plan", plan.planId, "high", true, "file-association-backup");
-    confirmationToken = token.token;
+  if (!plan) {
+    setFileAssociationError("无法执行文件关联计划", "请先生成修改计划。");
+    return;
   }
+  if (!(await askForConfirmation(`将处理 ${plan.changes.length} 项文件关联，并在执行前写入备份。受保护项只会提示进入 Windows 设置。确定继续吗？`))) return;
   showToast("正在备份并执行文件关联计划");
   try {
-    const result = await invoke<FileAssociationApplyResult>("apply_file_association_plan", { plan, confirmationToken });
-    state.fileAssociations.applyResultMessage = result.message;
+    const result = await invoke<FileAssociationApplyResult>("apply_file_association_plan", { planId: plan.planId });
     state.fileAssociations.plan = null;
     state.fileAssociations.backups = await invoke<FileAssociationBackupSummary[]>("list_file_association_backups");
     state.fileAssociations.report = await invoke<FileAssociationReport>("scan_file_associations");
-    renderFileAssociations();
-    showToast(result.message, !result.success);
+    setFileAssociationResult(formatFileAssociationResult(result), !result.success);
   } catch (error) {
-    showToast(error instanceof Error ? error.message : String(error), true);
+    state.fileAssociations.plan = null;
+    setFileAssociationError("文件关联执行失败", error);
   }
 }
 
 async function rollbackFileAssociationBackup(backupId: string) {
   if (!(await askForConfirmation(`将回滚文件关联备份 ${backupId}。UserChoice 保护项仍会要求你到 Windows 设置确认。确定继续吗？`, { title: "确认文件关联回滚", danger: true }))) return;
-  const token = await riskOperationToken("rollback_file_association_backup", backupId, "high", true, "file-association-backup");
   try {
-    const result = await invoke<FileAssociationApplyResult>("rollback_file_association_backup", { backupId, confirmationToken: token.token });
-    state.fileAssociations.applyResultMessage = result.message;
+    const result = await invoke<FileAssociationApplyResult>("rollback_file_association_backup", { backupId });
     state.fileAssociations.report = await invoke<FileAssociationReport>("scan_file_associations");
-    renderFileAssociations();
-    showToast(result.message, !result.success);
+    state.fileAssociations.backups = await invoke<FileAssociationBackupSummary[]>("list_file_association_backups");
+    setFileAssociationResult(formatFileAssociationResult(result), !result.success);
   } catch (error) {
-    showToast(error instanceof Error ? error.message : String(error), true);
+    setFileAssociationError("文件关联回滚失败", error);
   }
+}
+
+function formatFileAssociationResult(result: FileAssociationApplyResult) {
+  const lines = [result.message];
+  if (result.backupPath) lines.push(`备份：${result.backupPath}`);
+  result.items.forEach((item) => {
+    const status = item.success ? "成功" : item.requiresSystemSettings ? "需系统确认" : "失败";
+    lines.push(`${item.extension} · ${status} · ${item.message}`);
+  });
+  return lines.join("\n");
+}
+
+function setFileAssociationResult(message: string, isError = false) {
+  state.fileAssociations.applyResultMessage = message;
+  renderFileAssociations();
+  focusResult("#file-assoc-operation-result");
+  showToast(message.split("\n")[0], isError);
+}
+
+function setFileAssociationError(title: string, error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  setFileAssociationResult(`${title}：${message}`, true);
 }
 
 function riskText(risk: string) {
@@ -4081,7 +4128,8 @@ document.querySelector("#repair-doctor-safe")?.addEventListener("click", async (
   if (!(await askForConfirmation("将自动清理真实失效/重复 PATH，并修复 DevEnv 管理的用户级环境变量。不会安装软件、结束进程或修改系统级变量。确定继续吗？"))) return;
   showToast("正在执行安全修复并重新诊断");
   try {
-    const result = await invoke<DoctorRepairResult>("repair_doctor_safe");
+    const plan = await invoke<DoctorRepairPlan>("create_doctor_repair_plan");
+    const result = await invoke<DoctorRepairResult>("execute_doctor_repair_plan", { planId: plan.planId });
     state.doctor = result.report;
     renderDoctor();
     const detail = result.applied.length ? result.applied.join("\n") : "没有可自动修复的安全项目";
@@ -4092,11 +4140,12 @@ document.querySelector("#repair-doctor-safe")?.addEventListener("click", async (
         <small>${escapeHtml(detail)}</small>
         ${result.remaining.length ? `<ul>${result.remaining.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>` : "<small>没有剩余需要手动处理的自动修复项</small>"}
       </article>`;
+      focusResult("#doctor-repair-result");
     }
     showToast(`安全修复完成，当前评分 ${result.afterScore}`);
     await refreshBase();
   } catch (error) {
-    showToast(error instanceof Error ? error.message : String(error), true);
+    renderOperationError("#doctor-repair-result", "安全修复失败", error);
   }
 });
 document.querySelector("#profile-file-path")?.addEventListener("input", () => {
@@ -4261,6 +4310,30 @@ document.querySelector("#preview-cleanup-plan")?.addEventListener("click", async
   }
 });
 
+document.addEventListener("input", (event) => {
+  const input = (event.target as HTMLElement).closest<HTMLInputElement>(
+    "#file-assoc-app-search, #file-assoc-target-name, #file-assoc-target-exe, #file-assoc-extension-input",
+  );
+  if (!input) return;
+  if (input.id === "file-assoc-app-search") state.fileAssociations.appQuery = input.value;
+  if (input.id === "file-assoc-target-name") state.fileAssociations.targetAppName = input.value;
+  if (input.id === "file-assoc-target-exe") state.fileAssociations.targetExecutable = input.value;
+  if (input.id === "file-assoc-extension-input") state.fileAssociations.extensionInput = input.value;
+});
+
+document.addEventListener("input", (event) => {
+  const input = (event.target as HTMLElement).closest<HTMLInputElement>("#file-assoc-filter-keyword");
+  if (!input) return;
+  state.fileAssociations.filter.keyword = input.value;
+  const cursor = input.selectionStart ?? input.value.length;
+  renderFileAssociations();
+  window.requestAnimationFrame(() => {
+    const replacement = document.querySelector<HTMLInputElement>("#file-assoc-filter-keyword");
+    replacement?.focus();
+    replacement?.setSelectionRange(cursor, cursor);
+  });
+});
+
 document.addEventListener("change", (event) => {
   const recycleDrive = (event.target as HTMLElement).closest<HTMLInputElement>("input[data-recycle-drive]");
   if (recycleDrive) {
@@ -4276,13 +4349,18 @@ document.addEventListener("change", (event) => {
     const extension = fileAssociationSelect.dataset.fileAssocSelect || "";
     if (fileAssociationSelect.checked) state.fileAssociations.selectedExtensions.add(extension);
     else state.fileAssociations.selectedExtensions.delete(extension);
+    state.fileAssociations.extensionInput = Array.from(state.fileAssociations.selectedExtensions).join(", ");
+    return;
+  }
+  const advancedRisk = (event.target as HTMLElement).closest<HTMLInputElement>("#file-assoc-advanced-risk");
+  if (advancedRisk) {
+    state.fileAssociations.advancedHighRisk = advancedRisk.checked;
     return;
   }
   const fileAssociationFilter = (event.target as HTMLElement).closest<HTMLInputElement | HTMLSelectElement>(
-    "#file-assoc-filter-keyword, #file-assoc-filter-risk, #file-assoc-filter-category, #file-assoc-filter-missing",
+    "#file-assoc-filter-risk, #file-assoc-filter-category, #file-assoc-filter-missing",
   );
   if (fileAssociationFilter) {
-    state.fileAssociations.filter.keyword = document.querySelector<HTMLInputElement>("#file-assoc-filter-keyword")?.value || "";
     state.fileAssociations.filter.risk = document.querySelector<HTMLSelectElement>("#file-assoc-filter-risk")?.value || "";
     state.fileAssociations.filter.category = document.querySelector<HTMLSelectElement>("#file-assoc-filter-category")?.value || "";
     state.fileAssociations.filter.onlyMissingApp = document.querySelector<HTMLInputElement>("#file-assoc-filter-missing")?.checked || false;
@@ -4728,7 +4806,7 @@ document.querySelectorAll<HTMLButtonElement>(".sort-head").forEach((button) => {
 
 document.addEventListener("click", async (event) => {
   const button = (event.target as HTMLElement).closest<HTMLButtonElement>(
-    "button[data-action], button[data-toolchain-action], button[data-python-tool], button[data-page-key], button[data-dev-cache], button[data-chsrc-action], button[data-cleanup-report-action], button[data-restore-env-backup], button[data-mysql-action], button[data-file-assoc-tab], button[data-file-assoc-plan-one], button[data-file-assoc-rollback], #scan-file-associations, #open-default-apps-settings, #export-file-association-report, #pick-file-assoc-target, #create-file-assoc-plan, #apply-file-assoc-plan, #open-file-type-settings, #load-file-assoc-backups, #open-file-assoc-backup-dir, #apply-project-config, #apply-environment-preview, #apply-python-repair, #create-managed-python-pip-plan, #execute-mysql-plan, #accept-safety-disclaimer",
+    "button[data-action], button[data-toolchain-action], button[data-python-tool], button[data-page-key], button[data-dev-cache], button[data-chsrc-action], button[data-cleanup-report-action], button[data-restore-env-backup], button[data-mysql-action], button[data-file-assoc-tab], button[data-file-assoc-plan-one], button[data-file-assoc-use-app], button[data-file-assoc-rollback], #scan-file-associations, #open-default-apps-settings, #export-file-association-report, #search-file-assoc-app, #pick-file-assoc-target, #create-file-assoc-plan, #apply-file-assoc-plan, #open-file-type-settings, #load-file-assoc-backups, #open-file-assoc-backup-dir, #apply-project-config, #apply-environment-preview, #apply-python-repair, #create-managed-python-pip-plan, #execute-mysql-plan, #accept-safety-disclaimer",
   );
   if (!button) return;
   const fileAssocTab = button.dataset.fileAssocTab as FileAssociationUiState["activeTab"] | undefined;
@@ -4745,18 +4823,18 @@ document.addEventListener("click", async (event) => {
   if (button.id === "open-default-apps-settings") {
     try {
       await invoke("open_default_apps_settings");
-      showToast("已打开 Windows 默认应用设置");
+      setFileAssociationResult("已打开 Windows 默认应用设置。请在系统页面完成受保护关联。");
     } catch (error) {
-      showToast(error instanceof Error ? error.message : String(error), true);
+      setFileAssociationError("打开默认应用设置失败", error);
     }
     return;
   }
   if (button.id === "export-file-association-report") {
     try {
       const path = await invoke<string>("export_file_association_report");
-      showToast(`文件关联报告已导出：${path}`);
+      setFileAssociationResult(`文件关联报告已导出：${path}`);
     } catch (error) {
-      showToast(error instanceof Error ? error.message : String(error), true);
+      setFileAssociationError("文件关联报告导出失败", error);
     }
     return;
   }
@@ -4764,11 +4842,29 @@ document.addEventListener("click", async (event) => {
     await pickFileAssociationTarget();
     return;
   }
+  if (button.id === "search-file-assoc-app") {
+    await searchFileAssociationApp();
+    return;
+  }
+  const appCandidateIndex = button.dataset.fileAssocUseApp;
+  if (appCandidateIndex !== undefined) {
+    const candidate = state.fileAssociations.appSearchResult?.candidates[Number(appCandidateIndex)];
+    if (!candidate?.exists) {
+      setFileAssociationError("无法选择应用", "该候选程序不存在，请重新搜索或手动选择 exe。");
+      return;
+    }
+    state.fileAssociations.targetAppName = candidate.displayName;
+    state.fileAssociations.targetExecutable = candidate.executablePath;
+    setFileAssociationResult(`已选择 ${candidate.displayName}：${candidate.executablePath}`);
+    return;
+  }
   const planOne = button.dataset.fileAssocPlanOne;
   if (planOne) {
     state.fileAssociations.selectedExtensions = new Set([planOne]);
+    state.fileAssociations.extensionInput = planOne;
     state.fileAssociations.activeTab = "apps";
-    renderFileAssociations();
+    setFileAssociationResult(`已选择 ${planOne}，请搜索或选择目标应用后生成修改计划。`);
+    focusResult("#file-assoc-app-search");
     return;
   }
   if (button.id === "create-file-assoc-plan") {
@@ -4782,9 +4878,9 @@ document.addEventListener("click", async (event) => {
   if (button.id === "open-file-type-settings") {
     try {
       await invoke("open_file_type_settings");
-      showToast("已打开 Windows 文件类型设置");
+      setFileAssociationResult("已打开 Windows 文件类型设置。");
     } catch (error) {
-      showToast(error instanceof Error ? error.message : String(error), true);
+      setFileAssociationError("打开文件类型设置失败", error);
     }
     return;
   }
@@ -4795,9 +4891,9 @@ document.addEventListener("click", async (event) => {
   if (button.id === "open-file-assoc-backup-dir") {
     try {
       await invoke("open_file_association_backup_dir");
-      showToast("已打开文件关联备份目录");
+      setFileAssociationResult("已打开文件关联备份目录。");
     } catch (error) {
-      showToast(error instanceof Error ? error.message : String(error), true);
+      setFileAssociationError("打开文件关联备份目录失败", error);
     }
     return;
   }

@@ -25,7 +25,12 @@
     "transactional-config-profile-apply-with-exact-rollback",
     "profile-json-picker-and-durable-results",
     "profile-copy-rename-and-single-confirmation-history-restore",
-    "stable-utc-audit-timestamps"
+    "stable-utc-audit-timestamps",
+    "doctor-fingerprint-bound-atomic-repair-with-rollback",
+    "doctor-durable-success-and-error-results",
+    "file-association-app-discovery-and-durable-results",
+    "backend-bound-single-use-file-association-plans",
+    "exact-file-association-registry-backups"
   ],
   "batches": [
     {
@@ -101,8 +106,13 @@
     {
       "id": "doctor",
       "priority": "P1",
-      "status": "pending",
+      "status": "completed",
       "strategy": "replace the legacy direct repair internally while retaining its existing button and result panel",
+      "equivalentImplementation": [
+        "the existing repair button creates and consumes a fingerprint-bound single-use backend plan",
+        "the complete environment repair group uses one backup and restores the original environment on any failure",
+        "success and failure remain visible in the existing doctor result panel"
+      ],
       "commands": [
         "create_doctor_repair_plan",
         "execute_doctor_repair_plan"
@@ -111,8 +121,13 @@
     {
       "id": "file-associations",
       "priority": "P1",
-      "status": "pending",
-      "strategy": "wire application search into the existing file-association controls",
+      "status": "completed",
+      "strategy": "wire bounded application search and single-confirmation execution into the existing file-association controls",
+      "equivalentImplementation": [
+        "common installed applications are discovered through bounded known locations, PATH, package managers and App Paths",
+        "the backend stores and consumes each immutable file-association plan once while the frontend shows one ordinary confirmation",
+        "registry backups preserve exact raw values for rollback and all actions render durable page results"
+      ],
       "commands": [
         "search_file_association_app"
       ]

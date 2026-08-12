@@ -581,6 +581,23 @@ struct DoctorRepairResult {
     report: DoctorReport,
 }
 
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct DoctorRepairPlan {
+    plan_id: String,
+    created_at: u64,
+    before_score: u8,
+    actions: Vec<String>,
+    warnings: Vec<String>,
+}
+
+#[derive(Clone)]
+struct PendingDoctorRepairPlan {
+    public: DoctorRepairPlan,
+    report_fingerprint: String,
+    environment_fingerprint: String,
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct PythonToolState {
@@ -1101,6 +1118,8 @@ static RECYCLE_BIN_PLANS: OnceLock<Mutex<HashMap<String, cleanup::RecycleBinClea
 static PROFILE_HISTORY_RESTORE_PLANS: OnceLock<
     Mutex<HashMap<String, PendingProfileHistoryRestorePlan>>,
 > = OnceLock::new();
+static DOCTOR_REPAIR_PLANS: OnceLock<Mutex<HashMap<String, PendingDoctorRepairPlan>>> =
+    OnceLock::new();
 
 #[derive(Debug, Clone)]
 struct PendingExpansionPlan {
@@ -1114,6 +1133,8 @@ const EXPANSION_PLAN_TTL_SECONDS: u64 = 15 * 60;
 const MAX_PENDING_EXPANSION_PLANS: usize = 32;
 const PROFILE_HISTORY_PLAN_TTL_SECONDS: u64 = 15 * 60;
 const MAX_PENDING_PROFILE_HISTORY_PLANS: usize = 64;
+const DOCTOR_REPAIR_PLAN_TTL_SECONDS: u64 = 10 * 60;
+const MAX_PENDING_DOCTOR_REPAIR_PLANS: usize = 32;
 
 fn confirmation_tokens() -> &'static Mutex<HashMap<String, ConfirmationToken>> {
     CONFIRMATION_TOKENS.get_or_init(|| Mutex::new(HashMap::new()))
@@ -1134,6 +1155,10 @@ fn recycle_bin_plans() -> &'static Mutex<HashMap<String, cleanup::RecycleBinClea
 fn profile_history_restore_plans(
 ) -> &'static Mutex<HashMap<String, PendingProfileHistoryRestorePlan>> {
     PROFILE_HISTORY_RESTORE_PLANS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn doctor_repair_plans() -> &'static Mutex<HashMap<String, PendingDoctorRepairPlan>> {
+    DOCTOR_REPAIR_PLANS.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
 const RISK_OPERATION_REGISTRY: &[RiskOperationSpec] = &[
@@ -1264,22 +1289,6 @@ const RISK_OPERATION_REGISTRY: &[RiskOperationSpec] = &[
         requires_backup: true,
         requires_token: true,
         description: "执行 MySQL 高危修复计划",
-    },
-    RiskOperationSpec {
-        command: "apply_file_association_plan",
-        action_id: "apply_file_association_plan",
-        risk_level: "high",
-        requires_backup: true,
-        requires_token: true,
-        description: "执行文件默认打开方式修改计划",
-    },
-    RiskOperationSpec {
-        command: "rollback_file_association_backup",
-        action_id: "rollback_file_association_backup",
-        risk_level: "high",
-        requires_backup: true,
-        requires_token: true,
-        description: "回滚文件默认打开方式备份",
     },
 ];
 
@@ -3058,7 +3067,7 @@ fn list_environment_backups() -> Result<Vec<EnvironmentBackupInfo>, String> {
     Ok(result)
 }
 
-fn configure_user_environment_blocking() -> Result<OperationResult, String> {
+fn configure_user_environment_with_backup(create_backup: bool) -> Result<OperationResult, String> {
     let paths = load_paths()?;
     paths.ensure().map_err(|err| err.to_string())?;
     let environment = user_environment()?;
@@ -3067,7 +3076,9 @@ fn configure_user_environment_blocking() -> Result<OperationResult, String> {
         .or_else(|| environment.get("PATH"))
         .cloned()
         .unwrap_or_default();
-    let backup_name = create_environment_backup(&paths, &environment)?;
+    let backup_name = create_backup
+        .then(|| create_environment_backup(&paths, &environment))
+        .transpose()?;
     let selected_java_home = select_java_home(&paths, &environment);
     set_user_environment_values(
         &paths,
@@ -3077,11 +3088,15 @@ fn configure_user_environment_blocking() -> Result<OperationResult, String> {
     broadcast_environment_change();
     Ok(OperationResult {
         success: true,
-        message: selected_java_home
-            .map(|value| format!("已配置用户环境变量，JAVA_HOME = {value}；备份：{backup_name}"))
-            .unwrap_or_else(|| {
-                format!("已配置用户环境变量，未发现可用 JAVA_HOME；备份：{backup_name}")
-            }),
+        message: format!(
+            "{}{}",
+            selected_java_home
+                .map(|value| format!("已配置用户环境变量，JAVA_HOME = {value}"))
+                .unwrap_or_else(|| "已配置用户环境变量，未发现可用 JAVA_HOME".to_string()),
+            backup_name
+                .map(|name| format!("；备份：{name}"))
+                .unwrap_or_default()
+        ),
     })
 }
 
@@ -3101,6 +3116,10 @@ async fn cleanup_path_entries(
 }
 
 fn cleanup_path_entries_blocking() -> Result<OperationResult, String> {
+    cleanup_path_entries_with_backup(true)
+}
+
+fn cleanup_path_entries_with_backup(create_backup: bool) -> Result<OperationResult, String> {
     let paths = load_paths()?;
     let environment = user_environment()?;
     let old_path = environment
@@ -3131,7 +3150,7 @@ fn cleanup_path_entries_blocking() -> Result<OperationResult, String> {
     }
 
     let new_path = retained.join(";");
-    let backup_name = if removed > 0 {
+    let backup_name = if removed > 0 && create_backup {
         Some(create_environment_backup(&paths, &environment)?)
     } else {
         None
@@ -3145,8 +3164,10 @@ fn cleanup_path_entries_blocking() -> Result<OperationResult, String> {
             "PATH 没有需要清理的真实失效或重复项".to_string()
         } else {
             format!(
-                "已清理 {removed} 个真实失效或重复 PATH，托管待安装路径已保留；备份：{}",
-                backup_name.unwrap_or_default()
+                "已清理 {removed} 个真实失效或重复 PATH，托管待安装路径已保留{}",
+                backup_name
+                    .map(|name| format!("；备份：{name}"))
+                    .unwrap_or_default()
             )
         },
     })
@@ -8684,34 +8705,195 @@ async fn repair_doctor_safe() -> Result<DoctorRepairResult, String> {
 }
 
 fn repair_doctor_safe_blocking() -> Result<DoctorRepairResult, String> {
+    let plan = create_doctor_repair_plan_blocking()?;
+    execute_doctor_repair_plan_blocking(plan.plan_id)
+}
+
+fn doctor_repair_actions(report: &DoctorReport) -> Vec<String> {
+    report
+        .checks
+        .iter()
+        .filter(|check| doctor_check_needs_attention(check))
+        .filter_map(|check| check.fix_action.as_deref())
+        .filter(|action| matches!(*action, "cleanup_path" | "configure_env"))
+        .map(str::to_string)
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect()
+}
+
+fn doctor_report_fingerprint(report: &DoctorReport, actions: &[String]) -> String {
+    let mut checks = report
+        .checks
+        .iter()
+        .filter(|check| {
+            check
+                .fix_action
+                .as_ref()
+                .is_some_and(|action| actions.contains(action))
+        })
+        .collect::<Vec<_>>();
+    checks.sort_by(|left, right| left.id.cmp(&right.id));
+    let mut hasher = Sha256::new();
+    for action in actions {
+        hasher.update(action.as_bytes());
+        hasher.update([0]);
+    }
+    for check in checks {
+        for value in [
+            check.id.as_str(),
+            check.status.as_str(),
+            check.severity.as_str(),
+            check.fix_action.as_deref().unwrap_or(""),
+        ] {
+            hasher.update(value.as_bytes());
+            hasher.update([0]);
+        }
+    }
+    format!("{:x}", hasher.finalize())
+}
+
+#[tauri::command]
+async fn create_doctor_repair_plan() -> Result<DoctorRepairPlan, String> {
+    run_blocking(create_doctor_repair_plan_blocking).await?
+}
+
+fn create_doctor_repair_plan_blocking() -> Result<DoctorRepairPlan, String> {
     let before = run_doctor_blocking()?;
-    let actions = before
-        .checks
-        .iter()
-        .filter(|item| item.status != "正常")
-        .filter_map(|item| item.fix_action.as_deref())
-        .collect::<BTreeSet<_>>();
-    let mut applied = Vec::new();
-    if actions.contains("cleanup_path") {
-        applied.push(cleanup_path_entries_blocking()?.message);
-    }
-    if actions.contains("configure_env") {
-        applied.push(configure_user_environment_blocking()?.message);
-    }
-    let report = run_doctor_blocking()?;
-    let remaining = report
-        .checks
-        .iter()
-        .filter(|item| doctor_check_needs_attention(item))
-        .map(|item| format!("{}：{}", item.title, item.detail))
-        .collect();
-    Ok(DoctorRepairResult {
+    let actions = doctor_repair_actions(&before);
+    let report_fingerprint = doctor_report_fingerprint(&before, &actions);
+    let environment_fingerprint = environment_fingerprint(&user_environment()?);
+    let created_at = unix_timestamp();
+    let mut hasher = Sha256::new();
+    hasher.update(report_fingerprint.as_bytes());
+    hasher.update(environment_fingerprint.as_bytes());
+    hasher.update(created_at.to_le_bytes());
+    hasher.update(
+        SAVE_JSON_COUNTER
+            .fetch_add(1, Ordering::Relaxed)
+            .to_le_bytes(),
+    );
+    let plan_id = format!("doctor-repair-{:x}", hasher.finalize());
+    let plan = DoctorRepairPlan {
+        plan_id: plan_id.clone(),
+        created_at,
         before_score: before.score,
-        after_score: report.score,
-        applied,
-        remaining,
-        report,
-    })
+        actions,
+        warnings: vec![
+            "仅修改当前用户的 DEVENV_HOME、JAVA_HOME 和 Path".to_string(),
+            "执行前自动备份；整组操作失败时恢复原环境".to_string(),
+            "计划只使用一次，并在诊断或环境变化后失效".to_string(),
+        ],
+    };
+    let now = unix_timestamp();
+    let mut plans = doctor_repair_plans()
+        .lock()
+        .map_err(|_| "环境医生修复计划存储不可用".to_string())?;
+    plans.retain(|_, pending| {
+        now.saturating_sub(pending.public.created_at) <= DOCTOR_REPAIR_PLAN_TTL_SECONDS
+    });
+    if plans.len() >= MAX_PENDING_DOCTOR_REPAIR_PLANS {
+        if let Some(oldest) = plans
+            .iter()
+            .min_by_key(|(_, pending)| pending.public.created_at)
+            .map(|(id, _)| id.clone())
+        {
+            plans.remove(&oldest);
+        }
+    }
+    plans.insert(
+        plan_id,
+        PendingDoctorRepairPlan {
+            public: plan.clone(),
+            report_fingerprint,
+            environment_fingerprint,
+        },
+    );
+    Ok(plan)
+}
+
+#[tauri::command]
+async fn execute_doctor_repair_plan(plan_id: String) -> Result<DoctorRepairResult, String> {
+    run_blocking(move || execute_doctor_repair_plan_blocking(plan_id)).await?
+}
+
+fn execute_doctor_repair_plan_blocking(
+    plan_id: String,
+) -> Result<DoctorRepairResult, String> {
+    let now = unix_timestamp();
+    let pending = {
+        let mut plans = doctor_repair_plans()
+            .lock()
+            .map_err(|_| "环境医生修复计划存储不可用".to_string())?;
+        plans.retain(|_, pending| {
+            now.saturating_sub(pending.public.created_at) <= DOCTOR_REPAIR_PLAN_TTL_SECONDS
+        });
+        plans
+            .remove(&plan_id)
+            .ok_or_else(|| "环境医生修复计划不存在、已过期或已经使用".to_string())?
+    };
+    let before = run_doctor_blocking()?;
+    let actions = doctor_repair_actions(&before);
+    if doctor_report_fingerprint(&before, &actions) != pending.report_fingerprint {
+        return Err("诊断结果在确认后发生变化，请重新执行安全修复".to_string());
+    }
+    let paths = load_paths()?;
+    let environment = user_environment()?;
+    if environment_fingerprint(&environment) != pending.environment_fingerprint {
+        return Err("用户环境变量在确认后发生变化，请重新执行安全修复".to_string());
+    }
+    if pending.public.actions.is_empty() {
+        return Ok(DoctorRepairResult {
+            before_score: before.score,
+            after_score: before.score,
+            applied: Vec::new(),
+            remaining: before
+                .checks
+                .iter()
+                .filter(|check| doctor_check_needs_attention(check))
+                .map(|check| format!("{}：{}", check.title, check.detail))
+                .collect(),
+            report: before,
+        });
+    }
+    let backup_name = create_environment_backup(&paths, &environment)?;
+    let execution = (|| {
+        let mut applied = Vec::new();
+        for action in &pending.public.actions {
+            let result = match action.as_str() {
+                "cleanup_path" => cleanup_path_entries_with_backup(false),
+                "configure_env" => configure_user_environment_with_backup(false),
+                _ => return Err(format!("不支持的环境医生修复动作：{action}")),
+            }?;
+            applied.push(result.message);
+        }
+        let report = run_doctor_blocking()?;
+        Ok::<(Vec<String>, DoctorReport), String>((applied, report))
+    })();
+    match execution {
+        Ok((mut applied, report)) => {
+            applied.push(format!("整组操作备份：{backup_name}"));
+            let remaining = report
+                .checks
+                .iter()
+                .filter(|check| doctor_check_needs_attention(check))
+                .map(|check| format!("{}：{}", check.title, check.detail))
+                .collect();
+            Ok(DoctorRepairResult {
+                before_score: before.score,
+                after_score: report.score,
+                applied,
+                remaining,
+                report,
+            })
+        }
+        Err(error) => Err(match restore_environment_snapshot(&environment) {
+            Ok(()) => format!("安全修复失败，已恢复原环境：{error}"),
+            Err(rollback_error) => {
+                format!("安全修复失败，且原环境恢复不完整：{error}；{rollback_error}")
+            }
+        }),
+    }
 }
 
 #[tauri::command]
@@ -8855,24 +9037,31 @@ fn restore_profile_state(
     if let Err(error) = apply_profile_current_versions(paths, current) {
         failures.push(format!("恢复运行时失败：{error}"));
     }
-    let previous_path = environment
-        .get("Path")
-        .or_else(|| environment.get("PATH"))
-        .cloned()
-        .unwrap_or_default();
-    if let Err(error) = restore_environment_values(
-        environment.get("DEVENV_HOME").map(String::as_str),
-        environment.get("JAVA_HOME").map(String::as_str),
-        &previous_path,
-    ) {
+    if let Err(error) = restore_environment_snapshot(environment) {
         failures.push(format!("恢复环境变量失败：{error}"));
     }
-    broadcast_environment_change();
     if failures.is_empty() {
         Ok(())
     } else {
         Err(failures.join("；"))
     }
+}
+
+fn restore_environment_snapshot(
+    environment: &std::collections::HashMap<String, String>,
+) -> Result<(), String> {
+    let previous_path = environment
+        .get("Path")
+        .or_else(|| environment.get("PATH"))
+        .cloned()
+        .unwrap_or_default();
+    restore_environment_values(
+        environment.get("DEVENV_HOME").map(String::as_str),
+        environment.get("JAVA_HOME").map(String::as_str),
+        &previous_path,
+    )?;
+    broadcast_environment_change();
+    Ok(())
 }
 
 fn validate_profile_environment(profile: &ConfigProfile) -> Result<(), String> {
@@ -9694,37 +9883,25 @@ async fn create_file_association_plan(
 }
 
 #[tauri::command]
+async fn search_file_association_app(
+    query: String,
+    extension: Option<String>,
+) -> Result<file_assoc::FileAssociationAppSearchResult, String> {
+    run_blocking(move || file_assoc::search_file_association_app_blocking(query, extension)).await?
+}
+
+#[tauri::command]
 async fn apply_file_association_plan(
-    plan: file_assoc::FileAssociationPlan,
-    confirmation_token: Option<String>,
+    plan_id: String,
 ) -> Result<file_assoc::FileAssociationApplyResult, String> {
-    run_blocking(move || {
-        if plan.requires_confirmation_token {
-            require_risk_operation_token(
-                "apply_file_association_plan",
-                &plan.plan_id,
-                confirmation_token,
-            )?;
-        }
-        file_assoc::apply_file_association_plan_blocking(plan)
-    })
-    .await?
+    run_blocking(move || file_assoc::apply_file_association_plan_blocking(plan_id)).await?
 }
 
 #[tauri::command]
 async fn rollback_file_association_backup(
     backup_id: String,
-    confirmation_token: Option<String>,
 ) -> Result<file_assoc::FileAssociationApplyResult, String> {
-    run_blocking(move || {
-        require_risk_operation_token(
-            "rollback_file_association_backup",
-            &backup_id,
-            confirmation_token,
-        )?;
-        file_assoc::rollback_file_association_backup_blocking(backup_id)
-    })
-    .await?
+    run_blocking(move || file_assoc::rollback_file_association_backup_blocking(backup_id)).await?
 }
 
 #[tauri::command]
@@ -9869,6 +10046,8 @@ pub fn run() {
             open_process_location,
             run_doctor,
             repair_doctor_safe,
+            create_doctor_repair_plan,
+            execute_doctor_repair_plan,
             export_doctor_report,
             export_doctor_report_json,
             doctor_report_text,
@@ -9929,6 +10108,7 @@ pub fn run() {
             generate_vscode_config,
             scan_file_associations,
             create_file_association_plan,
+            search_file_association_app,
             apply_file_association_plan,
             rollback_file_association_backup,
             list_file_association_backups,
@@ -14890,6 +15070,52 @@ mod tests {
         assert!(!current_timestamp().contains("SystemTime"));
     }
 
+    fn doctor_report_fixture() -> DoctorReport {
+        DoctorReport {
+            score: 60,
+            summary: "test".to_string(),
+            checks: vec![
+                DoctorCheck {
+                    id: "path".to_string(),
+                    title: "PATH".to_string(),
+                    category: "环境".to_string(),
+                    status: "需清理".to_string(),
+                    severity: "warning".to_string(),
+                    detail: "存在重复项".to_string(),
+                    fix_action: Some("cleanup_path".to_string()),
+                },
+                DoctorCheck {
+                    id: "network".to_string(),
+                    title: "网络".to_string(),
+                    category: "网络".to_string(),
+                    status: "需检查".to_string(),
+                    severity: "warning".to_string(),
+                    detail: "manual".to_string(),
+                    fix_action: Some("network".to_string()),
+                },
+            ],
+            suggestions: Vec::new(),
+            generated_at: "ignored".to_string(),
+        }
+    }
+
+    #[test]
+    fn doctor_repair_plan_contains_only_supported_safe_actions() {
+        let report = doctor_report_fixture();
+        assert_eq!(doctor_repair_actions(&report), vec!["cleanup_path"]);
+    }
+
+    #[test]
+    fn doctor_repair_fingerprint_tracks_diagnostic_evidence() {
+        let mut report = doctor_report_fixture();
+        let actions = doctor_repair_actions(&report);
+        let before = doctor_report_fingerprint(&report, &actions);
+        report.checks[0].detail = "changed".to_string();
+        assert_eq!(before, doctor_report_fingerprint(&report, &actions));
+        report.checks[0].status = "正常".to_string();
+        assert_ne!(before, doctor_report_fingerprint(&report, &actions));
+    }
+
     #[test]
     fn move_plan_is_backend_bound_and_single_use() {
         let plan = cleanup::MovePlan {
@@ -15532,8 +15758,6 @@ mod tests {
             "clean_dev_cache",
             "kill_process",
             "execute_mysql_repair_plan",
-            "apply_file_association_plan",
-            "rollback_file_association_backup",
         ] {
             let spec = risk_operation_spec(command).unwrap_or_else(|| panic!("missing {command}"));
             assert!(spec.requires_token);

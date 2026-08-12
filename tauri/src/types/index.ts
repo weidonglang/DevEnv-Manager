@@ -778,8 +778,31 @@ export type FileAssociationPlan = {
   changes: FileAssociationChange[];
   backupPath: string;
   warnings: string[];
+  riskLevel: string;
   requiresConfirmationToken: boolean;
   planFingerprint: string;
+};
+
+export type FileAssociationAppCandidate = {
+  appId: string;
+  displayName: string;
+  executablePath: string;
+  source: string;
+  confidence: number;
+  exists: boolean;
+  recommendedCommandTemplate: string;
+  notes: string[];
+};
+
+export type FileAssociationAppSearchResult = {
+  query: string;
+  normalizedQuery: string;
+  matchedAppId?: string | null;
+  matchedDisplayName?: string | null;
+  autoSelected?: FileAssociationAppCandidate | null;
+  candidates: FileAssociationAppCandidate[];
+  manualSelectionRequired: boolean;
+  message: string;
 };
 
 export type FileAssociationApplyResult = {
@@ -825,6 +848,14 @@ export type DoctorRepairResult = {
   applied: string[];
   remaining: string[];
   report: DoctorReport;
+};
+
+export type DoctorRepairPlan = {
+  planId: string;
+  createdAt: number;
+  beforeScore: number;
+  actions: string[];
+  warnings: string[];
 };
 
 export type ConfigProfileImportPreview = {

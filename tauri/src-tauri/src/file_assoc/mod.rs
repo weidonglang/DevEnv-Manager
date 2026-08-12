@@ -1,13 +1,61 @@
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
+use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Mutex, OnceLock};
 
 const HIGH_RISK_EXTENSIONS: &[&str] = &[
     ".exe", ".msi", ".reg", ".bat", ".cmd", ".ps1", ".vbs", ".scr",
 ];
+static FILE_ASSOC_ID_COUNTER: AtomicU64 = AtomicU64::new(0);
+static FILE_ASSOCIATION_PLANS: OnceLock<Mutex<HashMap<String, FileAssociationPlan>>> =
+    OnceLock::new();
+const FILE_ASSOCIATION_PLAN_TTL_SECONDS: u64 = 30 * 60;
+const MAX_PENDING_FILE_ASSOCIATION_PLANS: usize = 128;
+
+fn file_association_plan_store() -> &'static Mutex<HashMap<String, FileAssociationPlan>> {
+    FILE_ASSOCIATION_PLANS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn plan_created_at(plan: &FileAssociationPlan) -> Option<u64> {
+    plan.created_at.parse::<u64>().ok()
+}
+
+fn plan_expired(plan: &FileAssociationPlan, now: u64) -> bool {
+    plan_created_at(plan)
+        .is_none_or(|created| created.saturating_add(FILE_ASSOCIATION_PLAN_TTL_SECONDS) < now)
+}
+
+fn store_file_association_plan(plan: &FileAssociationPlan) -> Result<(), String> {
+    let now = current_timestamp().parse::<u64>().unwrap_or_default();
+    let mut store = file_association_plan_store()
+        .lock()
+        .map_err(|_| "文件关联计划存储暂时不可用".to_string())?;
+    store.retain(|_, pending| !plan_expired(pending, now));
+    if store.len() >= MAX_PENDING_FILE_ASSOCIATION_PLANS {
+        return Err("待执行的文件关联计划过多，请完成或等待旧计划过期后重试".to_string());
+    }
+    store.insert(plan.plan_id.clone(), plan.clone());
+    Ok(())
+}
+
+fn consume_file_association_plan(plan_id: &str) -> Result<FileAssociationPlan, String> {
+    let mut store = file_association_plan_store()
+        .lock()
+        .map_err(|_| "文件关联计划存储暂时不可用".to_string())?;
+    let stored = store
+        .remove(plan_id)
+        .ok_or_else(|| "文件关联计划不存在、已执行或已经过期，请重新创建预览".to_string())?;
+    let now = current_timestamp().parse::<u64>().unwrap_or_default();
+    if plan_expired(&stored, now) {
+        return Err("文件关联计划已超过 30 分钟，请重新创建预览".to_string());
+    }
+    Ok(stored)
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -111,6 +159,7 @@ pub struct FileAssociationPlan {
     pub changes: Vec<FileAssociationChange>,
     pub backup_path: String,
     pub warnings: Vec<String>,
+    pub risk_level: String,
     pub requires_confirmation_token: bool,
     pub plan_fingerprint: String,
 }
@@ -164,6 +213,60 @@ pub struct FileAssociationBackup {
 pub struct FileAssociationBackupRecord {
     pub extension: String,
     pub before: FileAssociationRecord,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extension_key_before: Option<FileAssociationRegistryKeyBackup>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_prog_id_before: Option<FileAssociationProgIdBackup>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct FileAssociationRegistryValueBackup {
+    pub value_type: u32,
+    pub bytes: Vec<u8>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct FileAssociationRegistryKeyBackup {
+    pub existed: bool,
+    pub default_value: Option<FileAssociationRegistryValueBackup>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct FileAssociationProgIdBackup {
+    pub prog_id: String,
+    pub root: FileAssociationRegistryKeyBackup,
+    pub shell: FileAssociationRegistryKeyBackup,
+    pub open: FileAssociationRegistryKeyBackup,
+    pub command: FileAssociationRegistryKeyBackup,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileAssociationAppCandidate {
+    pub app_id: String,
+    pub display_name: String,
+    pub executable_path: String,
+    pub source: String,
+    pub confidence: u8,
+    pub exists: bool,
+    pub recommended_command_template: String,
+    pub notes: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileAssociationAppSearchResult {
+    pub query: String,
+    pub normalized_query: String,
+    pub matched_app_id: Option<String>,
+    pub matched_display_name: Option<String>,
+    pub auto_selected: Option<FileAssociationAppCandidate>,
+    pub candidates: Vec<FileAssociationAppCandidate>,
+    pub manual_selection_required: bool,
+    pub message: String,
 }
 
 #[derive(Debug, Clone)]
@@ -171,6 +274,14 @@ struct ExtensionDefinition {
     extension: &'static str,
     category: &'static str,
     description: &'static str,
+}
+
+#[derive(Debug, Clone)]
+struct KnownApp {
+    app_id: &'static str,
+    display_name: &'static str,
+    aliases: &'static [&'static str],
+    exe_names: &'static [&'static str],
 }
 
 pub fn scan_file_associations_blocking() -> Result<FileAssociationReport, String> {
@@ -309,12 +420,8 @@ pub fn create_file_association_plan_blocking(
         });
     }
     let created_at = current_timestamp();
-    let plan_id = format!("file-assoc-{}", timestamp_compact());
+    let plan_id = unique_file_assoc_id("file-assoc");
     let backup_path = backup_dir().join(format!("{plan_id}.json"));
-    let requires_confirmation_token = changes.iter().any(|item| {
-        item.risk == FileAssociationRisk::HighRisk
-            || item.apply_mode == FileAssociationApplyMode::Blocked
-    });
     let mut plan = FileAssociationPlan {
         plan_id,
         created_at,
@@ -323,17 +430,92 @@ pub fn create_file_association_plan_blocking(
         changes,
         backup_path: display_path(&backup_path),
         warnings,
-        requires_confirmation_token,
+        risk_level: "high".to_string(),
+        requires_confirmation_token: false,
         plan_fingerprint: String::new(),
     };
     plan.plan_fingerprint = plan_fingerprint(&plan);
+    store_file_association_plan(&plan)?;
     Ok(plan)
 }
 
+pub fn search_file_association_app_blocking(
+    query: String,
+    extension: Option<String>,
+) -> Result<FileAssociationAppSearchResult, String> {
+    let query = query.trim().to_string();
+    if query.is_empty() {
+        return Err("请输入目标应用名称".to_string());
+    }
+    let normalized_query = normalize_app_query(&query);
+    if normalized_query.len() < 2 {
+        return Err("应用名称过短，请输入更明确的名称".to_string());
+    }
+    let app = known_apps()
+        .into_iter()
+        .find(|candidate| app_matches_query(candidate, &normalized_query));
+    let Some(app) = app else {
+        return Ok(FileAssociationAppSearchResult {
+            query,
+            normalized_query,
+            matched_app_id: None,
+            matched_display_name: None,
+            auto_selected: None,
+            candidates: Vec::new(),
+            manual_selection_required: true,
+            message: "没有识别到内置应用别名，请手动选择 exe。".to_string(),
+        });
+    };
+
+    let mut candidates = Vec::new();
+    collect_known_location_candidates(&app, &mut candidates);
+    collect_path_candidates(&app, &mut candidates);
+    collect_package_manager_candidates(&app, &mut candidates);
+    collect_app_paths_candidates(&app, &mut candidates);
+    candidates.sort_by(|left, right| {
+        right
+            .confidence
+            .cmp(&left.confidence)
+            .then_with(|| left.executable_path.cmp(&right.executable_path))
+    });
+    deduplicate_candidates(&mut candidates);
+
+    let auto_selected = candidates.iter().find(|item| item.exists).cloned();
+    let message = match &auto_selected {
+        Some(candidate) => format!(
+            "已找到 {}：{}",
+            candidate.display_name, candidate.executable_path
+        ),
+        None => format!("没有自动找到 {}，请手动选择 exe。", app.display_name),
+    };
+    let notes = extension
+        .and_then(|value| normalize_extension(&value).ok())
+        .map(|value| format!("将用于 {value} 的默认打开方式计划"))
+        .into_iter()
+        .collect::<Vec<_>>();
+    if !notes.is_empty() && auto_selected.is_some() {
+        if let Some(first) = candidates.first_mut() {
+            first.notes.extend(notes);
+        }
+    }
+    Ok(FileAssociationAppSearchResult {
+        query,
+        normalized_query,
+        matched_app_id: Some(app.app_id.to_string()),
+        matched_display_name: Some(app.display_name.to_string()),
+        manual_selection_required: auto_selected.is_none(),
+        auto_selected,
+        candidates,
+        message,
+    })
+}
+
 pub fn apply_file_association_plan_blocking(
-    plan: FileAssociationPlan,
+    plan_id: String,
 ) -> Result<FileAssociationApplyResult, String> {
+    let plan = consume_file_association_plan(&plan_id)?;
     validate_plan_fingerprint(&plan)?;
+    validate_plan_is_current(&plan)?;
     if plan.changes.is_empty() {
         return Err("计划为空，未执行任何修改".to_string());
     }
@@ -469,7 +651,11 @@ pub fn list_file_association_backups_blocking() -> Result<Vec<FileAssociationBac
             }
         }
     }
-    backups.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+    backups.sort_by(|a, b| {
+        b.created_at
+            .cmp(&a.created_at)
+            .then_with(|| b.backup_id.cmp(&a.backup_id))
+    });
     Ok(backups)
 }
 
@@ -659,6 +845,224 @@ fn apply_user_level_change(_change: &FileAssociationChange) -> Result<(), String
     Err("文件关联修改仅支持 Windows。".to_string())
 }
 
+fn capture_backup_record(
+    change: &FileAssociationChange,
+) -> Result<FileAssociationBackupRecord, String> {
+    let (extension_key_before, target_prog_id_before) = capture_registry_state(change)?;
+    Ok(FileAssociationBackupRecord {
+        extension: change.extension.clone(),
+        before: change.before.clone(),
+        extension_key_before,
+        target_prog_id_before,
+    })
+}
+
+#[cfg(windows)]
+fn capture_registry_state(
+    change: &FileAssociationChange,
+) -> Result<
+    (
+        Option<FileAssociationRegistryKeyBackup>,
+        Option<FileAssociationProgIdBackup>,
+    ),
+    String,
+> {
+    use winreg::{enums::*, RegKey};
+
+    if change.apply_mode != FileAssociationApplyMode::UserLevelRegistry {
+        return Ok((None, None));
+    }
+    validate_managed_prog_id(&change.after.prog_id)?;
+    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+    let extension_path = format!(r"Software\Classes\{}", change.extension);
+    let prog_id_path = format!(r"Software\Classes\{}", change.after.prog_id);
+    let shell_path = format!(r"{}\shell", prog_id_path);
+    let open_path = format!(r"{}\open", shell_path);
+    let command_path = format!(r"{}\command", open_path);
+    let extension_key_before = capture_registry_key(&hkcu, &extension_path)?;
+    let target_prog_id_before = FileAssociationProgIdBackup {
+        prog_id: change.after.prog_id.clone(),
+        root: capture_registry_key(&hkcu, &prog_id_path)?,
+        shell: capture_registry_key(&hkcu, &shell_path)?,
+        open: capture_registry_key(&hkcu, &open_path)?,
+        command: capture_registry_key(&hkcu, &command_path)?,
+    };
+    Ok((Some(extension_key_before), Some(target_prog_id_before)))
+}
+
+#[cfg(not(windows))]
+fn capture_registry_state(
+    _change: &FileAssociationChange,
+) -> Result<
+    (
+        Option<FileAssociationRegistryKeyBackup>,
+        Option<FileAssociationProgIdBackup>,
+    ),
+    String,
+> {
+    Ok((None, None))
+}
+
+#[cfg(windows)]
+fn capture_registry_key(
+    root: &winreg::RegKey,
+    path: &str,
+) -> Result<FileAssociationRegistryKeyBackup, String> {
+    use std::io::ErrorKind;
+    use winreg::enums::KEY_READ;
+
+    let key = match root.open_subkey_with_flags(path, KEY_READ) {
+        Ok(key) => key,
+        Err(error) if error.kind() == ErrorKind::NotFound => {
+            return Ok(FileAssociationRegistryKeyBackup {
+                existed: false,
+                default_value: None,
+            });
+        }
+        Err(error) => return Err(format!("Failed to inspect registry key {path}: {error}")),
+    };
+    let default_value = match key.get_raw_value("") {
+        Ok(value) => Some(backup_registry_value(value)),
+        Err(error) if error.kind() == ErrorKind::NotFound => None,
+        Err(error) => {
+            return Err(format!(
+                "Failed to inspect the default value for registry key {path}: {error}"
+            ));
+        }
+    };
+    Ok(FileAssociationRegistryKeyBackup {
+        existed: true,
+        default_value,
+    })
+}
+
+#[cfg(windows)]
+fn backup_registry_value(value: winreg::RegValue) -> FileAssociationRegistryValueBackup {
+    let winreg::RegValue { bytes, vtype } = value;
+    FileAssociationRegistryValueBackup {
+        value_type: vtype as u32,
+        bytes,
+    }
+}
+
+#[cfg(windows)]
+fn registry_value_from_backup(
+    value: &FileAssociationRegistryValueBackup,
+) -> Result<winreg::RegValue, String> {
+    use winreg::enums::*;
+
+    let vtype = match value.value_type {
+        0 => REG_NONE,
+        1 => REG_SZ,
+        2 => REG_EXPAND_SZ,
+        3 => REG_BINARY,
+        4 => REG_DWORD,
+        5 => REG_DWORD_BIG_ENDIAN,
+        6 => REG_LINK,
+        7 => REG_MULTI_SZ,
+        8 => REG_RESOURCE_LIST,
+        9 => REG_FULL_RESOURCE_DESCRIPTOR,
+        10 => REG_RESOURCE_REQUIREMENTS_LIST,
+        11 => REG_QWORD,
+        other => {
+            return Err(format!(
+                "Unsupported registry value type in backup: {other}"
+            ))
+        }
+    };
+    Ok(winreg::RegValue {
+        bytes: value.bytes.clone(),
+        vtype,
+    })
+}
+
+#[cfg(windows)]
+fn restore_registry_key(
+    root: &winreg::RegKey,
+    path: &str,
+    before: &FileAssociationRegistryKeyBackup,
+    label: &str,
+) -> Result<(), String> {
+    use std::io::ErrorKind;
+
+    if !before.existed {
+        return match root.delete_subkey_all(path) {
+            Ok(()) => Ok(()),
+            Err(error) if error.kind() == ErrorKind::NotFound => Ok(()),
+            Err(error) => Err(format!(
+                "Failed to remove restored {label} key {path}: {error}"
+            )),
+        };
+    }
+    let key = root
+        .create_subkey(path)
+        .map_err(|error| format!("Failed to open restored {label} key {path}: {error}"))?
+        .0;
+    match &before.default_value {
+        Some(value) => key
+            .set_raw_value("", &registry_value_from_backup(value)?)
+            .map_err(|error| {
+                format!("Failed to restore the default value for {label} key {path}: {error}")
+            }),
+        None => match key.delete_value("") {
+            Ok(()) => Ok(()),
+            Err(error) if error.kind() == ErrorKind::NotFound => Ok(()),
+            Err(error) => Err(format!(
+                "Failed to clear the default value for {label} key {path}: {error}"
+            )),
+        },
+    }
+}
+
+#[cfg(windows)]
+fn restore_target_prog_id(
+    classes: &winreg::RegKey,
+    before: &FileAssociationProgIdBackup,
+) -> Result<(), String> {
+    validate_managed_prog_id(&before.prog_id)?;
+    if !before.root.existed {
+        return restore_registry_key(classes, &before.prog_id, &before.root, "ProgID");
+    }
+
+    restore_registry_key(classes, &before.prog_id, &before.root, "ProgID")?;
+    let shell_path = format!(r"{}\shell", before.prog_id);
+    let open_path = format!(r"{}\open", shell_path);
+    let command_path = format!(r"{}\command", open_path);
+    restore_registry_key(classes, &command_path, &before.command, "ProgID command")?;
+    if !before.open.existed {
+        delete_empty_registry_key(classes, &open_path, "ProgID open")?;
+    }
+    if !before.shell.existed {
+        delete_empty_registry_key(classes, &shell_path, "ProgID shell")?;
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
+fn delete_empty_registry_key(root: &winreg::RegKey, path: &str, label: &str) -> Result<(), String> {
+    use std::io::ErrorKind;
+
+    match root.delete_subkey(path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(format!(
+            "Failed to remove the app-created {label} key {path}: {error}"
+        )),
+    }
+}
+
+fn validate_managed_prog_id(prog_id: &str) -> Result<(), String> {
+    if prog_id.starts_with("DevEnvManager.")
+        && prog_id
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '.' | '_' | '-'))
+    {
+        Ok(())
+    } else {
+        Err(format!("Unsafe managed ProgID in backup: {prog_id}"))
+    }
+}
+
 #[cfg(windows)]
 fn restore_record(record: &FileAssociationBackupRecord) -> Result<(), String> {
     use winreg::{enums::*, RegKey};
@@ -667,6 +1071,13 @@ fn restore_record(record: &FileAssociationBackupRecord) -> Result<(), String> {
         .create_subkey(r"Software\Classes")
         .map_err(|err| format!("打开当前用户 Classes 失败：{err}"))?
         .0;
+    if let Some(before) = &record.extension_key_before {
+        restore_registry_key(&classes, &record.extension, before, "extension")?;
+        if let Some(target_before) = &record.target_prog_id_before {
+            restore_target_prog_id(&classes, target_before)?;
+        }
+        return Ok(());
+    }
     let extension_key = classes
         .create_subkey(&record.extension)
         .map_err(|err| format!("打开扩展名键失败：{err}"))?
@@ -687,6 +1098,11 @@ fn restore_record(_record: &FileAssociationBackupRecord) -> Result<(), String> {
 }
 
 fn write_backup(plan: &FileAssociationPlan) -> Result<FileAssociationBackup, String> {
+    let records = plan
+        .changes
+        .iter()
+        .map(capture_backup_record)
+        .collect::<Result<Vec<_>, _>>()?;
     let backup = FileAssociationBackup {
         backup_id: plan.plan_id.clone(),
         created_at: current_timestamp(),
@@ -695,14 +1111,7 @@ fn write_backup(plan: &FileAssociationPlan) -> Result<FileAssociationBackup, Str
         plan_id: plan.plan_id.clone(),
         plan_fingerprint: plan.plan_fingerprint.clone(),
         target_app_name: plan.target_app_name.clone(),
-        records: plan
-            .changes
-            .iter()
-            .map(|change| FileAssociationBackupRecord {
-                extension: change.extension.clone(),
-                before: change.before.clone(),
-            })
-            .collect(),
+        records,
     };
     let path = PathBuf::from(&plan.backup_path);
     if let Some(parent) = path.parent() {
@@ -731,6 +1140,27 @@ fn validate_plan_fingerprint(plan: &FileAssociationPlan) -> Result<(), String> {
     let expected = plan_fingerprint(plan);
     if expected != plan.plan_fingerprint {
         return Err("文件关联计划指纹不匹配，已拒绝执行".to_string());
+    }
+    Ok(())
+}
+
+fn validate_plan_is_current(plan: &FileAssociationPlan) -> Result<(), String> {
+    if !Path::new(&plan.target_executable).is_file() {
+        return Err("目标应用在创建预览后已不可用，请重新选择应用".to_string());
+    }
+    for change in &plan.changes {
+        let current = read_current_association(&change.extension)
+            .unwrap_or((None, FileAssociationSource::Unknown));
+        let current_command = current.0.as_deref().and_then(read_open_command);
+        if current.0 != change.before.current_prog_id
+            || current.1 != change.before.source
+            || current_command != change.before.current_command
+        {
+            return Err(format!(
+                "{} 的文件关联在创建预览后发生变化，请重新扫描并创建计划",
+                change.extension
+            ));
+        }
     }
     Ok(())
 }
@@ -926,6 +1356,380 @@ fn extension_definitions() -> Vec<ExtensionDefinition> {
     .collect()
 }
 
+fn known_apps() -> Vec<KnownApp> {
+    vec![
+        KnownApp {
+            app_id: "vscode",
+            display_name: "Visual Studio Code",
+            aliases: &["vscode", "vs code", "code", "visual studio code"],
+            exe_names: &["Code.exe", "code.exe", "code.cmd"],
+        },
+        KnownApp {
+            app_id: "intellij-idea",
+            display_name: "IntelliJ IDEA",
+            aliases: &[
+                "idea",
+                "intellij",
+                "intellij idea",
+                "jetbrains idea",
+                "idea64",
+            ],
+            exe_names: &["idea64.exe", "idea.exe", "idea.bat"],
+        },
+        KnownApp {
+            app_id: "notepad-plus-plus",
+            display_name: "Notepad++",
+            aliases: &["notepad++", "npp", "notepad plus plus"],
+            exe_names: &["notepad++.exe"],
+        },
+        KnownApp {
+            app_id: "7zip",
+            display_name: "7-Zip",
+            aliases: &["7zip", "7-zip", "7z"],
+            exe_names: &["7zFM.exe", "7z.exe"],
+        },
+        KnownApp {
+            app_id: "vlc",
+            display_name: "VLC media player",
+            aliases: &["vlc", "vlc media player"],
+            exe_names: &["vlc.exe"],
+        },
+        KnownApp {
+            app_id: "potplayer",
+            display_name: "PotPlayer",
+            aliases: &["potplayer", "pot player"],
+            exe_names: &["PotPlayerMini64.exe", "PotPlayerMini.exe"],
+        },
+        KnownApp {
+            app_id: "edge",
+            display_name: "Microsoft Edge",
+            aliases: &["edge", "microsoft edge", "msedge"],
+            exe_names: &["msedge.exe"],
+        },
+        KnownApp {
+            app_id: "chrome",
+            display_name: "Google Chrome",
+            aliases: &["chrome", "google chrome"],
+            exe_names: &["chrome.exe"],
+        },
+        KnownApp {
+            app_id: "acrobat",
+            display_name: "Adobe Reader",
+            aliases: &["acrobat", "adobe reader", "adobe acrobat"],
+            exe_names: &["AcroRd32.exe", "Acrobat.exe"],
+        },
+        KnownApp {
+            app_id: "notepad",
+            display_name: "Windows 记事本",
+            aliases: &["notepad", "记事本"],
+            exe_names: &["notepad.exe"],
+        },
+    ]
+}
+
+fn normalize_app_query(value: &str) -> String {
+    value
+        .chars()
+        .filter(|ch| ch.is_ascii_alphanumeric() || ('\u{4e00}'..='\u{9fff}').contains(ch))
+        .flat_map(char::to_lowercase)
+        .collect()
+}
+
+fn app_matches_query(app: &KnownApp, normalized_query: &str) -> bool {
+    app.aliases.iter().any(|alias| {
+        let normalized_alias = normalize_app_query(alias);
+        normalized_alias == normalized_query
+            || normalized_alias.contains(normalized_query)
+            || normalized_query.contains(&normalized_alias)
+    })
+}
+
+fn collect_known_location_candidates(
+    app: &KnownApp,
+    candidates: &mut Vec<FileAssociationAppCandidate>,
+) {
+    let mut paths = Vec::new();
+    let local = env::var_os("LOCALAPPDATA").map(PathBuf::from);
+    let program_files = env::var_os("ProgramFiles").map(PathBuf::from);
+    let program_files_x86 = env::var_os("ProgramFiles(x86)").map(PathBuf::from);
+    match app.app_id {
+        "vscode" => {
+            if let Some(root) = &local {
+                paths.push(
+                    root.join("Programs")
+                        .join("Microsoft VS Code")
+                        .join("Code.exe"),
+                );
+            }
+            for root in [&program_files, &program_files_x86].into_iter().flatten() {
+                paths.push(root.join("Microsoft VS Code").join("Code.exe"));
+            }
+        }
+        "intellij-idea" => {
+            if let Some(root) = &local {
+                collect_jetbrains_idea_dirs(&root.join("Programs").join("JetBrains"), &mut paths);
+                collect_jetbrains_idea_dirs(
+                    &root.join("JetBrains").join("Toolbox").join("apps"),
+                    &mut paths,
+                );
+            }
+            for root in [&program_files, &program_files_x86].into_iter().flatten() {
+                collect_jetbrains_idea_dirs(&root.join("JetBrains"), &mut paths);
+            }
+        }
+        "notepad-plus-plus" => {
+            for root in [&program_files, &program_files_x86].into_iter().flatten() {
+                paths.push(root.join("Notepad++").join("notepad++.exe"));
+            }
+        }
+        "7zip" => {
+            for root in [&program_files, &program_files_x86].into_iter().flatten() {
+                paths.push(root.join("7-Zip").join("7zFM.exe"));
+            }
+        }
+        "vlc" => {
+            for root in [&program_files, &program_files_x86].into_iter().flatten() {
+                paths.push(root.join("VideoLAN").join("VLC").join("vlc.exe"));
+            }
+        }
+        "potplayer" => {
+            for root in [&program_files, &program_files_x86].into_iter().flatten() {
+                paths.push(
+                    root.join("DAUM")
+                        .join("PotPlayer")
+                        .join("PotPlayerMini64.exe"),
+                );
+            }
+        }
+        "edge" => {
+            for root in [&program_files, &program_files_x86].into_iter().flatten() {
+                paths.push(
+                    root.join("Microsoft")
+                        .join("Edge")
+                        .join("Application")
+                        .join("msedge.exe"),
+                );
+            }
+        }
+        "chrome" => {
+            if let Some(root) = &local {
+                paths.push(
+                    root.join("Google")
+                        .join("Chrome")
+                        .join("Application")
+                        .join("chrome.exe"),
+                );
+            }
+            for root in [&program_files, &program_files_x86].into_iter().flatten() {
+                paths.push(
+                    root.join("Google")
+                        .join("Chrome")
+                        .join("Application")
+                        .join("chrome.exe"),
+                );
+            }
+        }
+        "acrobat" => {
+            for root in [&program_files, &program_files_x86].into_iter().flatten() {
+                paths.push(
+                    root.join("Adobe")
+                        .join("Acrobat Reader DC")
+                        .join("Reader")
+                        .join("AcroRd32.exe"),
+                );
+                paths.push(
+                    root.join("Adobe")
+                        .join("Acrobat DC")
+                        .join("Acrobat")
+                        .join("Acrobat.exe"),
+                );
+            }
+        }
+        "notepad" => {
+            if let Some(system_root) = env::var_os("SystemRoot").map(PathBuf::from) {
+                paths.push(system_root.join("System32").join("notepad.exe"));
+            }
+        }
+        _ => {}
+    }
+    for path in paths {
+        push_app_candidate(candidates, app, path, "knownLocation", 95, Vec::new());
+    }
+}
+
+fn collect_jetbrains_idea_dirs(root: &Path, paths: &mut Vec<PathBuf>) {
+    const MAX_DEPTH: usize = 4;
+    const MAX_DIRECTORIES: usize = 256;
+    let mut pending = vec![(root.to_path_buf(), 0_usize)];
+    let mut inspected = 0_usize;
+    while let Some((directory, depth)) = pending.pop() {
+        if inspected >= MAX_DIRECTORIES {
+            break;
+        }
+        inspected += 1;
+        let Ok(entries) = fs::read_dir(&directory) else {
+            continue;
+        };
+        for entry in entries.flatten().take(80) {
+            let path = entry.path();
+            if !path.is_dir() {
+                continue;
+            }
+            let name = entry.file_name().to_string_lossy().to_ascii_lowercase();
+            if name.contains("intellij idea") || name == "idea" {
+                paths.push(path.join("bin").join("idea64.exe"));
+                paths.push(path.join("bin").join("idea.exe"));
+            }
+            if depth < MAX_DEPTH {
+                pending.push((path, depth + 1));
+            }
+        }
+    }
+}
+
+fn collect_path_candidates(app: &KnownApp, candidates: &mut Vec<FileAssociationAppCandidate>) {
+    let Some(path_value) = env::var_os("PATH") else {
+        return;
+    };
+    for directory in env::split_paths(&path_value).take(256) {
+        for exe_name in app.exe_names {
+            let candidate = directory.join(exe_name);
+            if !candidate.is_file() {
+                continue;
+            }
+            let path = if app.app_id == "vscode" && exe_name.ends_with(".cmd") {
+                directory
+                    .parent()
+                    .map(|parent| parent.join("Code.exe"))
+                    .filter(|path| path.is_file())
+                    .unwrap_or(candidate)
+            } else {
+                candidate
+            };
+            push_app_candidate(candidates, app, path, "path", 75, Vec::new());
+        }
+    }
+}
+
+fn collect_package_manager_candidates(
+    app: &KnownApp,
+    candidates: &mut Vec<FileAssociationAppCandidate>,
+) {
+    if let Some(scoop) = env::var_os("SCOOP").map(PathBuf::from) {
+        for exe_name in app.exe_names {
+            push_app_candidate(
+                candidates,
+                app,
+                scoop
+                    .join("apps")
+                    .join(app.app_id)
+                    .join("current")
+                    .join(exe_name),
+                "scoop",
+                80,
+                Vec::new(),
+            );
+        }
+    }
+    if let Some(choco) = env::var_os("ChocolateyInstall").map(PathBuf::from) {
+        for exe_name in app.exe_names {
+            push_app_candidate(
+                candidates,
+                app,
+                choco
+                    .join("lib")
+                    .join(app.app_id)
+                    .join("tools")
+                    .join(exe_name),
+                "chocolatey",
+                78,
+                Vec::new(),
+            );
+        }
+    }
+}
+
+fn collect_app_paths_candidates(app: &KnownApp, candidates: &mut Vec<FileAssociationAppCandidate>) {
+    for path in app_paths_for_exe_names(app.exe_names) {
+        push_app_candidate(candidates, app, path, "appPaths", 90, Vec::new());
+    }
+}
+
+#[cfg(windows)]
+fn app_paths_for_exe_names(exe_names: &[&str]) -> Vec<PathBuf> {
+    use winreg::enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE};
+    use winreg::RegKey;
+
+    let mut result = Vec::new();
+    for hive in [HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE] {
+        let root = RegKey::predef(hive);
+        for exe_name in exe_names {
+            let subkey = format!(
+                r"Software\Microsoft\Windows\CurrentVersion\App Paths\{}",
+                exe_name
+            );
+            let Ok(key) = root.open_subkey(subkey) else {
+                continue;
+            };
+            if let Ok(value) = key.get_value::<String, _>("") {
+                result.push(PathBuf::from(value));
+            }
+        }
+    }
+    result
+}
+
+#[cfg(not(windows))]
+fn app_paths_for_exe_names(_exe_names: &[&str]) -> Vec<PathBuf> {
+    Vec::new()
+}
+
+fn push_app_candidate(
+    candidates: &mut Vec<FileAssociationAppCandidate>,
+    app: &KnownApp,
+    path: PathBuf,
+    source: &str,
+    confidence: u8,
+    notes: Vec<String>,
+) {
+    let exists = path.is_file();
+    if !exists && source != "knownLocation" {
+        return;
+    }
+    let executable_path = path.to_string_lossy().to_string();
+    candidates.push(FileAssociationAppCandidate {
+        app_id: app.app_id.to_string(),
+        display_name: app.display_name.to_string(),
+        recommended_command_template: format!("\"{}\" \"%1\"", executable_path),
+        executable_path,
+        source: source.to_string(),
+        confidence: if exists {
+            confidence
+        } else {
+            confidence.saturating_sub(30)
+        },
+        exists,
+        notes,
+    });
+}
+
+fn deduplicate_candidates(candidates: &mut Vec<FileAssociationAppCandidate>) {
+    let mut seen = BTreeMap::<String, usize>::new();
+    let mut deduped: Vec<FileAssociationAppCandidate> = Vec::new();
+    for candidate in candidates.drain(..) {
+        let key = candidate.executable_path.to_ascii_lowercase();
+        if let Some(index) = seen.get(&key).copied() {
+            if candidate.confidence > deduped[index].confidence {
+                deduped[index] = candidate;
+            }
+            continue;
+        }
+        seen.insert(key, deduped.len());
+        deduped.push(candidate);
+    }
+    *candidates = deduped;
+}
+
 fn backup_root() -> PathBuf {
     dirs::data_dir()
         .or_else(dirs::home_dir)
@@ -967,6 +1771,15 @@ fn timestamp_compact() -> String {
     unix_timestamp().to_string()
 }
 
+fn unique_file_assoc_id(prefix: &str) -> String {
+    let counter = FILE_ASSOC_ID_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let millis = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis();
+    format!("{prefix}-{millis}-{}-{counter}", std::process::id())
+}
+
 fn unix_timestamp() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -997,6 +1810,29 @@ mod tests {
     }
 
     #[test]
+    fn app_search_matches_common_aliases() {
+        let vscode = known_apps()
+            .into_iter()
+            .find(|app| app_matches_query(app, &normalize_app_query("vs code")))
+            .unwrap();
+        assert_eq!(vscode.app_id, "vscode");
+        let idea = known_apps()
+            .into_iter()
+            .find(|app| app_matches_query(app, &normalize_app_query("jetbrains idea")))
+            .unwrap();
+        assert_eq!(idea.app_id, "intellij-idea");
+    }
+
+    #[test]
+    fn app_search_unknown_query_requires_manual_selection() {
+        let result =
+            search_file_association_app_blocking("definitely unknown editor".to_string(), None)
+                .unwrap();
+        assert!(result.manual_selection_required);
+        assert!(result.candidates.is_empty());
+    }
+
+    #[test]
     fn command_parser_reads_quoted_executable() {
         assert_eq!(
             command_executable(r#""C:\Program Files\App\app.exe" "%1""#).as_deref(),
@@ -1013,6 +1849,68 @@ mod tests {
             advanced_high_risk: false,
         };
         assert!(create_file_association_plan_blocking(request).is_err());
+    }
+
+    #[test]
+    fn normal_plan_uses_backend_bound_single_confirmation_contract() {
+        let request = FileAssociationPlanRequest {
+            target_app_name: "Fixture App".to_string(),
+            target_executable: std::env::current_exe()
+                .unwrap()
+                .to_string_lossy()
+                .to_string(),
+            extensions: vec![".devenvtest182".to_string()],
+            advanced_high_risk: false,
+        };
+        let plan = create_file_association_plan_blocking(request).unwrap();
+
+        assert_eq!(plan.risk_level, "high");
+        assert!(!plan.requires_confirmation_token);
+        assert!(!plan.backup_path.trim().is_empty());
+    }
+
+    #[test]
+    fn legacy_backup_record_remains_readable_without_registry_snapshots() {
+        let before = unknown_record(
+            ".devenvtest182",
+            ExtensionDefinition {
+                extension: ".devenvtest182",
+                category: "fixture",
+                description: "fixture",
+            },
+        );
+        let value = serde_json::json!({
+            "extension": ".devenvtest182",
+            "before": before,
+        });
+
+        let record: FileAssociationBackupRecord = serde_json::from_value(value).unwrap();
+
+        assert!(record.extension_key_before.is_none());
+        assert!(record.target_prog_id_before.is_none());
+    }
+
+    #[test]
+    fn managed_prog_id_guard_rejects_registry_paths() {
+        assert!(validate_managed_prog_id("DevEnvManager.Fixture.devenvtest182").is_ok());
+        assert!(validate_managed_prog_id(r"DevEnvManager.Fixture\shell").is_err());
+        assert!(validate_managed_prog_id("OtherVendor.Fixture").is_err());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn registry_value_backup_preserves_raw_type_and_bytes() {
+        use winreg::enums::REG_EXPAND_SZ;
+
+        let original = winreg::RegValue {
+            bytes: vec![37, 0, 84, 0, 69, 0, 77, 0, 80, 0, 37, 0, 0, 0],
+            vtype: REG_EXPAND_SZ,
+        };
+        let backup = backup_registry_value(original);
+        let restored = registry_value_from_backup(&backup).unwrap();
+
+        assert_eq!(restored.vtype, REG_EXPAND_SZ);
+        assert_eq!(restored.bytes, backup.bytes);
     }
 
     #[test]
@@ -1045,12 +1943,69 @@ mod tests {
             }],
             backup_path: "backup.json".to_string(),
             warnings: Vec::new(),
+            risk_level: "high".to_string(),
             requires_confirmation_token: false,
             plan_fingerprint: String::new(),
         };
         plan.plan_fingerprint = plan_fingerprint(&plan);
         assert!(validate_plan_fingerprint(&plan).is_ok());
+        let serialized = serde_json::to_value(&plan).unwrap();
+        let change = &serialized["changes"][0];
+        assert_eq!(change["extension"], ".txt");
+        assert_eq!(change["before"]["currentProgId"], serde_json::Value::Null);
+        assert_eq!(change["after"]["appName"], "App");
+        assert_eq!(change["after"]["executable"], "app.exe");
+        assert_eq!(change["applyMode"], "openSystemSettings");
+        assert!(serialized["backupPath"].as_str().is_some());
+        assert_eq!(serialized["riskLevel"], "high");
+        assert_eq!(serialized["requiresConfirmationToken"], false);
         plan.target_app_name = "Other".to_string();
         assert!(validate_plan_fingerprint(&plan).is_err());
+    }
+
+    #[test]
+    fn backend_store_consumes_plan_id_once() {
+        let record = unknown_record(
+            ".devenvplanbinding",
+            ExtensionDefinition {
+                extension: ".devenvplanbinding",
+                category: "fixture",
+                description: "fixture",
+            },
+        );
+        let mut plan = FileAssociationPlan {
+            plan_id: unique_file_assoc_id("file-assoc-binding"),
+            created_at: current_timestamp(),
+            target_app_name: "Fixture App".to_string(),
+            target_executable: "fixture.exe".to_string(),
+            changes: vec![FileAssociationChange {
+                extension: ".devenvplanbinding".to_string(),
+                before: record,
+                after: FileAssociationTarget {
+                    prog_id: "DevEnvManager.Fixture.devenvplanbinding".to_string(),
+                    app_name: "Fixture App".to_string(),
+                    executable: "fixture.exe".to_string(),
+                    command: "\"fixture.exe\" \"%1\"".to_string(),
+                },
+                apply_mode: FileAssociationApplyMode::OpenSystemSettings,
+                risk: FileAssociationRisk::Normal,
+                warnings: Vec::new(),
+            }],
+            backup_path: "fixture.json".to_string(),
+            warnings: Vec::new(),
+            risk_level: "high".to_string(),
+            requires_confirmation_token: false,
+            plan_fingerprint: String::new(),
+        };
+        plan.plan_fingerprint = plan_fingerprint(&plan);
+        store_file_association_plan(&plan).unwrap();
+
+        assert_eq!(
+            consume_file_association_plan(&plan.plan_id)
+                .unwrap()
+                .plan_id,
+            plan.plan_id
+        );
+        assert!(consume_file_association_plan(&plan.plan_id).is_err());
     }
 }

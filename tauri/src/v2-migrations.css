@@ -12,6 +12,28 @@
   margin-top: 18px;
 }
 
+.file-assoc-app-results {
+  display: grid;
+  gap: 8px;
+  max-height: 320px;
+  margin: 10px 0;
+  overflow: auto;
+}
+
+.file-assoc-app-results .runtime {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.file-assoc-app-results .runtime small {
+  grid-column: 1 / -1;
+}
+
+#file-assoc-operation-result {
+  margin-top: 12px;
+  overflow-wrap: anywhere;
+}
+
 @media (max-width: 1050px) {
   .profile-file-row {
     grid-template-columns: minmax(0, 1fr) 1fr;
