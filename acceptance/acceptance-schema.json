@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devenv-manager.local/acceptance-schema.json",
+  "title": "DevEnv Manager feature manifest",
+  "type": "object",
+  "required": ["schemaVersion", "productVersion", "pages"],
+  "properties": {
+    "$schema": { "type": "string", "minLength": 1 },
+    "schemaVersion": { "const": 1 },
+    "productVersion": { "type": "string", "minLength": 1 },
+    "pages": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["pageId", "displayName", "features"],
+        "properties": {
+          "pageId": { "type": "string", "pattern": "^[a-z][a-zA-Z0-9-]*$" },
+          "displayName": { "type": "string", "minLength": 1 },
+          "features": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["featureId", "userVisibleName", "status", "priority", "frontendEntry", "backendCommands", "riskLevel", "safeSmokeMode", "acceptanceChecks"],
+              "properties": {
+                "featureId": { "type": "string", "pattern": "^[a-z][a-zA-Z0-9.-]+$" },
+                "userVisibleName": { "type": "string", "minLength": 1 },
+                "status": { "enum": ["implemented", "partial", "backendOnly", "uiOnly", "missing", "deferred", "manualOnly"] },
+                "priority": { "enum": ["P0", "P1", "P2"] },
+                "frontendEntry": {
+                  "type": "object",
+                  "required": ["viewId", "selectors"],
+                  "properties": {
+                    "viewId": { "type": "string", "minLength": 1 },
+                    "selectors": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+                  },
+                  "additionalProperties": false
+                },
+                "backendCommands": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+                "riskLevel": { "enum": ["readOnly", "low", "medium", "high", "critical"] },
+                "requiresTauri": { "type": "boolean" },
+                "requiresWindows": { "type": "boolean" },
+                "safeSmokeMode": { "enum": ["readOnly", "dryRun", "static", "manual"] },
+                "manualOnlyReason": { "type": ["string", "null"] },
+                "acceptanceChecks": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

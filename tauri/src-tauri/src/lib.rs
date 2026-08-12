@@ -1,3 +1,4 @@
+mod acceptance;
 mod cleanup;
 mod diagnostics;
 mod env_core;
@@ -10085,6 +10086,33 @@ async fn powershell_runner_status() -> Result<powershell_runner::PowerShellResul
     .await?
 }
 
+#[tauri::command]
+fn list_feature_acceptance_cases() -> Result<Vec<acceptance::FeatureAcceptanceCase>, String> {
+    acceptance::list_cases()
+}
+
+#[tauri::command]
+async fn run_feature_acceptance_case(
+    case_id: String,
+) -> Result<acceptance::FeatureAcceptanceResult, String> {
+    run_blocking(move || acceptance::run_case(&case_id)).await?
+}
+
+#[tauri::command]
+async fn run_feature_acceptance_suite(
+    page: Option<String>,
+) -> Result<acceptance::FeatureAcceptanceSuite, String> {
+    run_blocking(move || acceptance::run_suite(page.as_deref())).await?
+}
+
+#[tauri::command]
+async fn export_feature_acceptance_report(
+    format: String,
+    suite: Option<acceptance::FeatureAcceptanceSuite>,
+) -> Result<String, String> {
+    run_blocking(move || acceptance::export_report(&format, suite)).await?
+}
+
 pub fn run() {
     suppress_system_error_dialogs();
     tauri::Builder::default()
@@ -10266,7 +10294,11 @@ pub fn run() {
             open_file_type_settings,
             open_file_association_backup_dir,
             export_file_association_report,
-            powershell_runner_status
+            powershell_runner_status,
+            list_feature_acceptance_cases,
+            run_feature_acceptance_case,
+            run_feature_acceptance_suite,
+            export_feature_acceptance_report
         ])
         .run(tauri::generate_context!())
         .expect("error while running DevEnv Manager");

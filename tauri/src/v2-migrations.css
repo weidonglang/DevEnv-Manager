@@ -64,7 +64,127 @@
   margin-bottom: 10px;
 }
 
+.acceptance-center {
+  margin-top: 16px;
+}
+
+.acceptance-head {
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.acceptance-head .panel-title > div {
+  display: grid;
+  gap: 4px;
+}
+
+.acceptance-head h2,
+.acceptance-head p {
+  margin: 0;
+}
+
+.acceptance-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(100px, 1fr));
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.acceptance-summary > div {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid var(--border, #c8d2da);
+  border-radius: 6px;
+  background: var(--surface-soft, Canvas);
+  color: var(--text, CanvasText);
+}
+
+.acceptance-summary span,
+.acceptance-case small,
+.acceptance-table small {
+  color: var(--muted, GrayText);
+}
+
+.acceptance-summary strong {
+  font-size: 1.35rem;
+}
+
+.acceptance-export-actions {
+  justify-content: flex-end;
+}
+
+.acceptance-results {
+  margin-top: 12px;
+}
+
+.acceptance-inventory {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
+}
+
+.acceptance-case {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 8px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--border, #c8d2da);
+  border-radius: 6px;
+  color: var(--text, CanvasText);
+  background: var(--surface-soft, Canvas);
+}
+
+.acceptance-case small {
+  grid-column: 2;
+}
+
+.acceptance-priority,
+.acceptance-status {
+  display: inline-flex;
+  width: max-content;
+  padding: 2px 7px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.acceptance-status.passed { color: var(--success, #16794a); }
+.acceptance-status.failed { color: var(--danger, #b42318); }
+.acceptance-status.manual,
+.acceptance-status.skipped { color: var(--warning, #8a5a00); }
+
+.acceptance-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.acceptance-table th,
+.acceptance-table td {
+  padding: 10px;
+  border-bottom: 1px solid var(--border, #c8d2da);
+  text-align: left;
+  vertical-align: top;
+  color: var(--text, CanvasText);
+}
+
+.acceptance-table td:nth-child(2) {
+  display: grid;
+  gap: 3px;
+  min-width: 180px;
+}
+
 @media (max-width: 1050px) {
+  .acceptance-summary {
+    grid-template-columns: repeat(2, minmax(100px, 1fr));
+  }
+
+  .acceptance-head {
+    align-items: stretch;
+  }
+
   .profile-file-row {
     grid-template-columns: minmax(0, 1fr) 1fr;
   }

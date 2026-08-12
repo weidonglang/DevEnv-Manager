@@ -52,6 +52,9 @@ jobs:
       - name: v2 migration manifest
         run: python scripts/check_v2_migration_manifest.py
 
+      - name: Feature acceptance manifest
+        run: python scripts/check_feature_manifest.py
+
       - name: Safety wording
         run: python scripts/check_safety_wording.py
 

@@ -37,6 +37,7 @@ import {
   type MigratedFileAssociationUiState,
 } from "./fileAssociationMigration";
 import { enhanceProjectReportPanel } from "./projectReportMigration";
+import { mountFeatureAcceptanceCenter } from "./acceptanceCenter";
 import {
   enhanceBuildToolVersionSelectors,
   enhancePortPanel,
@@ -1147,6 +1148,7 @@ enhanceProjectReportPanel(document, icon(FileText));
 enhancePortPanel(document, icon(FileText));
 enhanceRuntimePanel(document, icon(FileText), icon(RotateCcw));
 enhanceBuildToolVersionSelectors(document);
+mountFeatureAcceptanceCenter(document);
 
 function setText(id: string, value: string | number) {
   const element = document.querySelector<HTMLElement>(`#${id}`);

@@ -1215,3 +1215,46 @@ export type EnvironmentBackupInfo = {
   pathEntries: number;
 };
 
+export type FeatureAcceptanceCase = {
+  caseId: string;
+  featureId: string;
+  featureName: string;
+  page: string;
+  pageName: string;
+  viewId: string;
+  mode: "readOnly" | "dryRun" | "static" | "manual";
+  priority: "P0" | "P1" | "P2";
+  status: string;
+  riskLevel: string;
+  selectors: string[];
+  backendCommands: string[];
+  manualOnlyReason?: string | null;
+};
+
+export type FeatureAcceptanceResult = {
+  caseId: string;
+  featureId: string;
+  page: string;
+  mode: string;
+  priority: string;
+  status: "passed" | "failed" | "skipped" | "manual" | string;
+  reason: string;
+  durationMs: number;
+  commandsCalled: string[];
+  resultPanelFound?: boolean | null;
+  warnings: string[];
+  artifacts: string[];
+};
+
+export type FeatureAcceptanceSuite = {
+  productVersion: string;
+  generatedAt: string;
+  pageFilter?: string | null;
+  total: number;
+  passed: number;
+  failed: number;
+  skipped: number;
+  manual: number;
+  results: FeatureAcceptanceResult[];
+};
+

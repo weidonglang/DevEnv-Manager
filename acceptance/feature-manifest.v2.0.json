@@ -1,0 +1,237 @@
+{
+  "$schema": "./acceptance-schema.json",
+  "schemaVersion": 1,
+  "productVersion": "2.0.0-development",
+  "pages": [
+    {
+      "pageId": "overview",
+      "displayName": "总览",
+      "features": [
+        {
+          "featureId": "overview.snapshot",
+          "userVisibleName": "系统与配置快照",
+          "status": "implemented",
+          "priority": "P0",
+          "frontendEntry": { "viewId": "view-overview", "selectors": ["#snapshot-list", "#metric-root", "#effective-runtime-list"] },
+          "backendCommands": ["app_snapshot", "load_config", "env_snapshot"],
+          "riskLevel": "readOnly",
+          "requiresTauri": true,
+          "requiresWindows": false,
+          "safeSmokeMode": "readOnly",
+          "manualOnlyReason": null,
+          "acceptanceChecks": ["frontendEntryVisible", "backendCommandRegistered", "resultPanelVisible"]
+        }
+      ]
+    },
+    {
+      "pageId": "doctor",
+      "displayName": "环境医生",
+      "features": [
+        {
+          "featureId": "doctor.diagnose",
+          "userVisibleName": "一键诊断与持久结果",
+          "status": "implemented",
+          "priority": "P0",
+          "frontendEntry": { "viewId": "view-doctor", "selectors": ["#run-doctor", "#doctor-score", "#doctor-checks"] },
+          "backendCommands": ["run_doctor"],
+          "riskLevel": "readOnly",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "safeSmokeMode": "readOnly",
+          "manualOnlyReason": null,
+          "acceptanceChecks": ["frontendEntryVisible", "backendCommandRegistered", "resultPanelVisible", "noToastOnly"]
+        }
+      ]
+    },
+    {
+      "pageId": "ports",
+      "displayName": "端口",
+      "features": [
+        {
+          "featureId": "ports.scan",
+          "userVisibleName": "端口扫描、分类与原因",
+          "status": "implemented",
+          "priority": "P0",
+          "frontendEntry": { "viewId": "view-ports", "selectors": ["#scan-ports", "#ports-body", "#port-operation-result"] },
+          "backendCommands": ["scan_ports", "port_history", "export_port_report"],
+          "riskLevel": "readOnly",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "safeSmokeMode": "readOnly",
+          "manualOnlyReason": null,
+          "acceptanceChecks": ["frontendEntryVisible", "backendCommandRegistered", "resultPanelVisible", "rowReasonVisible"]
+        },
+        {
+          "featureId": "ports.release",
+          "userVisibleName": "低风险端口一键释放",
+          "status": "implemented",
+          "priority": "P0",
+          "frontendEntry": { "viewId": "view-ports", "selectors": ["#port-detail"] },
+          "backendCommands": ["release_user_port"],
+          "riskLevel": "high",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "safeSmokeMode": "manual",
+          "manualOnlyReason": "验收不得结束真实用户进程；自动测试只验证保护规则。",
+          "acceptanceChecks": ["frontendEntryVisible", "backendCommandRegistered", "protectedProcessGuard", "durableResult"]
+        }
+      ]
+    },
+    {
+      "pageId": "runtimes",
+      "displayName": "版本管理",
+      "features": [
+        {
+          "featureId": "runtime.inventory",
+          "userVisibleName": "运行时分组与管理边界",
+          "status": "implemented",
+          "priority": "P0",
+          "frontendEntry": { "viewId": "view-runtimes", "selectors": ["#runtime-list", "#managed-jdks", "#runtime-migration-result"] },
+          "backendCommands": ["discover_runtimes", "list_runtime_switch_backups"],
+          "riskLevel": "readOnly",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "safeSmokeMode": "readOnly",
+          "manualOnlyReason": null,
+          "acceptanceChecks": ["frontendEntryVisible", "backendCommandRegistered", "managedExternalBoundary", "resultPanelVisible"]
+        },
+        {
+          "featureId": "runtime.verification",
+          "userVisibleName": "运行时强验证与报告",
+          "status": "implemented",
+          "priority": "P0",
+          "frontendEntry": { "viewId": "view-runtimes", "selectors": ["#inspect-runtime-strong", "#runtime-strong-result", "#export-runtime-report-markdown"] },
+          "backendCommands": ["inspect_runtime_strong_verification", "export_runtime_verification_report"],
+          "riskLevel": "readOnly",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "safeSmokeMode": "readOnly",
+          "manualOnlyReason": null,
+          "acceptanceChecks": ["frontendEntryVisible", "backendCommandRegistered", "resultPanelVisible", "boundedProbe"]
+        }
+      ]
+    },
+    {
+      "pageId": "environment",
+      "displayName": "环境",
+      "features": [
+        {
+          "featureId": "environment.reliability",
+          "userVisibleName": "JAVA_HOME、PATH 与 Python 可靠性",
+          "status": "implemented",
+          "priority": "P0",
+          "frontendEntry": { "viewId": "view-environment", "selectors": ["#env-reliability-result", "#env-repair-plan-result"] },
+          "backendCommands": ["inspect_env_reliability", "create_env_repair_plan", "apply_env_repair_plan"],
+          "riskLevel": "high",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "safeSmokeMode": "readOnly",
+          "manualOnlyReason": null,
+          "acceptanceChecks": ["frontendEntryVisible", "backendCommandRegistered", "resultPanelVisible", "backendBoundPlan"]
+        }
+      ]
+    },
+    {
+      "pageId": "project",
+      "displayName": "项目",
+      "features": [
+        {
+          "featureId": "project.analysis",
+          "userVisibleName": "项目分析、配置预览与验证",
+          "status": "implemented",
+          "priority": "P1",
+          "frontendEntry": { "viewId": "view-project", "selectors": ["#project-path", "#check-project", "#project-config-preview", "#project-output"] },
+          "backendCommands": ["analyze_project", "preview_project_configuration", "inspect_project_port_configs", "inspect_idea_project", "verify_java_consumer_environment"],
+          "riskLevel": "readOnly",
+          "requiresTauri": true,
+          "requiresWindows": false,
+          "safeSmokeMode": "manual",
+          "manualOnlyReason": "需要用户明确选择测试项目目录。",
+          "acceptanceChecks": ["frontendEntryVisible", "backendCommandRegistered", "resultPanelVisible", "directoryPickerVisible"]
+        }
+      ]
+    },
+    {
+      "pageId": "maintenance",
+      "displayName": "空间分析",
+      "features": [
+        {
+          "featureId": "cleanup.analysis",
+          "userVisibleName": "磁盘、清理目标与重复文件分析",
+          "status": "implemented",
+          "priority": "P0",
+          "frontendEntry": { "viewId": "view-maintenance", "selectors": ["#maintenance-overview", "#scan-maintenance", "#scan-duplicates", "#cleanup-report"] },
+          "backendCommands": ["inspect_maintenance_overview", "inspect_disk_overview", "scan_cleanup_targets", "scan_duplicate_large_files"],
+          "riskLevel": "readOnly",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "safeSmokeMode": "static",
+          "manualOnlyReason": null,
+          "acceptanceChecks": ["frontendEntryVisible", "backendCommandRegistered", "resultPanelVisible", "directoryPickerVisible"]
+        },
+        {
+          "featureId": "cleanup.archive",
+          "userVisibleName": "桌面、下载与通用归档",
+          "status": "implemented",
+          "priority": "P0",
+          "frontendEntry": { "viewId": "view-maintenance", "selectors": ["#preview-desktop-archive", "#preview-downloads-archive", "#move-plan-result", "#rollback-records"] },
+          "backendCommands": ["create_move_plan", "execute_move_plan", "rollback_move"],
+          "riskLevel": "high",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "safeSmokeMode": "manual",
+          "manualOnlyReason": "自动验收不得移动真实用户文件。",
+          "acceptanceChecks": ["frontendEntryVisible", "backendCommandRegistered", "resultPanelVisible", "backendBoundPlan", "rollbackVisible"]
+        }
+      ]
+    },
+    {
+      "pageId": "toolbox",
+      "displayName": "工具箱",
+      "features": [
+        {
+          "featureId": "fileAssociations.manage",
+          "userVisibleName": "文件关联搜索、计划和回滚",
+          "status": "implemented",
+          "priority": "P0",
+          "frontendEntry": { "viewId": "view-toolbox", "selectors": ["#file-association-manager"] },
+          "backendCommands": ["scan_file_associations", "search_file_association_app", "create_file_association_plan", "apply_file_association_plan", "rollback_file_association_backup"],
+          "riskLevel": "high",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "safeSmokeMode": "readOnly",
+          "manualOnlyReason": null,
+          "acceptanceChecks": ["frontendEntryVisible", "backendCommandRegistered", "resultPanelVisible", "backendBoundPlan", "rollbackVisible"]
+        },
+        {
+          "featureId": "profiles.manage",
+          "userVisibleName": "配置档案应用与恢复",
+          "status": "implemented",
+          "priority": "P1",
+          "frontendEntry": { "viewId": "view-environment", "selectors": ["#profile-list", "#profile-operation-result"] },
+          "backendCommands": ["list_config_profiles", "apply_config_profile", "list_config_profile_history", "execute_profile_history_restore_plan"],
+          "riskLevel": "high",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "safeSmokeMode": "readOnly",
+          "manualOnlyReason": null,
+          "acceptanceChecks": ["frontendEntryVisible", "backendCommandRegistered", "resultPanelVisible", "rollbackVisible"]
+        },
+        {
+          "featureId": "acceptance.center",
+          "userVisibleName": "安全功能验收中心",
+          "status": "implemented",
+          "priority": "P1",
+          "frontendEntry": { "viewId": "view-toolbox", "selectors": ["#feature-acceptance-center", "#run-feature-acceptance", "#feature-acceptance-results"] },
+          "backendCommands": ["list_feature_acceptance_cases", "run_feature_acceptance_case", "run_feature_acceptance_suite", "export_feature_acceptance_report"],
+          "riskLevel": "readOnly",
+          "requiresTauri": true,
+          "requiresWindows": false,
+          "safeSmokeMode": "readOnly",
+          "manualOnlyReason": null,
+          "acceptanceChecks": ["frontendEntryVisible", "backendCommandRegistered", "resultPanelVisible", "reportExport"]
+        }
+      ]
+    }
+  ]
+}
