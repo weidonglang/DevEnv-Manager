@@ -146,6 +146,26 @@
       ]
     },
     {
+      "pageId": "toolchains",
+      "displayName": "开发工具链",
+      "features": [
+        {
+          "featureId": "toolchains.manage",
+          "userVisibleName": "Git、Node.js 与 Python 工具链检查和持久反馈",
+          "status": "implemented",
+          "priority": "P1",
+          "frontendEntry": { "viewId": "view-toolchains", "selectors": ["#inspect-toolchains", "#git-toolchain", "#node-toolchain", "#python-toolchain", "#toolchain-operation-result"] },
+          "backendCommands": ["inspect_toolchains", "run_toolchain_action"],
+          "riskLevel": "high",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "safeSmokeMode": "readOnly",
+          "manualOnlyReason": null,
+          "acceptanceChecks": ["frontendEntryVisible", "backendCommandRegistered", "resultPanelVisible", "postActionVerification", "noToastOnly"]
+        }
+      ]
+    },
+    {
       "pageId": "project",
       "displayName": "项目",
       "features": [

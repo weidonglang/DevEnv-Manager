@@ -257,6 +257,12 @@ fn run_safe_feature(feature_id: &str) -> (String, String, Vec<String>, Vec<Strin
                 vec!["inspect_platform_toolchains".to_string()],
             )
         }),
+        "toolchains.manage" => super::inspect_toolchains_blocking().map(|_| {
+            (
+                "Git、Node.js 与 Python 工具链状态读取完成".to_string(),
+                vec!["inspect_toolchains".to_string()],
+            )
+        }),
         "environment.reliability" => super::load_paths().map(|paths| {
             let _snapshot = super::env_core::inspect_env_reliability(&paths.root);
             (

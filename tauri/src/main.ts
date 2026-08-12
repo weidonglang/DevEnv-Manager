@@ -43,6 +43,7 @@ import {
   enhancePlatformPanel,
   enhancePortPanel,
   enhanceRuntimePanel,
+  enhanceToolchainPanel,
   renderGroupedRuntimeDiscovery,
   setMigrationResult,
 } from "./p0Migration";
@@ -1150,6 +1151,7 @@ enhanceProjectReportPanel(document, icon(FileText));
 enhancePortPanel(document, icon(FileText));
 enhanceRuntimePanel(document, icon(FileText), icon(RotateCcw));
 enhanceBuildToolVersionSelectors(document);
+enhanceToolchainPanel(document);
 enhancePlatformPanel(document);
 mountFeatureAcceptanceCenter(document);
 
@@ -2027,25 +2029,50 @@ function renderToolchains() {
   `;
 }
 
+async function loadToolchains() {
+  state.toolchains = await invoke<ToolchainReport>("inspect_toolchains");
+  renderToolchains();
+}
+
 async function inspectToolchains(message = "正在检查开发工具链") {
+  setMigrationResult("#toolchain-operation-result", message);
   showToast(message);
   try {
-    state.toolchains = await invoke<ToolchainReport>("inspect_toolchains");
-    renderToolchains();
+    await loadToolchains();
+    setMigrationResult("#toolchain-operation-result", "工具链检查完成；Git、Node.js 与 Python 状态已刷新。");
+    focusResult("#toolchain-operation-result");
     showToast("工具链检查完成");
   } catch (error) {
-    showToast(error instanceof Error ? error.message : String(error), true);
+    const message = error instanceof Error ? error.message : String(error);
+    setMigrationResult("#toolchain-operation-result", `工具链检查失败：${message}`, true);
+    focusResult("#toolchain-operation-result");
+    showToast(message, true);
   }
 }
 
 async function runToolchainAction(action: string, value: string | null = null, secondary: string | null = null) {
+  setMigrationResult("#toolchain-operation-result", "正在执行工具链操作…");
   showToast("正在执行工具链操作");
+  let operationMessage = "";
   try {
     const result = await invoke<OperationResult>("run_toolchain_action", { action, value, secondary });
+    operationMessage = result.message;
+    setMigrationResult("#toolchain-operation-result", `${result.message}\n正在重新检查工具链状态…`);
     showToast(result.message);
-    await inspectToolchains("正在验证操作结果");
+    await loadToolchains();
+    setMigrationResult("#toolchain-operation-result", `${result.message}\n工具链状态已重新检查，详细结果保留在对应生态区域。`);
+    focusResult("#toolchain-operation-result");
   } catch (error) {
-    showToast(error instanceof Error ? error.message : String(error), true);
+    const message = error instanceof Error ? error.message : String(error);
+    setMigrationResult(
+      "#toolchain-operation-result",
+      operationMessage
+        ? `${operationMessage}\n后置状态检查失败：${message}\n请点击“全面检查”重新读取当前状态。`
+        : `工具链操作失败：${message}`,
+      true,
+    );
+    focusResult("#toolchain-operation-result");
+    showToast(message, true);
   }
 }
 
@@ -4123,6 +4150,8 @@ document.querySelector("#save-git-identity")?.addEventListener("click", () => {
   const name = document.querySelector<HTMLInputElement>("#git-user-name")?.value.trim() || "";
   const email = document.querySelector<HTMLInputElement>("#git-user-email")?.value.trim() || "";
   if (!name || !email) {
+    setMigrationResult("#toolchain-operation-result", "请填写 Git 用户名和邮箱。", true);
+    focusResult("#toolchain-operation-result");
     showToast("请填写 Git 用户名和邮箱", true);
     return;
   }
@@ -4131,6 +4160,8 @@ document.querySelector("#save-git-identity")?.addEventListener("click", () => {
 document.querySelector("#generate-ssh-key")?.addEventListener("click", async () => {
   const email = document.querySelector<HTMLInputElement>("#git-user-email")?.value.trim() || "";
   if (!email) {
+    setMigrationResult("#toolchain-operation-result", "请先填写用于 SSH Key 注释的邮箱。", true);
+    focusResult("#toolchain-operation-result");
     showToast("请先填写用于 SSH Key 注释的邮箱", true);
     return;
   }

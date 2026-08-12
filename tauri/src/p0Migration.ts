@@ -108,6 +108,17 @@ export function enhanceRuntimePanel(root: Document, fileIcon: string, restoreIco
   strongResult.insertAdjacentElement("afterend", tools);
 }
 
+export function enhanceToolchainPanel(root: Document) {
+  const firstPanel = root.querySelector<HTMLElement>("#view-toolchains > .panel");
+  if (!firstPanel || root.querySelector("#toolchain-operation-result")) return;
+  const result = document.createElement("div");
+  result.id = "toolchain-operation-result";
+  result.className = "operation-result hidden";
+  result.dataset.testid = "toolchain-operation-result";
+  result.setAttribute("aria-live", "polite");
+  firstPanel.insertAdjacentElement("afterend", result);
+}
+
 export function enhancePlatformPanel(root: Document) {
   const firstPanel = root.querySelector<HTMLElement>("#view-platforms > .panel");
   if (!firstPanel || root.querySelector("#platform-operation-result")) return;

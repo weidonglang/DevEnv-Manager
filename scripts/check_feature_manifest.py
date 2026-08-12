@@ -71,8 +71,9 @@ def frontend_invokes(source: str) -> set[str]:
 
 
 def function_body(source: str, function_name: str) -> str:
-    marker = f"fn {function_name}("
-    start = source.find(marker)
+    markers = (f"fn {function_name}(", f"function {function_name}(")
+    starts = [source.find(marker) for marker in markers]
+    start = min((index for index in starts if index >= 0), default=-1)
     if start < 0:
         fail(f"required function is missing: {function_name}")
     body_start = source.find("{", start)
@@ -198,6 +199,18 @@ def main() -> int:
     ]
     if missing_dotnet_actions:
         fail(f"dotnet provider actions are not fully wired: {missing_dotnet_actions}")
+    toolchain_action_body = function_body(frontend_source, "runToolchainAction")
+    for required_result_marker in (
+        "#toolchain-operation-result",
+        "setMigrationResult",
+        "loadToolchains",
+        "focusResult",
+    ):
+        if required_result_marker not in toolchain_action_body:
+            fail(
+                "toolchain actions must keep a durable verified result: "
+                f"missing {required_result_marker}"
+            )
 
     print(
         "feature manifest passed "

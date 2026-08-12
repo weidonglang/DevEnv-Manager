@@ -14846,8 +14846,8 @@ fn tool_registry() -> Vec<ToolDefinition> {
             exe_names: &["rustup", "rustc", "cargo"],
             env_vars: &["RUSTUP_HOME", "CARGO_HOME"],
             managed_path_entries: &[],
-            supports_install: false,
-            supports_switch: false,
+            supports_install: true,
+            supports_switch: true,
             supports_mirror: true,
         },
         ToolDefinition {
@@ -14857,7 +14857,7 @@ fn tool_registry() -> Vec<ToolDefinition> {
             exe_names: &["dotnet"],
             env_vars: &["DOTNET_ROOT"],
             managed_path_entries: &[],
-            supports_install: false,
+            supports_install: true,
             supports_switch: false,
             supports_mirror: false,
         },
@@ -17005,6 +17005,10 @@ mod tests {
         assert!(ids.contains("git"));
         assert!(ids.contains("pnpm"));
         assert!(ids.contains("python-tools"));
+        let rust = tools.iter().find(|item| item.id == "rust").unwrap();
+        assert!(rust.supports_install && rust.supports_switch);
+        let dotnet = tools.iter().find(|item| item.id == "dotnet").unwrap();
+        assert!(dotnet.supports_install && !dotnet.supports_switch);
     }
 
     #[test]
