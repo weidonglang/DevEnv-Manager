@@ -32,7 +32,6 @@ export type ConfigView = {
     safetyDisclaimerAccepted: boolean;
     safetyDisclaimerVersion: number;
     safetyDisclaimerAcceptedAt?: string | null;
-    onboardingCompleted: boolean;
   };
   installed: {
     jdks: ManagedRuntime[];
@@ -82,7 +81,7 @@ export type EnvRepairPlan = {
   actions: EnvRepairAction[];
   expectedAfter: { javaHome?: string; devenvHome?: string; path?: string };
   warnings: string[];
-  riskLevel: "medium";
+  riskLevel: string;
   requiresTerminalRestart: boolean;
   backupName: string;
   disclaimer: string;
@@ -103,14 +102,6 @@ export type EnvBackupRecord = {
   devenvHomePreview?: string;
   pathEntryCount: number;
   sourcePlanId?: string;
-};
-export type EnvBackupDiff = {
-  backupName: string;
-  currentJavaHome?: string;
-  backupJavaHome?: string;
-  currentPathEntries: number;
-  backupPathEntries: number;
-  changedVariables: string[];
 };
 export type EnvReliabilitySnapshot = {
   generatedAt: string;
@@ -170,7 +161,6 @@ export type PythonIntegrityReport = {
 export type RuntimeStrongVerificationReport = {
   generatedAt: string;
   items: Array<{
-    runtimeId: string;
     kind: string;
     version: string;
     path: string;
@@ -178,78 +168,24 @@ export type RuntimeStrongVerificationReport = {
     current: boolean;
     environmentEffective: boolean;
     status: string;
-    checks: RuntimeVerificationCheck[];
+    checks: ValidationCheck[];
     failureStage?: string;
     report: string[];
   }>;
   summary: string[];
 };
 
-export type RuntimeVerificationCheck = {
-  id: string;
-  label: string;
-  command: string;
-  expected: string;
-  actual: string;
-  status: "passed" | "failed" | "skipped";
-  error?: string;
-  elapsedMs: number;
-  required: boolean;
-  suggestion: string;
-};
-
-export type RuntimeSwitchPlan = {
-  planId: string;
-  createdAt: string;
-  expiresAt: number;
-  runtimeId: string;
-  switchMode: "managed" | "external-user" | "provider" | "project";
-  sourceAuthority: string;
-  provider?: string;
-  kind: string;
-  version: string;
-  targetRoot: string;
-  previousVersion?: string;
-  previousRoot?: string;
-  environmentChanges: string[];
-  pathDiff: string[];
-  backupName: string;
-  backupId: string;
-  backupPath: string;
-  stateFingerprint: string;
-  verificationSteps: string[];
-  warnings: string[];
-  riskLevel: string;
-  planFingerprint: string;
-};
-
 export type RuntimeSwitchBackupSummary = {
   backupId: string;
-  createdAt: string;
-  targetKind: string;
-  targetVersion: string;
-  targetRoot: string;
-  switchMode: string;
-  backupPath: string;
+  createdAt: number;
+  kind: string;
+  previousVersion?: string;
+  requestedVersion: string;
+  target: string;
+  status: string;
+  detail: string;
   restorable: boolean;
-  validationError: string | null;
-};
-
-export type RuntimeSwitchResult = {
-  success: boolean;
-  message: string;
-  planId: string;
-  backupName: string;
-  backupId: string;
-  backupPath: string;
-  userEnvironmentWritten: boolean;
-  currentProcessUnchanged: boolean;
-  newChildProcessVerified: boolean;
-  restartRequired: boolean;
-  selectionScope: string;
-  rollbackPerformed: boolean;
-  rollbackVerified: boolean;
-  verification: RuntimeStrongVerificationReport["items"][number];
+  validationError?: string;
 };
 
 export type IdeaProjectReport = {
@@ -291,23 +227,10 @@ export type KillResult = OperationResult & {
 };
 
 export type RuntimeInfo = {
-  id: string;
   kind: string;
-  displayName: string;
-  ecosystem: string;
   version: string;
   executable: string;
-  runtimeRoot: string;
   source: string;
-  management: "managed" | "external";
-  sourceAuthority: string;
-  provider?: string;
-  switchModes: Array<"managed" | "external-user" | "provider" | "project">;
-  switchEligible: boolean;
-  switchBlockers: string[];
-  verificationFingerprint: string;
-  current: boolean;
-  installedAt?: string;
 };
 
 export type JavaEnvironmentReport = {
@@ -326,132 +249,29 @@ export type JavaEnvironmentReport = {
 };
 
 export type PortRecord = {
-  groupId: string;
-  groupFingerprint: string;
   protocol: string;
   localAddress: string;
   localPort: number;
   remoteAddress: string;
   state: string;
   pid: number;
-  processStartTime: number;
   processName: string;
-  friendlyNameZh: string;
-  friendlyNameEn: string;
   processPath: string;
-  productName: string;
-  fileDescription: string;
-  companyName: string;
-  publisher: string;
   commandLine: string;
-  commandLineFingerprint: string;
   parentPid: number;
   parentProcessName: string;
   serviceNames: string[];
-  serviceDisplayNames: string[];
-  serviceStates: string[];
-  serviceStartModes: string[];
-  serviceDetails: Array<{
-    name: string;
-    displayName: string;
-    state: string;
-    startMode: string;
-    processId: number;
-    serviceType: string;
-    description: string;
-    pathName: string;
-    serviceHostGroup: string;
-    serviceDll: string;
-    coreWindowsService: boolean;
-  }>;
-  bindings: Array<{ localAddress: string; localEndpoint: string; remoteEndpoint: string; state: string }>;
-  bindingCount: number;
-  remoteConnectionCount: number;
-  relatedPorts: number[];
-  sourceRecordCount: number;
-  hasIpv4: boolean;
-  hasIpv6: boolean;
-  scanSources: Array<{ source: string; scannedAt: number; recordCount: number; fallback: boolean; conflicts: string[] }>;
   commonUsage: string;
   explanation: string;
   risk: string;
   identity: string;
-  identityId: string;
-  identityCategory: string;
-  identityEcosystem: string;
   confidence: number;
-  confidenceLevel: "verified" | "high" | "medium" | "low" | "unknown" | "conflict";
-  identityCatalogVersion: string;
   evidenceCount: number;
   conflictCount: number;
   riskLevel: string;
   recommendation: string;
-  recommendationZh: string;
-  recommendationEn: string;
   evidence: string[];
   conflictEvidence: string[];
-};
-
-export type PortScanSnapshot = {
-  scanId: string;
-  scope: "recommended" | "full";
-  status: "idle" | "scanning" | "success" | "stale" | "failed";
-  source: string;
-  scannedAt: number;
-  elapsedMs: number;
-  rawCount: number;
-  filteredCount: number;
-  truncated: boolean;
-  cached: boolean;
-  complete: boolean;
-  userMessage: string;
-  debugSummary: string;
-  records: PortRecord[];
-};
-
-export type PortResolutionPlan = {
-  planId: string;
-  groupId: string;
-  groupFingerprint: string;
-  scanId: string;
-  pid: number;
-  port: number;
-  protocol: string;
-  processStartTime: number;
-  processName: string;
-  processPath: string;
-  commandLineFingerprint: string;
-  parentPid?: number;
-  parentProcessName?: string;
-  childProcesses: Array<{ pid: number; name: string }>;
-  serviceNames: string[];
-  bindings: PortRecord["bindings"];
-  relatedPorts: number[];
-  expectedOwnerIdentity: string;
-  createdAt: number;
-  expiresAt: number;
-  projectRoot?: string;
-  riskLevel: "low" | "medium" | "high" | "critical";
-  warnings: string[];
-  recommendedActions: string[];
-};
-
-export type PortResolutionResult = {
-  success: boolean;
-  message: string;
-  targetPort: number;
-  targetPid: number;
-  processName: string;
-  serviceOwned: boolean;
-  requiresAdmin: boolean;
-  failureReason: string;
-  nextSteps: string[];
-  pidExited: boolean;
-  portReleased: boolean;
-  relatedPortsReleased: boolean;
-  remainingRelatedPorts: number[];
-  releaseCheckedAt: string;
-  remainingOwners: PortRecord[];
 };
 
 export type PortHistorySummary = {
@@ -502,17 +322,6 @@ export type CommandRunResult = {
   elapsedMs: number;
 };
 
-export type PowerShellResult = {
-  success: boolean;
-  exitCode?: number | null;
-  stdout: string;
-  stderr: string;
-  elapsedMs: number;
-  timedOut: boolean;
-  executable: string;
-  killedProcessTree: boolean;
-};
-
 export type CommandSafetyAssessment = {
   allowed: boolean;
   risk: string;
@@ -557,7 +366,6 @@ export type ConfigProfileHistoryEntry = {
   reason: string;
   profileCount: number;
   fingerprint: string;
-  profiles: ConfigProfile[];
 };
 
 export type ProfileHistoryRestorePlan = {
@@ -567,14 +375,10 @@ export type ProfileHistoryRestorePlan = {
   snapshotReason: string;
   profileCount: number;
   backupHistoryId: string;
-  riskLevel: string;
   planFingerprint: string;
-  warnings: string[];
 };
 
-export type ProfileHistoryRestoreResult = {
-  success: boolean;
-  message: string;
+export type ProfileHistoryRestoreResult = OperationResult & {
   restoredHistoryId: string;
   backupHistoryId: string;
   restoredProfileCount: number;
@@ -607,7 +411,6 @@ export type PythonAnalysis = {
   launcherPath: string;
   launcherOutput: string;
   firstPythonOnPath: string;
-  firstPython3OnPath: string;
   firstPipOnPath: string;
   pythonMPipAvailable: boolean;
   managedPythonAvailable: boolean;
@@ -697,9 +500,6 @@ export type ProjectPortConfig = {
   currentPort: number;
   line: number;
   description: string;
-  mode: "replace" | "append" | "create";
-  willOverwriteExistingFile: boolean;
-  backupPath?: string;
 };
 
 
@@ -724,20 +524,17 @@ export type ToolchainReport = {
     githubSshStatus: string;
     githubHttpsStatus: string;
     gitLfs: ToolState;
-    globalConfigPath: string;
   };
   node: {
     tools: ToolState[];
     npmPrefix: string;
     npmRegistry: string;
     pnpmStorePath: string;
-    npmConfigPath: string;
   };
   python: {
     tools: ToolState[];
     pipConfig: string;
     pipIndexUrl: string;
-    pipConfigPath: string;
   };
   generatedAt: string;
 };
@@ -761,7 +558,6 @@ export type PlatformReport = {
     dotnet: ToolState;
     sdks: string[];
     runtimes: string[];
-    nugetConfigPath: string;
   };
   mirrors: {
     npmRegistry: string;
@@ -816,11 +612,6 @@ export type LocalServiceStatus = {
   serviceName: string;
   serviceState: string;
   binaryPath: string;
-  executablePath: string;
-  installDirectory: string;
-  pathStatus: string;
-  logPath: string;
-  logPathReason: string;
 };
 
 export type MySqlCandidate = {
@@ -891,15 +682,6 @@ export type MySqlRepairPlan = {
   planFingerprint: string;
 };
 
-export type ConfirmationTokenView = {
-  token: string;
-  command: string;
-  actionId: string;
-  planId: string;
-  riskLevel: string;
-  expiresAt: number;
-};
-
 export type MySqlExecutionGuard = {
   actionId: string;
   planId: string;
@@ -934,23 +716,7 @@ export type UpdateCheckResult = {
     url: string;
   }>;
   fileName: string;
-  platform: string;
-  size: number;
   checkedAt: string;
-};
-
-export type UpdateDownloadResult = {
-  success: boolean;
-  version: string;
-  platform: string;
-  fileName: string;
-  filePath: string;
-  size: number;
-  sha256: string;
-  sourceName: string;
-  sourceUrl: string;
-  verified: boolean;
-  message: string;
 };
 
 export type FileAssociationSource = "userChoice" | "hkcu" | "hklm" | "unknown";
@@ -995,37 +761,6 @@ export type FileAssociationPlanRequest = {
   advancedHighRisk: boolean;
 };
 
-export type FileAssociationAppCandidate = {
-  appId: string;
-  displayName: string;
-  executablePath: string;
-  source:
-    | "knownLocation"
-    | "appPaths"
-    | "registry"
-    | "path"
-    | "scoop"
-    | "chocolatey"
-    | "winget"
-    | "jetbrainsToolbox"
-    | "manualCache";
-  confidence: number;
-  exists: boolean;
-  recommendedCommandTemplate: string;
-  notes: string[];
-};
-
-export type FileAssociationAppSearchResult = {
-  query: string;
-  normalizedQuery: string;
-  matchedAppId?: string | null;
-  matchedDisplayName?: string | null;
-  autoSelected?: FileAssociationAppCandidate | null;
-  candidates: FileAssociationAppCandidate[];
-  manualSelectionRequired: boolean;
-  message: string;
-};
-
 export type FileAssociationTarget = {
   progId: string;
   appName: string;
@@ -1050,9 +785,31 @@ export type FileAssociationPlan = {
   changes: FileAssociationChange[];
   backupPath: string;
   warnings: string[];
-  riskLevel: "high";
+  riskLevel: string;
   requiresConfirmationToken: boolean;
   planFingerprint: string;
+};
+
+export type FileAssociationAppCandidate = {
+  appId: string;
+  displayName: string;
+  executablePath: string;
+  source: string;
+  confidence: number;
+  exists: boolean;
+  recommendedCommandTemplate: string;
+  notes: string[];
+};
+
+export type FileAssociationAppSearchResult = {
+  query: string;
+  normalizedQuery: string;
+  matchedAppId?: string | null;
+  matchedDisplayName?: string | null;
+  autoSelected?: FileAssociationAppCandidate | null;
+  candidates: FileAssociationAppCandidate[];
+  manualSelectionRequired: boolean;
+  message: string;
 };
 
 export type FileAssociationApplyResult = {
@@ -1102,21 +859,9 @@ export type DoctorRepairResult = {
 
 export type DoctorRepairPlan = {
   planId: string;
+  createdAt: number;
   beforeScore: number;
   actions: string[];
-  actionDetails: Array<{
-    actionId: string;
-    title: string;
-    reason: string;
-    evidence: string[];
-    riskLevel: string;
-    requiresBackup: boolean;
-    requiresToken: boolean;
-    nextStep: string;
-  }>;
-  willCleanupPath: boolean;
-  willConfigureEnvironment: boolean;
-  backupName: string;
   warnings: string[];
 };
 
@@ -1136,18 +881,6 @@ export type ProfileRequirement = {
   version: string;
   installed: boolean;
   autoInstallSupported: boolean;
-};
-
-export type ProfileApplyPlan = {
-  planId: string;
-  profileId: string;
-  profileName: string;
-  missingRequirements: ProfileRequirement[];
-  runtimeSwitches: string[];
-  willInstall: boolean;
-  willWriteEnvironment: boolean;
-  backupName: string;
-  warnings: string[];
 };
 
 export type CleanupCandidate = {
@@ -1226,23 +959,7 @@ export type MovePlan = {
   risk: string;
   requiresAdmin: boolean;
   reversible: boolean;
-  selectedItems: MovePlanItem[];
   warnings: string[];
-};
-
-export type MovePlanItem = {
-  source: string;
-  target: string;
-  size: number;
-  sha256: string;
-};
-
-export type MoveReceipt = {
-  source: string;
-  target: string;
-  size: number;
-  sourceSha256: string;
-  targetSha256: string;
 };
 
 export type MoveResult = {
@@ -1255,8 +972,57 @@ export type MoveResult = {
   junctionCreated: boolean;
   failures: string[];
   rollbackId?: string;
-  receipts: MoveReceipt[];
   reportMarkdown: string;
+};
+
+export type RecycleBinReport = {
+  generatedAt: string;
+  itemCount: number;
+  totalBytes: number;
+  recoverableCount: number;
+  items: Array<{
+    id: string;
+    name: string;
+    originalPath: string;
+    recyclePath: string;
+    sourceDrive: string;
+    size: number;
+    deletedAt: string;
+    recoverable: boolean;
+  }>;
+  volumes: Array<{
+    drive: string;
+    itemCount: number;
+    totalBytes: number;
+    recoverableCount: number;
+  }>;
+  warnings: string[];
+};
+
+export type RecycleBinCleanupPlan = {
+  planId: string;
+  createdAt: string;
+  selectedDrives: string[];
+  itemIds: string[];
+  itemCount: number;
+  estimatedBytes: number;
+  snapshotFingerprint: string;
+  riskLevel: string;
+  warnings: string[];
+};
+
+export type RecycleBinCleanupResult = {
+  planId: string;
+  success: boolean;
+  beforeItemCount: number;
+  beforeBytes: number;
+  afterItemCount: number;
+  afterBytes: number;
+  cleanedItems: number;
+  cleanedBytes: number;
+  selectedDrives: string[];
+  failures: string[];
+  message: string;
 };
 
 export type RollbackRecord = {
@@ -1268,7 +1034,6 @@ export type RollbackRecord = {
   backupPath?: string;
   junctionPath?: string;
   reversible: boolean;
-  movedFiles: MoveReceipt[];
   notes: string[];
 };
 
@@ -1330,67 +1095,7 @@ export type DiskVolumeInfo = {
   usedBytes: number;
   usedPercent: number;
   fileSystem?: string;
-  diskKind: string;
-  removable: boolean;
-  readOnly: boolean;
-  systemVolume: boolean;
-  archiveTargetEligible: boolean;
-  archiveTargetReason: string;
   risk: string;
-};
-
-export type RecycleBinItem = {
-  id: string;
-  name: string;
-  originalPath: string;
-  recyclePath: string;
-  sourceDrive: string;
-  size: number;
-  deletedAt: string;
-  recoverable: boolean;
-};
-
-export type RecycleBinVolumeSummary = {
-  drive: string;
-  itemCount: number;
-  totalBytes: number;
-  recoverableCount: number;
-};
-
-export type RecycleBinReport = {
-  generatedAt: string;
-  itemCount: number;
-  totalBytes: number;
-  recoverableCount: number;
-  items: RecycleBinItem[];
-  volumes: RecycleBinVolumeSummary[];
-  warnings: string[];
-};
-
-export type RecycleBinCleanupPlan = {
-  planId: string;
-  createdAt: string;
-  selectedDrives: string[];
-  itemIds: string[];
-  itemCount: number;
-  estimatedBytes: number;
-  snapshotFingerprint: string;
-  riskLevel: "critical";
-  warnings: string[];
-};
-
-export type RecycleBinCleanupResult = {
-  planId: string;
-  success: boolean;
-  beforeItemCount: number;
-  beforeBytes: number;
-  afterItemCount: number;
-  afterBytes: number;
-  cleanedItems: number;
-  cleanedBytes: number;
-  selectedDrives: string[];
-  failures: string[];
-  message: string;
 };
 
 export type MaintenanceOverview = {
@@ -1428,8 +1133,6 @@ export type LargeFileItem = {
   openStatus: string;
   suggestion: string;
   risk: string;
-  actionable: boolean;
-  blockedReason?: string | null;
 };
 
 export type ArchivePlanItem = {
@@ -1439,36 +1142,6 @@ export type ArchivePlanItem = {
   source: string;
   addedAt: string;
   suggestion: string;
-};
-
-export type GenericArchivePlan = {
-  planId: string;
-  createdAt: string;
-  targetRoot: string;
-  estimatedBytes: number;
-  riskLevel: string;
-  entries: Array<{
-    id: string;
-    source: string;
-    target: string;
-    size: number;
-    sha256: string;
-    conflict: boolean;
-    conflictReason: string;
-  }>;
-  warnings: string[];
-};
-
-export type GenericArchiveResult = {
-  planId: string;
-  success: boolean;
-  movedItems: number;
-  movedBytes: number;
-  skippedItems: number;
-  failures: string[];
-  verifiedTargets: string[];
-  rollbackGuidance: string[];
-  receiptPath: string;
 };
 
 export type DuplicateGroup = {
@@ -1482,9 +1155,6 @@ export type FolderUsageReport = {
   name: string;
   path: string;
   totalBytes: number;
-  fileCount: number;
-  folderCount: number;
-  protectedCount: number;
   categories: Array<{
     name: string;
     path: string;
@@ -1543,5 +1213,48 @@ export type EnvironmentBackupInfo = {
   devenvHome: string;
   javaHome: string;
   pathEntries: number;
+};
+
+export type FeatureAcceptanceCase = {
+  caseId: string;
+  featureId: string;
+  featureName: string;
+  page: string;
+  pageName: string;
+  viewId: string;
+  mode: "readOnly" | "dryRun" | "static" | "manual";
+  priority: "P0" | "P1" | "P2";
+  status: string;
+  riskLevel: string;
+  selectors: string[];
+  backendCommands: string[];
+  manualOnlyReason?: string | null;
+};
+
+export type FeatureAcceptanceResult = {
+  caseId: string;
+  featureId: string;
+  page: string;
+  mode: string;
+  priority: string;
+  status: "passed" | "failed" | "skipped" | "manual" | string;
+  reason: string;
+  durationMs: number;
+  commandsCalled: string[];
+  resultPanelFound?: boolean | null;
+  warnings: string[];
+  artifacts: string[];
+};
+
+export type FeatureAcceptanceSuite = {
+  productVersion: string;
+  generatedAt: string;
+  pageFilter?: string | null;
+  total: number;
+  passed: number;
+  failed: number;
+  skipped: number;
+  manual: number;
+  results: FeatureAcceptanceResult[];
 };
 

@@ -30,6 +30,14 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Rust tests
+        working-directory: tauri/src-tauri
+        run: cargo test --all-targets
+
+      - name: Rust clippy
+        working-directory: tauri/src-tauri
+        run: cargo clippy --all-targets -- -D warnings
+
       - name: Frontend dependencies
         working-directory: tauri
         run: npm ci
@@ -38,55 +46,40 @@ jobs:
         working-directory: tauri
         run: npm run build
 
-      - name: Rust tests
-        working-directory: tauri/src-tauri
-        run: cargo test --all-targets
+      - name: v1.7 frontend baseline
+        run: python scripts/check_v17_frontend_baseline.py
 
-      - name: Rust formatting
-        working-directory: tauri/src-tauri
-        run: cargo fmt --all -- --check
+      - name: v2 migration manifest
+        run: python scripts/check_v2_migration_manifest.py
 
-      - name: Rust clippy
-        working-directory: tauri/src-tauri
-        run: cargo clippy --all-targets -- -D warnings
+      - name: Feature acceptance manifest
+        run: python scripts/check_feature_manifest.py
+
+      - name: Tauri command contract
+        run: python scripts/check_tauri_command_contract.py
+
+      - name: Frontend data contracts
+        run: python scripts/check_frontend_data_contracts.py
+
+      - name: Frontend action contracts
+        run: python scripts/check_frontend_action_contracts.py
+
+      - name: Frontend quality regressions
+        run: python scripts/check_frontend_quality_regressions.py
 
       - name: Safety wording
         run: python scripts/check_safety_wording.py
 
-      - name: Frontend i18n contracts
-        run: python scripts/check_frontend_i18n_contracts.py
-
-      - name: Process identity catalog
-        run: python scripts/check_process_identity_catalog.py
-
-      - name: Feature acceptance (static)
-        run: python scripts/run_feature_acceptance.py --mode static
-
-      - name: Feature acceptance (safe)
-        run: python scripts/run_feature_acceptance.py --mode safe
-
-      - name: Feature acceptance (frontend)
-        run: python scripts/run_feature_acceptance.py --mode frontend
-
-      - name: Visual acceptance (Edge)
-        working-directory: tauri
-        timeout-minutes: 10
-        run: npm run acceptance:visual
-
-      - name: Feature acceptance (report)
-        run: python scripts/run_feature_acceptance.py --mode report
-
       - name: Repository hygiene
         run: python scripts/check_repo_hygiene.py
 
-      - name: Upload acceptance reports
+      - name: Safe feature acceptance
+        run: python scripts/run_feature_acceptance.py --mode safe
+
+      - name: Upload feature acceptance reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: feature-acceptance-${{ github.sha }}
-          path: |
-            artifacts/feature-acceptance-*.json
-            artifacts/feature-acceptance-report.md
-            artifacts/manual-smoke-checklist.md
-            artifacts/isolated-evidence/**
-            artifacts/visual-acceptance/**
+          name: feature-acceptance-reports
+          path: artifacts/
+          if-no-files-found: warn

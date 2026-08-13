@@ -1,0 +1,187 @@
+{
+  "schemaVersion": 1,
+  "sourceVersion": "1.7.0",
+  "referenceVersion": "1.9.4",
+  "frontendPolicy": "preserve-v1.7-layout-content-and-styles",
+  "interactionPolicy": "keep-v1.7-single-confirmation-with-transparent-backend-validation",
+  "summary": {
+    "referenceOnlyCommands": 38,
+    "batches": 8
+  },
+  "completedBehaviorMigrations": [
+    "bounded-native-and-powershell-runner",
+    "windows-command-output-decoding",
+    "external-loader-error-dialog-suppression",
+    "forward-compatible-settings-preservation",
+    "unwritable-initial-root-recovery",
+    "backend-bound-single-use-move-and-expansion-plans",
+    "isolated-startup-data-loading",
+    "bounded-port-scan-with-read-only-fallback",
+    "guarded-one-click-port-release",
+    "bounded-managed-runtime-probes",
+    "transactional-managed-runtime-switch-with-rollback-receipts",
+    "cleanup-result-routing-and-automatic-archive-target",
+    "recycle-bin-preview-single-confirmation-and-verified-rescan",
+    "transactional-config-profile-apply-with-exact-rollback",
+    "profile-json-picker-and-durable-results",
+    "profile-copy-rename-and-single-confirmation-history-restore",
+    "stable-utc-audit-timestamps",
+    "doctor-fingerprint-bound-atomic-repair-with-rollback",
+    "doctor-durable-success-and-error-results",
+    "file-association-app-discovery-and-durable-results",
+    "backend-bound-single-use-file-association-plans",
+    "exact-file-association-registry-backups",
+    "selected-project-report-export-with-redaction",
+    "persisted-port-scan-preferences-and-redacted-reports",
+    "runtime-version-choice-verification-reports-and-recoverable-switch-receipts",
+    "grouped-runtime-discovery-with-managed-and-external-boundaries",
+    "runtime-install-verification-without-automatic-switching",
+    "durable-runtime-and-platform-operation-results",
+    "rustup-provider-managed-toolchain-lifecycle",
+    "dotnet-winget-provider-lifecycle-with-last-sdk-guard",
+    "durable-toolchain-actions-with-post-action-verification",
+    "settings-directory-picker-and-durable-save-result",
+    "complete-view-learning-settings-and-report-acceptance-coverage",
+    "plan-id-only-move-and-archive-execution",
+    "v17-single-confirmation-without-token-workflow"
+  ],
+  "batches": [
+    {
+      "id": "ports",
+      "priority": "P0",
+      "status": "completed",
+      "strategy": "merge reliability and one-click release into the existing v1.7 ports page",
+      "equivalentImplementation": [
+        "the bounded synchronous scan replaces separate scan status, enrichment and cancellation commands while preserving durable errors and native fallback",
+        "recommended or full scan scope and startup monitoring preferences are persisted by the backend",
+        "safe user-owned listeners retain one-click release, and Markdown or JSON reports are redacted before export"
+      ],
+      "commands": [
+        "cancel_port_scan",
+        "create_port_resolution_plan",
+        "enrich_port_scan",
+        "execute_port_resolution_plan",
+        "export_port_report",
+        "port_scan_status",
+        "set_port_scan_preferences"
+      ]
+    },
+    {
+      "id": "runtime",
+      "priority": "P0",
+      "status": "completed",
+      "strategy": "keep existing runtime cards and actions; perform plan validation transparently",
+      "equivalentImplementation": [
+        "managed runtime switching performs preflight validation, backup, pointer and environment changes, post-verification and automatic rollback behind one ordinary confirmation",
+        "verified switch receipts can be listed and restored once without exposing plan or token controls",
+        "Maven and Gradle accept validated release versions, and strong verification reports export as redacted Markdown or JSON"
+      ],
+      "commands": [
+        "cancel_runtime_switch_plan",
+        "create_runtime_switch_plan",
+        "execute_runtime_switch_plan",
+        "export_runtime_switch_plan",
+        "export_runtime_verification_report",
+        "install_gradle",
+        "install_maven",
+        "list_runtime_switch_backups",
+        "restore_runtime_switch_backup"
+      ]
+    },
+    {
+      "id": "cleanup",
+      "priority": "P0",
+      "status": "completed",
+      "strategy": "add useful actions to existing v1.7 cleanup sections without a second execution screen",
+      "equivalentImplementation": [
+        "desktop, downloads and generic archive flows use the existing v1.7 move panel with automatic or selected targets",
+        "the frontend submits only an opaque plan ID; the backend consumes the immutable stored plan once and rejects reuse or expiry",
+        "recycle-bin preview, execution, verified rescan and rollback guidance remain durable in the existing cleanup result area"
+      ],
+      "commands": [
+        "create_desktop_cleanup_plan",
+        "create_generic_archive_plan",
+        "create_junction_bridge_plan",
+        "create_recycle_bin_cleanup_plan",
+        "execute_desktop_cleanup_plan",
+        "execute_generic_archive_plan",
+        "execute_recycle_bin_cleanup_plan",
+        "inspect_recycle_bin",
+        "open_recycle_bin"
+      ]
+    },
+    {
+      "id": "profiles",
+      "priority": "P1",
+      "status": "completed",
+      "strategy": "extend the existing profile list and preserve one-confirmation apply and history restore behavior",
+      "equivalentImplementation": [
+        "apply_config_profile performs backend-bound validation, backup, exact apply, verification and rollback in one command",
+        "history restore creates and consumes an internal fingerprint-bound single-use plan without exposing token UX",
+        "copy, rename, import picker and durable result handling remain inside the v1.7 profile panel"
+      ],
+      "commands": [
+        "config_profile_plan_id",
+        "copy_config_profile",
+        "create_profile_apply_plan",
+        "create_profile_history_restore_plan",
+        "execute_profile_apply_plan",
+        "execute_profile_history_restore_plan",
+        "list_config_profile_history",
+        "rename_config_profile"
+      ]
+    },
+    {
+      "id": "doctor",
+      "priority": "P1",
+      "status": "completed",
+      "strategy": "replace the legacy direct repair internally while retaining its existing button and result panel",
+      "equivalentImplementation": [
+        "the existing repair button creates and consumes a fingerprint-bound single-use backend plan",
+        "the complete environment repair group uses one backup and restores the original environment on any failure",
+        "success and failure remain visible in the existing doctor result panel"
+      ],
+      "commands": [
+        "create_doctor_repair_plan",
+        "execute_doctor_repair_plan"
+      ]
+    },
+    {
+      "id": "file-associations",
+      "priority": "P1",
+      "status": "completed",
+      "strategy": "wire bounded application search and single-confirmation execution into the existing file-association controls",
+      "equivalentImplementation": [
+        "common installed applications are discovered through bounded known locations, PATH, package managers and App Paths",
+        "the backend stores and consumes each immutable file-association plan once while the frontend shows one ordinary confirmation",
+        "registry backups preserve exact raw values for rollback and all actions render durable page results"
+      ],
+      "commands": [
+        "search_file_association_app"
+      ]
+    },
+    {
+      "id": "reports",
+      "priority": "P1",
+      "status": "completed",
+      "strategy": "add selected-project Markdown and JSON export with durable results to the existing project output area",
+      "equivalentImplementation": [
+        "the report uses the project directory currently selected in the v1.7 project page instead of the application default root",
+        "analysis, configuration preview, ports, IDEA and Agent trace summaries are collected read-only and redacted before writing",
+        "Markdown and JSON exports show their final path or error persistently in the existing project output"
+      ],
+      "commands": [
+        "export_project_report"
+      ]
+    },
+    {
+      "id": "onboarding",
+      "priority": "P2",
+      "status": "deferred",
+      "strategy": "do not add a new first-run overlay while the v1.7 frontend is frozen",
+      "commands": [
+        "complete_onboarding"
+      ]
+    }
+  ]
+}

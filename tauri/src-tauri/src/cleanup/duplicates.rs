@@ -243,10 +243,7 @@ where
     C: Fn() -> bool,
 {
     let root = if root.trim().is_empty() {
-        dirs::download_dir()
-            .or_else(dirs::desktop_dir)
-            .or_else(dirs::home_dir)
-            .ok_or_else(|| "无法识别用户可分析目录".to_string())?
+        dirs::home_dir().ok_or_else(|| "无法识别用户目录".to_string())?
     } else {
         PathBuf::from(root.trim())
     };

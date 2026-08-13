@@ -36,9 +36,6 @@ use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::atomic::{AtomicU64, Ordering};
-
-use crate::powershell_runner;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[cfg(windows)]
@@ -56,8 +53,6 @@ pub const MANAGED_PATHS: [&str; 8] = [
     r"%DEVENV_HOME%\current\go\bin",
     r"%DEVENV_HOME%\tools\npm-global",
 ];
-
-static UNIQUE_ID_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -80,10 +75,6 @@ pub(crate) fn now_string() -> String {
 }
 
 pub(crate) fn app_config_dir() -> PathBuf {
-    #[cfg(feature = "acceptance-fixtures")]
-    if let Some(path) = env::var_os("DEVENV_ACCEPTANCE_CONFIG_DIR") {
-        return PathBuf::from(path);
-    }
     dirs::data_local_dir()
         .or_else(dirs::home_dir)
         .unwrap_or_else(|| PathBuf::from("."))
@@ -113,15 +104,6 @@ pub(crate) fn split_path(value: &str) -> Vec<String> {
 }
 
 pub(crate) fn user_environment() -> Result<HashMap<String, String>, String> {
-    #[cfg(feature = "acceptance-fixtures")]
-    if let Some(path) = env::var_os("DEVENV_ACCEPTANCE_ENV_STORE") {
-        let path = PathBuf::from(path);
-        return if path.is_file() {
-            read_json(&path)
-        } else {
-            Ok(HashMap::new())
-        };
-    }
     #[cfg(windows)]
     {
         let hkcu = RegKey::predef(HKEY_CURRENT_USER);
@@ -147,26 +129,6 @@ pub(crate) fn process_environment() -> HashMap<String, String> {
 }
 
 pub(crate) fn set_user_environment(values: &HashMap<String, Option<String>>) -> Result<(), String> {
-    #[cfg(feature = "acceptance-fixtures")]
-    if let Some(path) = env::var_os("DEVENV_ACCEPTANCE_ENV_STORE") {
-        let path = PathBuf::from(path);
-        let mut current = if path.is_file() {
-            read_json::<HashMap<String, String>>(&path)?
-        } else {
-            HashMap::new()
-        };
-        for (name, value) in values {
-            match value {
-                Some(value) => {
-                    current.insert(name.clone(), value.clone());
-                }
-                None => {
-                    current.remove(name);
-                }
-            }
-        }
-        return write_json(&path, &current);
-    }
     #[cfg(windows)]
     {
         let hkcu = RegKey::predef(HKEY_CURRENT_USER);
@@ -193,18 +155,9 @@ pub(crate) fn set_user_environment(values: &HashMap<String, Option<String>>) -> 
 }
 
 pub(crate) fn broadcast_environment_change() {
-    #[cfg(feature = "acceptance-fixtures")]
-    if env::var_os("DEVENV_ACCEPTANCE_ENV_STORE").is_some() {
-        return;
-    }
     #[cfg(windows)]
     {
-        let script = r#"
-Add-Type -Namespace Win32 -Name Native -MemberDefinition '[DllImport("user32.dll", SetLastError=true, CharSet=CharSet.Auto)] public static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg, UIntPtr wParam, string lParam, uint fuFlags, uint uTimeout, out UIntPtr lpdwResult);' | Out-Null
-$result = [UIntPtr]::Zero
-[Win32.Native]::SendMessageTimeout([IntPtr]0xffff, 0x1a, [UIntPtr]::Zero, 'Environment', 0x2, 5000, [ref]$result) | Out-Null
-"#;
-        let _ = powershell_runner::run_powershell_script(script, Vec::new(), 10);
+        let _ = crate::powershell_runner::broadcast_environment_change();
     }
 }
 
@@ -249,27 +202,13 @@ pub(crate) fn command_text(stdout: &[u8], stderr: &[u8]) -> String {
 }
 
 pub(crate) fn run_command(path: &Path, args: &[&str]) -> String {
-    powershell_runner::run_probe_command(path, args, 10)
+    hidden_command(path)
+        .args(args)
+        .output()
         .ok()
-        .filter(|output| output.success)
-        .map(|output| command_text(output.stdout.as_bytes(), output.stderr.as_bytes()))
+        .filter(|output| output.status.success())
+        .map(|output| command_text(&output.stdout, &output.stderr))
         .unwrap_or_default()
-}
-
-pub(crate) fn unix_timestamp_millis() -> u128 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|value| value.as_millis())
-        .unwrap_or(0)
-}
-
-pub(crate) fn unique_id(prefix: &str) -> String {
-    let counter = UNIQUE_ID_COUNTER.fetch_add(1, Ordering::Relaxed);
-    format!(
-        "{prefix}-{}-{}-{counter}",
-        unix_timestamp_millis(),
-        std::process::id()
-    )
 }
 
 pub(crate) fn find_in_path(

@@ -3,8 +3,7 @@ param(
   [Parameter(Mandatory=$true)][string]$Title,
   [Parameter(Mandatory=$true)][string]$NotesFile,
   [Parameter(Mandatory=$true)][string]$AssetPath,
-  [Parameter(Mandatory=$true)][string]$Sha256,
-  [switch]$UploadExisting
+  [Parameter(Mandatory=$true)][string]$Sha256
 )
 
 $ErrorActionPreference = "Stop"
@@ -52,26 +51,21 @@ try {
 } catch {
   $existing = $null
 }
-if ($existing -and $existing.id -and !$UploadExisting) {
+if ($existing -and $existing.id) {
   throw "Gitee Release for $Tag already exists. Delete it manually or publish a new tag; this script will not overwrite silently."
 }
 
-if ($existing -and $existing.id -and $UploadExisting) {
-  $release = $existing
-} else {
-  $notes = Get-Content -LiteralPath $NotesFile -Raw
-  $prerelease = "false"
-  if ($Tag -match "-qa\.") {
-    $prerelease = "true"
-  }
-  $release = Invoke-RestMethod -Uri "$api/repos/$owner/$repo/releases" -Method Post -Body @{
-    access_token = $env:GITEE_TOKEN
-    tag_name = $Tag
-    target_commitish = "main"
-    name = $Title
-    body = $notes
-    prerelease = $prerelease
-  }
+$notes = Get-Content -LiteralPath $NotesFile -Raw
+$prerelease = "false"
+if ($Tag -match "-qa\.") {
+  $prerelease = "true"
+}
+$release = Invoke-RestMethod -Uri "$api/repos/$owner/$repo/releases" -Method Post -Body @{
+  access_token = $env:GITEE_TOKEN
+  tag_name = $Tag
+  name = $Title
+  body = $notes
+  prerelease = $prerelease
 }
 
 if (!$release.id) {
@@ -80,28 +74,17 @@ if (!$release.id) {
 
 try {
   $assetItem = Get-Item -LiteralPath $AssetPath
-  Add-Type -AssemblyName System.Net.Http
-  $client = [System.Net.Http.HttpClient]::new()
-  $content = [System.Net.Http.MultipartFormDataContent]::new()
-  $stream = [System.IO.File]::OpenRead($assetItem.FullName)
-  try {
-    $fileContent = [System.Net.Http.StreamContent]::new($stream)
-    $content.Add($fileContent, "file", $assetItem.Name)
-    $uploadUri = "$api/repos/$owner/$repo/releases/$($release.id)/attach_files?access_token=$([uri]::EscapeDataString($env:GITEE_TOKEN))"
-    $response = $client.PostAsync($uploadUri, $content).GetAwaiter().GetResult()
-    $responseText = $response.Content.ReadAsStringAsync().GetAwaiter().GetResult()
-    if (!$response.IsSuccessStatusCode) {
-      throw "HTTP $([int]$response.StatusCode): $responseText"
-    }
-  } finally {
-    $stream.Dispose()
-    $content.Dispose()
-    $client.Dispose()
+  $upload = Invoke-RestMethod -Uri "$api/repos/$owner/$repo/releases/$($release.id)/attach_files" -Method Post -Form @{
+    access_token = $env:GITEE_TOKEN
+    file = $assetItem
+  }
+  if (!$upload) {
+    throw "empty upload response"
   }
 } catch {
-  throw "Gitee Release exists, but asset upload failed. Upload $AssetPath manually to https://gitee.com/$owner/$repo/releases/tag/$Tag. Error: $($_.Exception.Message)"
+  throw "Gitee Release was created, but asset upload failed. Upload $AssetPath manually to $($release.html_url). Error: $($_.Exception.Message)"
 }
 
-"Gitee Release URL: https://gitee.com/$owner/$repo/releases/tag/$Tag"
+"Gitee Release URL: $($release.html_url)"
 "Asset: $(Split-Path -Leaf $AssetPath)"
 "SHA256: $actualSha"

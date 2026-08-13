@@ -43,19 +43,13 @@ fn store_file_association_plan(plan: &FileAssociationPlan) -> Result<(), String>
     Ok(())
 }
 
-fn consume_file_association_plan(
-    submitted: &FileAssociationPlan,
-) -> Result<FileAssociationPlan, String> {
+fn consume_file_association_plan(plan_id: &str) -> Result<FileAssociationPlan, String> {
     let mut store = file_association_plan_store()
         .lock()
         .map_err(|_| "文件关联计划存储暂时不可用".to_string())?;
     let stored = store
-        .remove(&submitted.plan_id)
+        .remove(plan_id)
         .ok_or_else(|| "文件关联计划不存在、已执行或已经过期，请重新创建预览".to_string())?;
-    if serde_json::to_value(&stored).ok() != serde_json::to_value(submitted).ok() {
-        store.insert(stored.plan_id.clone(), stored);
-        return Err("文件关联计划内容在预览后发生变化，已拒绝执行".to_string());
-    }
     let now = current_timestamp().parse::<u64>().unwrap_or_default();
     if plan_expired(&stored, now) {
         return Err("文件关联计划已超过 30 分钟，请重新创建预览".to_string());
@@ -437,7 +431,7 @@ pub fn create_file_association_plan_blocking(
         backup_path: display_path(&backup_path),
         warnings,
         risk_level: "high".to_string(),
-        requires_confirmation_token: true,
+        requires_confirmation_token: false,
         plan_fingerprint: String::new(),
     };
     plan.plan_fingerprint = plan_fingerprint(&plan);
@@ -517,10 +511,11 @@ pub fn search_file_association_app_blocking(
 }
 
 pub fn apply_file_association_plan_blocking(
-    submitted: FileAssociationPlan,
+    plan_id: String,
 ) -> Result<FileAssociationApplyResult, String> {
-    let plan = consume_file_association_plan(&submitted)?;
+    let plan = consume_file_association_plan(&plan_id)?;
     validate_plan_fingerprint(&plan)?;
+    validate_plan_is_current(&plan)?;
     if plan.changes.is_empty() {
         return Err("计划为空，未执行任何修改".to_string());
     }
@@ -1149,6 +1144,27 @@ fn validate_plan_fingerprint(plan: &FileAssociationPlan) -> Result<(), String> {
     Ok(())
 }
 
+fn validate_plan_is_current(plan: &FileAssociationPlan) -> Result<(), String> {
+    if !Path::new(&plan.target_executable).is_file() {
+        return Err("目标应用在创建预览后已不可用，请重新选择应用".to_string());
+    }
+    for change in &plan.changes {
+        let current = read_current_association(&change.extension)
+            .unwrap_or((None, FileAssociationSource::Unknown));
+        let current_command = current.0.as_deref().and_then(read_open_command);
+        if current.0 != change.before.current_prog_id
+            || current.1 != change.before.source
+            || current_command != change.before.current_command
+        {
+            return Err(format!(
+                "{} 的文件关联在创建预览后发生变化，请重新扫描并创建计划",
+                change.extension
+            ));
+        }
+    }
+    Ok(())
+}
+
 fn plan_fingerprint(plan: &FileAssociationPlan) -> String {
     let mut clone = plan.clone();
     clone.plan_fingerprint.clear();
@@ -1542,17 +1558,32 @@ fn collect_known_location_candidates(
 }
 
 fn collect_jetbrains_idea_dirs(root: &Path, paths: &mut Vec<PathBuf>) {
-    let Ok(entries) = fs::read_dir(root) else {
-        return;
-    };
-    for entry in entries.flatten().take(80) {
-        let path = entry.path();
-        let name = entry.file_name().to_string_lossy().to_ascii_lowercase();
-        if name.contains("intellij idea") || name == "idea" {
-            paths.push(path.join("bin").join("idea64.exe"));
-            paths.push(path.join("bin").join("idea.exe"));
+    const MAX_DEPTH: usize = 4;
+    const MAX_DIRECTORIES: usize = 256;
+    let mut pending = vec![(root.to_path_buf(), 0_usize)];
+    let mut inspected = 0_usize;
+    while let Some((directory, depth)) = pending.pop() {
+        if inspected >= MAX_DIRECTORIES {
+            break;
         }
-        collect_jetbrains_idea_dirs(&path, paths);
+        inspected += 1;
+        let Ok(entries) = fs::read_dir(&directory) else {
+            continue;
+        };
+        for entry in entries.flatten().take(80) {
+            let path = entry.path();
+            if !path.is_dir() {
+                continue;
+            }
+            let name = entry.file_name().to_string_lossy().to_ascii_lowercase();
+            if name.contains("intellij idea") || name == "idea" {
+                paths.push(path.join("bin").join("idea64.exe"));
+                paths.push(path.join("bin").join("idea.exe"));
+            }
+            if depth < MAX_DEPTH {
+                pending.push((path, depth + 1));
+            }
+        }
     }
 }
 
@@ -1821,7 +1852,7 @@ mod tests {
     }
 
     #[test]
-    fn normal_plan_uses_registered_high_risk_token_contract() {
+    fn normal_plan_uses_backend_bound_single_confirmation_contract() {
         let request = FileAssociationPlanRequest {
             target_app_name: "Fixture App".to_string(),
             target_executable: std::env::current_exe()
@@ -1834,7 +1865,7 @@ mod tests {
         let plan = create_file_association_plan_blocking(request).unwrap();
 
         assert_eq!(plan.risk_level, "high");
-        assert!(plan.requires_confirmation_token);
+        assert!(!plan.requires_confirmation_token);
         assert!(!plan.backup_path.trim().is_empty());
     }
 
@@ -1913,7 +1944,7 @@ mod tests {
             backup_path: "backup.json".to_string(),
             warnings: Vec::new(),
             risk_level: "high".to_string(),
-            requires_confirmation_token: true,
+            requires_confirmation_token: false,
             plan_fingerprint: String::new(),
         };
         plan.plan_fingerprint = plan_fingerprint(&plan);
@@ -1927,13 +1958,13 @@ mod tests {
         assert_eq!(change["applyMode"], "openSystemSettings");
         assert!(serialized["backupPath"].as_str().is_some());
         assert_eq!(serialized["riskLevel"], "high");
-        assert_eq!(serialized["requiresConfirmationToken"], true);
+        assert_eq!(serialized["requiresConfirmationToken"], false);
         plan.target_app_name = "Other".to_string();
         assert!(validate_plan_fingerprint(&plan).is_err());
     }
 
     #[test]
-    fn backend_store_rejects_rehashed_tampered_plan_and_consumes_once() {
+    fn backend_store_consumes_plan_id_once() {
         let record = unknown_record(
             ".devenvplanbinding",
             ExtensionDefinition {
@@ -1963,21 +1994,18 @@ mod tests {
             backup_path: "fixture.json".to_string(),
             warnings: Vec::new(),
             risk_level: "high".to_string(),
-            requires_confirmation_token: true,
+            requires_confirmation_token: false,
             plan_fingerprint: String::new(),
         };
         plan.plan_fingerprint = plan_fingerprint(&plan);
         store_file_association_plan(&plan).unwrap();
 
-        let mut tampered = plan.clone();
-        tampered.target_executable = "attacker.exe".to_string();
-        tampered.plan_fingerprint = plan_fingerprint(&tampered);
-        assert!(validate_plan_fingerprint(&tampered).is_ok());
-        assert!(consume_file_association_plan(&tampered).is_err());
         assert_eq!(
-            consume_file_association_plan(&plan).unwrap().plan_id,
+            consume_file_association_plan(&plan.plan_id)
+                .unwrap()
+                .plan_id,
             plan.plan_id
         );
-        assert!(consume_file_association_plan(&plan).is_err());
+        assert!(consume_file_association_plan(&plan.plan_id).is_err());
     }
 }

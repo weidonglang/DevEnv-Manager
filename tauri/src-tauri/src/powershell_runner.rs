@@ -1,9 +1,10 @@
 use serde::{Deserialize, Serialize};
 use std::ffi::OsStr;
-use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::io::{Read, Write};
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::thread;
+use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
 #[cfg(windows)]
@@ -18,7 +19,7 @@ pub struct PowerShellRequest {
     pub risk_level: String,
     pub requires_admin: bool,
     pub allow_network: bool,
-    pub confirmation_token: Option<String>,
+    pub allow_side_effects: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -46,6 +47,39 @@ pub struct NativeCommandResult {
     pub executable: String,
 }
 
+const MAX_CAPTURE_BYTES: usize = 2 * 1024 * 1024;
+const TRUNCATION_MARKER: &[u8] = b"\n[output truncated by DevEnv Manager]\n";
+
+fn drain_pipe<R>(mut reader: R) -> JoinHandle<Vec<u8>>
+where
+    R: Read + Send + 'static,
+{
+    thread::spawn(move || {
+        let mut captured = Vec::new();
+        let mut chunk = [0_u8; 8192];
+        let mut truncated = false;
+        let capture_limit = MAX_CAPTURE_BYTES.saturating_sub(TRUNCATION_MARKER.len());
+        while let Ok(read) = reader.read(&mut chunk) {
+            if read == 0 {
+                break;
+            }
+            let remaining = capture_limit.saturating_sub(captured.len());
+            if remaining > 0 {
+                captured.extend_from_slice(&chunk[..read.min(remaining)]);
+            }
+            truncated |= read > remaining;
+        }
+        if truncated {
+            captured.extend_from_slice(TRUNCATION_MARKER);
+        }
+        captured
+    })
+}
+
+fn collected_output(handle: JoinHandle<Vec<u8>>) -> Vec<u8> {
+    handle.join().unwrap_or_default()
+}
+
 impl PowerShellRequest {
     pub fn read_only(script: impl Into<String>, timeout_seconds: u64) -> Self {
         Self {
@@ -56,7 +90,7 @@ impl PowerShellRequest {
             risk_level: "low".to_string(),
             requires_admin: false,
             allow_network: false,
-            confirmation_token: None,
+            allow_side_effects: false,
         }
     }
 }
@@ -71,17 +105,22 @@ pub fn run_powershell_script(
     run_powershell(request)
 }
 
+pub fn broadcast_environment_change() -> Result<PowerShellResult, String> {
+    run_powershell_script(
+        r#"
+Add-Type -Namespace Win32 -Name Native -MemberDefinition '[DllImport("user32.dll", SetLastError=true, CharSet=CharSet.Auto)] public static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg, UIntPtr wParam, string lParam, uint fuFlags, uint uTimeout, out UIntPtr lpdwResult);' | Out-Null
+$result = [UIntPtr]::Zero
+[Win32.Native]::SendMessageTimeout([IntPtr]0xffff, 0x1a, [UIntPtr]::Zero, 'Environment', 0x2, 5000, [ref]$result) | Out-Null
+"#,
+        Vec::new(),
+        8,
+    )
+}
+
 pub fn run_powershell(request: PowerShellRequest) -> Result<PowerShellResult, String> {
     let risk = request.risk_level.trim().to_ascii_lowercase();
-    if matches!(risk.as_str(), "medium" | "high" | "critical")
-        && request
-            .confirmation_token
-            .as_deref()
-            .unwrap_or("")
-            .trim()
-            .is_empty()
-    {
-        return Err("PowerShell 写入类请求缺少 confirmation token".to_string());
+    if matches!(risk.as_str(), "medium" | "high" | "critical") && !request.allow_side_effects {
+        return Err("PowerShell 写入类请求缺少后端副作用授权".to_string());
     }
     if request.requires_admin && !is_elevated() {
         return Err(
@@ -121,6 +160,16 @@ pub fn run_powershell(request: PowerShellRequest) -> Result<PowerShellResult, St
     let mut child = command
         .spawn()
         .map_err(|err| format!("启动 PowerShell 失败：{err}"))?;
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| "无法读取 PowerShell 标准输出".to_string())?;
+    let stderr = child
+        .stderr
+        .take()
+        .ok_or_else(|| "无法读取 PowerShell 错误输出".to_string())?;
+    let stdout_reader = drain_pipe(stdout);
+    let stderr_reader = drain_pipe(stderr);
     let mut timed_out = false;
     loop {
         if child
@@ -141,16 +190,16 @@ pub fn run_powershell(request: PowerShellRequest) -> Result<PowerShellResult, St
         killed_process_tree = kill_process_tree(child.id());
         let _ = child.kill();
     }
-    let output = child
-        .wait_with_output()
-        .map_err(|err| format!("读取 PowerShell 输出失败：{err}"))?;
-    let stdout = decode_output(&output.stdout);
-    let stderr = decode_output(&output.stderr);
+    let status = child
+        .wait()
+        .map_err(|err| format!("等待 PowerShell 结束失败：{err}"))?;
+    let stdout = collected_output(stdout_reader);
+    let stderr = collected_output(stderr_reader);
     Ok(PowerShellResult {
-        success: output.status.success() && !timed_out,
-        exit_code: output.status.code(),
-        stdout,
-        stderr,
+        success: status.success() && !timed_out,
+        exit_code: status.code(),
+        stdout: decode_output(&stdout),
+        stderr: decode_output(&stderr),
         elapsed_ms: start.elapsed().as_millis(),
         timed_out,
         executable,
@@ -159,7 +208,9 @@ pub fn run_powershell(request: PowerShellRequest) -> Result<PowerShellResult, St
 }
 
 pub fn powershell_executable() -> String {
-    for executable in ["pwsh.exe", "powershell.exe"] {
+    // Windows management modules such as Storage and ScheduledTasks are most
+    // reliable in the inbox host. Fall back to PowerShell 7 when it is absent.
+    for executable in ["powershell.exe", "pwsh.exe"] {
         let probe = run_native_command_with_timeout(
             executable,
             &[
@@ -183,19 +234,35 @@ pub fn run_native_command_with_timeout(
     args: &[&str],
     timeout_seconds: u64,
 ) -> Result<NativeCommandResult, String> {
-    let timeout_seconds = timeout_seconds.clamp(1, 300);
     let executable_ref = executable.as_ref();
     let executable_label = executable_ref.to_string_lossy().to_string();
     let mut command = Command::new(executable_ref);
+    command.args(args);
+    run_configured_command_with_timeout(command, executable_label, timeout_seconds)
+}
+
+pub fn run_configured_command_with_timeout(
+    mut command: Command,
+    executable_label: String,
+    timeout_seconds: u64,
+) -> Result<NativeCommandResult, String> {
+    let timeout_seconds = timeout_seconds.clamp(1, 300);
     hide_command_window(&mut command);
-    command
-        .args(args)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
+    command.stdout(Stdio::piped()).stderr(Stdio::piped());
     let start = Instant::now();
     let mut child = command
         .spawn()
         .map_err(|err| format!("Failed to start {executable_label}: {err}"))?;
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| format!("Failed to capture {executable_label} stdout"))?;
+    let stderr = child
+        .stderr
+        .take()
+        .ok_or_else(|| format!("Failed to capture {executable_label} stderr"))?;
+    let stdout_reader = drain_pipe(stdout);
+    let stderr_reader = drain_pipe(stderr);
     let mut timed_out = false;
     loop {
         if child
@@ -212,14 +279,16 @@ pub fn run_native_command_with_timeout(
         }
         thread::sleep(Duration::from_millis(50));
     }
-    let output = child
-        .wait_with_output()
-        .map_err(|err| format!("Failed to read {executable_label} output: {err}"))?;
+    let status = child
+        .wait()
+        .map_err(|err| format!("Failed to wait for {executable_label}: {err}"))?;
+    let stdout = collected_output(stdout_reader);
+    let stderr = collected_output(stderr_reader);
     Ok(NativeCommandResult {
-        success: output.status.success() && !timed_out,
-        exit_code: output.status.code(),
-        stdout: decode_output(&output.stdout),
-        stderr: decode_output(&output.stderr),
+        success: status.success() && !timed_out,
+        exit_code: status.code(),
+        stdout: decode_output(&stdout),
+        stderr: decode_output(&stderr),
         elapsed_ms: start.elapsed().as_millis(),
         timed_out,
         executable: executable_label,
@@ -232,91 +301,6 @@ pub fn run_probe_command(
     timeout_seconds: u64,
 ) -> Result<NativeCommandResult, String> {
     run_native_command_with_timeout(executable, args, timeout_seconds)
-}
-
-pub fn run_probe_command_with_env(
-    executable: impl AsRef<OsStr>,
-    args: &[&str],
-    timeout_seconds: u64,
-    environment: &[(&str, &str)],
-) -> Result<NativeCommandResult, String> {
-    run_probe_command_with_env_and_optional_cwd(
-        executable,
-        args,
-        timeout_seconds,
-        environment,
-        None,
-    )
-}
-
-pub fn run_probe_command_with_env_and_cwd(
-    executable: impl AsRef<OsStr>,
-    args: &[&str],
-    timeout_seconds: u64,
-    environment: &[(&str, &str)],
-    cwd: &Path,
-) -> Result<NativeCommandResult, String> {
-    run_probe_command_with_env_and_optional_cwd(
-        executable,
-        args,
-        timeout_seconds,
-        environment,
-        Some(cwd),
-    )
-}
-
-fn run_probe_command_with_env_and_optional_cwd(
-    executable: impl AsRef<OsStr>,
-    args: &[&str],
-    timeout_seconds: u64,
-    environment: &[(&str, &str)],
-    cwd: Option<&Path>,
-) -> Result<NativeCommandResult, String> {
-    let timeout_seconds = timeout_seconds.clamp(1, 300);
-    let executable_ref = executable.as_ref();
-    let executable_label = executable_ref.to_string_lossy().to_string();
-    let mut command = Command::new(executable_ref);
-    hide_command_window(&mut command);
-    command
-        .args(args)
-        .envs(environment.iter().copied())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    if let Some(cwd) = cwd {
-        command.current_dir(cwd);
-    }
-    let start = Instant::now();
-    let mut child = command
-        .spawn()
-        .map_err(|err| format!("Failed to start {executable_label}: {err}"))?;
-    let mut timed_out = false;
-    loop {
-        if child
-            .try_wait()
-            .map_err(|err| format!("Failed to wait for {executable_label}: {err}"))?
-            .is_some()
-        {
-            break;
-        }
-        if start.elapsed() >= Duration::from_secs(timeout_seconds) {
-            timed_out = true;
-            let _ = child.kill();
-            break;
-        }
-        thread::sleep(Duration::from_millis(50));
-    }
-    let output = child
-        .wait_with_output()
-        .map_err(|err| format!("Failed to read {executable_label} output: {err}"))?;
-    Ok(NativeCommandResult {
-        success: output.status.success() && !timed_out,
-        exit_code: output.status.code(),
-        stdout: decode_output(&output.stdout),
-        stderr: decode_output(&output.stderr),
-        elapsed_ms: start.elapsed().as_millis(),
-        timed_out,
-        executable: executable_label,
-    })
 }
 
 pub fn native_command_message(result: &NativeCommandResult) -> String {
@@ -362,9 +346,6 @@ fn hide_command_window(command: &mut Command) {
     }
 }
 
-#[allow(dead_code)]
-fn _assert_os_str(_: impl AsRef<OsStr>) {}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -383,7 +364,7 @@ mod tests {
     }
 
     #[test]
-    fn high_risk_request_requires_token() {
+    fn high_risk_request_requires_internal_side_effect_authorization() {
         let request = PowerShellRequest {
             script: "Write-Output ok".to_string(),
             args: Vec::new(),
@@ -392,7 +373,7 @@ mod tests {
             risk_level: "high".to_string(),
             requires_admin: false,
             allow_network: false,
-            confirmation_token: None,
+            allow_side_effects: false,
         };
         assert!(run_powershell(request).is_err());
     }
@@ -403,5 +384,48 @@ mod tests {
         let result = run_powershell_script("Start-Sleep -Seconds 3", Vec::new(), 1).unwrap();
         assert!(result.timed_out);
         assert!(!result.success);
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn configured_native_command_honors_timeout() {
+        let mut command = Command::new("powershell.exe");
+        command.args([
+            "-NoLogo",
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            "Start-Sleep -Seconds 3",
+        ]);
+        let result =
+            run_configured_command_with_timeout(command, "powershell.exe".to_string(), 1).unwrap();
+        assert!(result.timed_out);
+        assert!(!result.success);
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn configured_native_command_drains_large_output_while_running() {
+        let mut command = Command::new("powershell.exe");
+        command.args([
+            "-NoLogo",
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            "$value = 'x' * 200000; [Console]::Out.Write($value)",
+        ]);
+        let result =
+            run_configured_command_with_timeout(command, "powershell.exe".to_string(), 5).unwrap();
+        assert!(result.success);
+        assert!(!result.timed_out);
+        assert_eq!(result.stdout.len(), 200000);
+    }
+
+    #[test]
+    fn captured_output_is_bounded_and_marks_truncation() {
+        let reader = std::io::Cursor::new(vec![b'x'; MAX_CAPTURE_BYTES + 4096]);
+        let output = collected_output(drain_pipe(reader));
+        assert!(output.len() <= MAX_CAPTURE_BYTES);
+        assert!(output.ends_with(TRUNCATION_MARKER));
     }
 }

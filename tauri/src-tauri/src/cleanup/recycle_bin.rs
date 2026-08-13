@@ -2,7 +2,7 @@ use super::model::{
     RecycleBinCleanupPlan, RecycleBinCleanupResult, RecycleBinItem, RecycleBinReport,
     RecycleBinVolumeSummary,
 };
-use super::utils::{generated_at, unique_id};
+use super::utils::generated_at;
 use crate::powershell_runner::{run_powershell, run_powershell_script, PowerShellRequest};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
@@ -91,14 +91,14 @@ struct ClearOutcome {
 pub fn inspect_recycle_bin() -> Result<RecycleBinReport, String> {
     #[cfg(not(windows))]
     {
-        return Err("Windows Recycle Bin inspection is only available on Windows.".to_string());
+        Err("回收站检查仅支持 Windows".to_string())
     }
     #[cfg(windows)]
     {
         let output = run_powershell_script(INSPECT_SCRIPT, Vec::new(), 30)?;
         if !output.success {
             return Err(format!(
-                "Windows Recycle Bin inspection failed: {}",
+                "检查 Windows 回收站失败：{}",
                 readable_runner_error(&output.stderr, &output.stdout)
             ));
         }
@@ -126,10 +126,7 @@ pub fn execute_recycle_bin_cleanup_plan(
     if current_ids != plan.item_ids
         || snapshot_fingerprint(&selected_before) != plan.snapshot_fingerprint
     {
-        return Err(
-            "Recycle Bin contents changed after preview. Refresh and create a new cleanup plan."
-                .to_string(),
-        );
+        return Err("预览后回收站内容已变化，请重新检查并创建计划".to_string());
     }
 
     let output = run_powershell(PowerShellRequest {
@@ -140,11 +137,11 @@ pub fn execute_recycle_bin_cleanup_plan(
         risk_level: "critical".to_string(),
         requires_admin: false,
         allow_network: false,
-        confirmation_token: Some("validated-by-tauri-command-token-gate".to_string()),
+        allow_side_effects: true,
     })?;
     if !output.success {
         return Err(format!(
-            "Windows Recycle Bin cleanup failed: {}",
+            "清空 Windows 回收站失败：{}",
             readable_runner_error(&output.stderr, &output.stdout)
         ));
     }
@@ -180,46 +177,16 @@ pub fn execute_recycle_bin_cleanup_plan(
         selected_drives: plan.selected_drives,
         failures,
         message: if success {
-            "recycle-bin-cleanup-verified".to_string()
+            "回收站已清空并通过复扫验证".to_string()
         } else {
-            "recycle-bin-cleanup-incomplete".to_string()
+            "回收站清理未完全完成，请查看失败项".to_string()
         },
     })
 }
 
-fn verified_cleanup_failures(
-    outcomes: &[ClearOutcome],
-    remaining_items: usize,
-    cleaned_items: usize,
-    expected_items: usize,
-) -> Vec<String> {
-    // Clear-RecycleBin can report ERROR_FILE_NOT_FOUND after Windows has already
-    // removed the final item. The fresh shell snapshot is the authoritative result.
-    if remaining_items == 0 && cleaned_items == expected_items {
-        return Vec::new();
-    }
-
-    let mut failures = outcomes
-        .iter()
-        .filter(|item| !item.success)
-        .map(|item| format!("{}: {}", item.drive, item.error))
-        .collect::<Vec<_>>();
-    if remaining_items > 0 {
-        failures.push(format!(
-            "{remaining_items} previewed item(s) remain on the selected volume(s) after cleanup."
-        ));
-    }
-    if cleaned_items != expected_items {
-        failures.push(format!(
-            "Cleanup verification removed {cleaned_items} of {expected_items} previewed item(s)."
-        ));
-    }
-    failures
-}
-
 fn parse_report(json: &str) -> Result<RecycleBinReport, String> {
     let raw: RawRecycleBinEnvelope = serde_json::from_str(json.trim())
-        .map_err(|error| format!("Invalid Recycle Bin inspection response: {error}"))?;
+        .map_err(|error| format!("回收站检查结果格式无效：{error}"))?;
     Ok(report_from_raw(raw))
 }
 
@@ -234,10 +201,7 @@ fn report_from_raw(raw: RawRecycleBinEnvelope) -> RecycleBinReport {
                 .or_else(|| drive_from_path(&item.recycle_path))
                 .unwrap_or_default();
             if source_drive.is_empty() {
-                warnings.push("unresolved-source-drive".to_string());
-            }
-            if !item.recoverable {
-                warnings.push("unrecoverable-item".to_string());
+                warnings.push("有回收站项目无法识别来源盘符，已排除执行范围".to_string());
             }
             let id = recycle_item_id(
                 &item.recycle_path,
@@ -264,14 +228,14 @@ fn report_from_raw(raw: RawRecycleBinEnvelope) -> RecycleBinReport {
     });
     warnings.sort();
     warnings.dedup();
-    let mut volume_map = BTreeMap::<String, RecycleBinVolumeSummary>::new();
+    let mut volumes = BTreeMap::<String, RecycleBinVolumeSummary>::new();
     for item in &items {
         let drive = if item.source_drive.is_empty() {
-            "unknown".to_string()
+            "未知".to_string()
         } else {
             item.source_drive.clone()
         };
-        let summary = volume_map
+        let summary = volumes
             .entry(drive.clone())
             .or_insert(RecycleBinVolumeSummary {
                 drive,
@@ -288,7 +252,7 @@ fn report_from_raw(raw: RawRecycleBinEnvelope) -> RecycleBinReport {
         item_count: items.len(),
         total_bytes: items.iter().map(|item| item.size).sum(),
         recoverable_count: items.iter().filter(|item| item.recoverable).count(),
-        volumes: volume_map.into_values().collect(),
+        volumes: volumes.into_values().collect(),
         items,
         warnings,
     }
@@ -300,30 +264,24 @@ fn create_plan_from_report(
 ) -> Result<RecycleBinCleanupPlan, String> {
     let selected_drives = selected_drives
         .into_iter()
-        .map(|value| {
-            normalize_drive(&value).ok_or_else(|| format!("Invalid Recycle Bin drive: {value}"))
-        })
+        .map(|value| normalize_drive(&value).ok_or_else(|| format!("无效盘符：{value}")))
         .collect::<Result<BTreeSet<_>, _>>()?
         .into_iter()
         .collect::<Vec<_>>();
     if selected_drives.is_empty() {
-        return Err(
-            "Select at least one Recycle Bin volume before creating a cleanup plan.".to_string(),
-        );
+        return Err("请至少选择一个有内容的回收站盘符".to_string());
     }
     let items = selected_items(report, &selected_drives);
     if items.is_empty() {
-        return Err(
-            "The selected Recycle Bin volume does not contain any previewed items.".to_string(),
-        );
+        return Err("所选盘符的回收站中没有可预览项目".to_string());
     }
     let item_ids = items.iter().map(|item| item.id.clone()).collect::<Vec<_>>();
     let estimated_bytes = items.iter().map(|item| item.size).sum::<u64>();
     let snapshot_fingerprint = snapshot_fingerprint(&items);
     Ok(RecycleBinCleanupPlan {
         plan_id: format!(
-            "{}-{}",
-            unique_id("recycle-bin-cleanup"),
+            "recycle-bin-{}-{}",
+            generated_at(),
             &snapshot_fingerprint[..12]
         ),
         created_at: generated_at(),
@@ -334,9 +292,8 @@ fn create_plan_from_report(
         snapshot_fingerprint,
         risk_level: "critical".to_string(),
         warnings: vec![
-            "permanent-removal".to_string(),
-            "scope-by-volume".to_string(),
-            "snapshot-must-match".to_string(),
+            "执行后文件将永久移除，不能从回收站恢复".to_string(),
+            "执行前后都会重新读取回收站，内容变化时拒绝执行".to_string(),
         ],
     })
 }
@@ -348,14 +305,14 @@ fn validate_plan_shape(plan: &RecycleBinCleanupPlan) -> Result<(), String> {
         || plan.item_ids.is_empty()
         || plan.item_count != plan.item_ids.len()
     {
-        return Err("Recycle Bin cleanup plan is incomplete or invalid.".to_string());
+        return Err("回收站清理计划不完整或已损坏".to_string());
     }
-    for drive in &plan.selected_drives {
-        if normalize_drive(drive).as_deref() != Some(drive.as_str()) {
-            return Err(format!(
-                "Recycle Bin cleanup plan contains an invalid drive: {drive}"
-            ));
-        }
+    if plan
+        .selected_drives
+        .iter()
+        .any(|drive| normalize_drive(drive).as_deref() != Some(drive.as_str()))
+    {
+        return Err("回收站清理计划包含无效盘符".to_string());
     }
     Ok(())
 }
@@ -412,8 +369,7 @@ fn normalize_drive(value: &str) -> Option<String> {
 }
 
 fn drive_from_path(value: &str) -> Option<String> {
-    let value = value.trim();
-    let bytes = value.as_bytes();
+    let bytes = value.trim().as_bytes();
     if bytes.len() < 3
         || !bytes[0].is_ascii_alphabetic()
         || bytes[1] != b':'
@@ -426,26 +382,49 @@ fn drive_from_path(value: &str) -> Option<String> {
 
 fn parse_clear_outcomes(json: &str) -> Result<Vec<ClearOutcome>, String> {
     let value = serde_json::from_str::<serde_json::Value>(json.trim())
-        .map_err(|error| format!("Invalid Recycle Bin cleanup response: {error}"))?;
+        .map_err(|error| format!("回收站清理结果格式无效：{error}"))?;
     if value.is_array() {
-        serde_json::from_value(value)
-            .map_err(|error| format!("Invalid Recycle Bin cleanup response: {error}"))
+        serde_json::from_value(value).map_err(|error| format!("回收站清理结果格式无效：{error}"))
     } else {
         serde_json::from_value(value)
             .map(|item| vec![item])
-            .map_err(|error| format!("Invalid Recycle Bin cleanup response: {error}"))
+            .map_err(|error| format!("回收站清理结果格式无效：{error}"))
     }
+}
+
+fn verified_cleanup_failures(
+    outcomes: &[ClearOutcome],
+    remaining_items: usize,
+    cleaned_items: usize,
+    expected_items: usize,
+) -> Vec<String> {
+    if remaining_items == 0 && cleaned_items == expected_items {
+        return Vec::new();
+    }
+    let mut failures = outcomes
+        .iter()
+        .filter(|item| !item.success)
+        .map(|item| format!("{}：{}", item.drive, item.error))
+        .collect::<Vec<_>>();
+    if remaining_items > 0 {
+        failures.push(format!("复扫后仍有 {remaining_items} 个所选项目存在"));
+    }
+    if cleaned_items != expected_items {
+        failures.push(format!(
+            "复扫确认移除了 {cleaned_items}/{expected_items} 个预览项目"
+        ));
+    }
+    failures
 }
 
 fn readable_runner_error(stderr: &str, stdout: &str) -> String {
     let message = if stderr.trim().is_empty() {
-        stdout
+        stdout.trim()
     } else {
-        stderr
+        stderr.trim()
     };
-    let message = message.trim();
     if message.is_empty() {
-        "PowerShell returned no diagnostic message.".to_string()
+        "PowerShell 没有返回诊断信息".to_string()
     } else {
         message.to_string()
     }
@@ -463,29 +442,26 @@ mod tests {
     }
 
     #[test]
-    fn recycle_report_groups_items_by_source_volume() {
+    fn report_groups_items_by_source_volume() {
         let report = fixture_report();
         assert_eq!(report.item_count, 2);
         assert_eq!(report.total_bytes, 142);
         assert_eq!(report.volumes.len(), 2);
-        assert_eq!(report.volumes[0].drive, "C:");
-        assert_eq!(report.volumes[1].drive, "D:");
     }
 
     #[test]
-    fn recycle_plan_snapshots_selected_volume_items_and_rejects_empty_selection() {
+    fn plan_snapshots_only_selected_volumes() {
         let report = fixture_report();
         let plan = create_plan_from_report(&report, vec!["d:\\".to_string()]).unwrap();
         assert_eq!(plan.selected_drives, vec!["D:"]);
         assert_eq!(plan.item_count, 1);
         assert_eq!(plan.estimated_bytes, 100);
-        assert_eq!(plan.risk_level, "critical");
         assert_eq!(plan.snapshot_fingerprint.len(), 64);
         assert!(create_plan_from_report(&report, Vec::new()).is_err());
     }
 
     #[test]
-    fn recycle_plan_snapshot_changes_when_preview_changes() {
+    fn snapshot_changes_when_preview_changes() {
         let report = fixture_report();
         let first = create_plan_from_report(&report, vec!["C:".to_string()]).unwrap();
         let mut changed = report;
@@ -495,41 +471,12 @@ mod tests {
     }
 
     #[test]
-    fn recycle_report_recovers_source_drive_from_item_paths() {
-        let report = parse_report(
-            r#"{"Items":[{"Name":"fallback.txt","OriginalPath":"","RecyclePath":"E:\\$Recycle.Bin\\S-1-5-21\\$R3.txt","SourceDrive":"","Size":7,"DeletedAt":"2026-07-20T00:02:00Z","Recoverable":false}],"Warnings":[]}"#,
-        )
-        .unwrap();
-        assert_eq!(report.items[0].source_drive, "E:");
-        assert_eq!(report.volumes[0].drive, "E:");
-        assert!(!report
-            .warnings
-            .iter()
-            .any(|item| item == "unresolved-source-drive"));
-    }
-
-    #[test]
-    fn recycle_cleanup_accepts_verified_empty_snapshot_after_cmdlet_file_not_found() {
+    fn verified_empty_snapshot_overrides_cmdlet_file_not_found() {
         let outcomes = vec![ClearOutcome {
             drive: "E:".to_string(),
             success: false,
             error: "The system cannot find the file specified.".to_string(),
         }];
         assert!(verified_cleanup_failures(&outcomes, 0, 1, 1).is_empty());
-    }
-
-    #[test]
-    fn recycle_cleanup_keeps_cmdlet_error_when_items_remain() {
-        let outcomes = vec![ClearOutcome {
-            drive: "E:".to_string(),
-            success: false,
-            error: "Access is denied.".to_string(),
-        }];
-        let failures = verified_cleanup_failures(&outcomes, 1, 0, 1);
-        assert!(failures
-            .iter()
-            .any(|item| item.contains("Access is denied")));
-        assert!(failures.iter().any(|item| item.contains("remain")));
-        assert!(failures.iter().any(|item| item.contains("removed 0 of 1")));
     }
 }

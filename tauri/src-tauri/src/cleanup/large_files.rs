@@ -71,8 +71,6 @@ fn large_file_item(
             "medium"
         }
         .to_string(),
-        actionable: false,
-        blocked_reason: Some("大文件扫描仅提供只读分析".to_string()),
         file_type,
     }
 }

@@ -1,123 +1,57 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "DevEnv Manager Feature Acceptance Manifest",
+  "$id": "https://devenv-manager.local/acceptance-schema.json",
+  "title": "DevEnv Manager feature manifest",
   "type": "object",
-  "required": ["version", "pages"],
+  "required": ["schemaVersion", "productVersion", "pages"],
   "properties": {
-    "version": { "type": "string" },
-    "commandAllowlist": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "required": ["command", "reason"],
-        "properties": {
-          "command": { "type": "string" },
-          "reason": { "type": "string", "minLength": 1 },
-          "priority": { "type": "string" }
-        }
-      }
-    },
+    "$schema": { "type": "string", "minLength": 1 },
+    "schemaVersion": { "const": 1 },
+    "productVersion": { "type": "string", "minLength": 1 },
     "pages": {
       "type": "array",
+      "minItems": 1,
       "items": {
         "type": "object",
-        "required": ["pageId", "displayName", "priority", "features"],
+        "required": ["pageId", "displayName", "features"],
         "properties": {
-          "pageId": { "type": "string" },
-          "displayName": { "type": "string" },
-          "priority": { "enum": ["P0", "P1", "P2"] },
+          "pageId": { "type": "string", "pattern": "^[a-z][a-zA-Z0-9-]*$" },
+          "displayName": { "type": "string", "minLength": 1 },
           "features": {
             "type": "array",
+            "minItems": 1,
             "items": {
               "type": "object",
-              "required": [
-                "featureId",
-                "id",
-                "domain",
-                "userVisibleName",
-                "name",
-                "priority",
-                "targetVersion",
-                "status",
-                "oldFeature",
-                "frontendComponent",
-                "frontendEntry",
-                "selectors",
-                "backendCommands",
-                "backendExists",
-                "frontendWired",
-                "riskLevel",
-                "requiresTauri",
-                "requiresLoading",
-                "requiresResultArea",
-                "requiresErrorArea",
-                "requiresDebug",
-                "requiresReport",
-                "requiresRiskPlan",
-                "requiresToken",
-                "requiresVerify",
-                "requiresRollback",
-                "requiresPagination",
-                "requiresI18n",
-                "requiresDarkReadable",
-                "safeSmokeMode",
-                "manualAllowed",
-                "acceptanceChecks",
-                "testModes"
-              ],
+              "required": ["featureId", "userVisibleName", "status", "priority", "frontendEntry", "backendCommands", "riskLevel", "safeSmokeMode", "acceptanceChecks"],
               "properties": {
-                "featureId": { "type": "string" },
-                "userVisibleName": { "type": "string" },
-                "priority": { "enum": ["P0", "P1", "P2"] },
+                "featureId": { "type": "string", "pattern": "^[a-z][a-zA-Z0-9.-]+$" },
+                "userVisibleName": { "type": "string", "minLength": 1 },
                 "status": { "enum": ["implemented", "partial", "backendOnly", "uiOnly", "missing", "deferred", "manualOnly"] },
+                "priority": { "enum": ["P0", "P1", "P2"] },
                 "frontendEntry": {
                   "type": "object",
-                  "required": ["route", "testIds"],
+                  "required": ["viewId", "selectors"],
                   "properties": {
-                    "route": { "type": "string" },
-                    "testIds": { "type": "array", "items": { "type": "string" } }
-                  }
+                    "viewId": { "type": "string", "minLength": 1 },
+                    "selectors": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+                  },
+                  "additionalProperties": false
                 },
-                "selectors": {
-                  "type": "object",
-                  "additionalProperties": { "type": ["string", "null"] }
-                },
-                "backendCommands": { "type": "array", "items": { "type": "string" } },
-                "targetVersion": { "type": "string" },
-                "domain": { "type": "string" },
-                "oldFeature": { "type": "boolean" },
-                "oldEntry": { "type": ["string", "null"] },
-                "currentEntry": { "type": ["string", "null"] },
-                "frontendComponent": { "type": "string" },
-                "backendExists": { "type": "boolean" },
-                "frontendWired": { "type": "boolean" },
-                "riskLevel": { "type": "string" },
+                "backendCommands": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+                "riskLevel": { "enum": ["readOnly", "low", "medium", "high", "critical"] },
                 "requiresTauri": { "type": "boolean" },
                 "requiresWindows": { "type": "boolean" },
-                "requiresLoading": { "type": "boolean" },
-                "requiresResultArea": { "type": "boolean" },
-                "requiresErrorArea": { "type": "boolean" },
-                "requiresDebug": { "type": "boolean" },
-                "requiresReport": { "type": "boolean" },
-                "requiresRiskPlan": { "type": "boolean" },
-                "requiresToken": { "type": "boolean" },
-                "requiresVerify": { "type": "boolean" },
-                "requiresRollback": { "type": "boolean" },
-                "requiresPagination": { "type": "boolean" },
-                "requiresI18n": { "type": "boolean" },
-                "requiresDarkReadable": { "type": "boolean" },
-                "safeSmokeMode": { "type": "string" },
+                "safeSmokeMode": { "enum": ["readOnly", "dryRun", "static", "manual"] },
                 "manualOnlyReason": { "type": ["string", "null"] },
-                "deferredReason": { "type": ["string", "null"] },
-                "manualAllowed": { "type": "boolean" },
-                "expectedFailureReason": { "type": ["string", "null"] },
-                "testModes": { "type": "array", "items": { "type": "string" } },
-                "acceptanceChecks": { "type": "array", "items": { "type": "string" } }
-              }
+                "acceptanceChecks": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } }
+              },
+              "additionalProperties": false
             }
           }
-        }
+        },
+        "additionalProperties": false
       }
     }
-  }
+  },
+  "additionalProperties": false
 }

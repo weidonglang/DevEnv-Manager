@@ -7,13 +7,8 @@ use std::io::{Read, Seek, SeekFrom};
 use std::net::{Ipv4Addr, SocketAddrV4, TcpListener};
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::{
-    atomic::{AtomicU64, Ordering},
-    Mutex, OnceLock,
-};
+use std::sync::{Mutex, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
-
-use crate::powershell_runner;
 
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
@@ -148,7 +143,6 @@ pub struct MySqlPendingExecutionGuard {
 
 static PLANS: OnceLock<Mutex<HashMap<String, PendingPlan>>> = OnceLock::new();
 static BACKUPS: OnceLock<Mutex<Vec<BackupReceipt>>> = OnceLock::new();
-static PLAN_ID_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 fn plans() -> &'static Mutex<HashMap<String, PendingPlan>> {
     PLANS.get_or_init(|| Mutex::new(HashMap::new()))
@@ -356,14 +350,14 @@ fn service_inventory() -> Vec<(String, String, String)> {
     #[cfg(windows)]
     {
         let script = "[Console]::OutputEncoding=[System.Text.UTF8Encoding]::new(); @(Get-CimInstance Win32_Service | Where-Object { $_.Name -match 'mysql|maria' -or $_.PathName -match 'mysqld' } | Select-Object Name,State,PathName) | ConvertTo-Json -Compress";
-        let Ok(output) = powershell_runner::run_powershell_script(script, Vec::new(), 20) else {
+        let Ok(output) = crate::powershell_runner::run_powershell_script(script, Vec::new(), 10)
+        else {
             return Vec::new();
         };
         if !output.success {
             return Vec::new();
         }
-        let text = output.stdout;
-        let Ok(value) = serde_json::from_str::<serde_json::Value>(&text) else {
+        let Ok(value) = serde_json::from_str::<serde_json::Value>(&output.stdout) else {
             return Vec::new();
         };
         let items = match value {
@@ -958,12 +952,6 @@ pub fn create_plan(candidate_id: String, action: String) -> Result<MySqlRepairPl
     hasher.update(candidate.id.as_bytes());
     hasher.update(action.as_bytes());
     hasher.update(created.to_le_bytes());
-    hasher.update(std::process::id().to_le_bytes());
-    hasher.update(
-        PLAN_ID_COUNTER
-            .fetch_add(1, Ordering::Relaxed)
-            .to_le_bytes(),
-    );
     let plan_id = format!("mysql-{:x}", hasher.finalize());
     let risk_level = mysql_action_risk(&action).to_string();
     let plan_fingerprint = plan_fingerprint(&candidate, &action);
@@ -1074,9 +1062,6 @@ pub fn pending_execution_guard(plan_id: &str) -> Result<MySqlPendingExecutionGua
 fn copy_tree(source: &Path, destination: &Path) -> Result<(u64, usize, bool, bool, bool), String> {
     if !source.is_dir() {
         return Err("Data 目录不存在或不可读".to_string());
-    }
-    if !destination.is_absolute() {
-        return Err("备份目标必须是绝对路径（例如 C:\\DevEnv-Backups\\mysql-data），不能使用相对路径或全角盘符".to_string());
     }
     let source_canonical = source
         .canonicalize()
@@ -1305,19 +1290,6 @@ mod tests {
             .join("data")
             .join("backup");
         assert!(copy_tree(&source, &disguised).is_err());
-    }
-
-    #[test]
-    fn backup_rejects_relative_or_fullwidth_drive_destination() {
-        let source = tempfile::tempdir().unwrap();
-        fs::write(source.path().join("ibdata1"), b"fixture").unwrap();
-        for destination in [
-            PathBuf::from("relative-backup"),
-            PathBuf::from("C：\\DevEnv-Backups\\mysql-data"),
-        ] {
-            let error = copy_tree(source.path(), &destination).unwrap_err();
-            assert!(error.contains("绝对路径"), "unexpected error: {error}");
-        }
     }
 
     #[test]

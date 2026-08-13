@@ -2,9 +2,9 @@
 
 [GitHub 主仓库](https://github.com/weidonglang/DevEnv-Manager) · [Gitee 国内镜像](https://gitee.com/weidonglang/DevEnv-Manager) · [GitHub Release](https://github.com/weidonglang/DevEnv-Manager/releases) · [Gitee Release](https://gitee.com/weidonglang/DevEnv-Manager/releases) · [完整操作手册](docs/user-guide.md) · [安全说明](docs/safety-and-disclaimer.md) · [问题反馈](https://github.com/weidonglang/DevEnv-Manager/issues)
 
-面向 Windows 的开发环境诊断器与安全操作面板。当前版本：**1.9.4 Stable**。
+面向 Windows 的开发环境诊断器与安全操作面板。当前版本：**2.0.0 Stable**。
 
-1.9.4 新增中英文首次启动指导，将清理页划分为快速清理、空间整理和高级工具，并为符合条件的监听端口提供单流程安全释放。快捷操作不再要求用户手工处理计划或令牌，但后端仍严格执行计划、单次令牌、所有者复核、受保护进程和结果验证契约。
+2.0.0 以稳定的 v1.7.0 界面为基座重新实现后续能力，保留熟悉的页面结构和操作方式，同时补齐运行时、环境、端口、清理、项目、文件关联、配置档案与自动验收。写入操作不再暴露额外令牌步骤，仍由后端执行目标校验、备份、回读验证和边界保护。
 
 ## 下载与镜像
 
@@ -12,9 +12,7 @@
 - Gitee 国内镜像：https://gitee.com/weidonglang/DevEnv-Manager
 - GitHub Release：https://github.com/weidonglang/DevEnv-Manager/releases
 - Gitee Release：https://gitee.com/weidonglang/DevEnv-Manager/releases
-- v1.9.4 NSIS：https://github.com/weidonglang/DevEnv-Manager/releases/download/v1.9.4/DevEnv.Manager_1.9.4_x64-setup.exe
-- 国内下载：https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.9.4/DevEnv.Manager_1.9.4_x64-setup.exe
-- NSIS SHA256：`ad0b569ace83dc7b224fe841b97baa3fd6e15215c384e92a1d98f33493f644c1`
+- SHA256：以 [v2.0.0 Release](https://github.com/weidonglang/DevEnv-Manager/releases/tag/v2.0.0) 附带的 `SHA256SUMS.txt` 为准。
 
 适合：
 
@@ -25,6 +23,25 @@
 - 想把 JDK、Python、Node.js、Maven、Gradle 安装到固定目录并快速切换的人
 
 一句话：Windows 开发环境乱了？先看清实际生效的版本、PATH、JAVA_HOME 和工具来源，再决定是否执行受管修复。
+
+## 2.0.0 Stable
+
+2.0.0 是一次以可靠性为目标的基座重建，不是继续叠加旧前端重构。主要变化：
+
+- 保留 v1.7.0 的导航、页面结构、控件和样式，新增能力通过独立迁移适配层接入，并由自动基线哈希阻止原始前端被意外改写。
+- 运行时统一发现 JDK、Python、Node.js、Go、Maven、Gradle、Rust/rustup 和 .NET SDK，明确区分 DevEnv 受管版本与外部只读安装。
+- 受管运行时支持安装后强验证、切换回执、失败自动恢复；外部运行时只提供验证、打开位置、复制路径和系统卸载入口。
+- 环境可靠性同时核对进程与用户级 `JAVA_HOME`、PATH、java/javac、Python/pip、Maven/Gradle 生效链路，修复前创建备份并在写入后回读。
+- 端口扫描采用有界超时与本机只读回退，区分监听和连接记录；安全的用户开发进程保留一步释放，系统关键、服务所属和数据库进程受到保护。
+- 清理中心补齐磁盘概览、重复大文件、桌面/下载归档、回收站预览与复扫、软件占用和 C 盘只读分区判断；归档目标可自动推荐或通过目录选择器指定。
+- 项目分析真实展示根目录、项目类型、检测文件、包管理器和推荐运行时；项目配置、端口、IDEA 与 Java 消费端检查均有页面内持久结果。
+- 文件关联支持按扩展名搜索、应用发现、计划预览、精确注册表备份和回滚边界；受 Windows 保护的 UserChoice 交给系统设置处理。
+- 配置档案支持导入选择器、复制、重命名、历史恢复、应用前后验证和失败回滚。
+- 所有关键操作增加持久成功/失败区域，空白 toast 被抑制，路径输入统一使用系统选择器，深色与高对比模式采用可读颜色回退。
+- PowerShell 操作统一经过有界 runner，覆盖输出编码、超时、进程树清理和环境变更广播，避免扫描或写入流程长期卡住。
+- 内置开发者验收中心和 CI 契约检查覆盖 31 项功能、126 个稳定 selector、前后端命令漂移、字段契约、按钮接线和 UI 质量回归。
+
+我们也需要为 1.8.x 到 1.9.x 期间出现过的大面积“不可用”、操作无反馈、布局可读性和功能接线回归向用户道歉。2.0.0 选择回到经过验证的 v1.7.0 界面基座重新迁移能力，并用可重复运行的验收门禁防止同类问题再次出现。
 
 ## 项目定位
 
@@ -46,174 +63,6 @@ DevEnv Manager 解决的是 Windows 上多个开发生态互相影响的问题�
 - 适合希望用图形界面查看诊断证据，同时保留 CLI 自动化入口的用户。
 - 不适合希望软件自动接管整台机器、清理任意个人文件或替代专业包管理器的场景。
 - 熟练使用 mise/asdf/Scoop/Chocolatey 且环境已经稳定的用户，可以只使用诊断能力。
-
-## 1.9.4 Stable
-
-本版本重点降低首次使用、清理和端口处理的理解与操作成本：
-
-- 首次同意安全声明后显示四步中英文新手指导；完成或跳过后写入本机设置，不会在以后每次启动时重复出现。
-- 设置页保留“打开新手指导”，随时可以重新查看，不会重置首次启动状态。
-- 清理页分为“快速清理、空间整理、高级工具”，扫描、选择、确认和结果尽量靠近，执行后自动定位持久结果。
-- 主清理和 Windows 回收站增加短流程入口；危险操作仍保留计划、快照复核、备份或回执与确认边界。
-- 符合条件的用户/开发监听端口可点击“安全释放”完成计划、确认、执行和复扫；PID 4、系统进程、服务拥有端口和非监听连接继续受保护。
-- 功能 manifest 扩展到 47 个功能，自动验收覆盖 293 个前端 selector 和 34 个 Edge 视觉场景，包括新手指导的亮色、暗色和高对比主题。
-
-最终资产、SHA256、验收边界和未签名披露记录在 [docs/release-v1.9.4.md](docs/release-v1.9.4.md)。
-
-## 1.9.3 Stable
-
-我们向点击按钮后不知道结果在哪里、无法判断健康检查是否通过，或误以为项目、端口、文件关联和清理功能没有响应的用户道歉。操作反馈不应该依赖短暂 toast，也不应该要求用户在长页面中反复寻找刚生成的计划。v1.9.3 将这些工作流统一为可见、可定位、可持续查看的页面内状态。
-
-本次版本完成：
-
-- 运行时健康检查新增汇总和逐项结果表，明确显示健康、需要处理、必需检查数量和失败详情；行级健康检查会选中对应运行时并定位结果。
-- 项目分析、配置预览、配置应用、端口检查、IDEA 检查和 Java 消费端验证均显示加载、成功、空结果或失败状态；切换项目目录会清除旧预览，禁止把其他项目的预览误应用到当前项目。
-- 端口页默认保留全部连接和 UDP/TCP 诊断分组，同时提供“只看可处理监听端口”筛选；符合安全条件的监听端口可一键创建停止计划，但执行仍必须经过原有计划、令牌、所有者复核和释放验证。
-- 文件关联搜索会把 `txt` 规范化为 `.txt`，扫描、应用搜索、计划、应用、回滚、打开设置和导出均有持久结果；“修改打开方式”会明确选中扩展名并引导下一步。
-- 清理扫描结果和计划移动到主要操作旁，创建后自动定位；缓存/目录移动与普通清理分区展示，Windows 回收站以刷新、选择、创建计划、执行四步呈现，并提供非空卷快捷选择。
-- 新增统一结果定位辅助和专项验收，覆盖持久状态、结果聚焦、安全快捷入口和清理引导流程。
-
-冻结产品源码提交 `8161743` 通过 230 项 Rust 测试、Clippy、113 模块前端生产构建、278 个前端 selector、30 项 Edge 视觉验收和全部契约检查。聚合功能验收为 300 项：254 通过、0 失败、40 项危险动作按安全策略跳过、6 项人工或策略记录；P0/P1 失败、backend-only、ui-only、missing、partial、deferred 和 toast-only 均为 0。
-
-最终 release EXE 在无 UAC 的隔离 smoke 中正常启动，About 显示 1.9.3，Runtime 真实发现与健康检查显示 2 个受管、25 个外部运行时和 20/27 个完全通过必需检查的结果，并逐项展示“健康/需要处理”及失败检查。完整资产、SHA256、验收边界和非阻塞限制记录在 [docs/release-v1.9.3.md](docs/release-v1.9.3.md)。安装器暂未进行 Authenticode 签名，Windows 可能显示常规信任提示。
-
-## 1.9.2 Stable
-
-我们向遇到运行时页面首次打开卡顿、页面显示“无法加载运行时”，或看到 `devenv.debug.entries exceeded the quota` 的用户道歉。诊断日志本来只应帮助定位问题，不应该反过来阻断运行时、环境或其他页面的真实后端结果。这个缺陷说明此前对长期累积的大型诊断结果缺少产品级容量边界。
-
-本次热修复完成：
-
-- Debug 日志最多保留 200 条且持久化内容最多占用 256 KiB；大型字符串、数组、对象键和嵌套深度都会在写入前压缩。
-- 启动时会读取并压缩旧版留下的大型日志；替换旧值遇到浏览器配额限制时，会清理旧 Debug 键并以更小批次重试。
-- Debug 日志的读取、写入、清理和通知全部改为尽力而为。存储被禁用、写满或暂时不可用时使用内存回退，不会再让成功的 Tauri `invoke` 变成失败 Promise。
-- 保留敏感字段脱敏、循环对象保护和调试导出能力，同时避免同时保存同一份完整参数或结果的多个副本。
-- 新增独立配额回归：覆盖超大旧日志、首次写入强制 `QuotaExceededError`、大型/循环结果、敏感值、存储不可用和最新生命周期保留。
-- 真实 Tauri 隔离 smoke 注入 2,446,461 字符的旧日志并重载应用；运行时、环境和再次返回运行时均正常，页面无配额错误或失败调用，持久化日志自动降至 256 KiB 以下。
-
-冻结产品源码提交 `bfa7b3c` 通过 230 项 Rust 测试、Clippy、113 模块前端生产构建、268 个前端 selector、Debug 配额专项回归和全部契约检查。聚合功能验收为 300 项：254 通过、0 失败、40 项危险动作按安全策略跳过、6 项人工或策略记录；P0/P1 失败、backend-only、ui-only、missing、partial、deferred 和 toast-only 均为 0。
-
-本次只修改前端诊断日志隔离和版本元数据，不触碰安装、升级、卸载、配置迁移或高风险系统操作，因此没有重复执行无关的 UAC/ReleaseLab 全生命周期。最终资产仍从精确冻结提交一次构建，并核对版本、架构、大小和 SHA256。完整证据和边界记录在 [docs/release-v1.9.2.md](docs/release-v1.9.2.md)。安装器暂未进行 Authenticode 签名，Windows 可能显示常规信任提示。
-
-## 1.9.1 Stable
-
-我们向在 v1.9.0 中点击“设为当前”却看不到可靠反馈、无法判断操作是否开始，以及不得不手工修改环境变量来采用外部 Runtime 的用户郑重道歉。一个涉及 PATH、`JAVA_HOME` 和项目 SDK 的操作不应该让用户猜测，也不应该依赖用户反复截图和重装才能暴露状态丢失。v1.9.1 将这条工作流重新收束为可见、可验证、可恢复的完整闭环。
-
-本次版本完成：
-
-- 受管 Runtime 的“设为当前”会持续显示准备、计划已创建、执行、验证、成功或失败状态；计划自动聚焦，错误和结果不会只停留在短暂 toast。
-- 前端不再把 `kind/version/path` 当作可信目标。后端只接收稳定 Runtime ID 和白名单切换模式，并重新解析发现来源、强验证结果、可执行文件与 provider 身份。
-- 强验证通过的外部 JDK、Python、Node.js、Go、Maven 和 Gradle 可以采用到当前用户环境；DevEnv Manager 不写入、不移动、不删除这些外部目录，也不提供直接卸载。
-- nvm、fnm、Volta、Scoop 和 rustup 使用各自 provider 语义；非 rustup Rust 保持只读；.NET SDK 使用项目级 `global.json`，不会伪装成全局 SDK 切换。
-- 每次切换都保存精确计划、环境差异、来源权威、状态指纹、备份路径、有效期和单次确认令牌。计划过期、目标变化、文件/provider 指纹变化、篡改或重复执行都会被拒绝。
-- 执行后使用新子进程验证真实版本、命令路径和必要组件；失败时执行受约束回滚，并把备份、验证证据、下一步和恢复入口保留在页面。
-- Runtime 备份列表跨应用重启持久化。修复了后端已经保存备份、但页面首次加载漏掉第四个返回值而不显示恢复选项的问题。
-- 保留 v1.9.0 的九类 Runtime 分组、强验证、安装不自动切换、Profile 历史恢复，以及 v1.8.3 的端口、归档、回收站、主题可读性和高风险计划保护。
-
-冻结产品源码提交 `4137fbe` 通过 230 项 Rust 测试、Clippy、113 模块前端生产构建、268 个前端 selector、30 项视觉验收和全部契约检查。聚合功能验收为 300 项：254 通过、0 失败、40 项危险动作按安全策略跳过、6 项人工或策略记录；P0/P1 失败、backend-only、ui-only、missing、partial 和 toast-only 均为 0。
-
-最终 Windows ReleaseLab 验证受管 Node 切换与恢复、外部 Node 采用与恢复、外部目录哈希不变、应用重启后备份列表恢复、NSIS/MSI 安装启动卸载，以及 v1.9.0 升级后设置和 Profile 哈希不变。正式资产、SHA256、验收边界和非阻塞限制记录在 [docs/release-v1.9.1.md](docs/release-v1.9.1.md)。安装器暂未进行 Authenticode 签名，Windows 可能显示常规信任提示。
-
-## 1.9.0 Stable
-
-我们再次向受到此前版本 Runtime 状态混淆、安装与切换边界不清、Windows Store Alias 被误列为外部 Python，以及英文界面仍出现中文 Profile 结果影响的用户郑重道歉。用户不应该通过反复截图、重装和手工验证，替项目发现这些问题。v1.9.0 不只是增加页面选项，而是把运行时识别、安装、切换、验证和恢复重新收束到可审计的产品契约。
-
-本次版本完成：
-
-- Runtime 页面统一展示 JDK、Node.js、Python、Go、Maven、Gradle、Rust/Cargo/rustup、.NET 和其他工具九类生态，并按“当前生效、DevEnv Manager 受管、外部安装”分组。
-- 外部 Runtime 保持只读，只提供打开位置、复制路径和系统级管理入口；不会显示 DevEnv Manager 的直接切换或卸载操作。
-- JDK、Node、Python、Go、Maven 和 Gradle 安装区独立分组。安装完成后验证版本命令和必需组件，不完整目标进入重试或隔离流程，不会注册为可用 Runtime。
-- 安装 Runtime 不再自动修改当前环境。Maven 和 Gradle 支持明确选择版本；Rust、.NET 和其他工具在 1.9.0 中保持只读发现，不冒充完整安装管理。
-- Runtime 切换使用后端保存的精确计划，包含目标身份、PATH 差异、备份、状态指纹、风险和确认令牌；计划过期、状态变化、内容篡改或重复消费都会被拒绝。
-- 切换执行后重新验证实际命令和关键组件；失败时保留备份与回滚信息。Runtime 强验证报告可以从报告页导出。
-- Profile 历史记录持久化保存完整快照，默认保留最近 100 条；保存、删除、重命名、复制、导入、应用和恢复前都会留下可追踪快照。
-- Profile 历史恢复同样使用后端计划、指纹、备份和单次确认令牌，拒绝过期或已变化的目标状态。
-- Profile 操作摘要在中文和英文界面完整本地化；WindowsApps Store Alias 不再被当成可管理的 Python Runtime。
-- v1.8.3 的端口分组、归档选择与恢复、回收站复扫、暗色/高对比可读性，以及 Move、扩容、文件关联和 Junction 安全计划继续保留。
-
-冻结源码提交 `6e65e8d` 通过 216 项 Rust 测试、Clippy、113 模块前端构建、245 个前端 selector、30 项视觉验收和全部契约检查。功能验收报告为 246 通过、0 失败、40 项危险动作安全跳过、6 项人工或策略验收；P0/P1 失败、backend-only、ui-only、missing 和 partial 均为 0。最终 Windows ReleaseLab 从精确提交构建的 NSIS 安装，验证九类 Runtime 分组、Store Alias 过滤、中文/英文 Profile 历史恢复、Dark/High Contrast 可读性和卸载清理，结果全部通过。
-
-正式资产、SHA256、验收边界和非阻塞限制记录在 [docs/release-v1.9.0.md](docs/release-v1.9.0.md)。安装器暂未进行 Authenticode 签名，Windows 可能显示常规信任提示。
-
-## 1.8.3 Stable
-
-我们向所有在 v1.8.2 中遇到端口扫描超时、IPv4/IPv6 重复行、深色或高对比模式文字看不清、归档目标必须手写、归档后无法恢复或清理回收站，以及中英文混杂问题的用户郑重道歉。这些缺陷本应在发布前由自动化与真实 Windows 验收发现，而不应让用户反复截图和手测。
-
-v1.8.3 集中完成了以下修复和加固：
-
-- 端口扫描改为有界快速快照和异步增强，加入单航班、缓存、最近成功结果、强制刷新、取消与来源诊断；高连接压力下不再因 `netstat` 拖住页面。
-- IPv4、IPv6 和重复来源记录合并为稳定的一行，同时保留所有绑定、服务、进程路径、命令行、父进程、发布者和置信度证据。
-- `ESTABLISHED` 等非监听连接保持只读；系统进程、受保护进程和服务拥有目标继续禁止普通强制结束。
-- 桌面与下载目录归档会自动推荐可用的非系统盘，也可打开目录选择器，不再要求手写盘符或路径。
-- 归档预览固定列出每个源文件、目标文件、大小和 SHA256；跨盘执行采用“复制、校验哈希、删除源文件”，并为桌面和 Downloads 都提供持久的恢复入口。
-- 回收站增加独立快照、卷选择、计划、确认令牌、执行结果和最终复扫；只有权威复扫证明目标已消失时才判定成功。
-- Move、C 盘扩容和文件关联计划改为后端保存的精确计划，加入过期时间、容量上限、篡改拒绝和单次消费；扩容执行前重新读取分区布局。
-- Junction 在无法保存回滚记录时会立即失败并恢复原目录，不再留下无法追踪的连接。
-- 清理页在 Light、Dark、System 和 High Contrast 下统一使用主题令牌，修复白底白字、低对比和内容溢出。
-- 补齐清理、归档、环境和验证结果的中英文适配，并让视觉测试超时可控，避免 CI 被 Edge 探针无限挂起。
-
-冻结提交通过 211 项 Rust 测试、Clippy、113 模块前端生产构建、165 个 P0/P1 selector、全部前后端契约检查和 GitHub CI。最终 Windows ReleaseLab 从精确 HEAD 安装 NSIS，15 项关键功能断言全部通过：端口压力扫描约 59 ms，桌面和 Downloads 归档后按原 SHA256 恢复，回收站执行后复扫为空，D/HC 截图可读；清理后无应用注册、测试进程、计划任务或测试磁盘残留。
-
-正式资产、SHA256、验收边界和发布顺序记录在 [docs/release-v1.8.3.md](docs/release-v1.8.3.md)。v1.9.0 Runtime 重构和 Profile 历史模型仍在后续 issue 中跟踪，不会被本次热修复误报为完成。
-
-## 1.8.2 Stable
-
-我们需要向受 v1.8.0 和 v1.8.1 回归问题影响的用户郑重道歉。Workbench 重构后曾出现页面大面积“不可用”、按钮只有短暂提示却没有结果、旧功能入口丢失、深色和高对比度模式难以阅读、端口扫描超时拖累其他页面，以及计划创建后找不到执行入口等问题。这些问题不应由用户反复手测才能发现。
-
-v1.8.2 因此不是继续堆叠新功能，而是一次完整的稳定性恢复和旧功能迁移：
-
-- 以 v1.7.0 为黄金基线盘点 237 条入口和承诺，归一为 87 项用户能力；当前 74 项等价、13 项增强，缺失和降级均为 0。
-- 恢复 Cleanup 的磁盘概览、重复大文件、桌面/下载归档、通用归档、计划执行、回执、回滚、空间搬家和 C 盘扩容闭环。
-- 修复 C 盘扩容把 DiskPart 退出码误当成成功的问题；现在必须读取到扩容前后真实容量增长才算成功，并修复 `0 B` 和命令输出乱码。
-- 恢复 Ports 表格、进程身份、风险与可关闭原因；系统进程、受保护进程、服务拥有进程和无法确认路径的目标不能进入普通强制结束流程。
-- 恢复 Environment 的 JAVA_HOME/PATH/effective tools 证据、Java 稳定化计划、Python 修复、环境备份与回滚；JDK 8 的 `jar` 验证不再误判。
-- 恢复 Projects 的真实根目录、项目类型、检测文件、推荐运行时、IDEA 分析、Java consumer 验证和项目端口配置结果区。
-- 恢复 Reports 的 Doctor、Markdown/JSON 导出、打开位置、复制摘要和持久计划/结果；不再只依赖 toast。
-- 恢复 File Associations 的扩展名搜索、应用选择、计划预览、UserChoice 说明、备份和回滚。
-- 明确 Runtime 的受管/外部边界：外部运行时只读，不允许由 DevEnv Manager 直接切换或删除；受管操作继续走计划、确认令牌和验证。
-- 完成 Toolchains、Windows 服务、WSL 平台和 MySQL 修复的隔离 VM/UAC 验收；MySQL fixture 的系统表恢复后，`ibdata1` 与业务数据哈希保持不变。
-- 完成中英文公共结果字段、Cleanup/Runtime/Settings 进度文案和扩容动态状态适配；新增 648 个双语 key 的一致性门禁，覆盖 29 个 UI 与事件源文件。
-- 修复英文界面仍混入后端中文诊断、计划影响、清理原因和运行时验证说明的问题；所有后端可见文本统一经过语言适配边界。
-- 修复 Cleanup 摘要与数据库服务表格在 Dark/High Contrast 下的浅色背景和低对比度文字，主题样式统一使用设计令牌。
-- 抑制外部 JDK/工具探测失败时弹出的系统级 VCRUNTIME 错误窗口；探测失败现在只进入结构化结果，不阻断工作台。
-- 建立 static、safe、frontend、sandbox、manual 五层自动验收，检查 backend-only、ui-only、toast-only、字段漂移、selector、风险契约和空白提示。
-
-最终聚合验收为 283 项：240 通过、0 失败、36 项按安全策略跳过、7 项保留为有明确理由的人工或延期项。Rust 154 项测试、Clippy、110 模块前端生产构建、195 个稳定 selector、170 个后端命令裁决和 GitHub/Gitee 更新元数据一致性均已通过。
-
-v1.9.0 的 Runtime 数据模型重构继续由 #130 跟踪；Profile 历史版本恢复需要新的持久化模型，Advanced 模式仍属于后续策略和视觉工作。这些后续增强不属于 v1.7.0 旧功能缺失。
-
-正式安装包元数据、升级/回滚证据和验收边界记录在 [docs/release-v1.8.2.md](docs/release-v1.8.2.md)。历史 RC 安装包全部作废，不得用于分发。
-
-## 1.8.1 Stable
-
-v1.8.1 is a public hotfix release for:
-
-- Workbench stability after frontend data-contract regressions.
-- Dashboard fallback loading when port scan / netstat times out.
-- Async navigation, port search, plan/token feedback, and Risk UX progress/result rendering.
-- Runtime managed/external boundaries and safer install-only JDK feedback.
-- Dark/high-contrast readability and Debug export for troubleshooting.
-- GitHub + Gitee release metadata consistency.
-
-Installer: `DevEnv.Manager_1.8.1_x64-setup.exe`
-
-SHA256: `0020a53785094797c77e15ff811c62802669db9b657dcd168437e050b9747df0`
-
-## 1.8.0 Stable
-
-v1.8.0 includes the #116, #117, and #118 stabilization work:
-
-- Runtime/JDK/Python/port reliability hardening.
-- Profile and Doctor repair operations use plan -> token -> execute.
-- File association safety gates and app search.
-- Fluent workbench frontend with real IA routes.
-- Command Palette.
-- Unified Risk UX with preview, backup/receipt, token progress, result, and recovery guidance.
-- Light/Dark/System/High Contrast themes.
-- Stronger CI command contracts and frontend architecture checks.
-
-Installer: `DevEnv.Manager_1.8.0_x64-setup.exe`
-
-SHA256: `e827d5bcaaf4ea7d250d687011629253420e1ec9f92930c0af571d7998e6a51a`
 
 ## 1.7.0 Stable
 

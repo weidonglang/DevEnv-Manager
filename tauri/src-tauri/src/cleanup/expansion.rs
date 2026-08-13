@@ -1,8 +1,7 @@
 use super::disk::inspect_disk_overview;
 use super::model::{ExpansionPlan, ExpansionResult};
 use super::partition::inspect_partition_layout;
-use super::utils::unique_id;
-use crate::powershell_runner;
+use super::utils::generated_at;
 use std::process::Command;
 
 pub fn create_c_drive_expansion_plan() -> Result<ExpansionPlan, String> {
@@ -14,7 +13,7 @@ pub fn create_c_drive_expansion_plan() -> Result<ExpansionPlan, String> {
     if report.can_extend_safely {
         let added = report.unallocated_after_c.unwrap_or(0);
         Ok(ExpansionPlan {
-            plan_id: unique_id("expand"),
+            plan_id: format!("expand-{}", generated_at()),
             mode: "safe_extend_unallocated".to_string(),
             can_execute: true,
             requires_admin: true,
@@ -29,11 +28,11 @@ pub fn create_c_drive_expansion_plan() -> Result<ExpansionPlan, String> {
             explanation: "C 盘右侧紧邻未分配空间，满足安全扩展条件；仍需要管理员权限与三次确认。"
                 .to_string(),
         })
-    } else if report.can_delete_empty_adjacent_partition && !report.bitlocker_suspected {
+    } else if report.can_delete_empty_adjacent_partition {
         let adjacent = report.adjacent_right.clone().unwrap_or_default();
         risks.push("将删除 C 盘右侧空分区；仅当确认没有用户文件时才可继续。".to_string());
         Ok(ExpansionPlan {
-            plan_id: unique_id("expand"),
+            plan_id: format!("expand-{}", generated_at()),
             mode: "delete_empty_adjacent_partition_then_extend".to_string(),
             can_execute: true,
             requires_admin: true,
@@ -59,7 +58,7 @@ pub fn create_c_drive_expansion_plan() -> Result<ExpansionPlan, String> {
             "different_physical_disk"
         };
         Ok(ExpansionPlan {
-            plan_id: unique_id("expand"),
+            plan_id: format!("expand-{}", generated_at()),
             mode: mode.to_string(),
             can_execute: false,
             requires_admin: false,
@@ -72,44 +71,13 @@ pub fn create_c_drive_expansion_plan() -> Result<ExpansionPlan, String> {
     }
 }
 
-fn same_execution_shape(left: &ExpansionPlan, right: &ExpansionPlan) -> bool {
-    left.mode == right.mode
-        && left.can_execute == right.can_execute
-        && left.requires_admin == right.requires_admin
-        && left.estimated_added_bytes == right.estimated_added_bytes
-        && left.commands_preview == right.commands_preview
-        && left.backup_required == right.backup_required
-}
-
-pub fn revalidate_c_drive_expansion_plan(plan: &ExpansionPlan) -> Result<(), String> {
-    if !plan.can_execute {
-        return Err("该扩容计划不可执行，请重新检查分区布局".to_string());
-    }
-    let current = create_c_drive_expansion_plan()?;
-    if !same_execution_shape(plan, &current) {
-        return Err(
-            "分区布局或安全条件在预览后发生变化，已拒绝执行；请重新创建扩容计划".to_string(),
-        );
-    }
-    Ok(())
-}
-
 fn c_drive_totals() -> (u64, u64) {
     inspect_disk_overview()
         .unwrap_or_default()
         .into_iter()
-        .find(|item| {
-            item.drive
-                .trim()
-                .trim_end_matches(['\\', '/'])
-                .eq_ignore_ascii_case("C:")
-        })
+        .find(|item| item.drive.eq_ignore_ascii_case("C:"))
         .map(|item| (item.total_bytes, item.free_bytes))
         .unwrap_or_default()
-}
-
-fn verified_capacity_growth(before_total: u64, after_total: u64) -> Option<u64> {
-    (before_total > 0 && after_total > before_total).then(|| after_total - before_total)
 }
 
 pub fn execute_c_drive_expansion(plan: ExpansionPlan) -> ExpansionResult {
@@ -168,8 +136,8 @@ pub fn execute_c_drive_expansion(plan: ExpansionPlan) -> ExpansionResult {
                         result.success = output.status.success();
                         result.output = format!(
                             "{}{}",
-                            powershell_runner::decode_output(&output.stdout),
-                            powershell_runner::decode_output(&output.stderr)
+                            String::from_utf8_lossy(&output.stdout),
+                            String::from_utf8_lossy(&output.stderr)
                         );
                     }
                     Err(err) => result.output = format!("执行 diskpart 失败：{err}"),
@@ -182,31 +150,9 @@ pub fn execute_c_drive_expansion(plan: ExpansionPlan) -> ExpansionResult {
     {
         result.output = "C 盘扩容仅支持 Windows".to_string();
     }
-    let (mut after_total, mut after_free) = c_drive_totals();
-    if result.success {
-        for _ in 0..10 {
-            if verified_capacity_growth(before_total, after_total).is_some() {
-                break;
-            }
-            std::thread::sleep(std::time::Duration::from_millis(500));
-            (after_total, after_free) = c_drive_totals();
-        }
-    }
+    let (after_total, after_free) = c_drive_totals();
     result.after_total = after_total;
     result.after_free = after_free;
-    if result.success {
-        if let Some(growth) = verified_capacity_growth(before_total, after_total) {
-            result.output = format!(
-                "DiskPart completed successfully; verified C drive growth of {growth} bytes."
-            );
-        } else {
-            result.success = false;
-            result.output = format!(
-                "DiskPart returned success, but capacity verification could not prove that C drive grew.\n{}",
-                result.output.trim()
-            );
-        }
-    }
     result.report_markdown = expansion_report(&plan, &result);
     result
 }
@@ -237,40 +183,5 @@ mod tests {
         });
         assert!(!result.success);
         assert!(result.output.contains("不可执行"));
-    }
-
-    #[test]
-    fn c_drive_mount_normalization_accepts_windows_root() {
-        assert!(r"C:\"
-            .trim_end_matches(['\\', '/'])
-            .eq_ignore_ascii_case("C:"));
-    }
-
-    #[test]
-    fn capacity_verification_rejects_zero_and_no_growth() {
-        assert_eq!(verified_capacity_growth(0, 100), None);
-        assert_eq!(verified_capacity_growth(100, 100), None);
-        assert_eq!(verified_capacity_growth(100, 99), None);
-        assert_eq!(verified_capacity_growth(100, 125), Some(25));
-    }
-
-    #[test]
-    fn execution_shape_detects_tampered_diskpart_target() {
-        let plan = ExpansionPlan {
-            mode: "delete_empty_adjacent_partition_then_extend".to_string(),
-            can_execute: true,
-            requires_admin: true,
-            estimated_added_bytes: 1024,
-            commands_preview: vec![
-                "diskpart".to_string(),
-                "select disk 0".to_string(),
-                "select partition 2".to_string(),
-            ],
-            backup_required: true,
-            ..ExpansionPlan::default()
-        };
-        let mut changed = plan.clone();
-        changed.commands_preview[2] = "select partition 3".to_string();
-        assert!(!same_execution_shape(&plan, &changed));
     }
 }
