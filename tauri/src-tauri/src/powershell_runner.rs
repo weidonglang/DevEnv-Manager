@@ -19,7 +19,7 @@ pub struct PowerShellRequest {
     pub risk_level: String,
     pub requires_admin: bool,
     pub allow_network: bool,
-    pub confirmation_token: Option<String>,
+    pub allow_side_effects: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -90,7 +90,7 @@ impl PowerShellRequest {
             risk_level: "low".to_string(),
             requires_admin: false,
             allow_network: false,
-            confirmation_token: None,
+            allow_side_effects: false,
         }
     }
 }
@@ -105,17 +105,22 @@ pub fn run_powershell_script(
     run_powershell(request)
 }
 
+pub fn broadcast_environment_change() -> Result<PowerShellResult, String> {
+    run_powershell_script(
+        r#"
+Add-Type -Namespace Win32 -Name Native -MemberDefinition '[DllImport("user32.dll", SetLastError=true, CharSet=CharSet.Auto)] public static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg, UIntPtr wParam, string lParam, uint fuFlags, uint uTimeout, out UIntPtr lpdwResult);' | Out-Null
+$result = [UIntPtr]::Zero
+[Win32.Native]::SendMessageTimeout([IntPtr]0xffff, 0x1a, [UIntPtr]::Zero, 'Environment', 0x2, 5000, [ref]$result) | Out-Null
+"#,
+        Vec::new(),
+        8,
+    )
+}
+
 pub fn run_powershell(request: PowerShellRequest) -> Result<PowerShellResult, String> {
     let risk = request.risk_level.trim().to_ascii_lowercase();
-    if matches!(risk.as_str(), "medium" | "high" | "critical")
-        && request
-            .confirmation_token
-            .as_deref()
-            .unwrap_or("")
-            .trim()
-            .is_empty()
-    {
-        return Err("PowerShell 写入类请求缺少 confirmation token".to_string());
+    if matches!(risk.as_str(), "medium" | "high" | "critical") && !request.allow_side_effects {
+        return Err("PowerShell 写入类请求缺少后端副作用授权".to_string());
     }
     if request.requires_admin && !is_elevated() {
         return Err(
@@ -203,7 +208,9 @@ pub fn run_powershell(request: PowerShellRequest) -> Result<PowerShellResult, St
 }
 
 pub fn powershell_executable() -> String {
-    for executable in ["pwsh.exe", "powershell.exe"] {
+    // Windows management modules such as Storage and ScheduledTasks are most
+    // reliable in the inbox host. Fall back to PowerShell 7 when it is absent.
+    for executable in ["powershell.exe", "pwsh.exe"] {
         let probe = run_native_command_with_timeout(
             executable,
             &[
@@ -357,7 +364,7 @@ mod tests {
     }
 
     #[test]
-    fn high_risk_request_requires_token() {
+    fn high_risk_request_requires_internal_side_effect_authorization() {
         let request = PowerShellRequest {
             script: "Write-Output ok".to_string(),
             args: Vec::new(),
@@ -366,7 +373,7 @@ mod tests {
             risk_level: "high".to_string(),
             requires_admin: false,
             allow_network: false,
-            confirmation_token: None,
+            allow_side_effects: false,
         };
         assert!(run_powershell(request).is_err());
     }

@@ -55,6 +55,18 @@ jobs:
       - name: Feature acceptance manifest
         run: python scripts/check_feature_manifest.py
 
+      - name: Tauri command contract
+        run: python scripts/check_tauri_command_contract.py
+
+      - name: Frontend data contracts
+        run: python scripts/check_frontend_data_contracts.py
+
+      - name: Frontend action contracts
+        run: python scripts/check_frontend_action_contracts.py
+
+      - name: Frontend quality regressions
+        run: python scripts/check_frontend_quality_regressions.py
+
       - name: Safety wording
         run: python scripts/check_safety_wording.py
 

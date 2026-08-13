@@ -157,20 +157,7 @@ pub(crate) fn set_user_environment(values: &HashMap<String, Option<String>>) -> 
 pub(crate) fn broadcast_environment_change() {
     #[cfg(windows)]
     {
-        let script = r#"
-Add-Type -Namespace Win32 -Name Native -MemberDefinition '[DllImport("user32.dll", SetLastError=true, CharSet=CharSet.Auto)] public static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg, UIntPtr wParam, string lParam, uint fuFlags, uint uTimeout, out UIntPtr lpdwResult);' | Out-Null
-$result = [UIntPtr]::Zero
-[Win32.Native]::SendMessageTimeout([IntPtr]0xffff, 0x1a, [UIntPtr]::Zero, 'Environment', 0x2, 5000, [ref]$result) | Out-Null
-"#;
-        let _ = hidden_command("powershell.exe")
-            .args([
-                "-NoProfile",
-                "-ExecutionPolicy",
-                "Bypass",
-                "-Command",
-                script,
-            ])
-            .output();
+        let _ = crate::powershell_runner::broadcast_environment_change();
     }
 }
 

@@ -9,7 +9,9 @@
     "preview": "vite preview --host 127.0.0.1",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "tauri:build": "tauri build",
+    "acceptance:static": "python ../scripts/run_feature_acceptance.py --mode static",
+    "acceptance:frontend": "python ../scripts/run_feature_acceptance.py --mode frontend"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.1",

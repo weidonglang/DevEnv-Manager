@@ -1,6 +1,6 @@
 use super::model::{PartitionInfo, PartitionLayoutReport};
+use crate::powershell_runner;
 use serde::Deserialize;
-use std::process::Command;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
@@ -138,6 +138,8 @@ pub fn inspect_partition_layout() -> Result<PartitionLayoutReport, String> {
     #[cfg(windows)]
     {
         let script = r#"
+$ErrorActionPreference = 'Stop'
+Import-Module Storage -ErrorAction Stop
 $parts = Get-Partition | ForEach-Object {
   $vol = $null
   if ($_.DriveLetter) { $vol = Get-Volume -DriveLetter $_.DriveLetter -ErrorAction SilentlyContinue }
@@ -155,22 +157,21 @@ $parts = Get-Partition | ForEach-Object {
     BitlockerProtection=""
   }
 }
-$parts | ConvertTo-Json -Depth 4
+ConvertTo-Json -InputObject @($parts) -Depth 4 -Compress
 "#;
-        let output = Command::new("powershell.exe")
-            .args([
-                "-NoProfile",
-                "-ExecutionPolicy",
-                "Bypass",
-                "-Command",
-                script,
-            ])
-            .output()
+        let output = powershell_runner::run_powershell_script(script, Vec::new(), 15)
             .map_err(|err| format!("读取分区布局失败：{err}"))?;
-        if !output.status.success() {
-            return Err(String::from_utf8_lossy(&output.stderr).to_string());
+        if !output.success {
+            return Err(format!(
+                "读取分区布局失败：{}",
+                if output.stderr.trim().is_empty() {
+                    output.stdout
+                } else {
+                    output.stderr
+                }
+            ));
         }
-        parse_partition_layout_json(&String::from_utf8_lossy(&output.stdout))
+        parse_partition_layout_json(&output.stdout)
     }
     #[cfg(not(windows))]
     {

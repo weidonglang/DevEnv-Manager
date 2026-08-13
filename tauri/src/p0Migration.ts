@@ -1,5 +1,33 @@
 import type { RuntimeInfo } from "./types";
 
+export function installLegacySafetyCopyAdapter(root: Document) {
+  const replaceText = (text: Text) => {
+    const value = text.textContent || "";
+    if (!/confirmation token|\btoken\b/i.test(value)) return;
+    text.textContent = value
+      .replace(/confirmation token/gi, "计划校验")
+      .replace(/\btoken\b/gi, "计划校验");
+  };
+  const replaceLegacyCopy = (node: Node) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      replaceText(node as Text);
+      return;
+    }
+    const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
+    let current = walker.nextNode();
+    while (current) {
+      replaceText(current as Text);
+      current = walker.nextNode();
+    }
+  };
+  replaceLegacyCopy(root.body);
+  new MutationObserver((mutations) => {
+    for (const mutation of mutations) {
+      mutation.addedNodes.forEach(replaceLegacyCopy);
+    }
+  }).observe(root.body, { childList: true, subtree: true });
+}
+
 export function enhancePortPanel(root: Document, fileIcon: string) {
   const head = root.querySelector<HTMLElement>("#view-ports .panel-head");
   if (head && !root.querySelector("#export-port-report-markdown")) {
@@ -117,6 +145,63 @@ export function enhanceToolchainPanel(root: Document) {
   result.dataset.testid = "toolchain-operation-result";
   result.setAttribute("aria-live", "polite");
   firstPanel.insertAdjacentElement("afterend", result);
+}
+
+export function enhanceSettingsControls(root: Document, folderIcon: string) {
+  const rootInput = root.querySelector<HTMLInputElement>("#root-dir");
+  if (rootInput && !root.querySelector("#pick-root-dir")) {
+    const picker = migrationButton("pick-root-dir", "选择文件夹", folderIcon);
+    picker.dataset.pickDirectory = "root-dir";
+    rootInput.insertAdjacentElement("afterend", picker);
+  }
+  const detail = root.querySelector<HTMLElement>("#root-detail");
+  if (detail && !root.querySelector("#root-operation-result")) {
+    const result = document.createElement("div");
+    result.id = "root-operation-result";
+    result.className = "operation-result hidden";
+    result.dataset.testid = "root-operation-result";
+    result.setAttribute("aria-live", "polite");
+    detail.insertAdjacentElement("afterend", result);
+  }
+}
+
+export function enhanceDurableOperationPanels(root: Document) {
+  const panels = [
+    ["doctor-operation-result", "#doctor-score"],
+    ["environment-operation-result", "#env-reliability-result"],
+    ["maintenance-operation-result", ".maintenance-hero"],
+    ["toolbox-operation-result", "#view-toolbox > .grid.two"],
+    ["settings-operation-result", "#update-result"],
+  ] as const;
+  for (const [id, anchorSelector] of panels) {
+    if (root.querySelector(`#${id}`)) continue;
+    const anchor = root.querySelector<HTMLElement>(anchorSelector);
+    if (!anchor) continue;
+    const result = document.createElement("div");
+    result.id = id;
+    result.className = "operation-result hidden";
+    result.dataset.testid = id;
+    result.setAttribute("aria-live", "polite");
+    anchor.insertAdjacentElement("afterend", result);
+  }
+}
+
+export function enforcePickerBackedPathInputs(root: Document) {
+  root.querySelectorAll<HTMLButtonElement>("button[data-pick-directory]").forEach((button) => {
+    const target = button.dataset.pickDirectory;
+    if (!target) return;
+    const input = root.querySelector<HTMLInputElement>(`#${target}`);
+    if (!input) return;
+    input.readOnly = true;
+    input.dataset.pickerBacked = "true";
+    input.title = "请使用旁边的选择按钮";
+  });
+  const profilePath = root.querySelector<HTMLInputElement>("#profile-file-path");
+  if (profilePath && root.querySelector("#pick-profile-file")) {
+    profilePath.readOnly = true;
+    profilePath.dataset.pickerBacked = "true";
+    profilePath.title = "请使用旁边的选择文件按钮";
+  }
 }
 
 export function enhancePlatformPanel(root: Document) {

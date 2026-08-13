@@ -20,6 +20,20 @@
           "safeSmokeMode": "readOnly",
           "manualOnlyReason": null,
           "acceptanceChecks": ["frontendEntryVisible", "backendCommandRegistered", "resultPanelVisible"]
+        },
+        {
+          "featureId": "settings.manage",
+          "userVisibleName": "根目录、更新和本机设置",
+          "status": "implemented",
+          "priority": "P1",
+          "frontendEntry": { "viewId": "view-overview", "selectors": ["#root-dir", "#pick-root-dir", "#save-root", "#root-operation-result", "#auto-check-updates", "#check-updates", "#update-result", "#settings-operation-result"] },
+          "backendCommands": ["load_config", "set_root_dir", "set_auto_check_update", "check_for_updates"],
+          "riskLevel": "medium",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "safeSmokeMode": "readOnly",
+          "manualOnlyReason": null,
+          "acceptanceChecks": ["frontendEntryVisible", "backendCommandRegistered", "directoryPickerVisible", "resultPanelVisible", "noToastOnly"]
         }
       ]
     },
@@ -32,7 +46,7 @@
           "userVisibleName": "一键诊断与持久结果",
           "status": "implemented",
           "priority": "P0",
-          "frontendEntry": { "viewId": "view-doctor", "selectors": ["#run-doctor", "#doctor-score", "#doctor-checks"] },
+          "frontendEntry": { "viewId": "view-doctor", "selectors": ["#run-doctor", "#doctor-score", "#doctor-checks", "#doctor-operation-result"] },
           "backendCommands": ["run_doctor"],
           "riskLevel": "readOnly",
           "requiresTauri": true,
@@ -40,6 +54,20 @@
           "safeSmokeMode": "readOnly",
           "manualOnlyReason": null,
           "acceptanceChecks": ["frontendEntryVisible", "backendCommandRegistered", "resultPanelVisible", "noToastOnly"]
+        },
+        {
+          "featureId": "doctor.repair",
+          "userVisibleName": "环境医生安全修复与回执",
+          "status": "implemented",
+          "priority": "P1",
+          "frontendEntry": { "viewId": "view-doctor", "selectors": ["#repair-doctor-safe", "#doctor-repair-result", "#doctor-operation-result"] },
+          "backendCommands": ["repair_doctor_safe", "create_doctor_repair_plan", "execute_doctor_repair_plan"],
+          "riskLevel": "high",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "safeSmokeMode": "static",
+          "manualOnlyReason": null,
+          "acceptanceChecks": ["frontendEntryVisible", "backendCommandRegistered", "backendBoundPlan", "rollbackVisible", "durableResult"]
         }
       ]
     },
@@ -122,6 +150,20 @@
           "safeSmokeMode": "readOnly",
           "manualOnlyReason": null,
           "acceptanceChecks": ["frontendEntryVisible", "backendCommandRegistered", "resultPanelVisible", "providerBoundary", "rustupManagedOnly", "dotnetWingetOnly", "installDoesNotSetDefault", "noDirectExternalDelete"]
+        },
+        {
+          "featureId": "runtime.pythonRepair",
+          "userVisibleName": "Python 完整性检查与受管修复",
+          "status": "implemented",
+          "priority": "P1",
+          "frontendEntry": { "viewId": "view-runtimes", "selectors": ["#inspect-python-integrity", "#python-integrity-result", "#preview-python-repair", "#python-repair-preview", "#runtime-migration-result"] },
+          "backendCommands": ["inspect_python_integrity", "preview_python_repair", "apply_python_repair"],
+          "riskLevel": "high",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "safeSmokeMode": "static",
+          "manualOnlyReason": null,
+          "acceptanceChecks": ["frontendEntryVisible", "backendCommandRegistered", "resultPanelVisible", "backendBoundPlan", "durableResult"]
         }
       ]
     },
@@ -134,7 +176,7 @@
           "userVisibleName": "JAVA_HOME、PATH 与 Python 可靠性",
           "status": "implemented",
           "priority": "P0",
-          "frontendEntry": { "viewId": "view-environment", "selectors": ["#env-reliability-result", "#env-repair-plan-result"] },
+          "frontendEntry": { "viewId": "view-environment", "selectors": ["#env-reliability-result", "#env-repair-plan-result", "#environment-operation-result"] },
           "backendCommands": ["inspect_env_reliability", "create_env_repair_plan", "apply_env_repair_plan"],
           "riskLevel": "high",
           "requiresTauri": true,
@@ -162,6 +204,40 @@
           "safeSmokeMode": "readOnly",
           "manualOnlyReason": null,
           "acceptanceChecks": ["frontendEntryVisible", "backendCommandRegistered", "resultPanelVisible", "postActionVerification", "noToastOnly"]
+        },
+        {
+          "featureId": "toolchains.mysqlRepair",
+          "userVisibleName": "MySQL 只读诊断、备份和修复计划",
+          "status": "implemented",
+          "priority": "P1",
+          "frontendEntry": { "viewId": "view-toolbox", "selectors": ["#inspect-mysql-repair", "#mysql-repair-result", "#mysql-plan-preview", "#toolbox-operation-result"] },
+          "backendCommands": ["inspect_mysql_repair", "create_mysql_repair_plan", "execute_mysql_repair_plan"],
+          "riskLevel": "high",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "safeSmokeMode": "readOnly",
+          "manualOnlyReason": null,
+          "acceptanceChecks": ["frontendEntryVisible", "backendCommandRegistered", "resultPanelVisible", "backupRequired", "backendBoundPlan"]
+        }
+      ]
+    },
+    {
+      "pageId": "learning",
+      "displayName": "学习中心",
+      "features": [
+        {
+          "featureId": "learning.center",
+          "userVisibleName": "只读命令练习与安全白名单",
+          "status": "implemented",
+          "priority": "P1",
+          "frontendEntry": { "viewId": "view-learning", "selectors": ["#learning-command", "#run-learning-command", "#learning-output"] },
+          "backendCommands": ["run_learning_check"],
+          "riskLevel": "readOnly",
+          "requiresTauri": true,
+          "requiresWindows": false,
+          "safeSmokeMode": "readOnly",
+          "manualOnlyReason": null,
+          "acceptanceChecks": ["frontendEntryVisible", "backendCommandRegistered", "resultPanelVisible", "readOnlyAllowlist"]
         }
       ]
     },
@@ -194,7 +270,7 @@
           "userVisibleName": "磁盘、清理目标与重复文件分析",
           "status": "implemented",
           "priority": "P0",
-          "frontendEntry": { "viewId": "view-maintenance", "selectors": ["#maintenance-overview", "#scan-maintenance", "#scan-duplicates", "#cleanup-report"] },
+          "frontendEntry": { "viewId": "view-maintenance", "selectors": ["#maintenance-overview", "#scan-maintenance", "#scan-duplicates", "#cleanup-report", "#maintenance-operation-result"] },
           "backendCommands": ["inspect_maintenance_overview", "inspect_disk_overview", "scan_cleanup_targets", "scan_duplicate_large_files"],
           "riskLevel": "readOnly",
           "requiresTauri": true,
@@ -216,6 +292,48 @@
           "safeSmokeMode": "manual",
           "manualOnlyReason": "自动验收不得移动真实用户文件。",
           "acceptanceChecks": ["frontendEntryVisible", "backendCommandRegistered", "resultPanelVisible", "backendBoundPlan", "rollbackVisible"]
+        },
+        {
+          "featureId": "cleanup.recycleBin",
+          "userVisibleName": "Windows 回收站预览、清空和复扫",
+          "status": "implemented",
+          "priority": "P0",
+          "frontendEntry": { "viewId": "view-maintenance", "selectors": ["#inspect-recycle-bin", "#recycle-bin-result", "#maintenance-operation-result"] },
+          "backendCommands": ["inspect_recycle_bin", "create_recycle_bin_cleanup_plan", "execute_recycle_bin_cleanup_plan", "open_recycle_bin"],
+          "riskLevel": "high",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "safeSmokeMode": "readOnly",
+          "manualOnlyReason": null,
+          "acceptanceChecks": ["frontendEntryVisible", "backendCommandRegistered", "resultPanelVisible", "backendBoundPlan", "verifiedRescan"]
+        },
+        {
+          "featureId": "cleanup.expansion",
+          "userVisibleName": "C 盘分区检查与扩容计划",
+          "status": "implemented",
+          "priority": "P1",
+          "frontendEntry": { "viewId": "view-maintenance", "selectors": ["#inspect-partition-layout", "#create-expansion-plan", "#expansion-plan-result"] },
+          "backendCommands": ["inspect_partition_layout", "create_c_drive_expansion_plan", "execute_c_drive_expansion"],
+          "riskLevel": "critical",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "safeSmokeMode": "readOnly",
+          "manualOnlyReason": null,
+          "acceptanceChecks": ["frontendEntryVisible", "backendCommandRegistered", "resultPanelVisible", "readOnlyPreflight", "executeDisabledWhenUnsafe"]
+        },
+        {
+          "featureId": "cleanup.softwareAnalysis",
+          "userVisibleName": "软件、应用和游戏占用分析",
+          "status": "implemented",
+          "priority": "P1",
+          "frontendEntry": { "viewId": "view-maintenance", "selectors": ["#inspect-app-usage", "#app-usage"] },
+          "backendCommands": ["inspect_app_usage", "open_apps_features"],
+          "riskLevel": "readOnly",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "safeSmokeMode": "readOnly",
+          "manualOnlyReason": null,
+          "acceptanceChecks": ["frontendEntryVisible", "backendCommandRegistered", "resultPanelVisible", "noDirectUninstall"]
         }
       ]
     },
@@ -223,6 +341,104 @@
       "pageId": "toolbox",
       "displayName": "工具箱",
       "features": [
+        {
+          "featureId": "toolbox.systemPlatforms",
+          "userVisibleName": "Docker 与 WSL 检查和系统入口",
+          "status": "implemented",
+          "priority": "P1",
+          "frontendEntry": { "viewId": "view-toolbox", "selectors": ["#inspect-system-platforms", "#system-platform-result", "#toolbox-operation-result"] },
+          "backendCommands": ["inspect_system_platforms", "manage_system_platform", "open_docker_desktop"],
+          "riskLevel": "high",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "safeSmokeMode": "readOnly",
+          "manualOnlyReason": null,
+          "acceptanceChecks": ["frontendEntryVisible", "backendCommandRegistered", "resultPanelVisible", "durableResult", "singleConfirmation"]
+        },
+        {
+          "featureId": "toolbox.localServices",
+          "userVisibleName": "本地开发服务状态、日志和管理",
+          "status": "implemented",
+          "priority": "P1",
+          "frontendEntry": { "viewId": "view-toolbox", "selectors": ["#inspect-local-services", "#local-service-result", "#local-service-logs", "#toolbox-operation-result"] },
+          "backendCommands": ["inspect_local_services", "local_service_logs", "manage_local_service", "open_local_service_directory"],
+          "riskLevel": "high",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "safeSmokeMode": "readOnly",
+          "manualOnlyReason": null,
+          "acceptanceChecks": ["frontendEntryVisible", "backendCommandRegistered", "resultPanelVisible", "durableResult", "serviceBoundary"]
+        },
+        {
+          "featureId": "toolbox.network",
+          "userVisibleName": "开发站点与代理网络诊断",
+          "status": "implemented",
+          "priority": "P1",
+          "frontendEntry": { "viewId": "view-toolbox", "selectors": ["#run-network", "#network-result"] },
+          "backendCommands": ["network_diagnostics"],
+          "riskLevel": "readOnly",
+          "requiresTauri": true,
+          "requiresWindows": false,
+          "safeSmokeMode": "static",
+          "manualOnlyReason": null,
+          "acceptanceChecks": ["frontendEntryVisible", "backendCommandRegistered", "resultPanelVisible", "boundedNetworkTimeout"]
+        },
+        {
+          "featureId": "toolbox.downloadCache",
+          "userVisibleName": "下载缓存查看与回收站清理",
+          "status": "implemented",
+          "priority": "P1",
+          "frontendEntry": { "viewId": "view-toolbox", "selectors": ["#load-cache", "#clear-cache", "#cache-list", "#toolbox-operation-result"] },
+          "backendCommands": ["cache_entries", "clear_download_cache"],
+          "riskLevel": "medium",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "safeSmokeMode": "readOnly",
+          "manualOnlyReason": null,
+          "acceptanceChecks": ["frontendEntryVisible", "backendCommandRegistered", "resultPanelVisible", "recycleBinFirst"]
+        },
+        {
+          "featureId": "toolbox.commandRunner",
+          "userVisibleName": "白名单命令面板",
+          "status": "implemented",
+          "priority": "P1",
+          "frontendEntry": { "viewId": "view-toolbox", "selectors": ["#command-input", "#command-cwd", "#run-command", "#command-output"] },
+          "backendCommands": ["inspect_command_safety", "run_tool_command"],
+          "riskLevel": "medium",
+          "requiresTauri": true,
+          "requiresWindows": false,
+          "safeSmokeMode": "static",
+          "manualOnlyReason": null,
+          "acceptanceChecks": ["frontendEntryVisible", "backendCommandRegistered", "resultPanelVisible", "commandAllowlist", "dangerousShellBlocked"]
+        },
+        {
+          "featureId": "toolbox.agentTraces",
+          "userVisibleName": "AI Agent 与 CLI 只读痕迹分析",
+          "status": "implemented",
+          "priority": "P1",
+          "frontendEntry": { "viewId": "view-toolbox", "selectors": ["#inspect-agent-traces", "#agent-trace-result"] },
+          "backendCommands": ["inspect_agent_traces"],
+          "riskLevel": "readOnly",
+          "requiresTauri": true,
+          "requiresWindows": false,
+          "safeSmokeMode": "static",
+          "manualOnlyReason": null,
+          "acceptanceChecks": ["frontendEntryVisible", "backendCommandRegistered", "resultPanelVisible", "privacyBoundary"]
+        },
+        {
+          "featureId": "toolbox.updates",
+          "userVisibleName": "双通道更新检查、下载和校验",
+          "status": "implemented",
+          "priority": "P1",
+          "frontendEntry": { "viewId": "view-toolbox", "selectors": ["#auto-check-updates", "#check-updates", "#update-result", "#settings-operation-result"] },
+          "backendCommands": ["check_for_updates", "download_update", "launch_update_installer"],
+          "riskLevel": "high",
+          "requiresTauri": true,
+          "requiresWindows": true,
+          "safeSmokeMode": "static",
+          "manualOnlyReason": null,
+          "acceptanceChecks": ["frontendEntryVisible", "backendCommandRegistered", "resultPanelVisible", "sha256Required", "durableResult"]
+        },
         {
           "featureId": "fileAssociations.manage",
           "userVisibleName": "文件关联搜索、计划和回滚",
@@ -264,6 +480,20 @@
           "safeSmokeMode": "readOnly",
           "manualOnlyReason": null,
           "acceptanceChecks": ["frontendEntryVisible", "backendCommandRegistered", "resultPanelVisible", "reportExport"]
+        },
+        {
+          "featureId": "reports.export",
+          "userVisibleName": "跨页面 Markdown 与 JSON 报告导出",
+          "status": "implemented",
+          "priority": "P1",
+          "frontendEntry": { "viewId": "view-toolbox", "selectors": ["#export-doctor", "#doctor-operation-result", "#export-port-report-markdown", "#port-operation-result", "#export-runtime-report-markdown", "#runtime-migration-result", "#export-env-reliability", "#environment-operation-result", "#export-project-report-markdown", "#project-output", "#cleanup-report", "#maintenance-operation-result", "#export-file-association-report", "#export-feature-acceptance-markdown"] },
+          "backendCommands": ["export_doctor_report", "export_port_report", "export_runtime_verification_report", "export_env_reliability_report", "export_project_report", "export_cleanup_report", "export_file_association_report", "export_feature_acceptance_report"],
+          "riskLevel": "low",
+          "requiresTauri": true,
+          "requiresWindows": false,
+          "safeSmokeMode": "static",
+          "manualOnlyReason": null,
+          "acceptanceChecks": ["frontendEntryVisible", "backendCommandRegistered", "reportExport", "durableFeedback"]
         }
       ]
     }

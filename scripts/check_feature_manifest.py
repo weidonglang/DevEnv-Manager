@@ -112,6 +112,7 @@ def main() -> int:
     case_ids: set[str] = set()
     page_ids: set[str] = set()
     manifest_commands: set[str] = set()
+    covered_views: set[str] = set()
     selector_count = 0
     for page in manifest.get("pages", []):
         page_id = page.get("pageId", "")
@@ -145,6 +146,7 @@ def main() -> int:
             selectors = entry.get("selectors") or []
             if not view_id or f'id="{view_id}"' not in frontend_source:
                 fail(f"frontend view not found for {feature_id}: {view_id!r}")
+            covered_views.add(view_id)
             if priority in {"P0", "P1"} and not selectors:
                 fail(f"critical feature lacks selectors: {feature_id}")
             for selector in selectors:
@@ -167,9 +169,18 @@ def main() -> int:
     frontend_only = sorted(invokes - registered)
     if frontend_only:
         fail(f"frontend invokes missing backend registration: {frontend_only}")
-    declared_views = set(re.findall(r'id="(view-[a-z-]+)"', frontend_source))
+    declared_views = set(
+        re.findall(
+            r'<section\s+id="(view-[a-z-]+)"\s+class="[^"]*\bview\b[^"]*"',
+            frontend_source,
+        )
+    )
+    uncovered_views = sorted(declared_views - covered_views)
+    if uncovered_views:
+        fail(f"frontend views missing feature manifest coverage: {uncovered_views}")
+    known_view_ids = set(re.findall(r'id="(view-[a-z-]+)"', frontend_source))
     referenced_views = set(re.findall(r'#(view-[a-z-]+)', frontend_source))
-    missing_views = sorted(referenced_views - declared_views)
+    missing_views = sorted(referenced_views - known_view_ids)
     if missing_views:
         fail(f"frontend references unknown view ids: {missing_views}")
     for forbidden in ("create_confirmation_token", "confirmationToken", "riskOperationToken"):

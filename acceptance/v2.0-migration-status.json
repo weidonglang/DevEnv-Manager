@@ -40,6 +40,8 @@
     "rustup-provider-managed-toolchain-lifecycle",
     "dotnet-winget-provider-lifecycle-with-last-sdk-guard",
     "durable-toolchain-actions-with-post-action-verification",
+    "settings-directory-picker-and-durable-save-result",
+    "complete-view-learning-settings-and-report-acceptance-coverage",
     "plan-id-only-move-and-archive-execution",
     "v17-single-confirmation-without-token-workflow"
   ],

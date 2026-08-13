@@ -350,14 +350,14 @@ fn service_inventory() -> Vec<(String, String, String)> {
     #[cfg(windows)]
     {
         let script = "[Console]::OutputEncoding=[System.Text.UTF8Encoding]::new(); @(Get-CimInstance Win32_Service | Where-Object { $_.Name -match 'mysql|maria' -or $_.PathName -match 'mysqld' } | Select-Object Name,State,PathName) | ConvertTo-Json -Compress";
-        let Ok(output) = hidden_command("powershell.exe")
-            .args(["-NoProfile", "-NonInteractive", "-Command", script])
-            .output()
+        let Ok(output) = crate::powershell_runner::run_powershell_script(script, Vec::new(), 10)
         else {
             return Vec::new();
         };
-        let text = String::from_utf8_lossy(&output.stdout);
-        let Ok(value) = serde_json::from_str::<serde_json::Value>(&text) else {
+        if !output.success {
+            return Vec::new();
+        }
+        let Ok(value) = serde_json::from_str::<serde_json::Value>(&output.stdout) else {
             return Vec::new();
         };
         let items = match value {

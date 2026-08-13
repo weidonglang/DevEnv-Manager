@@ -7981,22 +7981,23 @@ fn launch_elevated_wsl(distro: Option<&str>, mode: &str) -> Result<(), String> {
         "install" => "Start-Process -FilePath wsl.exe -ArgumentList @('--install','--no-distribution') -Verb RunAs",
         "update" => "Start-Process -FilePath wsl.exe -ArgumentList @('--update') -Verb RunAs",
         "install-distro" => {
-            "Start-Process -FilePath wsl.exe -ArgumentList @('--install','--distribution',$env:DEVENV_WSL_DISTRO) -Verb RunAs"
+            "param([string]$Distro); Start-Process -FilePath wsl.exe -ArgumentList @('--install','--distribution',$Distro) -Verb RunAs"
         }
         _ => return Err("不支持的 WSL 授权操作".to_string()),
     };
-    let mut command = hidden_command("powershell.exe");
-    command.args(["-NoProfile", "-NonInteractive", "-Command", script]);
-    if let Some(distro) = distro {
-        command.env("DEVENV_WSL_DISTRO", distro);
-    }
-    let output = command
-        .output()
+    let args = distro
+        .map(|value| vec![value.to_string()])
+        .unwrap_or_default();
+    let output = powershell_runner::run_powershell_script(script, args, 15)
         .map_err(|err| format!("启动 WSL 授权操作失败：{err}"))?;
-    if !output.status.success() {
+    if !output.success {
         return Err(format!(
             "启动 WSL 授权操作失败：{}",
-            command_text(&output.stdout, &output.stderr)
+            if output.stderr.trim().is_empty() {
+                output.stdout
+            } else {
+                output.stderr
+            }
         ));
     }
     Ok(())
@@ -8115,17 +8116,13 @@ fn windows_service_inventory() -> Vec<WindowsServiceInfo> {
     #[cfg(windows)]
     {
         let script = "$ErrorActionPreference='Stop'; @(Get-CimInstance Win32_Service | Select-Object Name,State,PathName) | ConvertTo-Json -Compress";
-        let Ok(output) = hidden_command("powershell.exe")
-            .args(["-NoProfile", "-NonInteractive", "-Command", script])
-            .output()
-        else {
+        let Ok(output) = powershell_runner::run_powershell_script(script, Vec::new(), 10) else {
             return Vec::new();
         };
-        if !output.status.success() {
+        if !output.success {
             return Vec::new();
         }
-        let text = command_text(&output.stdout, &output.stderr);
-        let Ok(value) = serde_json::from_str::<Value>(&text) else {
+        let Ok(value) = serde_json::from_str::<Value>(&output.stdout) else {
             return Vec::new();
         };
         match value {
@@ -8215,19 +8212,24 @@ fn manage_local_service_blocking(
 async fn local_service_logs(service_name: String) -> Result<String, String> {
     run_blocking(move || {
         let (service, _) = validated_database_service(&service_name)?;
-        let script = "$needle=$env:DEVENV_SERVICE_NAME; Get-WinEvent -FilterHashtable @{LogName='Application'; StartTime=(Get-Date).AddDays(-7)} -MaxEvents 500 -ErrorAction SilentlyContinue | Where-Object { $_.ProviderName -like ('*'+$needle+'*') -or $_.Message -like ('*'+$needle+'*') } | Select-Object -First 50 TimeCreated,LevelDisplayName,ProviderName,Message | Format-List | Out-String -Width 240";
-        let output = hidden_command("powershell.exe")
-            .args(["-NoProfile", "-NonInteractive", "-Command", script])
-            .env("DEVENV_SERVICE_NAME", &service.name)
-            .output()
+        let script = "param([string]$Needle); Get-WinEvent -FilterHashtable @{LogName='Application'; StartTime=(Get-Date).AddDays(-7)} -MaxEvents 500 -ErrorAction SilentlyContinue | Where-Object { $_.ProviderName -like ('*'+$Needle+'*') -or $_.Message -like ('*'+$Needle+'*') } | Select-Object -First 50 TimeCreated,LevelDisplayName,ProviderName,Message | Format-List | Out-String -Width 240";
+        let output = powershell_runner::run_powershell_script(
+            script,
+            vec![service.name.clone()],
+            15,
+        )
             .map_err(|err| format!("读取 Windows 事件日志失败：{err}"))?;
-        if !output.status.success() {
+        if !output.success {
             return Err(format!(
                 "读取 Windows 事件日志失败：{}",
-                command_text(&output.stdout, &output.stderr)
+                if output.stderr.trim().is_empty() {
+                    output.stdout
+                } else {
+                    output.stderr
+                }
             ));
         }
-        let text = command_text(&output.stdout, &output.stderr);
+        let text = output.stdout;
         Ok(if text.trim().is_empty() {
             format!("最近 7 天没有找到与 {} 匹配的应用程序事件", service.name)
         } else {
@@ -11588,17 +11590,7 @@ fn restore_environment_values(
 fn broadcast_environment_change() {
     #[cfg(windows)]
     {
-        let _ = hidden_command("powershell")
-            .args([
-                "-NoProfile",
-                "-Command",
-                r#"
-Add-Type -Namespace Win32 -Name Native -MemberDefinition '[DllImport("user32.dll", SetLastError=true, CharSet=CharSet.Auto)] public static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg, UIntPtr wParam, string lParam, uint fuFlags, uint uTimeout, out UIntPtr lpdwResult);';
-$result = [UIntPtr]::Zero
-[Win32.Native]::SendMessageTimeout([IntPtr]0xffff, 0x1a, [UIntPtr]::Zero, 'Environment', 0x2, 5000, [ref]$result) | Out-Null
-"#,
-            ])
-            .output();
+        let _ = powershell_runner::broadcast_environment_change();
     }
 }
 

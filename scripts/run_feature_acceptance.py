@@ -41,19 +41,30 @@ def run(command: list[str]) -> str:
     return completed.stdout
 
 
-def run_static() -> None:
+def run_python_checks(scripts: tuple[str, ...]) -> list[dict]:
     checks = []
-    for script in (
-        "check_feature_manifest.py",
-        "check_v17_frontend_baseline.py",
-        "check_v2_migration_manifest.py",
-        "check_safety_wording.py",
-        "check_repo_hygiene.py",
-    ):
+    for script in scripts:
         output = run([sys.executable, str(ROOT / "scripts" / script)])
         checks.append({"check": script, "status": "passed", "output": output.strip()})
         if output.strip():
             console_text(output.strip())
+    return checks
+
+
+def run_static() -> None:
+    checks = run_python_checks(
+        (
+            "check_feature_manifest.py",
+            "check_tauri_command_contract.py",
+            "check_frontend_data_contracts.py",
+            "check_frontend_action_contracts.py",
+            "check_frontend_quality_regressions.py",
+            "check_v17_frontend_baseline.py",
+            "check_v2_migration_manifest.py",
+            "check_safety_wording.py",
+            "check_repo_hygiene.py",
+        )
+    )
     write_mode_result("static", checks)
 
 
@@ -61,15 +72,18 @@ def run_frontend() -> None:
     npm = "npm.cmd" if sys.platform == "win32" else "npm"
     run([npm, "run", "build", "--prefix", "tauri"])
     console_text("frontend production build passed")
-    output = run([sys.executable, str(ROOT / "scripts" / "check_feature_manifest.py")])
-    if output.strip():
-        console_text(output.strip())
+    checks = run_python_checks(
+        (
+            "check_feature_manifest.py",
+            "check_frontend_acceptance_selectors.py",
+            "check_frontend_data_contracts.py",
+            "check_frontend_action_contracts.py",
+            "check_frontend_quality_regressions.py",
+        )
+    )
     write_mode_result(
         "frontend",
-        [
-            {"check": "frontend-production-build", "status": "passed"},
-            {"check": "feature-manifest", "status": "passed", "output": output.strip()},
-        ],
+        [{"check": "frontend-production-build", "status": "passed"}, *checks],
     )
 
 
@@ -150,7 +164,7 @@ def write_reports(suite: dict) -> None:
     checklist = [
         "# DevEnv Manager Manual Smoke Checklist",
         "",
-        "自动验收完成后只需确认以下项目：",
+        "自动验收完成后只需确认以下少量视觉项目。",
         "",
         "- [ ] 工具箱中的验收中心在宽屏下完整显示，操作区没有挤压或大块无效空白。",
         "- [ ] 深色和高对比主题下，验收摘要、状态、失败原因和按钮文字清晰可读。",
@@ -183,6 +197,15 @@ def write_mode_result(mode: str, checks: list[dict]) -> None:
     )
 
 
+def run_report() -> None:
+    if not REPORT_JSON.exists():
+        run_safe()
+        return
+    suite = json.loads(REPORT_JSON.read_text(encoding="utf-8"))
+    write_reports(suite)
+    console_text(summary(suite))
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -196,7 +219,7 @@ def main() -> int:
     elif args.mode == "frontend":
         run_frontend()
     else:
-        run_safe()
+        run_report()
     return 0
 
 

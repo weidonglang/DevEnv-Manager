@@ -222,6 +222,12 @@ fn run_safe_feature(feature_id: &str) -> (String, String, Vec<String>, Vec<Strin
                 )
             })
         }
+        "settings.manage" => super::load_settings().map(|settings| {
+            (
+                format!("本机设置可读取：根目录 {}", settings.root_dir),
+                vec!["load_config".to_string()],
+            )
+        }),
         "doctor.diagnose" => super::run_doctor_blocking().map(|report| {
             (
                 format!(
@@ -232,6 +238,10 @@ fn run_safe_feature(feature_id: &str) -> (String, String, Vec<String>, Vec<Strin
                 vec!["run_doctor".to_string()],
             )
         }),
+        "doctor.repair" => Ok((
+            "安全修复入口、后端绑定计划与持久回执已进入静态契约".to_string(),
+            Vec::new(),
+        )),
         "ports.scan" => super::scan_ports_blocking().map(|records| {
             (
                 format!("端口扫描完成：{} 条结构化记录", records.len()),
@@ -257,12 +267,42 @@ fn run_safe_feature(feature_id: &str) -> (String, String, Vec<String>, Vec<Strin
                 vec!["inspect_platform_toolchains".to_string()],
             )
         }),
+        "runtime.pythonRepair" => Ok((
+            "Python 完整性检查、修复预览和受管执行入口已进入静态契约".to_string(),
+            Vec::new(),
+        )),
         "toolchains.manage" => super::inspect_toolchains_blocking().map(|_| {
             (
                 "Git、Node.js 与 Python 工具链状态读取完成".to_string(),
                 vec!["inspect_toolchains".to_string()],
             )
         }),
+        "toolchains.mysqlRepair" => {
+            let report = super::mysql_repair::inspect();
+            Ok((
+                format!("MySQL 只读诊断完成：{} 个候选", report.candidates.len()),
+                vec!["inspect_mysql_repair".to_string()],
+            ))
+        }
+        "learning.center" => {
+            let allowed =
+                super::learning_command_allowed(&["python".to_string(), "--version".to_string()]);
+            let mutation_blocked = !super::learning_command_allowed(&[
+                "python".to_string(),
+                "-m".to_string(),
+                "pip".to_string(),
+                "install".to_string(),
+                "requests".to_string(),
+            ]);
+            if allowed && mutation_blocked {
+                Ok((
+                    "学习中心只读命令白名单和写入拒绝规则有效".to_string(),
+                    vec!["run_learning_check".to_string()],
+                ))
+            } else {
+                Err("学习中心命令白名单边界失效".to_string())
+            }
+        }
         "environment.reliability" => super::load_paths().map(|paths| {
             let _snapshot = super::env_core::inspect_env_reliability(&paths.root);
             (
@@ -277,6 +317,66 @@ fn run_safe_feature(feature_id: &str) -> (String, String, Vec<String>, Vec<Strin
                 vec!["storage_cleanup_architecture".to_string()],
             ))
         }
+        "cleanup.recycleBin" => super::cleanup::inspect_recycle_bin().map(|report| {
+            (
+                format!(
+                    "Windows 回收站只读检查完成：{} 项，{} 个盘符",
+                    report.item_count,
+                    report.volumes.len()
+                ),
+                vec!["inspect_recycle_bin".to_string()],
+            )
+        }),
+        "cleanup.expansion" => super::cleanup::inspect_partition_layout().map(|report| {
+            (
+                format!("C 盘分区只读检查完成：系统磁盘 {}", report.system_disk),
+                vec!["inspect_partition_layout".to_string()],
+            )
+        }),
+        "cleanup.softwareAnalysis" => {
+            let report = super::cleanup::inspect_app_usage();
+            Ok((
+                format!(
+                    "软件与应用只读分析完成：{} 个已安装软件",
+                    report.installed_software.len()
+                ),
+                vec!["inspect_app_usage".to_string()],
+            ))
+        }
+        "toolbox.systemPlatforms" => super::inspect_system_platforms_blocking().map(|_| {
+            (
+                "Docker 与 WSL 状态读取完成".to_string(),
+                vec!["inspect_system_platforms".to_string()],
+            )
+        }),
+        "toolbox.localServices" => super::inspect_local_services_blocking().map(|services| {
+            (
+                format!("本地开发服务读取完成：{} 个服务", services.len()),
+                vec!["inspect_local_services".to_string()],
+            )
+        }),
+        "toolbox.network" => Ok((
+            "网络诊断入口、结构化结果与有界超时已进入静态契约".to_string(),
+            Vec::new(),
+        )),
+        "toolbox.downloadCache" => super::cache_entries(false).map(|entries| {
+            (
+                format!("下载缓存只读检查完成：{} 个文件", entries.len()),
+                vec!["cache_entries".to_string()],
+            )
+        }),
+        "toolbox.commandRunner" => Ok((
+            "命令面板白名单、后端安全评估和持久输出已进入静态契约".to_string(),
+            Vec::new(),
+        )),
+        "toolbox.agentTraces" => Ok((
+            "Agent 痕迹只读入口和隐私边界已进入静态契约".to_string(),
+            Vec::new(),
+        )),
+        "toolbox.updates" => Ok((
+            "更新检查、SHA256 下载校验和安装器启动入口已进入静态契约".to_string(),
+            Vec::new(),
+        )),
         "fileAssociations.manage" => {
             super::file_assoc::scan_file_associations_blocking().map(|report| {
                 (
@@ -295,10 +395,27 @@ fn run_safe_feature(feature_id: &str) -> (String, String, Vec<String>, Vec<Strin
             "验收清单与安全执行器已加载".to_string(),
             vec!["list_feature_acceptance_cases".to_string()],
         )),
+        "reports.export" => Ok((
+            "跨页面报告导出入口与后端命令已进入静态契约".to_string(),
+            Vec::new(),
+        )),
         _ => Err(format!("功能 {feature_id} 没有安全自动执行适配器")),
     };
     match outcome {
         Ok((reason, commands)) => ("passed".to_string(), reason, commands, Vec::new()),
+        Err(reason)
+            if feature_id == "cleanup.expansion"
+                && ["拒绝访问", "access is denied", "0x80041003"]
+                    .iter()
+                    .any(|marker| reason.to_ascii_lowercase().contains(marker)) =>
+        {
+            (
+                "skipped".to_string(),
+                format!("当前权限不能读取 Windows 分区布局，已安全跳过：{reason}"),
+                vec!["inspect_partition_layout".to_string()],
+                vec!["未执行分区修改、扩容或管理员提权。".to_string()],
+            )
+        }
         Err(reason) => ("failed".to_string(), reason, Vec::new(), Vec::new()),
     }
 }

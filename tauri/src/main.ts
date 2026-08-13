@@ -40,17 +40,21 @@ import { enhanceProjectReportPanel } from "./projectReportMigration";
 import { mountFeatureAcceptanceCenter } from "./acceptanceCenter";
 import {
   enhanceBuildToolVersionSelectors,
+  enhanceDurableOperationPanels,
   enhancePlatformPanel,
   enhancePortPanel,
   enhanceRuntimePanel,
+  enhanceSettingsControls,
   enhanceToolchainPanel,
+  enforcePickerBackedPathInputs,
+  installLegacySafetyCopyAdapter,
   renderGroupedRuntimeDiscovery,
   setMigrationResult,
 } from "./p0Migration";
 import { MYSQL_PERMISSION_UNKNOWN_HELP, mysqlPathValue } from "./features/mysql";
 import { canShowKillPortAction } from "./features/ports";
 import { SAFE_MODE_DESCRIPTION } from "./features/safeMode";
-import { hideToast, showToast } from "./features/toast";
+import { hideToast, showToast as showBaseToast } from "./features/toast";
 import { updateEmptyState } from "./features/update";
 import { riskBadge } from "./components/riskBadge";
 import type {
@@ -1147,12 +1151,25 @@ function icon(node: IconNode) {
   return `<svg ${attrsText}>${childText}</svg>`;
 }
 
+function showToast(message: unknown, isError = false) {
+  const text = typeof message === "string" ? message.trim() : "";
+  if (!text) {
+    hideToast();
+    return;
+  }
+  showBaseToast(text, isError);
+}
+
 enhanceProjectReportPanel(document, icon(FileText));
 enhancePortPanel(document, icon(FileText));
 enhanceRuntimePanel(document, icon(FileText), icon(RotateCcw));
 enhanceBuildToolVersionSelectors(document);
 enhanceToolchainPanel(document);
+enhanceSettingsControls(document, icon(FolderSearch));
 enhancePlatformPanel(document);
+enhanceDurableOperationPanels(document);
+enforcePickerBackedPathInputs(document);
+installLegacySafetyCopyAdapter(document);
 mountFeatureAcceptanceCenter(document);
 
 function setText(id: string, value: string | number) {
@@ -2625,19 +2642,28 @@ async function refreshAll(deep = false) {
 async function runOperation(
   action: () => Promise<OperationResult | KillResult | ConfigView>,
   pending: string,
+  resultSelector?: string,
 ): Promise<OperationResult | KillResult | ConfigView | null> {
   showToast(pending);
+  if (resultSelector) setMigrationResult(resultSelector, pending);
   try {
     const result = await action();
-    if ("message" in result) {
-      showToast(result.message);
-    } else {
-      showToast("操作完成");
+    const message = "message" in result && result.message.trim() ? result.message : "操作完成";
+    const failed = "success" in result && result.success === false;
+    showToast(message, failed);
+    if (resultSelector) {
+      setMigrationResult(resultSelector, message, failed);
+      focusResult(resultSelector);
     }
     await refreshBase();
     return result;
   } catch (error) {
-    showToast(error instanceof Error ? error.message : String(error), true);
+    const message = error instanceof Error ? error.message : String(error);
+    showToast(message, true);
+    if (resultSelector) {
+      setMigrationResult(resultSelector, message, true);
+      focusResult(resultSelector);
+    }
     return null;
   }
 }
@@ -2756,7 +2782,7 @@ async function runDoctorAction(action: string) {
   if (action === "cleanup_path") {
     await runOperation(async () => {
       return invoke<OperationResult>("cleanup_path_entries");
-    }, "正在清理 PATH");
+    }, "正在清理 PATH", "#doctor-operation-result");
     return;
   }
   if (action === "configure_env") {
@@ -2790,7 +2816,7 @@ async function runDoctorAction(action: string) {
       renderDoctor();
     }
     const report = state.doctor!;
-    await runOperation(() => invoke<OperationResult>("export_doctor_report", { report }), "正在导出诊断报告");
+    await runOperation(() => invoke<OperationResult>("export_doctor_report", { report }), "正在导出诊断报告", "#doctor-operation-result");
     return;
   }
   if (action === "network") {
@@ -3886,12 +3912,18 @@ document.querySelector("#refresh-all")?.addEventListener("click", () => void ref
 document.querySelector("#load-archive-plan")?.addEventListener("click", () => void loadArchivePlan());
 document.querySelector("#run-doctor")?.addEventListener("click", async () => {
   showToast("环境医生正在诊断");
+  setMigrationResult("#doctor-operation-result", "环境医生正在诊断...");
   try {
     state.doctor = await invoke<DoctorReport>("run_doctor");
     renderDoctor();
+    setMigrationResult("#doctor-operation-result", `环境诊断完成：评分 ${state.doctor.score}，共 ${state.doctor.checks.length} 项检查。`);
+    focusResult("#doctor-operation-result");
     showToast("环境诊断完成");
   } catch (error) {
-    showToast(error instanceof Error ? error.message : String(error), true);
+    const message = error instanceof Error ? error.message : String(error);
+    setMigrationResult("#doctor-operation-result", `环境诊断失败：${message}`, true);
+    focusResult("#doctor-operation-result");
+    showToast(message, true);
   }
 });
 document.querySelector("#export-doctor")?.addEventListener("click", async () => {
@@ -3904,6 +3936,7 @@ document.querySelector("#export-doctor")?.addEventListener("click", async () => 
     await runOperation(
       () => invoke<OperationResult>("export_doctor_report", { report }),
       "正在导出诊断报告",
+      "#doctor-operation-result",
     );
   } catch (error) {
     showToast(error instanceof Error ? error.message : String(error), true);
@@ -3918,6 +3951,7 @@ document.querySelector("#export-doctor-json")?.addEventListener("click", async (
     await runOperation(
       () => invoke<OperationResult>("export_doctor_report_json", { report: state.doctor! }),
       "正在导出 JSON 诊断报告",
+      "#doctor-operation-result",
     );
   } catch (error) {
     showToast(error instanceof Error ? error.message : String(error), true);
@@ -3931,14 +3965,37 @@ document.querySelector("#copy-doctor-report")?.addEventListener("click", async (
     }
     const text = await invoke<string>("doctor_report_text", { report: state.doctor!, format: "markdown" });
     await copyText(text);
+    setMigrationResult("#doctor-operation-result", "诊断报告已复制到剪贴板。");
+    focusResult("#doctor-operation-result");
   } catch (error) {
-    showToast(error instanceof Error ? error.message : String(error), true);
+    const message = error instanceof Error ? error.message : String(error);
+    setMigrationResult("#doctor-operation-result", `复制诊断报告失败：${message}`, true);
+    focusResult("#doctor-operation-result");
+    showToast(message, true);
   }
 });
-document.querySelector("#save-root")?.addEventListener("click", () => {
+document.querySelector("#save-root")?.addEventListener("click", async () => {
   const input = document.querySelector<HTMLInputElement>("#root-dir");
   if (!input) return;
-  void runOperation(() => invoke<ConfigView>("set_root_dir", { root: input.value }), "正在保存根目录");
+  const root = input.value.trim();
+  if (!root) {
+    setMigrationResult("#root-operation-result", "请选择 DevEnv Manager 根目录。", true);
+    focusResult("#root-operation-result");
+    return;
+  }
+  setMigrationResult("#root-operation-result", "正在保存并重新读取根目录…");
+  try {
+    state.config = await invoke<ConfigView>("set_root_dir", { root });
+    await refreshBase();
+    setMigrationResult("#root-operation-result", `根目录已保存并验证：${state.config?.settings.rootDir || root}`);
+    focusResult("#root-operation-result");
+    showToast("根目录已保存");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    setMigrationResult("#root-operation-result", `根目录保存失败：${message}`, true);
+    focusResult("#root-operation-result");
+    showToast(message, true);
+  }
 });
 document.querySelector("#scan-ports")?.addEventListener("click", async () => {
   setMigrationResult("#port-operation-result", "正在扫描端口...");
@@ -4009,7 +4066,7 @@ document.querySelector("#analyze-python")?.addEventListener("click", async () =>
     renderPythonAnalysis();
     showToast("Python 环境分析完成");
   } catch (error) {
-    showToast(error instanceof Error ? error.message : String(error), true);
+    renderOperationError("#python-analysis", "Python 环境分析失败", error);
   }
 });
 document.querySelector("#inspect-python-integrity")?.addEventListener("click", async () => {
@@ -4020,7 +4077,7 @@ document.querySelector("#inspect-python-integrity")?.addEventListener("click", a
     focusResult("#python-integrity-result");
     showToast(state.pythonIntegrity.fullyUsable ? "Python 核心组件可用" : "Python 存在核心组件缺失", !state.pythonIntegrity.fullyUsable);
   } catch (error) {
-    showToast(error instanceof Error ? error.message : String(error), true);
+    renderOperationError("#python-integrity-result", "Python 完整性检查失败", error);
   }
 });
 document.querySelector("#inspect-runtime-strong")?.addEventListener("click", async () => {
@@ -4031,7 +4088,7 @@ document.querySelector("#inspect-runtime-strong")?.addEventListener("click", asy
     focusResult("#runtime-strong-result");
     showToast(`运行时强验证完成：${state.runtimeStrong.items.length} 项`);
   } catch (error) {
-    showToast(error instanceof Error ? error.message : String(error), true);
+    renderOperationError("#runtime-strong-result", "运行时强验证失败", error);
   }
 });
 document.querySelector("#export-runtime-report-markdown")?.addEventListener("click", () => void exportRuntimeReport("markdown"));
@@ -4051,7 +4108,7 @@ document.querySelector("#preview-python-repair")?.addEventListener("click", asyn
     focusResult("#python-repair-preview");
     showToast("Python 修复计划已生成；确认命令和 PATH 差异后再执行");
   } catch (error) {
-    showToast(error instanceof Error ? error.message : String(error), true);
+    renderOperationError("#python-repair-preview", "Python 修复计划创建失败", error);
   }
 });
 document.querySelector("#run-learning-command")?.addEventListener("click", async () => {
@@ -4060,9 +4117,13 @@ document.querySelector("#run-learning-command")?.addEventListener("click", async
   try {
     const result = await invoke<CommandRunResult>("run_learning_check", { command });
     if (output) output.textContent = `退出码 ${result.returnCode} · ${result.elapsedMs} ms\n${result.output}`;
+    focusResult("#learning-output");
     showToast(result.success ? "只读检查完成" : "检查命令返回异常", !result.success);
   } catch (error) {
-    showToast(error instanceof Error ? error.message : String(error), true);
+    const message = error instanceof Error ? error.message : String(error);
+    if (output) output.textContent = `只读检查失败：${message}`;
+    focusResult("#learning-output");
+    showToast(message, true);
   }
 });
 document.querySelector("#inspect-toolchains")?.addEventListener("click", () => void inspectToolchains());
@@ -4190,9 +4251,10 @@ document.querySelector("#configure-env")?.addEventListener("click", async () => 
   try {
     state.environmentPreview = await invoke<EnvironmentConfigPreview>("preview_user_environment_configuration");
     renderEnvironmentPreview();
+    focusResult("#env-config-preview");
     showToast("环境配置预览已生成；确认差异后再写入");
   } catch (error) {
-    showToast(error instanceof Error ? error.message : String(error), true);
+    renderOperationError("#env-config-preview", "环境配置预览失败", error);
   }
 });
 document.querySelector("#inspect-env-reliability")?.addEventListener("click", async () => {
@@ -4200,15 +4262,17 @@ document.querySelector("#inspect-env-reliability")?.addEventListener("click", as
   try {
     state.envReliability = await invoke<EnvReliabilitySnapshot>("inspect_env_reliability");
     renderEnvReliability();
+    focusResult("#env-reliability-result");
     showToast(`环境可靠性检查完成：${state.envReliability.issues.length} 个问题/提示`);
   } catch (error) {
-    showToast(error instanceof Error ? error.message : String(error), true);
+    renderOperationError("#env-reliability-result", "环境可靠性检查失败", error);
   }
 });
 document.querySelector("#create-java-stabilize-plan")?.addEventListener("click", async () => {
   const input = document.querySelector<HTMLInputElement>("#java-stabilize-path");
   const jdkPath = input?.value.trim() || state.envReliability?.java.javaHomeExpanded || "";
   if (!jdkPath) {
+    renderOperationError("#env-repair-plan-result", "无法创建 Java 修复计划", "请先选择 JDK 根目录，不能选择 bin 目录。");
     showToast("请填写 JDK 根目录，不能填写 bin 目录", true);
     return;
   }
@@ -4220,7 +4284,7 @@ document.querySelector("#create-java-stabilize-plan")?.addEventListener("click",
     focusResult("#env-repair-plan-result");
     showToast("计划已生成；请检查 diff、备份名和风险说明");
   } catch (error) {
-    showToast(error instanceof Error ? error.message : String(error), true);
+    renderOperationError("#env-repair-plan-result", "Java 修复计划创建失败", error);
   }
 });
 document.querySelector("#apply-env-repair-plan")?.addEventListener("click", async () => {
@@ -4238,15 +4302,22 @@ document.querySelector("#apply-env-repair-plan")?.addEventListener("click", asyn
     renderEnvBackupRecords();
     showToast(state.envRepairResult.message, !state.envRepairResult.success);
   } catch (error) {
-    showToast(error instanceof Error ? error.message : String(error), true);
+    renderOperationError("#env-repair-plan-result", "环境修复执行失败", error);
   }
 });
 document.querySelector("#export-env-reliability")?.addEventListener("click", async () => {
+  setMigrationResult("#environment-operation-result", "正在导出环境可靠性报告...");
   try {
     const path = await invoke<string>("export_env_reliability_report", { format: "markdown" });
-    showToast(`环境可靠性报告已导出：${path}`);
+    const message = `环境可靠性报告已导出：${path}`;
+    setMigrationResult("#environment-operation-result", message);
+    focusResult("#environment-operation-result");
+    showToast(message);
   } catch (error) {
-    showToast(error instanceof Error ? error.message : String(error), true);
+    const message = error instanceof Error ? error.message : String(error);
+    setMigrationResult("#environment-operation-result", `环境可靠性报告导出失败：${message}`, true);
+    focusResult("#environment-operation-result");
+    showToast(message, true);
   }
 });
 async function loadEnvironmentBackups() {
@@ -4279,11 +4350,11 @@ document.querySelector("#check-env-health")?.addEventListener("click", async () 
 });
 document.querySelector("#cleanup-path")?.addEventListener("click", async () => {
   if (!(await askForConfirmation("将删除当前用户 PATH 中真实失效或重复的条目，并先创建环境备份；受管待安装路径会保留。确定继续吗？"))) return;
-  void runOperation(() => invoke<OperationResult>("cleanup_path_entries"), "正在清理真实失效和重复 PATH");
+  void runOperation(() => invoke<OperationResult>("cleanup_path_entries"), "正在清理真实失效和重复 PATH", "#environment-operation-result");
 });
 document.querySelector("#restore-env")?.addEventListener("click", async () => {
   if (!(await askForConfirmation("将恢复最近一次环境备份；已打开的终端和 IDE 不会自动刷新。确定继续吗？"))) return;
-  void runOperation(() => invoke<OperationResult>("restore_user_environment"), "正在恢复用户环境变量");
+  void runOperation(() => invoke<OperationResult>("restore_user_environment"), "正在恢复用户环境变量", "#environment-operation-result");
 });
 document.querySelector("#save-profile")?.addEventListener("click", () => {
   const input = document.querySelector<HTMLInputElement>("#profile-name");
@@ -4403,13 +4474,13 @@ document.querySelector("#load-cache")?.addEventListener("click", async () => {
 });
 document.querySelector("#clear-cache")?.addEventListener("click", async () => {
   if (!(await askForConfirmation("下载缓存将逐项移入 Windows 回收站，不会删除受管运行时或配置。确定继续吗？"))) return;
-  void runOperation(() => invoke<OperationResult>("clear_download_cache"), "正在将下载缓存移入回收站");
+  void runOperation(() => invoke<OperationResult>("clear_download_cache"), "正在将下载缓存移入回收站", "#toolbox-operation-result");
 });
 document.querySelector("#inspect-maintenance")?.addEventListener("click", () => void inspectMaintenance());
 document.querySelector("#scan-maintenance")?.addEventListener("click", () => void scanMaintenance());
 document.querySelector("#inspect-recycle-bin")?.addEventListener("click", () => void loadRecycleBin());
 document.querySelector("#open-recycle-bin")?.addEventListener("click", () => {
-  void runOperation(() => invoke<OperationResult>("open_recycle_bin"), "正在打开 Windows 回收站");
+  void runOperation(() => invoke<OperationResult>("open_recycle_bin"), "正在打开 Windows 回收站", "#maintenance-operation-result");
 });
 document.addEventListener("click", async (event) => {
   const create = (event.target as HTMLElement).closest<HTMLButtonElement>("#create-recycle-bin-plan");
@@ -4796,6 +4867,7 @@ document.querySelector("#auto-check-updates")?.addEventListener("change", (event
   void runOperation(
     () => invoke<ConfigView>("set_auto_check_update", { enabled }),
     enabled ? "正在启用启动更新检查" : "正在关闭启动更新检查",
+    "#settings-operation-result",
   );
 });
 document.querySelector("#inspect-system-platforms")?.addEventListener("click", async () => {
@@ -4831,12 +4903,12 @@ document.querySelector("#inspect-mysql-repair")?.addEventListener("click", async
   }
 });
 document.querySelector("#open-docker-desktop")?.addEventListener("click", () => {
-  void runOperation(() => invoke<OperationResult>("open_docker_desktop"), "正在启动 Docker Desktop");
+  void runOperation(() => invoke<OperationResult>("open_docker_desktop"), "正在启动 Docker Desktop", "#toolbox-operation-result");
 });
 document.querySelector("#self-uninstall")?.addEventListener("click", async () => {
   const ok = await askForConfirmation("这会启动 DevEnv Manager 的卸载程序并关闭当前程序。确定继续吗？");
   if (!ok) return;
-  void runOperation(() => invoke<OperationResult>("self_uninstall"), "正在启动卸载程序");
+  void runOperation(() => invoke<OperationResult>("self_uninstall"), "正在启动卸载程序", "#toolbox-operation-result");
 });
 document.querySelector("#run-command")?.addEventListener("click", async () => {
   const command = document.querySelector<HTMLInputElement>("#command-input")?.value || "";
@@ -5120,7 +5192,7 @@ document.addEventListener("click", async (event) => {
     const plan = state.pythonRepairPlan;
     if (!plan) return;
     if (!(await askForConfirmation(`将执行 ${plan.actions.length} 项 Python 修复，并先保存用户环境备份。pip 升级可能联网，确定继续吗？`))) return;
-    void runOperation(() => invoke<OperationResult>("apply_python_repair", { planId: plan.planId }), "正在执行并验证 Python 修复").then(async () => {
+    void runOperation(() => invoke<OperationResult>("apply_python_repair", { planId: plan.planId }), "正在执行并验证 Python 修复", "#runtime-migration-result").then(async () => {
       state.pythonRepairPlan = null;
       state.python = await invoke<PythonAnalysis>("analyze_python_environment");
       renderPythonAnalysis();
@@ -5201,7 +5273,7 @@ document.addEventListener("click", async (event) => {
   const devCache = button.dataset.devCache;
   if (devCache) {
     if (!(await askForConfirmation(`将调用 ${button.title || button.textContent || devCache}。该命令会清除可重新生成的开发缓存，确定继续吗？`))) return;
-    void runOperation(() => invoke<OperationResult>("clean_dev_cache", { tool: devCache }), `正在使用 ${devCache} 官方命令清理缓存`).then(() => void scanMaintenance());
+    void runOperation(() => invoke<OperationResult>("clean_dev_cache", { tool: devCache }), `正在使用 ${devCache} 官方命令清理缓存`, "#maintenance-operation-result").then(() => void scanMaintenance());
     return;
   }
   const chsrcAction = button.dataset.chsrcAction;
@@ -5218,9 +5290,16 @@ document.addEventListener("click", async (event) => {
         const result = await invoke<OperationResult>("run_chsrc_action", { action: chsrcAction, target, source });
         const output = document.querySelector<HTMLElement>("#chsrc-output");
         if (output) output.textContent = result.message;
-        showToast("chsrc 操作完成");
+        setMigrationResult("#toolchain-operation-result", result.message, !result.success);
+        focusResult("#toolchain-operation-result");
+        showToast(result.message || "chsrc 操作完成", !result.success);
       } catch (error) {
-        showToast(error instanceof Error ? error.message : String(error), true);
+        const message = error instanceof Error ? error.message : String(error);
+        const output = document.querySelector<HTMLElement>("#chsrc-output");
+        if (output) output.textContent = message;
+        setMigrationResult("#toolchain-operation-result", `chsrc 操作失败：${message}`, true);
+        focusResult("#toolchain-operation-result");
+        showToast(message, true);
       }
     })();
     return;
@@ -5230,9 +5309,20 @@ document.addEventListener("click", async (event) => {
     return;
   }
   if (button.dataset.cleanupReportAction === "json") {
+    setMigrationResult("#maintenance-operation-result", "正在导出清理 JSON 报告...");
     void invoke<string>("export_cleanup_report", { format: "json" })
-      .then((path) => showToast(`JSON 报告已导出：${path}`))
-      .catch((error) => showToast(error instanceof Error ? error.message : String(error), true));
+      .then((path) => {
+        const message = `清理 JSON 报告已导出：${path}`;
+        setMigrationResult("#maintenance-operation-result", message);
+        focusResult("#maintenance-operation-result");
+        showToast(message);
+      })
+      .catch((error) => {
+        const message = error instanceof Error ? error.message : String(error);
+        setMigrationResult("#maintenance-operation-result", `清理报告导出失败：${message}`, true);
+        focusResult("#maintenance-operation-result");
+        showToast(message, true);
+      });
     return;
   }
   if (button.id === "create-managed-python-pip-plan") {
@@ -5284,6 +5374,7 @@ document.addEventListener("click", async (event) => {
     void runOperation(
       () => invoke<OperationResult>("rollback_move", { rollbackId }),
       "正在执行空间搬家回滚",
+      "#maintenance-operation-result",
     ).then(() => void loadRollbackRecords());
     return;
   }
@@ -5327,6 +5418,7 @@ document.addEventListener("click", async (event) => {
         return invoke<OperationResult>("apply_project_configuration", { request });
       },
       "正在备份并应用项目配置",
+      "#project-output",
     ).then((result) => {
       const output = document.querySelector<HTMLElement>("#project-output");
       if (output && result && "message" in result) output.textContent = result.message;
@@ -5341,6 +5433,7 @@ document.addEventListener("click", async (event) => {
     void runOperation(
       () => invoke<OperationResult>("apply_user_environment_configuration", { previewId: preview.previewId }),
       "正在备份、写入并回读验证用户环境变量",
+      "#environment-operation-result",
     ).then(async () => {
       state.environmentPreview = null;
       renderEnvironmentPreview();
@@ -5355,6 +5448,7 @@ document.addEventListener("click", async (event) => {
     void runOperation(
       () => invoke<OperationResult>("restore_environment_backup", { fileName: restoreBackup }),
       "正在恢复指定环境备份",
+      "#environment-operation-result",
     ).then(async () => {
       await loadEnvironmentBackups();
       await refreshAll(false);
@@ -5428,9 +5522,19 @@ document.addEventListener("click", async (event) => {
     return;
   }
   if (action === "export-python-diagnostic") {
+    setMigrationResult("#runtime-migration-result", "正在导出 Python 只读诊断...");
     void invoke<OperationResult>("export_python_diagnostic_report")
-      .then((result) => showToast(result.message))
-      .catch((error) => showToast(error instanceof Error ? error.message : String(error), true));
+      .then((result) => {
+        setMigrationResult("#runtime-migration-result", result.message, !result.success);
+        focusResult("#runtime-migration-result");
+        showToast(result.message, !result.success);
+      })
+      .catch((error) => {
+        const message = error instanceof Error ? error.message : String(error);
+        setMigrationResult("#runtime-migration-result", `Python 诊断导出失败：${message}`, true);
+        focusResult("#runtime-migration-result");
+        showToast(message, true);
+      });
     return;
   }
   if (action === "open-app-config-dir") {
@@ -5532,6 +5636,7 @@ document.addEventListener("click", async (event) => {
     void runOperation(
       () => invoke<OperationResult>("manage_system_platform", { action: platformAction, value: value || null }),
       `正在${labels[platformAction] || "执行平台操作"}`,
+      "#toolbox-operation-result",
     ).then(async () => {
       state.systemPlatforms = await invoke<SystemPlatformReport>("inspect_system_platforms");
       renderSystemPlatforms();
@@ -5541,14 +5646,20 @@ document.addEventListener("click", async (event) => {
     void (async () => {
       if (!(await askForConfirmation("将从 GitHub Releases 下载新版安装包，并使用发布清单中的 SHA256 校验。确定继续吗？"))) return;
       showToast("正在下载并校验更新安装包");
+      setMigrationResult("#settings-operation-result", "正在下载并校验更新安装包...");
       try {
         const result = await invoke<OperationResult>("download_update");
         state.updateDownloaded = true;
         renderUpdate();
+        setMigrationResult("#settings-operation-result", result.message, !result.success);
+        focusResult("#settings-operation-result");
         showToast(result.message);
       } catch (error) {
         state.updateDownloaded = false;
-        showToast(error instanceof Error ? error.message : String(error), true);
+        const message = error instanceof Error ? error.message : String(error);
+        setMigrationResult("#settings-operation-result", `更新包下载失败：${message}`, true);
+        focusResult("#settings-operation-result");
+        showToast(message, true);
       }
     })();
   }
@@ -5556,10 +5667,15 @@ document.addEventListener("click", async (event) => {
     if (!(await askForConfirmation("将启动已校验的安装器并退出当前程序。请保存正在进行的工作，确定继续吗？"))) return;
     void (async () => {
       showToast("正在重新校验并启动更新安装器");
+      setMigrationResult("#settings-operation-result", "正在重新校验并启动更新安装器...");
       try {
-        await invoke<OperationResult>("launch_update_installer");
+        const result = await invoke<OperationResult>("launch_update_installer");
+        setMigrationResult("#settings-operation-result", result.message, !result.success);
       } catch (error) {
-        showToast(error instanceof Error ? error.message : String(error), true);
+        const message = error instanceof Error ? error.message : String(error);
+        setMigrationResult("#settings-operation-result", `启动更新安装器失败：${message}`, true);
+        focusResult("#settings-operation-result");
+        showToast(message, true);
       }
     })();
   }
@@ -5577,6 +5693,7 @@ document.addEventListener("click", async (event) => {
     void runOperation(
       () => invoke<OperationResult>("update_project_port", { path, configId, newPort }),
       "正在备份并修改项目端口",
+      "#project-output",
     ).then(() => void inspectProjectPorts(false));
   }
   if (action === "port-details") {
@@ -5587,7 +5704,7 @@ document.addEventListener("click", async (event) => {
   }
   if (action === "open-process-location") {
     const pid = Number(button.dataset.pid || 0);
-    void runOperation(() => invoke<OperationResult>("open_process_location", { pid }), "正在打开进程位置");
+    void runOperation(() => invoke<OperationResult>("open_process_location", { pid }), "正在打开进程位置", "#port-operation-result");
   }
   if (action === "local-service-manage") {
     const serviceName = button.dataset.service || "";
@@ -5597,6 +5714,7 @@ document.addEventListener("click", async (event) => {
     void runOperation(
       () => invoke<OperationResult>("manage_local_service", { serviceName, action: serviceAction }),
       `正在${actionLabel}服务 ${serviceName}`,
+      "#toolbox-operation-result",
     ).then(async () => {
       state.localServices = await invoke<LocalServiceStatus[]>("inspect_local_services");
       renderLocalServices();
@@ -5619,6 +5737,7 @@ document.addEventListener("click", async (event) => {
     void runOperation(
       () => invoke<OperationResult>("open_local_service_directory", { serviceName }),
       `正在打开 ${serviceName} 程序目录`,
+      "#toolbox-operation-result",
     );
   }
   if (action === "stop-local-service") {
@@ -5629,6 +5748,7 @@ document.addEventListener("click", async (event) => {
     void runOperation(
       () => invoke<OperationResult>("stop_local_service", { port, serviceName }),
       `正在停止服务 ${serviceName}`,
+      "#toolbox-operation-result",
     ).then(async () => {
       state.localServices = await invoke<LocalServiceStatus[]>("inspect_local_services");
       renderLocalServices();
@@ -5663,9 +5783,15 @@ document.addEventListener("click", async (event) => {
         if (output) {
           output.textContent = `退出码 ${result.returnCode} · ${result.elapsedMs} ms\n${result.output}`;
         }
+        focusResult("#project-output");
         showToast(result.success ? "项目操作完成" : "项目操作失败", !result.success);
       })
-      .catch((error) => showToast(error instanceof Error ? error.message : String(error), true));
+      .catch((error) => {
+        const message = error instanceof Error ? error.message : String(error);
+        if (output) output.textContent = `项目操作失败：${message}`;
+        focusResult("#project-output");
+        showToast(message, true);
+      });
   }
   if (action === "switch-jdk") {
     const version = button.dataset.version || "";
@@ -5685,6 +5811,7 @@ document.addEventListener("click", async (event) => {
     void runOperation(
       () => invoke<OperationResult>("uninstall_runtime", { kind: "jdk", version, path }),
       `正在卸载 JDK ${version}`,
+      "#runtime-migration-result",
     );
   }
   if (action === "switch-node") {
@@ -5702,6 +5829,7 @@ document.addEventListener("click", async (event) => {
     void runOperation(
       () => invoke<OperationResult>("uninstall_runtime", { kind: "node", version, path }),
       `正在卸载 Node.js ${version}`,
+      "#runtime-migration-result",
     );
   }
   if (action === "switch-go") {
@@ -5719,6 +5847,7 @@ document.addEventListener("click", async (event) => {
     void runOperation(
       () => invoke<OperationResult>("uninstall_runtime", { kind: "go", version, path }),
       `正在卸载 Go ${version}`,
+      "#platform-operation-result",
     );
   }
   if (action === "switch-python") {
@@ -5736,6 +5865,7 @@ document.addEventListener("click", async (event) => {
     void runOperation(
       () => invoke<OperationResult>("uninstall_runtime", { kind: "python", version, path }),
       `正在卸载 Python ${version}`,
+      "#runtime-migration-result",
     );
   }
   if (action === "switch-build-tool") {
@@ -5755,6 +5885,7 @@ document.addEventListener("click", async (event) => {
     void runOperation(
       () => invoke<OperationResult>("uninstall_runtime", { kind, version, path }),
       `正在卸载 ${kind} ${version}`,
+      "#runtime-migration-result",
     );
   }
   if (action === "apply-profile") {

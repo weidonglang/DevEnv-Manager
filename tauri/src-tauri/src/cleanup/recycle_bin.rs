@@ -137,7 +137,7 @@ pub fn execute_recycle_bin_cleanup_plan(
         risk_level: "critical".to_string(),
         requires_admin: false,
         allow_network: false,
-        confirmation_token: Some(format!("validated-plan:{}", plan.plan_id)),
+        allow_side_effects: true,
     })?;
     if !output.success {
         return Err(format!(
