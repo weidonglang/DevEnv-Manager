@@ -1,28 +1,28 @@
 {
   "schemaVersion": 2,
   "channel": "stable",
-  "version": "1.7.0",
-  "date": "2026-07-03",
+  "version": "2.0.0",
+  "date": "2026-08-13",
   "notes": [
-    "v1.7.0：新增文件打开方式管理器，支持 GitHub + Gitee 双平台发布、多源检查更新和国内下载 fallback。"
+    "v2.0.0：回到 v1.7 稳定界面基座，完整恢复运行时、环境、端口、清理、项目、文件关联和配置档案，并加入自动验收。"
   ],
   "assets": [
     {
       "platform": "windows-x64",
-      "fileName": "DevEnv.Manager_1.7.0_x64-setup.exe",
-      "size": 2614596,
-      "sha256": "6b88d7ca812770ca032ff331c4f0916b1ec7282eb9cdf6cea0c32dc79d3ab711",
-      "primaryUrl": "https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.7.0/DevEnv.Manager_1.7.0_x64-setup.exe",
+      "fileName": "DevEnv.Manager_2.0.0_x64-setup.exe",
+      "size": 2764375,
+      "sha256": "445235d00d81d2c461e8a98802fe7e5d49f56c2158a9c8d5ad2b37c8ea06c950",
+      "primaryUrl": "https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v2.0.0/DevEnv.Manager_2.0.0_x64-setup.exe",
       "mirrors": [
         {
           "name": "Gitee Release",
           "region": "cn",
-          "url": "https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v1.7.0/DevEnv.Manager_1.7.0_x64-setup.exe"
+          "url": "https://gitee.com/weidonglang/DevEnv-Manager/releases/download/v2.0.0/DevEnv.Manager_2.0.0_x64-setup.exe"
         },
         {
           "name": "GitHub Release",
           "region": "global",
-          "url": "https://github.com/weidonglang/DevEnv-Manager/releases/download/v1.7.0/DevEnv.Manager_1.7.0_x64-setup.exe"
+          "url": "https://github.com/weidonglang/DevEnv-Manager/releases/download/v2.0.0/DevEnv.Manager_2.0.0_x64-setup.exe"
         }
       ]
     }

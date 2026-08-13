@@ -66,4 +66,13 @@ v2.0.0 是一次基于 v1.7.0 稳定界面的完整能力重建。它保留原�
 
 ## 发布资产
 
-最终 NSIS、MSI、EXE 的文件大小与 SHA256 由发布构建生成，并记录在同版本 Release 的 `SHA256SUMS.txt` 中。GitHub 与 Gitee 上传完全相同的验收资产。
+GitHub 与 Gitee 上传完全相同的验收资产：
+
+| 文件 | 大小 | SHA256 |
+|---|---:|---|
+| `DevEnv.Manager_2.0.0_x64-setup.exe` | 2,764,375 bytes | `445235d00d81d2c461e8a98802fe7e5d49f56c2158a9c8d5ad2b37c8ea06c950` |
+| `DevEnv.Manager_2.0.0_x64_en-US.msi` | 4,681,728 bytes | `8f1854a76fce389cdc799456247b5aaae6ed157e33816458288950c5702bb629` |
+
+`SHA256SUMS.txt` 随 Release 一并提供。NSIS、GUI EXE 与 CLI EXE 均为 PE32+ x64，版本均为 2.0.0。二进制不依赖 `VCRUNTIME140.dll`；仅依赖 Windows 系统 API/UCRT API Set。
+
+本机 Windows Installer 服务不可访问，因此 WiX ICE01-ICE09 环境验证无法启动；MSI 使用相同 candle/link 输入并通过 `light.exe -sval` 生成。该限制只影响本机 ICE 验证，不影响 NSIS 或产品编译，但 MSI 安装生命周期仍列为发布后跟进验证项。
