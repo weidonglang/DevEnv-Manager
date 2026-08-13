@@ -2,9 +2,9 @@
 
 [GitHub 主仓库](https://github.com/weidonglang/DevEnv-Manager) · [Gitee 国内镜像](https://gitee.com/weidonglang/DevEnv-Manager) · [GitHub Release](https://github.com/weidonglang/DevEnv-Manager/releases) · [Gitee Release](https://gitee.com/weidonglang/DevEnv-Manager/releases) · [完整操作手册](docs/user-guide.md) · [安全说明](docs/safety-and-disclaimer.md) · [问题反馈](https://github.com/weidonglang/DevEnv-Manager/issues)
 
-面向 Windows 的开发环境诊断器与安全操作面板。当前版本：**1.7.0 Stable**。
+面向 Windows 的开发环境诊断器与安全操作面板。当前版本：**2.0.0 Stable**。
 
-1.7.0 新增文件打开方式管理器，并把更新链路升级为 GitHub + Gitee 双平台发布、多源 manifest fallback、镜像下载 fallback 和 SHA256 强校验。
+2.0.0 以稳定的 v1.7.0 界面为基座重新实现后续能力，保留熟悉的页面结构和操作方式，同时补齐运行时、环境、端口、清理、项目、文件关联、配置档案与自动验收。写入操作不再暴露额外令牌步骤，仍由后端执行目标校验、备份、回读验证和边界保护。
 
 ## 下载与镜像
 
@@ -12,7 +12,7 @@
 - Gitee 国内镜像：https://gitee.com/weidonglang/DevEnv-Manager
 - GitHub Release：https://github.com/weidonglang/DevEnv-Manager/releases
 - Gitee Release：https://gitee.com/weidonglang/DevEnv-Manager/releases
-- SHA256：`6b88d7ca812770ca032ff331c4f0916b1ec7282eb9cdf6cea0c32dc79d3ab711`
+- SHA256：以 [v2.0.0 Release](https://github.com/weidonglang/DevEnv-Manager/releases/tag/v2.0.0) 附带的 `SHA256SUMS.txt` 为准。
 
 适合：
 
@@ -23,6 +23,25 @@
 - 想把 JDK、Python、Node.js、Maven、Gradle 安装到固定目录并快速切换的人
 
 一句话：Windows 开发环境乱了？先看清实际生效的版本、PATH、JAVA_HOME 和工具来源，再决定是否执行受管修复。
+
+## 2.0.0 Stable
+
+2.0.0 是一次以可靠性为目标的基座重建，不是继续叠加旧前端重构。主要变化：
+
+- 保留 v1.7.0 的导航、页面结构、控件和样式，新增能力通过独立迁移适配层接入，并由自动基线哈希阻止原始前端被意外改写。
+- 运行时统一发现 JDK、Python、Node.js、Go、Maven、Gradle、Rust/rustup 和 .NET SDK，明确区分 DevEnv 受管版本与外部只读安装。
+- 受管运行时支持安装后强验证、切换回执、失败自动恢复；外部运行时只提供验证、打开位置、复制路径和系统卸载入口。
+- 环境可靠性同时核对进程与用户级 `JAVA_HOME`、PATH、java/javac、Python/pip、Maven/Gradle 生效链路，修复前创建备份并在写入后回读。
+- 端口扫描采用有界超时与本机只读回退，区分监听和连接记录；安全的用户开发进程保留一步释放，系统关键、服务所属和数据库进程受到保护。
+- 清理中心补齐磁盘概览、重复大文件、桌面/下载归档、回收站预览与复扫、软件占用和 C 盘只读分区判断；归档目标可自动推荐或通过目录选择器指定。
+- 项目分析真实展示根目录、项目类型、检测文件、包管理器和推荐运行时；项目配置、端口、IDEA 与 Java 消费端检查均有页面内持久结果。
+- 文件关联支持按扩展名搜索、应用发现、计划预览、精确注册表备份和回滚边界；受 Windows 保护的 UserChoice 交给系统设置处理。
+- 配置档案支持导入选择器、复制、重命名、历史恢复、应用前后验证和失败回滚。
+- 所有关键操作增加持久成功/失败区域，空白 toast 被抑制，路径输入统一使用系统选择器，深色与高对比模式采用可读颜色回退。
+- PowerShell 操作统一经过有界 runner，覆盖输出编码、超时、进程树清理和环境变更广播，避免扫描或写入流程长期卡住。
+- 内置开发者验收中心和 CI 契约检查覆盖 31 项功能、126 个稳定 selector、前后端命令漂移、字段契约、按钮接线和 UI 质量回归。
+
+我们也需要为 1.8.x 到 1.9.x 期间出现过的大面积“不可用”、操作无反馈、布局可读性和功能接线回归向用户道歉。2.0.0 选择回到经过验证的 v1.7.0 界面基座重新迁移能力，并用可重复运行的验收门禁防止同类问题再次出现。
 
 ## 项目定位
 

@@ -1,7 +1,7 @@
 {
   "$schema": "./acceptance-schema.json",
   "schemaVersion": 1,
-  "productVersion": "2.0.0-development",
+  "productVersion": "2.0.0",
   "pages": [
     {
       "pageId": "overview",
